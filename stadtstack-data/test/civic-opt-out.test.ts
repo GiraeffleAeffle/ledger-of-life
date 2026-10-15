@@ -669,6 +669,56 @@ for(const variant of ['content','nested','symlink','public','active'] as const)t
  assert.equal(await readFile(join(outside,'token.json'),'utf8'),'Synthetic unrelated credential content');
 });
 
+for(const layout of ['legacy','sealed'])test('canonical recovery seals and purges only a stopped private Codex output after permissive umask: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'model-scratch'),policy=fixturePolicy(stateDir),bytes='Retained synthetic source',entry={...rawEntry(bytes),relativePath:'sha256/'+hash(bytes).slice(0,2)+'/'+hash(bytes)};
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await publish(root,entry,bytes,stateDir);
+ const binding={kind:'prepared_source' as const,url:entry.url,sourceSha256:hash(bytes),observationId:'synthetic-model',receiptSha256:entry.receiptSha256};
+ let output='',scratch='';const open=fsPromises.open;
+ const mock=t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(output&&String(args[0])===output)throw Error('Synthetic interruption before output sealing');
+  return open(...args);
+ });syncBuiltinESMExports();
+ try{
+  await assert.rejects(withManagedSourceScratch(root,[binding],async scope=>{
+   scratch=scope.directory;output=join(scratch,'answer.json');
+   await writeFile(output,'{"synthetic":true}',{mode:0o600});await chmod(output,0o664);
+  },{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'openai',...policy}),CivicPolicyStateError);
+ }finally{mock.mock.restore();syncBuiltinESMExports();}
+ assert.equal((await lstat(output)).mode&0o777,0o664);
+ let inventory=await readCivicPolicyInventory(policy);const lease=inventory.scratch[0];assert.equal(lease.state,'partial');
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ const recovered=await recoverManagedSourceScratch(policy);
+ assert.equal(recovered.status,'complete');assert.deepEqual(recovered.recoveredLeases,[lease.id]);assert.equal(recovered.deletedFiles,1);assert.equal(recovered.deletedBytes,Buffer.byteLength('{"synthetic":true}'));
+ await assert.rejects(lstat(scratch),{code:'ENOENT'});
+ inventory=await readCivicPolicyInventory(policy);assert.equal(inventory.scratch[0].state,'purged');assert.equal(inventory.roots[0].complete,true);
+ assert.equal(inventory.scratch[0].tombstones[0].contentSha256,hash('{"synthetic":true}'));
+ await assertManagedSourceReadable(join(root,entry.relativePath),policy);
+});
+
+for(const variant of ['other-file','other-purpose','hardlink','symlink','nested','credential','public','executable','oversized'] as const)test('private model output retirement rejects '+variant,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'model-scratch'),policy=fixturePolicy(stateDir),bytes='Synthetic source',entry={...rawEntry(bytes),relativePath:'sha256/'+hash(bytes).slice(0,2)+'/'+hash(bytes)};
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});await publish(root,entry,bytes,stateDir);
+ const binding={kind:'prepared_source' as const,url:entry.url,sourceSha256:hash(bytes),observationId:'synthetic-model',receiptSha256:entry.receiptSha256};
+ const outside=join(base,'outside.json');await writeFile(outside,'unrelated protected bytes',{mode:0o600});
+ let output='';
+ await assert.rejects(withManagedSourceScratch(root,[binding],async scope=>{
+  output=join(scope.directory,variant==='other-file'?'unknown.json':'answer.json');
+  if(variant==='nested'||variant==='credential'){
+   const folder=join(scope.directory,variant==='nested'?'nested':'credential-cwd');await mkdir(folder,{mode:0o700});output=join(folder,'answer.json');
+  }
+  if(variant==='symlink')await symlink(outside,output);
+  else{
+   if(variant==='hardlink')await link(outside,output);
+   else await writeFile(output,variant==='oversized'?'x'.repeat(48*1024+1):'synthetic model output',{mode:0o600});
+   await chmod(output,variant==='executable'?0o775:0o664);
+  }
+  if(variant==='public')await chmod(scope.directory,0o755);
+ },{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:variant==='other-purpose'?'artifact':'openai',...policy}),CivicPolicyStateError);
+ const recovery=await recoverManagedSourceScratch(policy);assert.equal(recovery.status,'partial');assert.ok(recovery.issues.some(issue=>issue.code==='unsafe_scratch'));
+ assert.equal((await lstat(output)).isSymbolicLink(),variant==='symlink');
+ assert.equal(await readFile(outside,'utf8'),'unrelated protected bytes');
+});
+
 test('an active scratch producer is stopped by objection and no purge claims completion while it can write',async t=>{
  const {base,stateDir}=await sandbox(t),root=join(base,'active-scratch'),policy=fixturePolicy(stateDir),bytes=Buffer.from('active source');
  let receiptStatus='',directory='';

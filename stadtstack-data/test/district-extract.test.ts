@@ -517,8 +517,8 @@ test('Codex nonfatal error items retain evidence but cannot manufacture completi
   assert.equal(evidence.toolAttempted, false);
   assert.equal(evidence.completed, false);
   assert.equal(evidence.failureCategory, null);
-  assert.match(evidence.runtimeWarnings[0], /structured_schema_rejected/);
-  assert.equal(inspectCodexEvents(JSON.stringify({ type: 'turn.failed', error: { message: 'Invalid schema for response_format' } })).failureCategory, 'structured_schema_rejected');
+  assert.match(evidence.runtimeWarnings[0], /request_schema_rejected/);
+  assert.equal(inspectCodexEvents(JSON.stringify({ type: 'turn.failed', error: { message: 'Invalid schema for response_format' } })).failureCategory, 'request_schema_rejected');
   assert.deepEqual(evidence.attemptedToolTypes, []);
 });
 

@@ -999,17 +999,22 @@ function scratchRelative(path:string):string{
  if(scratchParts(path).some(sensitiveScratchPart))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
  return path;
 }
-async function inspectScratchTree(root:Root,lease:ScratchLease):Promise<{files:Array<{path:string;stat:Stats}>;directories:Array<{path:string;stat:Stats}>}|null>{
+async function inspectScratchTree(root:Root,lease:ScratchLease,retireModelOutput=false):Promise<{files:Array<{path:string;stat:Stats;sealPrivate?:boolean}>;directories:Array<{path:string;stat:Stats}>}|null>{
  await verifyRoot(root);const path=join(root.path,lease.directory);let stat:Stats;
  try{stat=await directory(path,false,true);}catch(error){if(missing(error))return null;throw error;}
  if(lease.identity&&!sameIdentity(lease.identity,stat))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');
- const files:Array<{path:string;stat:Stats}>=[],directories:Array<{path:string;stat:Stats}>=[];let count=0;
+ const files:Array<{path:string;stat:Stats;sealPrivate?:boolean}>=[],directories:Array<{path:string;stat:Stats}>=[];let count=0;
  const visit=async(folder:string,metadata:Stats):Promise<void>=>{
   for await(const child of await opendir(folder)){
    if(++count>MAX_SCRATCH_FILES||lease.identity===null)throw new CivicPolicyStateError('SCRATCH_INVENTORY_INCOMPLETE');
    const candidate=join(folder,child.name),parts=scratchParts(relative(path,candidate).split(sep).join('/'));
    const item=await lstat(candidate);
-   if(item.isSymbolicLink()||item.uid!==process.getuid?.()||(item.mode&0o022)!==0)throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
+   // Cleanup only, after process/resource quiescence: an old CLI may have
+   // inherited a permissive umask. Its sole declared output may be sealed
+   // before hashing/deletion, never admitted as an assessor response.
+   const sealPrivate=retireModelOutput&&lease.purpose==='openai'&&candidate===join(path,'answer.json')&&
+    (item.mode&0o077)!==0&&item.isFile()&&item.nlink===1&&item.size<=48*1024&&(item.mode&0o7111)===0;
+   if(item.isSymbolicLink()||item.uid!==process.getuid?.()||((item.mode&0o022)!==0&&!sealPrivate))throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
    if(parts.some(sensitiveScratchPart)){
     // No credential content is adopted, opened or deleted. Only an empty,
     // private, owned directory can be retired by its authenticated lease.
@@ -1018,7 +1023,7 @@ async function inspectScratchTree(root:Root,lease:ScratchLease):Promise<{files:A
     directories.push({path:candidate,stat:item});continue;
    }
    if(item.isDirectory()){await directory(candidate);await visit(candidate,item);}
-   else if(item.isFile()&&item.nlink===1&&item.size<=MAX_CONTENT)files.push({path:candidate,stat:item});
+   else if(item.isFile()&&item.nlink===1&&item.size<=MAX_CONTENT)files.push({path:candidate,stat:item,sealPrivate});
    else throw new CivicPolicyStateError('SCRATCH_PATH_UNSAFE');
   }
   directories.push({path:folder,stat:metadata});
@@ -1043,9 +1048,18 @@ async function cleanScratch(inventory:Inventory,lease:ScratchLease,policy:CivicP
  if(!resourcesRemoved){lease.state='partial';return false;}
  for(const group of lease.groups){if(!group.settled&&processExists(group.pid,true)){issue('scratch_processes_active');return false;}group.settled=true;}
  try{
-  const tree=await inspectScratchTree(root,lease);
+  const tree=await inspectScratchTree(root,lease,true);
   if(tree){
    for(const file of tree.files){
+    if(file.sealPrivate){
+     const handle=await open(file.path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
+     try{
+      await directory(join(root.path,lease.directory),false,true);
+      const metadata=await handle.stat();
+      if(!sameIdentity(file.stat,metadata)||!metadata.isFile()||metadata.uid!==process.getuid?.()||metadata.nlink!==1||metadata.size!==file.stat.size||metadata.mode!==file.stat.mode)throw new CivicPolicyStateError('SCRATCH_CONTENT_CHANGED');
+      await handle.chmod(0o600);await handle.sync();
+     }finally{await handle.close();}
+    }
     const actual=await fileDigest(file.path),current=await lstat(file.path);
     if(!sameIdentity(actual.stat,current)||!sameIdentity(file.stat,current)||current.isSymbolicLink()||current.nlink!==1||current.size!==actual.stat.size||current.mtimeMs!==actual.stat.mtimeMs||current.ctimeMs!==actual.stat.ctimeMs)throw new CivicPolicyStateError('SCRATCH_CONTENT_CHANGED');
     await directory(dirname(file.path));await unlink(file.path);
@@ -1059,7 +1073,7 @@ async function cleanScratch(inventory:Inventory,lease:ScratchLease,policy:CivicP
 }
 // The wrapper cannot execute a native command until its process-group identity
 // has been durably enrolled. Parent death before the gate closes executes nothing.
-const SCRATCH_PROCESS_GATE=`const net=require('node:net'),cp=require('node:child_process');let data='',size=0;const gate=new net.Socket({fd:3,readable:true,writable:false});gate.setEncoding('utf8');gate.on('data',chunk=>{size+=Buffer.byteLength(chunk);if(size>65536)process.exit(126);data+=chunk;});gate.on('error',()=>process.exit(126));gate.on('end',()=>{if(!data)process.exit(0);let value;try{value=JSON.parse(data);}catch{process.exit(126);}const child=cp.spawn(value.file,value.args,{cwd:process.cwd(),env:process.env,stdio:['pipe','inherit','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.on('error',()=>process.exit(127));child.on('exit',(code,signal)=>{if(signal)process.kill(process.pid,signal);else process.exit(code??1);});});`;
+const SCRATCH_PROCESS_GATE=`process.umask(0o077);const net=require('node:net'),cp=require('node:child_process');let data='',size=0;const gate=new net.Socket({fd:3,readable:true,writable:false});gate.setEncoding('utf8');gate.on('data',chunk=>{size+=Buffer.byteLength(chunk);if(size>65536)process.exit(126);data+=chunk;});gate.on('error',()=>process.exit(126));gate.on('end',()=>{if(!data)process.exit(0);let value;try{value=JSON.parse(data);}catch{process.exit(126);}const child=cp.spawn(value.file,value.args,{cwd:process.cwd(),env:process.env,stdio:['pipe','inherit','inherit']});process.stdin.pipe(child.stdin);child.stdin.on('error',()=>{});child.on('error',()=>process.exit(127));child.on('exit',(code,signal)=>{if(signal)process.kill(process.pid,signal);else process.exit(code??1);});});`;
 /** Source-owned disposable workspace. All subprocesses MUST use scope.spawn;
  * callbacks must await their writes/children, and may call managed final writes.
  * The inventory lock is held only for lease/child registration and cleanup.

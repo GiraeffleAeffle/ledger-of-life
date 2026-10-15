@@ -21,10 +21,10 @@ import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
 
-async function largeItem(t:TestContext){
+async function largeItem(t:TestContext,critical=false){
  // Many chunks, one independently extraction-cited chunk; irrelevant duplicate
  // quotations elsewhere must not broaden the context or bind another chunk.
- const quote='Strausberg synthetic source statement. ÄÖÜ 😀';
+ const quote='Strausberg synthetic source statement. ÄÖÜ 😀'+(critical?' Feststellungsbeschluss 18.10.2018':'');
  const text='Uncited document-only prefix.\n'+quote+'\n'+'x'.repeat(56000)+'\n'+quote+'\n'+'x'.repeat(70000);
  const f=await admittedAssessmentFixture(text,true);t.after(()=>rm(f.directory,{recursive:true,force:true}));
  const chunks=documentChunks(text),chunk=chunks.find(c=>c.start>0&&c.text.includes(quote))!;
@@ -32,6 +32,7 @@ async function largeItem(t:TestContext){
  record.sources[0].locator=`text-sha256:${f.source.textSha256};chars:${chunk.start}-${chunk.end}`;
  record.topics=[{id:'siedlung',parentId:null,provenance:'model',confidence:0.8,quote:'source statement'}];
  record.locations=[{label:'Strausberg',quote:'Strausberg',geometry:null,precision:'none'}];
+ if(critical){record.stage='adopted';record.originalStatus='Feststellungsbeschluss';record.stageQuote='Feststellungsbeschluss';record.stageDate='2018-10-18';record.stageDateQuote='18.10.2018';record.stageDateReason=null;}
  record.verification.evidenceHash=knowledgeEvidenceHash(record);
  const body={version:'district-prepared-v2' as const,municipalityId:'strausberg',sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units' as const,textLength:text.length,method:'text' as const,ocrUsed:false,limitations:[]};
  const prepared:PreparedDocument={...body,receiptSha256:digest(canonical(body))};verifyPreparedDocument(prepared,prepared,Buffer.from(text));
@@ -173,4 +174,33 @@ test('pilot-shaped multichunk A/C assessments use strict complete nullable-revie
  const C=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(C.role,'C');
  assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS.C,C.data))<ASSESSMENT_RECONCILIATION_BYTES);
  assert.deepEqual(JSON.parse(f.item.claim).propositions.map((p:{claimId:string})=>p.claimId),f.item.claimIds);
+});
+
+test('pilot item-one critical finalization has satisfiable complete strict A/B/C answers after lossless projection',async t=>{
+ const f=await largeItem(t,true),evidence=await originalEvidence(f.item,f.context),target=f.item.criticalTarget!;
+ assert.ok(target);assert.equal(target.claims[0].kind,'finalization');assert.equal(target.claims[0].stage,'adopted');
+ const source=evidence[0],input=buildAssessmentPassInput(f.item,evidence,'A');
+ const output=assessmentOutputSchema.required().parse({
+  itemId:f.item.itemId,outcome:'supported',scores:{correctness:2,sources:2,usefulness:1},holdReasons:[],
+  rationale:'Synthetic satisfiability witness, not a model assessment or independent verification.',
+  assertions:target.claims.map(claim=>{
+   const locator=source.locators.find(locator=>locator.quote===claim.quote);assert.ok(locator);
+   return {claimId:claim.claimId,sourceId:claim.sourceId,locatorId:locator.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,
+    unit:null,value:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality};
+  }),valueReview:null,criticalReview:{
+   recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,
+   claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',
+    rationale:'Synthetic inspection of the complete supplied evidence; this is only a schema satisfiability witness.'})),
+  },
+ });
+ const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
+ assert.deepEqual(A.deterministicIssues,[]);assert.deepEqual(B.deterministicIssues,[]);
+ const projected=input.data.criticalTarget as Record<string,unknown>;
+ assert.equal(projected.claimProjectionSha256,target.claimProjectionSha256);
+ assert.deepEqual((projected.claims as {claimId:string}[]).map(claim=>claim.claimId),f.item.claimIds);
+ const C=buildAssessmentPassInput(f.item,evidence,'C',{A,B});
+ for(const role of ['A','B','C'] as const){
+  const data=role==='C'?C.data:buildAssessmentPassInput(f.item,evidence,role).data;
+  assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS[role],data))<(role==='C'?ASSESSMENT_RECONCILIATION_BYTES:ASSESSMENT_CONTEXT_BYTES));
+ }
 });

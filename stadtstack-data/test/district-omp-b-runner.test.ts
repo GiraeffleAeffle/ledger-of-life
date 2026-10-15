@@ -15,6 +15,9 @@ import {assessmentOutputSchema,PROMPTS,digest as assessmentDigest} from '../src/
 import {z} from 'zod';
 import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,assertManagedSourceReadable,readCivicPolicyInventory,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {assessmentBridgeHoldReason} from '../src/district-assessment-broker.ts';
+import {DistrictExecutionHold} from '../src/district-jobs.ts';
+import {ReasonCodeSchema} from '../src/district-step-receipt.ts';
 
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
 function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
@@ -267,4 +270,13 @@ for(const failure of ['credential','unsafe-output'] as const)test('parallel A ev
  assert.equal(inventory.scratch.filter(lease=>lease.rootId===digest(root))[0].state,failure==='credential'?'closed':'partial');
  if(failure==='credential')await assert.rejects(lstat(scratch),{code:'ENOENT'});
  else assert.equal(await readFile(join(scratch,'credentials','token.json'),'utf8'),'Synthetic protected bytes');
+});
+
+test('broker preserves every controlled runner hold reason without retaining arbitrary messages',()=>{
+ const reasons:OmpRunnerHold['reason'][]=['security_review_required','unavailable','credential_unavailable','request_rejected','resource_limit','provider_failed','event_stream','model_identity_mismatch'];
+ for(const reason of reasons){
+  const code=assessmentBridgeHoldReason(new OmpRunnerHold(reason));assert.equal(code,`omp_${reason}`);ReasonCodeSchema.parse(code);
+ }
+ assert.equal(assessmentBridgeHoldReason(new DistrictExecutionHold('owner_stopped')),'owner_stopped');
+ assert.equal(assessmentBridgeHoldReason(Error('private credential/source message')),'execution_exception');
 });
