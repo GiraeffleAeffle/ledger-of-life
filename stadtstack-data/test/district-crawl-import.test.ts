@@ -38,7 +38,7 @@ import {answer} from './district-assessment.fixture.ts';
 import {setTimeout as delay} from 'node:timers/promises';
 import {inferPreparedDocument,archiveJointExtractionContract} from '../src/district-inference.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
-import {sealQueueTextContribution,buildQueueTextRun} from '../src/district-queue-text-run.ts';
+import {sealQueueTextContribution,buildQueueTextRun,exportQueueTextContribution} from '../src/district-queue-text-run.ts';
 import {loadR1TextCompositionInput,buildR1TextCompositionContext} from '../src/district-r1-text-composition.ts';
 import {authenticatePublicationProvenance} from '../src/district-publication-provenance.ts';
 import {prepareKnowledge} from '../src/prepare-knowledge.ts';
@@ -688,6 +688,12 @@ test('offline frozen crawl import preserves managed originals and produces enque
    assert.equal((await exportResidualTextContribution(pool!,item.cas,[extractionKey],heldInput.contributions[0])).results.length,1);
    const heldCases=JSON.parse((await item.cas.read(held.artifacts.quarantine.sha256)).toString('utf8')).cases;
    assert.equal(heldCases.length,1);assert.equal(heldCases.find((entry:{candidate?:unknown})=>entry.candidate)?.reason,'assessment_held');
+   const heldRow=(await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1) ORDER BY attempt DESC LIMIT 1',[pendingKey])).rows[0],terminalAssessment={documentId:item.document.id,step:'assessment_reconcile' as const,jobKey:pendingKey,receiptId:heldRow.receipt.id,receiptSha256:heldRow.receipt_sha256,reasonCode:heldRow.receipt.reasonCode};
+   const exceptionInput={jobKeys:[extractionKey],reconciliationJobKeys:[pendingKey],terminalAssessmentExceptions:[terminalAssessment]},heldWithEvidence=await sealQueueTextContribution(pool!,item.cas,exceptionInput);
+   assert.equal(heldWithEvidence.records,0);assert.equal(heldWithEvidence.committedDocuments,1);assert.equal(heldWithEvidence.terminalAssessmentExceptions.length,1);assert.equal(heldWithEvidence.terminalAssessmentExceptions[0].receiptSha256,heldRow.receipt_sha256);assert.equal(heldWithEvidence.terminalAssessmentExceptions[0].attemptHistory.length,1);
+   const exceptionComposition=await loadR1TextCompositionInput(JSON.parse((await item.cas.read(heldWithEvidence.compositionArtifactSha256)).toString('utf8')),pin=>item.cas.read(pin.sha256));
+   const exceptionExport=await exportQueueTextContribution(pool!,item.cas,[extractionKey],exceptionComposition.contributions[0]);assert.equal(exceptionExport.terminalAssessmentExceptions[0].reasonCode,heldRow.receipt.reasonCode);
+   await assert.rejects(buildQueueTextRun(pool!,item.cas,{...exceptionInput,terminalAssessmentExceptions:[{...terminalAssessment,documentId:'foreign-document'}]}),/extracted document/);
    const CJobKey=await enqueueAssessmentResolution(pool!,store,item.cas,pair,'C',policy);
    assert.equal((await runAssessment(CJobKey,'third-pass-current-refresh')).state,'completed');
    const reconcileKey=await enqueueAssessmentResolution(pool!,store,item.cas,{...pair,CJobKey},'reconcile',policy);
@@ -750,6 +756,49 @@ test('offline frozen crawl import preserves managed originals and produces enque
      await exportResidualTextContribution(pool!,mixed.cas,[key],inputValue.contributions[0]);
      const replayed=await sealQueueTextContribution(pool!,mixed.cas,input);assert.deepEqual(replayed,sealedMixed);
      assert.deepEqual(await mixed.cas.read(replayed.compositionArtifactSha256),compositionBytes);
+    });
+   });
+   await st.test('terminal assessment context and A/B holds retain receipt-authenticated source ancestry',async()=>{
+    const terminal=await fixture('terminal-assessment-context',{body:item.bytes});
+    await withFixtureAuthorizedCorpus(terminal.indexBytes,policy,async()=>{
+     const imported=await importCrawlCorpusForResidual(store,terminal.cas,terminal.manifest),preparedKey=await enqueueResidualPreparation(store,terminal.cas,imported.jobs[0]);
+     await runDistrictJobs({store,cas:terminal.cas,handlers:{residual_prepare:prepareFixture},authorizationId:await authorize(preparedKey,'terminal-assessment-prepare'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const extractionKey=await enqueueCommittedResidualExtraction(pool!,store,terminal.cas,preparedKey);await runDistrictJobs({store,cas:terminal.cas,handlers:{residual_extract:extractionFixture},authorizationId:await authorize(extractionKey,'terminal-assessment-extract'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const preparationKey=await enqueueResidualAssessmentItems(pool!,store,terminal.cas,extractionKey);
+     const pin=async<S extends 'assessment_prepare'|'assessment_a'|'assessment_b'>(jobKey:string,step:S)=>{const row=(await pool!.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1) ORDER BY attempt DESC LIMIT 1',[jobKey])).rows[0];return {documentId:terminal.document.id,step,jobKey,receiptId:row.receipt.id,receiptSha256:row.receipt_sha256,reasonCode:row.receipt.reasonCode};};
+     const hold=async(jobKey:string,step:'assessment_prepare'|'assessment_a'|'assessment_b',reasonCode:'assessment_context_exceeded'|'execution_exception'|'isolation_unavailable')=>{const handler:JobHandler=async()=>({outcome:'held_execution',reasonCode});handler.currentPolicy=assessmentHandlers[step].currentPolicy;const run=await runDistrictJobs({store,cas:terminal.cas,handlers:{[step]:handler},authorizationId:await authorize(jobKey,'terminal-'+step),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(run.jobsStarted,1);};
+     await hold(preparationKey,'assessment_prepare','assessment_context_exceeded');const contextPin=await pin(preparationKey,'assessment_prepare'),contextInput={jobKeys:[extractionKey],reconciliationJobKeys:[],terminalAssessmentExceptions:[contextPin]},contextSeal=await sealQueueTextContribution(pool!,terminal.cas,contextInput);
+     assert.equal(contextSeal.records,0);assert.equal(contextSeal.committedDocuments,1);assert.equal(contextSeal.terminalAssessmentExceptions[0].reasonCode,'assessment_context_exceeded');
+     const contextComposition=await loadR1TextCompositionInput(JSON.parse((await terminal.cas.read(contextSeal.compositionArtifactSha256)).toString('utf8')),pin=>terminal.cas.read(pin.sha256));
+     await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],contextComposition.contributions[0]);
+     await store.resume(preparationKey);await runDistrictJobs({store,cas:terminal.cas,handlers:assessmentHandlers,authorizationId:await authorize(preparationKey,'resume-context'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     await assert.rejects(exportQueueTextContribution(pool!,terminal.cas,[extractionKey],contextComposition.contributions[0]),/current committed held attempt/);
+     const AKey=(await enqueuePreparedAssessmentPass(pool!,store,terminal.cas,preparationKey,'A'))[0];await hold(AKey,'assessment_a','execution_exception');
+     const aSpec=(await pool!.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[AKey])).rows[0].spec,terminalBroker=new DistrictAssessmentBroker(pool!,terminal.cas,{policyOptions:policy,fixtureProtocol:true}),BKey=await enqueueAssessmentB(terminalBroker,{itemArtifactSha256:aSpec.selector.itemArtifactSha256,sourceScope:aSpec.sourceScope,policyProofSha256:aSpec.policyProofSha256,transport:'mac-bridge',clientContractSha256:digest('synthetic terminal B client')});await hold(BKey,'assessment_b','isolation_unavailable');
+     const input={jobKeys:[extractionKey],reconciliationJobKeys:[],terminalAssessmentExceptions:[await pin(AKey,'assessment_a'),await pin(BKey,'assessment_b')]},sealed=await sealQueueTextContribution(pool!,terminal.cas,input);
+     assert.equal(sealed.records,0);assert.equal(sealed.committedDocuments,1);assert.equal(sealed.terminalAssessmentExceptions.length,2);
+     const composition=await loadR1TextCompositionInput(JSON.parse((await terminal.cas.read(sealed.compositionArtifactSha256)).toString('utf8')),pin=>terminal.cas.read(pin.sha256));assert.equal((await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],composition.contributions[0])).terminalAssessmentExceptions.length,2);
+    });
+   });
+   await st.test('pre-beb7047 held_quality seal bytes remain exportable while enrichment is explicit',async()=>{
+    const historical=await fixture('legacy-held-quality-seal',{body:Buffer.from('Synthetic Strausberg narrative ohne belegten Vorgang.')});
+    await withFixtureAuthorizedCorpus(historical.indexBytes,policy,async()=>{
+     const imported=await importCrawlCorpusForResidual(store,historical.cas,historical.manifest),preparedKey=await enqueueResidualPreparation(store,historical.cas,imported.jobs[0]);
+     await runDistrictJobs({store,cas:historical.cas,handlers:{residual_prepare:prepareFixture},authorizationId:await authorize(preparedKey,'historical-held-prepare'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const key=await enqueueCommittedResidualExtraction(pool!,store,historical.cas,preparedKey),qualityHold:JobHandler=async context=>({...await extractionFixture(context),outcome:'held_quality',reasonCode:'quality_failed'});qualityHold.currentPolicy=extractionFixture.currentPolicy;
+     await runDistrictJobs({store,cas:historical.cas,handlers:{residual_extract:qualityHold},authorizationId:await authorize(key,'historical-held-extract'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const selected={jobKeys:[key],reconciliationJobKeys:[]},enriched=await buildQueueTextRun(pool!,historical.cas,{...selected,attemptHistory:'committed-v1'}),enrichedRun=JSON.parse(Buffer.from(enriched.contribution.artifacts.extractionRun.bytes).toString('utf8'));
+     assert.equal(enrichedRun.queue.attemptHistory,'committed-v1');assert.equal(enrichedRun.queue.extractionAttemptHistory.length,1);
+     // Pre-beb7047 format has the same genuine committed outputs/receipts but
+     // neither later queue history field. No extraction/receipt is invented.
+     const preBebRun=structuredClone(enrichedRun);delete preBebRun.queue.attemptHistory;delete preBebRun.queue.extractionAttemptHistory;
+     const legacyBytes=Buffer.from(canonicalJson(preBebRun)),legacySha256=digest(legacyBytes),legacyFixture={...enriched.contribution,runId:legacySha256,artifacts:{...enriched.contribution.artifacts,extractionRun:{bytes:legacyBytes,sha256:legacySha256}}};
+     assert.equal((await exportQueueTextContribution(pool!,historical.cas,[key],legacyFixture)).contribution.runId,legacySha256);
+     assert.equal((await exportResidualTextContribution(pool!,historical.cas,[key],legacyFixture)).contribution.runId,legacySha256);
+     const legacy=await sealQueueTextContribution(pool!,historical.cas,selected);assert.equal(legacy.runId,legacySha256);assert.deepEqual(await historical.cas.read(legacy.runId),legacyBytes);assert.deepEqual(await sealQueueTextContribution(pool!,historical.cas,selected),legacy);
+     const modern=await sealQueueTextContribution(pool!,historical.cas,{...selected,attemptHistory:'committed-v1'});assert.equal(modern.attemptHistory,'committed-v1');assert.notEqual(modern.runId,legacySha256);await exportQueueTextContribution(pool!,historical.cas,[key],enriched.contribution);
+     // beb7047 emitted history without a marker: preserve that envelope too.
+     const bebRun=structuredClone(enrichedRun);delete bebRun.queue.attemptHistory;const bebBytes=Buffer.from(canonicalJson(bebRun)),bebSha256=digest(bebBytes),bebFixture={...enriched.contribution,runId:bebSha256,artifacts:{...enriched.contribution.artifacts,extractionRun:{bytes:bebBytes,sha256:bebSha256}}};assert.equal((await exportQueueTextContribution(pool!,historical.cas,[key],bebFixture)).contribution.runId,bebSha256);
     });
    });
    st.mock.timers.enable({apis:['Date'],now:new Date(checked.currentReceipt.expiresAt)});

@@ -6,7 +6,7 @@ import {canonicalJson,digest,HashSchema} from './district-adapter-contract.ts';
 import {DistrictCas} from './district-cas.ts';
 import {DistrictJobStore} from './district-jobs.ts';
 import {exportRun} from './district-r1.ts';
-import {exportResidualTextContribution} from './district-residual-jobs.ts';
+import {exportQueueTextContribution,QueueTextSealInputSchema} from './district-queue-text-run.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
 import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,type PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import {publicationPolicyReceiptInventorySchema} from './district-publication-policy.ts';
@@ -29,7 +29,7 @@ export const Step8InputSchema=z.object({
  schemaVersion:z.literal('stadtstack-r1-step8-v1'),
  expectedSources:z.number().int().positive(),expectedDocuments:z.number().int().positive(),
  campaign:Pin,
- seals:z.array(z.object({sealResult:Pin,jobKeys:z.array(HashSchema).min(1),reconciliationJobKeys:z.array(HashSchema)}).strict()).min(1),
+ seals:z.array(QueueTextSealInputSchema.safeExtend({sealResult:Pin})).min(1),
  structuredRunIds:z.array(z.uuid()).min(1),registry:Pin,privateProvenance:Pin,
  staging:z.array(Pin.extend({destination:z.string().min(1)}).strict()).min(1),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
@@ -93,23 +93,25 @@ export async function runStep8(raw:unknown,pool:Pool){
   const composition=await loadR1TextCompositionInput(serialized,async pin=>{
    const path=join(cas.root,'sha256',pin.sha256.slice(0,2),pin.sha256);if(pin.path!==path)throw Error('Source seal escapes managed CAS');return source.read(path);
   });
-  const exported=await exportResidualTextContribution(pool,cas,selected.jobKeys,composition.contributions[0]);
+  const exported=await exportQueueTextContribution(pool,cas,selected.jobKeys,composition.contributions[0]);
   const extraction=JSON.parse(Buffer.from(exported.contribution.artifacts.extractionRun.bytes).toString('utf8'));
   const expectedSource=remainingSources.get(exported.contribution.pins.corpusSha256);if(!expectedSource)throw Error('Duplicate or unexpected sealed source');
-  assertStep8ExportMembership(expectedSource,exported.results);remainingSources.delete(expectedSource.corpus.sha256);
+  assertStep8ExportMembership(expectedSource,exported.results,exported.terminalDocumentExceptions);remainingSources.delete(expectedSource.corpus.sha256);
+  for(const [key,schema] of [['terminalDocumentExceptions',QueueTextSealInputSchema.shape.terminalDocumentExceptions],['terminalAssessmentExceptions',QueueTextSealInputSchema.shape.terminalAssessmentExceptions]] as const){const actual=exported[key].map(pin=>({documentId:pin.documentId,step:pin.step,jobKey:pin.jobKey,receiptId:pin.receiptId,receiptSha256:pin.receiptSha256,reasonCode:pin.reasonCode}));if(canonicalJson([...schema.parse(selected[key])].sort((a,b)=>a.jobKey.localeCompare(b.jobKey)))!==canonicalJson(actual))throw Error('Source terminal exception selection differs from seal');}
   const cases=JSON.parse(Buffer.from(exported.contribution.artifacts.quarantine.bytes).toString('utf8')).cases,admittedRecords=JSON.parse(Buffer.from(exported.contribution.artifacts.records.bytes).toString('utf8')).records;
   const assessmentPins=z.array(z.object({recordId:z.string(),pins:CriticalAssessmentInventorySchema.shape.records.element.nullable()}).passthrough()).parse(extraction.queue.assessments);
   for(const result of exported.results){
    const documentCases=cases.filter((entry:{documentId?:string;sourceSha256?:string})=>entry.documentId===result.documentId||entry.sourceSha256===result.result.sourceSha256),records=admittedRecords.filter((entry:{extraction:{inputSha256:string}})=>entry.extraction.inputSha256===result.result.sourceSha256);
    if(!records.length&&!documentCases.length)throw Error('Document has neither admission nor explicit disposition');
-   sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:result.documentId,sourceSha256:result.result.sourceSha256,jobKey:result.result.taskId,admittedRecordIds:records.map((entry:{id:string})=>entry.id),cases:documentCases,classification:classifyStep8Exception(documentCases),assessments:assessmentPins.filter(entry=>result.result.records.some(record=>record.id===entry.recordId)),queueEvidence:extraction.queue});
+   sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:result.documentId,sourceSha256:result.result.sourceSha256,jobKey:result.result.taskId,admittedRecordIds:records.map((entry:{id:string})=>entry.id),cases:documentCases,classification:classifyStep8Exception(documentCases),assessments:assessmentPins.filter(entry=>result.result.records.some(record=>record.id===entry.recordId)),terminalAssessmentExceptions:exported.terminalAssessmentExceptions.filter(entry=>entry.documentId===result.documentId),queueEvidence:extraction.queue});
   }
+  for(const exception of exported.terminalDocumentExceptions){const documentCases=cases.filter((entry:{documentId?:string})=>entry.documentId===exception.documentId);if(!documentCases.length)throw Error('Terminal document lacks explicit quarantine disposition');sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:exception.documentId,sourceSha256:exception.sourceSha256,jobKey:exception.jobKey,admittedRecordIds:[],cases:documentCases,classification:{...classifyStep8Exception(documentCases),terminal:true},terminalDocumentException:exception,assessments:[],queueEvidence:extraction.queue});}
   for(const entry of assessmentPins)if(entry.pins){const pathFor=(sha256:string)=>join(cas.root,'sha256',sha256.slice(0,2),sha256);auditAssessments.push({recordId:entry.recordId,item:pathFor(entry.pins.itemArtifactSha256),A:pathFor(entry.pins.AArtifactSha256),B:pathFor(entry.pins.BArtifactSha256),C:pathFor(entry.pins.CArtifactSha256)});}
   if(canonicalJson([...selected.reconciliationJobKeys].sort())!==canonicalJson(extraction.queue.reconciliationJobKeys))throw Error('Source reconciliation selection differs from seal');
   compositions.push(serialized);
   policyInventories.push(publicationPolicyReceiptInventorySchema.parse(JSON.parse((await source.read(seal.policyInventory.path)).toString('utf8'))));
   criticalInventories.push(CriticalAssessmentInventorySchema.parse(JSON.parse((await source.read(seal.criticalInventory.path)).toString('utf8'))));
-  exports.push({compositionArtifactSha256:seal.compositionArtifactSha256,runId:exported.contribution.runId,committedDocuments:exported.results.length,jobKeys:selected.jobKeys,reconciliationJobKeys:selected.reconciliationJobKeys});
+  exports.push({compositionArtifactSha256:seal.compositionArtifactSha256,runId:exported.contribution.runId,committedDocuments:exported.results.length+exported.terminalDocumentExceptions.length,jobKeys:selected.jobKeys,reconciliationJobKeys:selected.reconciliationJobKeys,terminalDocumentExceptions:exported.terminalDocumentExceptions,terminalAssessmentExceptions:exported.terminalAssessmentExceptions});
  }
  if(exports.reduce((n,item)=>n+item.committedDocuments,0)!==input.expectedDocuments)throw Error('Incomplete committed document set');
  if(remainingSources.size||sourceDispositions.length!==input.expectedDocuments)throw Error('Campaign disposition inventory incomplete');
@@ -128,6 +130,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  bindings=uniqueBindings([...bindings,...native.bindings.map(binding=>({...binding,independentAllowed:false}))]);
  // Export committed native receipts to the same managed CAS contract used by the CLI.
  for(const row of native.receipts){await claim.assertOwned();const bytes=Buffer.from(canonicalJson(row.receipt));if(digest(bytes)!==row.sha256)throw Error('Native receipt digest mismatch');await writeManagedSourceArtifact(cas.root,join(cas.root,'sha256',row.sha256.slice(0,2),row.sha256),bytes,bindings,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});await claim.assertOwned();}
+ const sourceDispositionInventory=await write('source-dispositions.json',{schemaVersion:'stadtstack-r1-step8-source-dispositions-v1',status:'authenticated_not_released',generationNonce:claim.nonce,campaign:input.campaign,complete:true,sourceDispositions});
  const registry=await write('inputs/registry.json',null,native.registryBytes),structuredRun=await write('inputs/structured-run.json',native.run);
  const composition=r1TextCompositionInputSchema.parse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:input.clocks.recordsGeneratedAt,approvedRunOrder:compositions.flatMap(item=>item.approvedRunOrder),admissions:compositions.flatMap(item=>item.admissions),contributions:compositions.flatMap(item=>item.contributions)});
  const context=buildR1TextCompositionContext(await loadR1TextCompositionInput(composition,pin=>readReplayPin(pin,process.cwd())));
@@ -151,7 +154,7 @@ export async function runStep8(raw:unknown,pool:Pool){
   const scratchOutput=join(prepared.scope.directory,'candidate');
   const manifest=await publish({stagingDir:prepared.stagingDir,outDir:scratchOutput,asOf:input.asOf,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,priorCityRoot:prepared.publication.priorDirectory,policyReceipts:policyReceipts.path,textComposition:textComposition.path,structuredRun:structuredRun.path,criticalAssessments:criticalAssessments.path,identityAssessments:input.identityAssessments?.path,regionalPolicyReceipts:input.regionalPolicyReceipts?.path,privateProvenance,casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,qualityGeneratedAt:input.clocks.qualityGeneratedAt,manifestGeneratedAt:input.clocks.manifestGeneratedAt},predecessors,prepared.publication);
   await verifyDataRelease(scratchOutput);
-  await write('exception-inventory.json',{schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign:input.campaign,complete:true,sourceDispositions,native:{coverage:native.run.coverage,fieldHolds:native.fieldHolds},preparation:{publicationQuarantine:prepared.publicationQuarantine,criticalHolds:prepared.summary.criticalHolds,classification:classifyStep8Exception(prepared.publicationQuarantine)},assessments:auditAssessments});
+  await write('exception-inventory.json',{schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign:input.campaign,sourceDispositionInventory,complete:true,sourceDispositions,native:{coverage:native.run.coverage,fieldHolds:native.fieldHolds},preparation:{publicationQuarantine:prepared.publicationQuarantine,criticalHolds:prepared.summary.criticalHolds,classification:classifyStep8Exception(prepared.publicationQuarantine)},assessments:auditAssessments});
   const auditManifest=[];
   for(const [index,entry] of auditAssessments.entries()){const row:Record<string,string>={};for(const role of ['item','A','B','C'] as const){const bytes=await readFile(entry[role]),path=join(output,`audit/${index}-${role}.json`);if(digest(bytes)!==entry[role].split('/').at(-1))throw Error('Assessment handoff artifact hash mismatch');await write(`audit/${index}-${role}.json`,null,bytes);row[role]=path;}auditManifest.push(row);}
   await write('audit/assessments.json',auditManifest);

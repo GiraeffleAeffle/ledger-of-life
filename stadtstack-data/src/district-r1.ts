@@ -42,7 +42,7 @@ import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
 import type {StructuredWorkerRequest} from './district-structured-parser-worker.ts';
-import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction,exportResidualTextContribution} from './district-residual-jobs.ts';
+import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,enqueueCommittedResidualExtraction} from './district-residual-jobs.ts';
 import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
@@ -51,7 +51,7 @@ import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompo
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
 import {CrawlPolicyRefreshEnqueueSchema,enqueueCrawlPolicyRefresh,policyRefreshHandler} from './district-policy-refresh.ts';
-import {QueueTextSealInputSchema,sealQueueTextContribution} from './district-queue-text-run.ts';
+import {QueueTextSealInputSchema,sealQueueTextContribution,exportQueueTextContribution} from './district-queue-text-run.ts';
 import {KnowledgeRecordsSchema} from './district-schema.ts';
 import {readTextLineageArtifact} from './text-run-lineage.ts';
 import {resumeSubscriptionUsage,subscriptionUsageStatus,UsageResumeInputSchema} from './district-subscription-usage.ts';
@@ -519,7 +519,7 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase},da
   }
   if(command==='seal-text-contribution'){
    const manifest=QueueTextSealInputSchema.parse(input);
-   for(const jobKey of manifest.jobKeys){
+   for(const jobKey of [...manifest.jobKeys,...manifest.terminalDocumentExceptions.map(pin=>pin.jobKey)]){
     const row=await pool.query<{selector:unknown}>('SELECT spec->\'selector\' AS selector FROM district_pipeline.jobs WHERE job_key=$1',[jobKey]);
     if(row.rowCount!==1)throw Error('Queue seal extraction selector unavailable');
     const selected=ResidualInputSchema.strip().parse(row.rows[0].selector);
@@ -528,7 +528,7 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase},da
    process.stdout.write(canonicalJson(await sealQueueTextContribution(pool,cas,manifest))+'\n');return;
   }
   if(command==='export-text-contribution'){
-   const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
+   const manifest=z.object({jobKeys:z.array(HashSchema).max(10000),compositionArtifactSha256:HashSchema}).strict().parse(input),compositionPath=join(cas.root,'sha256',manifest.compositionArtifactSha256.slice(0,2),manifest.compositionArtifactSha256);
    await assertManagedSourceReadable(compositionPath);
    const serialized=r1TextCompositionInputSchema.parse(JSON.parse((await cas.read(manifest.compositionArtifactSha256)).toString('utf8')));
    if(serialized.contributions.length!==1||serialized.contributions[0].sourceArtifactKind!=='native_extraction_output')throw Error('Residual export requires one genuine sealed native contribution');
@@ -537,7 +537,7 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase},da
     if(pin.path!==actualPath)throw Error('Text contribution artifact must use fixed managed CAS hash path');
     await assertManagedSourceReadable(actualPath);return cas.read(pin.sha256);
    });
-   const exported=await exportResidualTextContribution(pool,cas,manifest.jobKeys,composition.contributions[0]),stepReceiptSha256s:string[]=[];
+   const exported=await exportQueueTextContribution(pool,cas,manifest.jobKeys,composition.contributions[0]),stepReceiptSha256s:string[]=[];
    const context=buildR1TextCompositionContext(composition),native=KnowledgeRecordsSchema.parse(readTextLineageArtifact(exported.contribution.artifacts.records));
    if(exported.contribution.pins.registrySha256!==registrySha256||canonicalJson(context.knowledge.records)!==canonicalJson(native.records)||canonicalJson(serialized.approvedRunOrder)!==canonicalJson([exported.contribution.runId])||serialized.generatedAt!==native.generatedAt)throw Error('Residual export composition rewrites its sealed admissions');
    for(let index=0;index<exported.stepReceipts.length;index++){
@@ -548,7 +548,7 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase},da
     const source={url:reference.url,sha256:reference.sha256,policyReceiptSha256:reference.policyReceiptSha256,binding:httpObservationBinding(reference)};
     const hash=semanticHash(receipt);await exportStepReceipt(store,cas,hash,source);await exportStepReceipt(store,cas,result.preparationReceiptSha256,source);stepReceiptSha256s.push(hash);
    }
-   process.stdout.write(canonicalJson({compositionArtifactSha256:manifest.compositionArtifactSha256,path:compositionPath,runId:exported.contribution.runId,stepReceiptSha256s,committedDocuments:exported.results.length,records:context.knowledge.records.length,heldRecords:context.composition.quarantine.cases.filter(entry=>entry.candidate!==undefined).length})+'\n');return;
+   process.stdout.write(canonicalJson({compositionArtifactSha256:manifest.compositionArtifactSha256,path:compositionPath,runId:exported.contribution.runId,stepReceiptSha256s,committedDocuments:exported.results.length+exported.terminalDocumentExceptions.length,terminalDocumentExceptions:exported.terminalDocumentExceptions,terminalAssessmentExceptions:exported.terminalAssessmentExceptions,records:context.knowledge.records.length,heldRecords:context.composition.quarantine.cases.filter(entry=>entry.candidate!==undefined).length})+'\n');return;
   }
   if(command==='enqueue-residual-preparation'){
    const manifest=z.object({jobs:z.array(ResidualInputSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];

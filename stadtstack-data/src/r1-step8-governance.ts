@@ -24,9 +24,10 @@ export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>
  }
  return campaign;
 }
-export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[]){
+export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string}[]=[]){
  const expected=source.documents.map(document=>canonicalJson([document.documentId,document.sha256,document.jobKey])).sort();
  const actual=results.map(result=>{if(result.corpusSha256!==source.corpus.sha256||result.result.municipalityId!==source.municipalityId)throw Error('Exported campaign source scope mismatch');return canonicalJson([result.documentId,result.result.sourceSha256,result.result.taskId]);}).sort();
+ for(const exception of exceptions){if(exception.corpusSha256!==source.corpus.sha256||exception.municipalityId!==source.municipalityId||exception.sourceId!==source.sourceId)throw Error('Terminal campaign source scope mismatch');actual.push(canonicalJson([exception.documentId,exception.sourceSha256,exception.jobKey]));}actual.sort();
  if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exported campaign document/job set mismatch');
 }
 /** mkdir is the atomic generation reservation; the sibling claim is non-source control metadata. */
