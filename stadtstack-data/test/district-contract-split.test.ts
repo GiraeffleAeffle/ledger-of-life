@@ -57,6 +57,15 @@ test('database supervision remains host-only for the five queued R1 semantic con
   for(const file of affected)assert.deepEqual(await contracts[name].compute(change(file)),before,name+': '+file);
  }
 });
+
+test('host resolver cutover changes only B contracts among the scoped queued job contracts',async()=>{
+ for(const file of ['district-omp-b-runner.ts','../scripts/build-omp-b-image.sh']){
+  for(const name of ['residualPreparation','residual','assessmentQueue','policyRefresh'])
+   assert.deepEqual(await contracts[name].compute(change(file)),await contracts[name].compute(hash),name+': '+file);
+  assert.notDeepEqual(await assessmentBJobContract(change(file)),await assessmentBJobContract(hash));
+  assert.notEqual(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash));
+ }
+});
 test('preparation jobs are independent of extraction prompts/model/decoding/chunking and output assembly',async()=>{
  const preparation=await residualPreparationContract(hash),extraction=await residualJobContract(hash);
  assert.deepEqual(Object.keys(preparation),['preparationSha256']);
