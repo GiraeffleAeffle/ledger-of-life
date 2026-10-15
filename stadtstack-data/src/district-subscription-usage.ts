@@ -4,15 +4,17 @@ import type {Pool,PoolClient} from 'pg';
 import {z} from 'zod';
 import {HashSchema,digest,semanticHash} from './district-adapter-contract.ts';
 import {DistrictJobStore,DistrictExecutionHold,canonicalJobIdentity,type DistrictJobSpec,type NotificationIdentity} from './district-jobs.ts';
-import {SubscriptionLimitSchema,type SubscriptionLimit} from './district-subscription-limit.ts';
+import {SubscriptionLimitSchema,OmpLimitFailureProofSchema,retryableOmpFailureProof,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
 import {encodeStepReceipt,StepReceiptSchema} from './district-step-receipt.ts';
+import {completedCodexIntents,type CodexCompletionIntent,type CodexCompletionProof} from './district-subscription-cache.ts';
+import type {CivicPolicyOptions} from './civic-opt-out.ts';
 
 export const SUBSCRIPTION_RESUME_APPROVAL='9882aa1a3938c41a358760705705b943b31e569e11a7b5a2f6579c8661a6b028';
 export const SUBSCRIPTION_PARENT_APPROVAL='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b';
 const OWNER_EXPIRY='2026-10-25T21:59:59Z';
 export const UsageResumeInputSchema=z.object({jobKeys:z.array(HashSchema).min(1).max(500),approvedBy:z.string().min(1).max(256),expiresAt:z.iso.datetime(),maxElapsedMs:z.number().int().min(1).max(86400000),mode:z.enum(['attended','bounded_unattended'])}).strict();
 export type UsageResumeInput=z.infer<typeof UsageResumeInputSchema>;
-interface UsageHold {id:string;provider:SubscriptionLimit['provider'];authorization_id:string;job_id:string;bridge_lease_id:string|null;reset_at:Date|null;observed_at:Date;no_output:boolean}
+interface UsageHold {id:string;provider:SubscriptionLimit['provider'];authorization_id:string;job_id:string;bridge_lease_id:string|null;reset_at:Date|null;observed_at:Date;no_output:boolean;failure_proof:unknown}
 interface ResumeJob {id:string;job_key:string;spec:DistrictJobSpec;state:string;reason_code:string;held_run_id:string|null;receipt:unknown;receipt_sha256:string|null;attempt:number;fencing_token:string;cancellation_requested:boolean;reserved_micro_usd:string}
 interface PriorAuthorization {id:string;state:string;expires_at:Date;max_elapsed_ms:number;allowed_job_keys:string[];allowed_ags:string[];category:'production'|'evaluation'|'development'}
 
@@ -26,24 +28,28 @@ export async function subscriptionUsageStatus(pool:Pool){
  return {holds:result.rows};
 }
 
-export async function recordBSubscriptionHold(client:PoolClient,authorizationId:string,jobId:string,leaseId:string,input:SubscriptionLimit,noOutput:boolean){
- const limit=SubscriptionLimitSchema.parse(input);
- if(limit.provider!=='anthropic-subscription')throw new DistrictExecutionHold('usage_unknown');
- await client.query(`INSERT INTO district_pipeline.r1_subscription_usage_holds(id,provider,authorization_id,job_id,bridge_lease_id,limit_kind,reset_at,observed_at,no_output) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[randomUUID(),limit.provider,authorizationId,jobId,leaseId,limit.limitKind,limit.resetAt,limit.observedAt,noOutput]);
+export function bSubscriptionFailureVersions(leaseId:string,noOutput:boolean,input:OmpLimitFailureProof):Record<string,string>{
+ const proof=OmpLimitFailureProofSchema.parse(input);
+ return {subscriptionLimitLeaseId:leaseId,subscriptionLimitNoOutput:String(noOutput),subscriptionLimitExitCode:String(proof.exitCode),subscriptionLimitTerminalFrame:proof.terminalFrame,subscriptionLimitStreamSha256:proof.streamSha256,subscriptionLimitTerminalMessageSha256:proof.terminalMessageSha256??'none'};
+}
+export async function recordBSubscriptionHold(client:PoolClient,authorizationId:string,jobId:string,leaseId:string,input:SubscriptionLimit,noOutput:boolean,failureProof:OmpLimitFailureProof){
+ const limit=SubscriptionLimitSchema.parse(input),proof=OmpLimitFailureProofSchema.parse(failureProof);
+ if(limit.provider!=='anthropic-subscription'||noOutput&&!retryableOmpFailureProof(proof))throw new DistrictExecutionHold('usage_unknown');
+ await client.query(`INSERT INTO district_pipeline.r1_subscription_usage_holds(id,provider,authorization_id,job_id,bridge_lease_id,limit_kind,reset_at,observed_at,no_output,failure_proof) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[randomUUID(),limit.provider,authorizationId,jobId,leaseId,limit.limitKind,limit.resetAt,limit.observedAt,noOutput,proof]);
 }
 /** Never clear a submission intent or claimed lease. A separately committed
  * disposition admits only the exact proven empty provider failure it names. */
 export async function assertBSubscriptionResume(client:PoolClient,authorizationId:string,jobId:string):Promise<string[]>{
  const unresolved=await client.query(`SELECT 1 FROM district_pipeline.r1_subscription_usage_holds h WHERE h.provider='anthropic-subscription' AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_subscription_resumptions r WHERE r.hold_id=h.id) LIMIT 1`);
  if(unresolved.rowCount)throw new DistrictExecutionHold('budget_paused');
- const resolved=await client.query<{bridge_lease_id:string}>(`SELECT h.bridge_lease_id FROM district_pipeline.r1_subscription_usage_holds h JOIN district_pipeline.r1_subscription_resumptions r ON r.hold_id=h.id AND r.job_id=h.job_id JOIN district_pipeline.preauthorizations disposition ON disposition.id=r.authorization_id JOIN district_pipeline.preauthorizations current ON current.id=$1 WHERE h.job_id=$2 AND h.provider='anthropic-subscription' AND h.no_output AND h.reset_at IS NOT NULL AND h.reset_at<=clock_timestamp() AND disposition.approved_at>h.observed_at AND disposition.approved_at>=h.reset_at AND current.approved_at>=disposition.approved_at AND current.state='approved' AND current.expires_at>clock_timestamp() AND r.owner_approval_sha256=$3 AND r.parent_approval_sha256=$4`,[authorizationId,jobId,SUBSCRIPTION_RESUME_APPROVAL,SUBSCRIPTION_PARENT_APPROVAL]);
+ const resolved=await client.query<{bridge_lease_id:string}>(`SELECT h.bridge_lease_id FROM district_pipeline.r1_proven_bridge_limit_failures h JOIN district_pipeline.r1_subscription_resumptions r ON r.hold_id=h.id AND r.job_id=h.job_id AND r.prior_receipt_sha256=h.failure_receipt_sha256 JOIN district_pipeline.preauthorizations disposition ON disposition.id=r.authorization_id JOIN district_pipeline.preauthorizations current ON current.id=$1 WHERE h.job_id=$2 AND h.reset_at IS NOT NULL AND h.reset_at<=clock_timestamp() AND disposition.approved_at>h.observed_at AND disposition.approved_at>=h.reset_at AND current.approved_at>=disposition.approved_at AND current.state='approved' AND current.expires_at>clock_timestamp() AND r.owner_approval_sha256=$3 AND r.parent_approval_sha256=$4`,[authorizationId,jobId,SUBSCRIPTION_RESUME_APPROVAL,SUBSCRIPTION_PARENT_APPROVAL]);
  return resolved.rows.map(row=>row.bridge_lease_id);
 }
 
 /** Lead-only, no waits or provider calls. The same transaction issues fresh
  * canonical authority, records its basis and invokes guarded queue resume.
  * Codex's own reserveR1CodexCall creates r1_codex_resumptions lazily, unchanged. */
-export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,options:{checkPolicy:(spec:DistrictJobSpec)=>Promise<void>;notification?:NotificationIdentity}){
+export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,options:{checkPolicy:(spec:DistrictJobSpec)=>Promise<void>;notification?:NotificationIdentity;casRoot?:string;completionPolicy?:CivicPolicyOptions}){
  const input=UsageResumeInputSchema.parse(raw),jobKeys=[...new Set(input.jobKeys)].sort();
  if(jobKeys.length!==input.jobKeys.length)throw Error('Duplicate resume job key');
  for(const [name,expected] of [['r1-subscription-usage-autoresume-2026-10-14',SUBSCRIPTION_RESUME_APPROVAL],['r1-nine-town-models-2026-10-13',SUBSCRIPTION_PARENT_APPROVAL]]){
@@ -79,6 +85,11 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
   if(!holds.rowCount)throw new DistrictExecutionHold('usage_unknown');
   for(const hold of holds.rows){
    if(!hold.reset_at||hold.reset_at>now||hold.observed_at>=now||!hold.no_output)throw new DistrictExecutionHold('budget_paused');
+   if(hold.provider==='anthropic-subscription'&&!retryableOmpFailureProof(hold.failure_proof))throw new DistrictExecutionHold('budget_paused');
+  }
+  if(provider==='anthropic-subscription'){
+   const proven=await client.query('SELECT id FROM district_pipeline.r1_proven_bridge_limit_failures WHERE id=ANY($1::uuid[])',[holds.rows.map(hold=>hold.id)]);
+   if(proven.rowCount!==holds.rowCount)throw new DistrictExecutionHold('usage_unknown');
   }
   const live=await client.query(`SELECT 1 FROM district_pipeline.executor_runs r JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE r.state='running' AND a.allowed_job_keys && $1::text[] LIMIT 1`,[jobKeys]);
   if(live.rowCount)throw new DistrictExecutionHold('lease_lost');
@@ -86,6 +97,7 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
   if(Number(selections.rows[0].count)>500)throw new DistrictExecutionHold('source_limit_exceeded');
   const sourceResumes=await client.query<{count:string}>('SELECT count(DISTINCT authorization_id) FROM district_pipeline.r1_subscription_resumptions WHERE source_scope_sha256=$1',[scopeSha256]);
   if(Number(sourceResumes.rows[0].count)>=6)throw new DistrictExecutionHold('source_limit_exceeded');
+  const completionProofs:Array<CodexCompletionProof&{jobKey:string}>=[];
   for(const job of jobs.rows){
    const run=runs.rows.find(run=>run.id===job.held_run_id),authorization=authorities.rows.find(auth=>auth.id===run?.authorization_id);
    if(!authorization||authorization.state!=='approved'||!authorization.allowed_job_keys.includes(job.job_key)||!authorization.allowed_ags.includes(job.spec.sourceScope.ags))throw new DistrictExecutionHold('authorization_revoked');
@@ -100,21 +112,27 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
    const own=holds.rows.filter(hold=>hold.authorization_id===authorization.id);
    if(!own.length&&provider==='openai-subscription')throw new DistrictExecutionHold('usage_unknown');
    if(provider==='anthropic-subscription'){
-    const ambiguous=await client.query(`SELECT 1 FROM district_pipeline.assessment_bridge_leases b WHERE b.job_id=$1 AND b.claimed_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_subscription_usage_holds h WHERE h.bridge_lease_id=b.id AND h.no_output AND h.reset_at<=clock_timestamp()) LIMIT 1`,[job.id]);
+    const ambiguous=await client.query(`SELECT 1 FROM district_pipeline.assessment_bridge_leases b WHERE b.job_id=$1 AND b.claimed_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_proven_bridge_limit_failures h WHERE h.bridge_lease_id=b.id AND h.reset_at<=clock_timestamp()) LIMIT 1`,[job.id]);
     if(ambiguous.rowCount)throw new DistrictExecutionHold('usage_unknown');
    }else{
     // Count every intent for each original, not just this job's intents.
     const originalCaps=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_documents d WHERE d.original_sha256 IN(SELECT original_sha256 FROM district_pipeline.r1_codex_call_intents WHERE job_id=$1) AND (SELECT count(*) FROM district_pipeline.r1_codex_call_intents i WHERE i.original_sha256=d.original_sha256)>=d.max_calls LIMIT 1`,[job.id]);
     if(originalCaps.rowCount)throw new DistrictExecutionHold('source_limit_exceeded');
-    const ambiguous=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_call_intents i WHERE i.job_id=$1 AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_codex_usage_holds h WHERE h.failed_intent_id=i.id) LIMIT 1`,[job.id]);
-    if(ambiguous.rowCount)throw new DistrictExecutionHold('usage_unknown');
+    const ambiguous=await client.query<CodexCompletionIntent>(`SELECT i.id,i.request_sha256 FROM district_pipeline.r1_codex_call_intents i WHERE i.job_id=$1 AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_codex_usage_holds h JOIN district_pipeline.r1_subscription_usage_holds evidence ON evidence.codex_authorization_id=h.authorization_id WHERE h.failed_intent_id=i.id AND evidence.provider='openai-subscription' AND evidence.no_output AND evidence.reset_at<=clock_timestamp())`,[job.id]);
+    if(ambiguous.rowCount){
+     if(job.spec.step!=='residual_extract'||!options.casRoot)throw new DistrictExecutionHold('usage_unknown');
+     let completed:CodexCompletionProof[];
+     try{completed=await completedCodexIntents(options.casRoot,job.job_key,ambiguous.rows,options.completionPolicy);}catch{throw new DistrictExecutionHold('usage_unknown');}
+     if(ambiguous.rows.some(intent=>!completed.some(proof=>proof.intentId===intent.id)))throw new DistrictExecutionHold('usage_unknown');
+     completionProofs.push(...completed.map(proof=>({...proof,jobKey:job.job_key})));
+    }
    }
    await options.checkPolicy(job.spec);
   }
   const finalClock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now');
   if(finalClock.rows[0].now>=new Date(OWNER_EXPIRY)||finalClock.rows[0].now>=new Date(input.expiresAt)||authorities.rows.some(auth=>auth.expires_at<=finalClock.rows[0].now))throw new DistrictExecutionHold('authorization_expired');
   if(new Set(authorities.rows.map(auth=>auth.category)).size!==1)throw new DistrictExecutionHold('authorization_mode_mismatch');
-  const authorizationId=randomUUID(),approval={version:'r1-subscription-usage-resume-v1',authorizationId,ownerApprovalSha256:SUBSCRIPTION_RESUME_APPROVAL,parentApprovalSha256:SUBSCRIPTION_PARENT_APPROVAL,holdIds:holds.rows.map(hold=>hold.id),holdReceipts:jobs.rows.map(job=>({jobKey:job.job_key,receiptSha256:job.receipt_sha256,runId:job.held_run_id,attempt:job.attempt})),...input,jobKeys,approvedAt:now.toISOString()};
+  const authorizationId=randomUUID(),approval={version:'r1-subscription-usage-resume-v1',authorizationId,ownerApprovalSha256:SUBSCRIPTION_RESUME_APPROVAL,parentApprovalSha256:SUBSCRIPTION_PARENT_APPROVAL,holdIds:holds.rows.map(hold=>hold.id),holdReceipts:jobs.rows.map(job=>({jobKey:job.job_key,receiptSha256:job.receipt_sha256,runId:job.held_run_id,attempt:job.attempt})),completionProofs,...input,jobKeys,approvedAt:now.toISOString()};
   const approvalSha256=semanticHash(approval);
   // These two canonical methods only need query(); bind them to this transaction.
   const store=new DistrictJobStore(client as unknown as Pool);

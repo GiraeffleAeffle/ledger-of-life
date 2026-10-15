@@ -487,6 +487,7 @@ export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1
    const handlers={...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool)};
    const resumed=await resumeSubscriptionUsage(pool,UsageResumeInputSchema.parse(input),{
     notification:pipelineNotificationConfig,
+    casRoot:cas.root,
     checkPolicy:async spec=>{
      const handler=handlers[spec.step];
      if(!handler?.currentPolicy)throw new DistrictExecutionHold('source_policy_stale');

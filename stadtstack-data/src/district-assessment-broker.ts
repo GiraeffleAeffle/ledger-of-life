@@ -18,7 +18,7 @@ import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestS
 import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
-import {assertBSubscriptionResume,recordBSubscriptionHold} from './district-subscription-usage.ts';
+import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
@@ -386,11 +386,11 @@ export class DistrictAssessmentBroker {
      const authority=await this.job(client,job.id,job.runId);
      const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);
      if(found.rows[0]){
-      if(error instanceof OmpRunnerHold&&error.subscriptionLimit)await recordBSubscriptionHold(client,authority.authorization_id,job.id,found.rows[0].id,error.subscriptionLimit,error.noOutput);
+      if(error instanceof OmpRunnerHold&&error.subscriptionLimit&&error.failureProof)await recordBSubscriptionHold(client,authority.authorization_id,job.id,found.rows[0].id,error.subscriptionLimit,error.noOutput,error.failureProof);
       await this.hold(client,found.rows[0],reason);
      }
     });
-    return {outcome:'held_execution',reasonCode:reason};
+    return {outcome:'held_execution',reasonCode:reason,...(error instanceof OmpRunnerHold&&error.failureProof?{versions:bSubscriptionFailureVersions(prepared.row.id,error.noOutput,error.failureProof)}:{})};
    }
    const result=await this.transaction(async client=>{
     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];

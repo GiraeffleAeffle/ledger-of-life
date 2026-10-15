@@ -368,6 +368,15 @@ No old authority clock, intent, lease, receipt or ambiguous reservation is erase
 `reserveR1CodexCall` alone still creates the canonical Codex resumption rows when
 the newly authorized live job actually reserves its next call.
 
+Completed earlier Codex requests in the same residual extraction (for example,
+extraction completed before a judge hit quota) are not ambiguous merely because
+they have no failed-intent hold. Resume reconciles their request hashes with the
+exact job's persisted answer-cache bindings, the existing envelope integrity
+codec and live managed custody of stable file bytes. The new approval records
+content-free completion-proof hashes. The normal inference path reuses those
+answers; it does not resubmit them. Missing, corrupted, unregistered or changed
+cache evidence remains held. No cache writer/generation contract changes.
+
 Codex captures content-free `{provider,limitKind,resetAt,observedAt}` through the
 existing stdout diagnostic projection, without changing extraction/A/C framing.
 The installed CLI inspected offline was **0.160.0**: its exported rate-window
@@ -375,18 +384,28 @@ schema has `resetsAt`, and its embedded raw protocol has `token_count`,
 `rate_limits`, `primary`/`secondary`, `used_percent` and absolute `resets_at`.
 An exhausted snapshot contributes only its provider-stated absolute clock and
 only alongside a real usage-limit error; all exhausted windows must have clocks,
-and the latest is used. Percent alone, relative/local-time prose, overloads,
+and the latest is used. A snapshot fallback is allowed only when the error's
+reset clock is absent, never when provider clocks conflict or are unusable.
+Percent alone, relative/local-time prose, overloads,
 truncated/unknown streams and invented delays never establish a reset. No
 provider inference/account request was used to inspect the installed schema.
 
 The omp-b runner projects typed provider error fields before purging transient
-buffers. Only a complete bounded stream proving **no model content/tool output**
-can fund a B retry. A new fenced attempt retains its old claimed lease and intent;
-both broker preparation and a database insertion trigger require the exact
-immutable reset disposition. Unknown failures, partial model output, generic
-HTTP 429s, missing reset clocks and ambiguous submissions stay held. Migration 007
-replaces job-wide B intent uniqueness with per-fence uniqueness plus that guard;
-it does not delete historical intents or relax ambiguity protection.
+buffers. B retry certification requires normal container exit **0**, the
+successful decoder's provider-failure rejection and one fully closed
+assistant-error / turn-end / agent-end frame, with consistent typed provider
+failure messages and **no model content/tool output** anywhere. A killed process
+(including exit 137), an incomplete terminal frame or an unrelated decoder
+failure remains ambiguous even if a typed quota error and reset were captured.
+A new fenced attempt retains its old claimed lease and intent. Broker admission
+and the database retry trigger independently bind the recorded normal-exit and
+terminal-frame hashes to the exact immutable canonical held receipt, original
+claimed lease and intent, and absence of any recorded submission. A bare
+`no_output` certification or reset disposition cannot bypass that proof.
+Unknown failures, partial output, generic HTTP 429s and missing reset clocks stay
+held. Migration 007 replaces job-wide B intent uniqueness with per-fence
+uniqueness plus that guard; it never deletes historical intents. **Its constraint
+replacement takes ACCESS EXCLUSIVE: apply it only with the campaign stopped.**
 
 The B job/output and root-owned omp runner review hashes change and require
 review reissue and fresh B enqueues. Preparation, residual extraction, A/C

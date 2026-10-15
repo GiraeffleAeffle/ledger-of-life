@@ -11,7 +11,7 @@ import {withManagedSourceScratch,type ManagedSourceContext,type ManagedDockerCon
 import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
-import {ompSubscriptionLimit,type SubscriptionLimit} from './district-subscription-limit.ts';
+import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
 export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
@@ -26,7 +26,8 @@ export class OmpRunnerHold extends Error {
  readonly reason:'security_review_required'|'unavailable'|'credential_unavailable'|'request_rejected'|'resource_limit'|'provider_failed'|'event_stream'|'model_identity_mismatch';
  readonly subscriptionLimit?:SubscriptionLimit;
  readonly noOutput:boolean;
- constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean}){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;}
+ readonly failureProof?:OmpLimitFailureProof;
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;binary?:string;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -117,6 +118,14 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
  const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
  const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
  return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage};
+}
+/** Preserve limit metadata on failure, but certify retry only for the normal,
+ * completely framed provider-failure path rejected by the successful decoder. */
+export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:string,exitCode:number,error:unknown):OmpRunnerHold|null{
+ const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
+ if(!evidence)return null;
+ if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
+ return new OmpRunnerHold('provider_failed',evidence);
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
@@ -245,9 +254,9 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     let parsed:OmpParsedEvents;
     try{parsed=inspectOmpEvents(stdout,result.exitCode);}catch(error){
      const stderrBytes=Buffer.concat(errors,errorBytes);
-     let limit;
-     try{limit=ompSubscriptionLimit(stdout,stderrBytes.toString('utf8'),finishedAt);}finally{stderrBytes.fill(0);}
-     if(limit)throw new OmpRunnerHold('provider_failed',limit);
+     let failure:OmpRunnerHold|null;
+     try{failure=inspectOmpLimitFailure(stdout,stderrBytes.toString('utf8'),finishedAt,result.exitCode,error);}finally{stderrBytes.fill(0);}
+     if(failure)throw failure;
      throw error;
     }
     const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:auth.version+' sha256:'+auth.binarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};

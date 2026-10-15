@@ -1,19 +1,24 @@
 import test,{type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,mkdir,writeFile,readFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
-import {join} from 'node:path';
+import {basename,dirname,join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
 import {Pool} from 'pg';
 import {DistrictCas} from '../src/district-cas.ts';
-import {digest} from '../src/district-adapter-contract.ts';
+import {digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type ClaimedJob,type JobHandler,type DistrictJobSpec} from '../src/district-jobs.ts';
 import {reserveR1CodexCall,holdR1CodexFailure} from '../src/district-codex-accounting.ts';
 import {SubscriptionRuntimeError} from '../src/district-model-contract.ts';
 import {failureDiagnostic,runtimeToolEvidence} from '../src/district-model-diagnostics.ts';
-import {resumeSubscriptionUsage,recordBSubscriptionHold,assertBSubscriptionResume,subscriptionUsageStatus,type UsageResumeInput} from '../src/district-subscription-usage.ts';
+import {resumeSubscriptionUsage,recordBSubscriptionHold,bSubscriptionFailureVersions,assertBSubscriptionResume,subscriptionUsageStatus,SUBSCRIPTION_RESUME_APPROVAL,SUBSCRIPTION_PARENT_APPROVAL,type UsageResumeInput} from '../src/district-subscription-usage.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import {ompSubscriptionLimit} from '../src/district-subscription-limit.ts';
+import {cachedModelAnswer,modelAnswerCacheBinding,type CachedAnswer} from '../src/district-answer-cache.ts';
+import {prepareDocument,preparedCacheContext,preparedSourceBindings,type PreparedSourceReference} from '../src/district-prepared-document.ts';
+import {withManagedSourceWrite} from '../src/civic-opt-out.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
 async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-subscription'='openai-subscription'){
@@ -34,7 +39,7 @@ async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-s
  const input:UsageResumeInput={jobKeys:[jobKey],approvedBy:'synthetic-test-lead',expiresAt,maxElapsedMs:60000,mode:'attended'};
  let policyChecks=0;
  const resume=(overrides:Partial<UsageResumeInput>={})=>resumeSubscriptionUsage(db,{...input,...overrides},{checkPolicy:async()=>{policyChecks++;}});
- const originalSha256=digest(randomUUID()),requestSha256=digest(randomUUID());
+ const sourceBytes=Buffer.from('Synthetic quota source '+randomUUID()),originalSha256=digest(sourceBytes),requestSha256=digest(randomUUID());
  let job:ClaimedJob|undefined,leaseId:string|undefined;
  async function bridgeIntent(claim:ClaimedJob){
   const artifact=await cas.put(Buffer.from('synthetic bridge artifact'),{kind:'derived',mimeType:'application/json'});await store.addArtifact(artifact);
@@ -43,10 +48,11 @@ async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-s
   await db.query(`INSERT INTO district_pipeline.assessment_bridge_submission_intents(lease_id,job_id,run_id,fencing_token,input_sha256,intent_sha256,client_id) VALUES($1,$2,$3,$4,$5,$6,'synthetic-vm')`,[id,claim.id,claim.runId,claim.fencingToken,artifact.sha256,digest(id)]);
   return id;
  }
- async function hold(resetAt:string|null,noOutput=true,extraIntent=false,authorization=authorizationId){
+ async function hold(resetAt:string|null,noOutput=true,extraIntent=false,authorization=authorizationId,beforeLimit?:(job:ClaimedJob)=>Promise<void>,failure:{exitCode?:number;incomplete?:boolean;omitReceiptProof?:boolean}={}){
   const result=await run(async context=>{
    job=context.job;
    if(provider==='openai-subscription'){
+    await beforeLimit?.(job);
     await reserveR1CodexCall(db,job,originalSha256,requestSha256);
     if(extraIntent)await reserveR1CodexCall(db,job,originalSha256,digest('synthetic ambiguous '+randomUUID()));
     const stdout=JSON.stringify({type:'turn.failed',error:{code:'usage_limit_reached',...(resetAt?{resets_at:resetAt}:{})}})+'\n';
@@ -54,12 +60,15 @@ async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-s
     return holdR1CodexFailure(db,job,originalSha256,new SubscriptionRuntimeError('rate_limit','Synthetic fixture quota failure',{reason:'rate_limit',diagnostic}));
    }
    leaseId=await bridgeIntent(job);
-   const client=await db.connect();try{await client.query('BEGIN');await recordBSubscriptionHold(client,authorization,job.id,leaseId,{provider,limitKind:'usage_limit',resetAt,observedAt:new Date().toISOString()},noOutput);await client.query('COMMIT');}finally{client.release();}
-   return {outcome:'held_execution',reasonCode:'budget_paused'};
+   const message={role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',timestamp:1,stopReason:'error',content:noOutput?[]:[{type:'text',text:'Synthetic ambiguous partial output'}],errorMessage:JSON.stringify({type:'rate_limit_error',...(resetAt?{reset_at:resetAt}:{})})};
+   const events=failure.incomplete?[{type:'session'},{type:'error',error:{type:'rate_limit_error',reset_at:resetAt}}]:[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{...message,stopReason:undefined,errorMessage:undefined}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}];
+   const evidence=ompSubscriptionLimit(events.map(event=>JSON.stringify(event)).join('\n')+'\n','',new Date().toISOString(),failure.exitCode??0);assert.ok(evidence);
+   const client=await db.connect();try{await client.query('BEGIN');await recordBSubscriptionHold(client,authorization,job.id,leaseId,evidence.limit,evidence.noOutput,evidence.failureProof);await client.query('COMMIT');}finally{client.release();}
+   return {outcome:'held_execution',reasonCode:'budget_paused',...(!failure.omitReceiptProof?{versions:bSubscriptionFailureVersions(leaseId,evidence.noOutput,evidence.failureProof)}:{})};
   },authorization);
   assert.equal(result.reasonCode,'budget_paused');return {job:job!,leaseId};
  }
- return {db,store,cas,jobKey,spec,authorizationId,run,input,resume,hold,bridgeIntent,originalSha256,requestSha256,get policyChecks(){return policyChecks;}};
+ return {db,store,cas,jobKey,spec,authorizationId,run,input,resume,hold,bridgeIntent,sourceBytes,originalSha256,requestSha256,get policyChecks(){return policyChecks;}};
 }
 
 test('subscription usage autoresume against disposable PostgreSQL',{skip:!connectionString,timeout:120000},async t=>{
@@ -85,6 +94,40 @@ test('subscription usage autoresume against disposable PostgreSQL',{skip:!connec
   const f=await fixture(t);await f.hold(new Date(Date.now()-1000).toISOString(),true,true);
   await assert.rejects(f.resume(),{message:'usage_unknown'});assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_call_intents')).rowCount,2);
   assert.equal((await f.db.query('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[f.jobKey])).rows[0].state,'held_execution');
+ });
+ for(const mode of ['valid','missing','tampered','bad_digest','unmanaged'] as const)await t.test('completed extraction before judge limit reconciles only authenticated reusable cache: '+mode,async t=>{
+  const f=await fixture(t),authority=await createCivicPolicyTestContext(t);
+  const reference:PreparedSourceReference={id:'synthetic-source',url:'https://stadt.de/source',sha256:f.originalSha256,retrievedAt:'2026-10-11T12:00:00.000Z',locator:'synthetic fixture',mimeType:'text/plain',sourceType:'website',policy:{robots:{state:'allowed',url:'https://stadt.de/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'}};
+  const prepared=await prepareDocument({bytes:f.sourceBytes,municipalityId:'strausberg',references:[reference],mimeType:'text/plain',extractorSha256:digest('synthetic cache extractor'),toolVersions:{node:process.versions.node}},async()=>{throw Error('Synthetic text must not launch a parser');});
+  const modelIdentitySha256=digest('synthetic readiness identity'),binding=modelAnswerCacheBinding({provider:'openai-subscription',modelIdentitySha256,system:'synthetic frozen extraction',input:{source:{text:prepared.text}},schema:{type:'object'},sourceContext:preparedCacheContext(prepared.receiptSha256,prepared.references)});
+  const cacheRoot=join(dirname(f.cas.root),basename(f.cas.root)+'-residual-model',f.jobKey,'cache'),path=join(cacheRoot,binding+'.answer.json');
+  const body:CachedAnswer={binding,modelIdentitySha256,receivedAt:new Date().toISOString(),value:{record:null},responseSha256:digest('synthetic completed native response'),returnedModel:null,runtimeWarnings:[]};
+  const options={cacheRoot,binding,modelIdentitySha256,sourceContext:{decisionId:authority.decisionId,references:prepared.references,receiptSha256:prepared.receiptSha256,policy:authority.policy}};
+  let generated=0;
+  await f.hold(new Date(Date.now()-1000).toISOString(),true,false,f.authorizationId,async job=>{
+   const generate=async()=>{await reserveR1CodexCall(f.db,job,f.originalSha256,semanticHash(binding));generated++;return body;};
+   if(mode==='unmanaged'){await generate();await mkdir(cacheRoot,{recursive:true});await writeFile(path,JSON.stringify({...body,cacheSha256:digest(JSON.stringify(body))})+'\n');}
+   else await cachedModelAnswer(options,generate);
+  });
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_call_intents')).rowCount,2);
+  if(mode==='missing')await rm(path);
+  if(mode==='tampered')await writeFile(path,JSON.stringify({...body,value:{record:'unapproved changed bytes'},cacheSha256:digest(JSON.stringify({...body,value:{record:'unapproved changed bytes'}}))})+'\n');
+  if(mode==='bad_digest'){
+   const bytes=Buffer.from(JSON.stringify({...body,cacheSha256:digest('not the body')})+'\n');
+   await withManagedSourceWrite(cacheRoot,preparedSourceBindings(prepared.references,prepared.receiptSha256).map(source=>({...source,relativePath:binding+'.answer.json',contentSha256:digest(bytes)})),()=>writeFile(path,bytes),authority.policy);
+  }
+  const resume=()=>resumeSubscriptionUsage(f.db,f.input,{casRoot:f.cas.root,completionPolicy:authority.policy,checkPolicy:async()=>{}});
+  if(mode!=='valid'){
+   await assert.rejects(resume(),{message:'usage_unknown'});
+   assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,0);return;
+  }
+  const bytes=await readFile(path),resumed=await resume();assert.equal(resumed.approval.completionProofs.length,1);assert.equal(resumed.approval.completionProofs[0].answerContentSha256,digest(bytes));
+  const result=await f.run(async context=>{
+   assert.deepEqual(await cachedModelAnswer(options,async()=>{assert.fail('Completed extraction must be reused, never submitted again');}),body);
+   await reserveR1CodexCall(f.db,context.job,f.originalSha256,f.requestSha256);return {outcome:'succeeded',reasonCode:'completed'};
+  },resumed.authorizationId);
+  assert.equal(result.state,'completed');assert.equal(generated,1);assert.deepEqual(await readFile(path),bytes);
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_call_intents')).rowCount,3);
  });
  await t.test('six source resumptions are a durable ceiling, not reset by new stage authority',async t=>{
   const f=await fixture(t);let authorization=f.authorizationId;
@@ -144,6 +187,22 @@ test('subscription usage autoresume against disposable PostgreSQL',{skip:!connec
   assert.equal(result.state,'completed');assert.equal((await f.db.query('SELECT * FROM district_pipeline.assessment_bridge_submission_intents')).rowCount,2);
   const prior=await f.db.query('SELECT state,claimed_at FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[held.leaseId]);assert.equal(prior.rows[0].state,'held');assert.ok(prior.rows[0].claimed_at);
   await assert.rejects(f.db.query('DELETE FROM district_pipeline.assessment_bridge_submission_intents'),/Immutable/);
+ });
+ for(const failure of [{exitCode:137},{incomplete:true}] as const)await t.test('B killed or unterminated typed limit remains ambiguous: '+JSON.stringify(failure),async t=>{
+  const f=await fixture(t,'anthropic-subscription');await f.hold(new Date(Date.now()-1000).toISOString(),true,false,f.authorizationId,undefined,failure);
+  assert.equal((await f.db.query('SELECT no_output FROM district_pipeline.r1_subscription_usage_holds')).rows[0].no_output,false);
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_proven_bridge_limit_failures')).rowCount,0);
+  await assert.rejects(f.resume(),{message:'budget_paused'});
+ });
+ await t.test('B certification without its authenticated terminal held receipt cannot bypass the retry trigger',async t=>{
+  const f=await fixture(t,'anthropic-subscription');await f.hold(new Date(Date.now()-1000).toISOString(),true,false,f.authorizationId,undefined,{omitReceiptProof:true});
+  assert.equal((await f.db.query('SELECT no_output FROM district_pipeline.r1_subscription_usage_holds')).rows[0].no_output,true,'Exercise the independent receipt barrier, not just the certification flag');
+  await assert.rejects(f.resume(),{message:'usage_unknown'});
+  await f.store.resume(f.jobKey);
+  const approvalSha256=digest('synthetic manual bypass attempt'),manual=await f.store.authorize({approvalSha256,approvedBy:'synthetic-manual-lead',expiresAt:f.input.expiresAt,jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development'});
+  await f.db.query(`INSERT INTO district_pipeline.r1_subscription_resumptions(hold_id,job_id,authorization_id,source_scope_sha256,approval_sha256,owner_approval_sha256,parent_approval_sha256,prior_receipt_sha256) SELECT h.id,h.job_id,$1,$2,$3,$4,$5,s.receipt_sha256 FROM district_pipeline.r1_subscription_usage_holds h JOIN district_pipeline.step_receipts s ON s.job_id=h.job_id`,[manual,digest('synthetic source scope'),approvalSha256,SUBSCRIPTION_RESUME_APPROVAL,SUBSCRIPTION_PARENT_APPROVAL]);
+  const result=await f.run(async context=>{await f.bridgeIntent(context.job);return {outcome:'succeeded',reasonCode:'completed'};},manual);
+  assert.equal(result.state,'held');assert.equal((await f.db.query('SELECT * FROM district_pipeline.assessment_bridge_submission_intents')).rowCount,1);
  });
  for(const noOutput of [false,true])await t.test(noOutput?'B no-reset hold remains held':'B possible model output remains held',async t=>{
   const f=await fixture(t,'anthropic-subscription');await f.hold(noOutput?null:new Date(Date.now()-1000).toISOString(),noOutput);
