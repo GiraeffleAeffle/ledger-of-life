@@ -1,13 +1,15 @@
-import test from 'node:test';
+import test,{mock} from 'node:test';
 import assert from 'node:assert/strict';
 import {EventEmitter} from 'node:events';
 import {PassThrough} from 'node:stream';
 import {mkdtemp,writeFile,chmod,rm,readFile,mkdir,lstat} from 'node:fs/promises';
+import {promises as fsPromises,type Stats} from 'node:fs';
+import {syncBuiltinESMExports} from 'node:module';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -62,7 +64,7 @@ function fakeSpawn(outputs:{version?:string;lists:string[];token:string;tokenExi
  const spawn=(file:string,args:string[],options:SpawnOptions):ChildProcess=>{
   calls.push({file,args,env:options.env as NodeJS.ProcessEnv});const child=new EventEmitter() as ChildProcess;
   const stdin=new PassThrough(),stdout=new PassThrough(),stderr=new PassThrough();Object.assign(child,{stdin,stdout,stderr,kill:()=>true});
-  let content='';if(args[0]==='--version')content=outputs.version??OMP_VERSION+'\n';
+  let content='';if(args[0]==='--version')content=outputs.version??OMP_HOST_VERSION+'\n';
   else if(args[0]==='token'&&args[2]==='--list')content=outputs.lists[Math.min(listIndex++,outputs.lists.length-1)]??'';
   else if(args[0]==='token'&&args[2]==='--account')content=outputs.token;
   queueMicrotask(()=>{
@@ -75,13 +77,33 @@ function fakeSpawn(outputs:{version?:string;lists:string[];token:string;tokenExi
  return {spawn,calls,chunks};
 }
 
-async function withBinary(work:(binary:string,root:string)=>Promise<void>){const root=await mkdtemp(join(tmpdir(),'omp-runner-test-')),binary=join(root,'omp');try{await writeFile(binary,'synthetic executable');await chmod(binary,0o500);await work(binary,root);}finally{await rm(root,{recursive:true,force:true});}}
+type UnsafeHostMetadata='file-owner'|'file-group-write'|'file-world-write'|'file-symlink'|'file-links'|'parent-owner'|'parent-group-write'|'parent-world-write'|'parent-symlink';
+async function withBinary(work:(binary:string,root:string)=>Promise<void>,unsafe?:UnsafeHostMetadata){
+ const root=await mkdtemp(join(tmpdir(),'omp-runner-test-')),binary=join(root,'omp');
+ const original=fsPromises.lstat;
+ // Synthetic source-free metadata only: tests neither require root nor touch
+ // the installed host resolver/credential store. No real executable is spawned.
+ const metadata=mock.method(fsPromises,'lstat',async(path:string)=>{
+  const actual=await original(path),value=Object.assign(Object.create(Object.getPrototypeOf(actual)),actual,{uid:0,mode:actual.isDirectory()?0o40755:actual.mode}) as Stats;
+  if(path===(unsafe?.startsWith('parent-')?root:binary)){
+   if(unsafe?.endsWith('-owner'))value.uid=1000;
+   if(unsafe?.endsWith('-group-write'))value.mode|=0o020;
+   if(unsafe?.endsWith('-world-write'))value.mode|=0o002;
+   if(unsafe?.endsWith('-symlink'))value.isSymbolicLink=()=>true;
+   if(unsafe==='file-links')value.nlink=2;
+  }
+  return value;
+ });syncBuiltinESMExports();
+ try{await writeFile(binary,'synthetic executable');await chmod(binary,0o500);await work(binary,root);}
+ finally{metadata.mock.restore();syncBuiltinESMExports();await rm(root,{recursive:true,force:true});}
+}
 async function fileSha256(path:string){return createHash('sha256').update(await readFile(path)).digest('hex');}
+async function hostReview(path:string){return {hostResolverBinarySha256:await fileSha256(path),hostResolverVersion:OMP_HOST_VERSION} as const;}
 
 test('credential resolver accepts a stable single-account OAuth token without putting it in argv or env',async()=>withBinary(async(binary,root)=>{
  const mock=fakeSpawn({lists:['1. Max OAuth\n','1. Max OAuth\n'],token:'sk-ant-oat-synthetic\n'});
- const resolved=await resolveOmpCredential(mock.spawn,binary,root,await fileSha256(binary));
- assert.equal(resolved.version,OMP_VERSION);assert.equal(resolved.token.toString(),'sk-ant-oat-synthetic');
+ const resolved=await resolveOmpCredential(mock.spawn,binary,root,await hostReview(binary));
+ assert.equal(resolved.version,OMP_HOST_VERSION);assert.equal(resolved.token.toString(),'sk-ant-oat-synthetic');
  assert.deepEqual(mock.calls.map(call=>call.args),[['--version'],['token','anthropic','--list'],['token','anthropic','--account','1'],['token','anthropic','--list']]);
  for(const call of mock.calls){assert.deepEqual(call.env,{HOME:'/home/max',PATH:'/usr/bin:/bin',LANG:'C.UTF-8',TZ:'UTC'});assert.equal(call.args.includes(resolved.token.toString()),false);}
  resolved.token.fill(0);
@@ -94,9 +116,9 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
   {lists:['1. account one\n','1. account one\n'],token:'not-oauth'},
   {lists:['1. account one\n','1. changed account\n'],token:'sk-ant-oat-x'},
  ];
- for(const scenario of cases){const mock=fakeSpawn(scenario);await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await fileSha256(binary)),OmpRunnerHold);}
+ for(const scenario of cases){const mock=fakeSpawn(scenario);await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await hostReview(binary)),OmpRunnerHold);}
  const wrongVersion=fakeSpawn({version:'omp/18.9.1',lists:['1. account one\n'],token:'sk-ant-oat-x'});
- await assert.rejects(resolveOmpCredential(wrongVersion.spawn,binary,root,await fileSha256(binary)),OmpRunnerHold);
+ await assert.rejects(resolveOmpCredential(wrongVersion.spawn,binary,root,await hostReview(binary)),OmpRunnerHold);
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
@@ -186,9 +208,9 @@ test('CLI assessment manifest parses both explicit transports and rejects ambigu
 });
 
 test('only the stock LF version terminator is accepted',async()=>withBinary(async(binary,root)=>{
- for(const version of [OMP_VERSION,OMP_VERSION+'\r\n',OMP_VERSION+'\n\n',OMP_VERSION+'\nextra',' '+OMP_VERSION+'\n']){
+ for(const version of [OMP_HOST_VERSION,OMP_HOST_VERSION+'\r\n',OMP_HOST_VERSION+'\n\n',OMP_HOST_VERSION+'\nextra',' '+OMP_HOST_VERSION+'\n',OMP_VERSION+'\n']){
   const mock=fakeSpawn({version,lists:['1. OAuth\n'],token:'sk-ant-oat-synthetic\n'});
-  await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await fileSha256(binary)),OmpRunnerHold);
+  await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await hostReview(binary)),OmpRunnerHold);
   assert.deepEqual(mock.calls.map(call=>call.args),[['--version']]);
  }
 }));
@@ -231,8 +253,8 @@ test('usage keeps normalized token buckets and only valid final-attempt cost est
 test('credential capture wipes original stdout/stderr chunks on success, nonzero exit, bounds and late data',async()=>withBinary(async(binary,root)=>{
  for(const failure of [null,'exit','bound','stderr-bound'] as const){
   const mock=fakeSpawn({lists:['1. OAuth\n','1. OAuth\n'],token:failure==='bound'?'sk-ant-oat-'+ 'x'.repeat(16384):'sk-ant-oat-synthetic\n',tokenExit:failure==='exit'?1:0,tokenStderr:failure==='stderr-bound'?'sk-ant-oat-'+ 'x'.repeat(16384):'sk-ant-oat-synthetic-stderr',lateChunks:true});
-  if(failure===null){const auth=await resolveOmpCredential(mock.spawn,binary,root,await fileSha256(binary));assert.equal(auth.token.toString(),'sk-ant-oat-synthetic');auth.token.fill(0);}
-  else await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await fileSha256(binary)),OmpRunnerHold);
+  if(failure===null){const auth=await resolveOmpCredential(mock.spawn,binary,root,await hostReview(binary));assert.equal(auth.token.toString(),'sk-ant-oat-synthetic');auth.token.fill(0);}
+  else await assert.rejects(resolveOmpCredential(mock.spawn,binary,root,await hostReview(binary)),OmpRunnerHold);
   assert.ok(mock.chunks.length>0);for(const chunk of mock.chunks)assert.equal(chunk.every(byte=>byte===0),true);
  }
 }));
@@ -279,4 +301,34 @@ test('broker preserves every controlled runner hold reason without retaining arb
  }
  assert.equal(assessmentBridgeHoldReason(new DistrictExecutionHold('owner_stopped')),'owner_stopped');
  assert.equal(assessmentBridgeHoldReason(Error('private credential/source message')),'execution_exception');
+});
+
+for(const unsafe of ['file-owner','file-group-write','file-world-write','file-symlink','file-links','parent-owner','parent-group-write','parent-world-write','parent-symlink'] as const)test('host credential resolver rejects unsafe metadata before any control call: '+unsafe,async()=>withBinary(async(binary,root)=>{
+ const fake=fakeSpawn({lists:['1. OAuth\n'],token:'sk-ant-oat-synthetic\n'});
+ await assert.rejects(resolveOmpCredential(fake.spawn,binary,root,await hostReview(binary)),{reason:'security_review_required'});
+ assert.equal(fake.calls.length,0);
+},unsafe));
+
+test('host resolver review hash is separate from the image hash and mismatch stops before credential reads',async()=>withBinary(async(binary,root)=>{
+ const fake=fakeSpawn({lists:['1. OAuth\n','1. OAuth\n'],token:'sk-ant-oat-synthetic\n'});
+ await assert.rejects(resolveOmpCredential(fake.spawn,binary,root,{hostResolverBinarySha256:'0'.repeat(64),hostResolverVersion:OMP_HOST_VERSION}),{reason:'security_review_required'});
+ assert.equal(fake.calls.length,0);
+ const review={...await hostReview(binary),ompBinarySha256:'0'.repeat(64)};
+ const auth=await resolveOmpCredential(fake.spawn,binary,root,review);assert.equal(auth.version,OMP_HOST_VERSION);auth.token.fill(0);
+}));
+
+test('review requires explicit current host resolver fields and keeps the container version unchanged',()=>{
+ const review={version:OMP_RUNNER_VERSION,imageId:'sha256:'+'a'.repeat(64),runnerContractSha256:'b'.repeat(64),ompBinarySha256:'c'.repeat(64),
+  hostResolverBinarySha256:'d'.repeat(64),hostResolverVersion:OMP_HOST_VERSION,dockerDaemonId:'synthetic-daemon',securityReviewId:'synthetic-review',reviewedBy:'synthetic-reviewer',reviewedAt:'2026-10-14T00:00:00Z',dockerSocket:'/run/docker.sock'};
+ assert.deepEqual(OmpReviewSchema.parse(review),review);
+ const {hostResolverBinarySha256,hostResolverVersion,...old}=review;assert.throws(()=>OmpReviewSchema.parse(old));
+ assert.throws(()=>OmpReviewSchema.parse({...review,hostResolverVersion:OMP_VERSION}));
+ assert.equal(OMP_HOST_BINARY,'/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4');assert.equal(OMP_HOST_VERSION,'omp/18.10.4');assert.equal(OMP_VERSION,'omp/18.9.2');
+});
+
+test('image builder requires the reviewed old image source and isolates its version probe from host credentials',async()=>{
+ const script=await readFile(new URL('../scripts/build-omp-b-image.sh',import.meta.url),'utf8');
+ assert.match(script,/OMP_IMAGE_BINARY:\?/);assert.match(script,/647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
+ assert.match(script,/env -i HOME="\$TMP" PATH=\/usr\/bin:\/bin "\$TMP\/omp" --version/);
+ assert.doesNotMatch(script,/\/home\/max\/\.local\/bin\/omp|omp-host-18\.10\.4/);
 });

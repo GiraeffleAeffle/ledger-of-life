@@ -1,6 +1,6 @@
 import {spawn as nodeSpawn,type ChildProcess, type SpawnOptions} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {constants} from 'node:fs';
+import {constants,type Stats} from 'node:fs';
 import {lstat,open,mkdir,chmod,readFile} from 'node:fs/promises';
 import {join,dirname,basename,resolve} from 'node:path';
 import {z} from 'zod';
@@ -15,12 +15,13 @@ import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} f
 export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
-export const OMP_BINARY='/home/max/.local/bin/omp';
+export const OMP_HOST_BINARY='/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4';
+export const OMP_HOST_VERSION='omp/18.10.4';
 export const OMP_REVIEW_PATH='/etc/stadtstack/omp-b-review.json';
 export const OMP_RUNNER_VERSION='district-omp-b-runner-v1';
 export const OMP_LIMITS=Object.freeze({walltimeMs:240_000,modelMaxTimeSeconds:OMP_B_MODEL_MAX_TIME_SECONDS,inputBytes:512*1024,outputBytes:2*1024*1024,stderrBytes:16*1024,tokenBytes:16*1024});
 const hash=z.string().regex(/^[a-f0-9]{64}$/),image=z.string().regex(/^sha256:[a-f0-9]{64}$/);
-export const OmpReviewSchema=z.object({version:z.literal(OMP_RUNNER_VERSION),imageId:image,runnerContractSha256:hash,ompBinarySha256:hash,dockerDaemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),securityReviewId:z.string().min(1).max(200),reviewedBy:z.string().min(1).max(200),reviewedAt:z.iso.datetime(),dockerSocket:z.string().regex(/^\/run\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.sock$/)}).strict();
+export const OmpReviewSchema=z.object({version:z.literal(OMP_RUNNER_VERSION),imageId:image,runnerContractSha256:hash,ompBinarySha256:hash,hostResolverBinarySha256:hash,hostResolverVersion:z.literal(OMP_HOST_VERSION),dockerDaemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),securityReviewId:z.string().min(1).max(200),reviewedBy:z.string().min(1).max(200),reviewedAt:z.iso.datetime(),dockerSocket:z.string().regex(/^\/run\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.sock$/)}).strict();
 export type OmpReview=z.infer<typeof OmpReviewSchema>;
 export class OmpRunnerHold extends Error {
  readonly reason:'security_review_required'|'unavailable'|'credential_unavailable'|'request_rejected'|'resource_limit'|'provider_failed'|'event_stream'|'model_identity_mismatch';
@@ -30,7 +31,7 @@ export class OmpRunnerHold extends Error {
  constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
-export interface OmpRunnerDependencies {spawn?:OmpSpawn;binary?:string;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
+export interface OmpRunnerDependencies {spawn?:OmpSpawn;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
 const sha=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const oauthMarker=Buffer.from('sk-ant-oat','ascii');
 const object=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
@@ -160,14 +161,25 @@ function capture(spawn:OmpSpawn,file:string,args:string[],options:SpawnOptions,i
  child.stdin.on('error',()=>{});child.stdin.end(input);return promise;
 }
 export interface ResolvedOmpCredential {token:Buffer;version:string;binarySha256:string;accountLabelSha256:string}
-export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:string,expectedBinarySha256:string,signal?:AbortSignal):Promise<ResolvedOmpCredential>{
+export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:string,review:Pick<OmpReview,'hostResolverBinarySha256'|'hostResolverVersion'>,signal?:AbortSignal):Promise<ResolvedOmpCredential>{
  const env={HOME:'/home/max',PATH:'/usr/bin:/bin',LANG:'C.UTF-8',TZ:'UTC'};
- const initial=await lstat(binary).catch(()=>null);
- if(!initial||!initial.isFile()||initial.isSymbolicLink()||(initial.mode&0o022)!==0)throw new OmpRunnerHold('credential_unavailable');
+ // No user-writable harness path or symlinked ancestor may supply this trusted
+ // credential reader. The deployed entrypoint itself is a fixed reviewed path.
+ if(binary!==resolve(binary)||review.hostResolverVersion!==OMP_HOST_VERSION)throw new OmpRunnerHold('security_review_required');
+ let initial:Stats;
+ try{
+  for(let parent=dirname(binary);;parent=dirname(parent)){
+   const metadata=await lstat(parent);
+   if(!metadata.isDirectory()||metadata.isSymbolicLink()||metadata.uid!==0||(metadata.mode&0o022)!==0)throw new OmpRunnerHold('security_review_required');
+   if(parent===dirname(parent))break;
+  }
+  initial=await lstat(binary);
+  if(!initial.isFile()||initial.isSymbolicLink()||initial.uid!==0||initial.nlink!==1||(initial.mode&0o022)!==0||(initial.mode&0o111)===0)throw new OmpRunnerHold('security_review_required');
+ }catch{throw new OmpRunnerHold('security_review_required');}
  const binarySha256=sha(await readFile(binary));
- if(binarySha256!==expectedBinarySha256)throw new OmpRunnerHold('security_review_required');
+ if(binarySha256!==review.hostResolverBinarySha256)throw new OmpRunnerHold('security_review_required');
  const version=await capture(spawn,binary,['--version'],{cwd:jobRoot,env,stdio:['pipe','pipe','pipe'],windowsHide:true},Buffer.alloc(0),1024,5000,signal);
- const versionMatches=version.code===0&&version.stdout.equals(Buffer.from(OMP_VERSION+'\n'));version.stdout.fill(0);version.stderr.fill(0);
+ const versionMatches=version.code===0&&version.stdout.equals(Buffer.from(review.hostResolverVersion+'\n'));version.stdout.fill(0);version.stderr.fill(0);
  if(!versionMatches)throw new OmpRunnerHold('credential_unavailable');
  const list=async()=>capture(spawn,binary,['token','anthropic','--list'],{cwd:jobRoot,env,stdio:['pipe','pipe','pipe'],windowsHide:true},Buffer.alloc(0),16*1024,10_000,signal);
  const first=await list();if(first.code!==0){first.stdout.fill(0);first.stderr.fill(0);throw new OmpRunnerHold('credential_unavailable');}
@@ -185,7 +197,7 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  const after=await lstat(binary).catch(()=>null);let afterSha:string;
  try{afterSha=sha(await readFile(binary));}catch{token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  if(!after||after.dev!==initial.dev||after.ino!==initial.ino||after.size!==initial.size||after.mtimeMs!==initial.mtimeMs||after.ctimeMs!==initial.ctimeMs||afterSha!==binarySha256){token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
- return {token,version:OMP_VERSION,binarySha256,accountLabelSha256};
+ return {token,version:review.hostResolverVersion,binarySha256,accountLabelSha256};
 }
 export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string}
 /** A failed control/provider lease must not quarantine the shared evidence CAS.
@@ -212,7 +224,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
    try{
     await scope.assertActive();
     const credentialCwd=join(scope.directory,'host-control');await mkdir(credentialCwd,{mode:0o700});
-    const auth=await resolveOmpCredential(deps.spawn??nodeSpawn,deps.binary??OMP_BINARY,credentialCwd,review.ompBinarySha256,scope.signal);token=auth.token;
+    const auth=await resolveOmpCredential(deps.spawn??nodeSpawn,OMP_HOST_BINARY,credentialCwd,review,scope.signal);token=auth.token;
     const controlContract=ompAssessmentControl(),settings=await readFile(new URL('../docker/omp-b/settings.yml',import.meta.url)),prompt=Buffer.from(controlContract.prompt);
     payload=Buffer.from(canonicalJson(data));
     if(payload.length>OMP_LIMITS.inputBytes)throw new OmpRunnerHold('request_rejected');
@@ -259,10 +271,10 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
      if(failure)throw failure;
      throw error;
     }
-    const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:auth.version+' sha256:'+auth.binarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
+    const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const answer:ModelAnswer={...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:auth.version+' sha256:'+auth.binarySha256};
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An
