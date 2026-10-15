@@ -1876,9 +1876,10 @@ export async function repackCivicPolicyInventory(options:InventoryRepackOptions=
   if(options.dryRun||before.sha256===after.sha256){await assertOriginal();const ended=performance.now();return result(options.dryRun?'dry_run':'already_packed',ended,ended);}
   const manifestPath=await backupInventoryManifest(state,original,options.backupPath);
   for(const segment of plan.added)await publishSegment(state,segment);
-  // A failed/crashed publication leaves a reusable, content-addressed candidate.
+  // Atomic rename keeps staging single-linked even if killed before cleanup.
+  // It also safely replaces a two-link candidate stranded by older staging.
   const candidateName='inventory.repack-'+after.sha256+'.json',candidatePath=join(state,candidateName);
-  try{await atomicJson(candidatePath,physical,true,true,serialized);}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
+  await atomicJson(candidatePath,physical,false,true,serialized);
   const candidateIdentity=await lstat(candidatePath,{bigint:true}),candidateStamp=snapshotStamp(candidateIdentity);
   if(!candidateIdentity.isFile()||candidateIdentity.nlink!==1n||(candidateIdentity.mode&0o777n)!==0o600n)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_MISMATCH');
   validatedInventoryBytes.delete(state);readInventorySnapshots.delete(state);

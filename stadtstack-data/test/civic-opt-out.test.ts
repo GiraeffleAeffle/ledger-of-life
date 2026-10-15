@@ -1561,7 +1561,8 @@ for(const mutation of ['roots','authority','objections','segment','old_segment',
  const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),before=await readFile(path),originalOpen=fsPromises.open;let injected=false;
  t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
   const candidate=String(args[0]);
-  if(!injected&&candidate.startsWith(join(stateDir,'inventory.repack-'))&&candidate.endsWith('.json')){
+  const staged=!injected&&candidate.startsWith(join(stateDir,'inventory.repack-'))&&candidate.endsWith('.json')?await lstat(candidate).catch((error:NodeJS.ErrnoException)=>{if(error.code!=='ENOENT')throw error;return undefined;}):undefined;
+  if(staged){
    injected=true;
    if(mutation==='roots'){const value=JSON.parse(await readFile(candidate,'utf8'));value.roots[0].complete=false;await writeFile(candidate,JSON.stringify(value)+'\n',{mode:0o600});}
    if(mutation==='authority')await writeFile(join(stateDir,'authority.json'),Buffer.concat([await readFile(join(stateDir,'authority.json')),Buffer.from('\n')]),{mode:0o600});
@@ -1646,7 +1647,7 @@ test('repack requires pinned sealed state and refuses a mismatched original back
  await assert.rejects(repackCivicPolicyInventory(policy),{code:'CIVIC_POLICY_BACKUP_MISMATCH'});assert.deepEqual(await readFile(path),before);
 });
 
-for(const phase of ['segment','candidate','after_rename'] as const)test('repack survives a real process crash at '+phase,{timeout:30_000},async t=>{
+for(const phase of ['segment','candidate','candidate_rename','candidate_linked','after_rename'] as const)test('repack survives a real process crash at '+phase,{timeout:30_000},async t=>{
  const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),before=await readFile(path),logical=await readCivicPolicyInventory(policy),physical=JSON.parse(before.toString('utf8')),module=new URL('../src/civic-opt-out.ts',import.meta.url).href;
  const script=`
   // Module-loading boundary: fault hooks must be live before custody imports.
@@ -1657,14 +1658,27 @@ for(const phase of ['segment','candidate','after_rename'] as const)test('repack 
    if(phase==='segment'&&path.startsWith(stateDir+'/inventory-segments/')&&path.endsWith('.json')&&!oldPins.some(sha=>path.endsWith('/'+sha+'.json')))await pause();
    if(phase==='candidate'&&path.startsWith(stateDir+'/inventory.repack-')&&path.endsWith('.json'))await pause();
    return handle;};
-  fs.rename=async(...args)=>{await originalRename(...args);if(phase==='after_rename'&&String(args[1])===stateDir+'/inventory.json')await pause();};
+  fs.rename=async(...args)=>{
+   const target=String(args[1]),candidate=target.startsWith(stateDir+'/inventory.repack-')&&target.endsWith('.json');
+   // Reproduce the old exclusive staging protocol's precise crash window.
+   if(phase==='candidate_linked'&&candidate){await fs.link(...args);await pause();await fs.unlink(args[0]);return;}
+   await originalRename(...args);
+   if(phase==='candidate_rename'&&candidate||phase==='after_rename'&&target===stateDir+'/inventory.json')await pause();
+  };
   syncBuiltinESMExports();const {repackCivicPolicyInventory}=await import(module);await repackCivicPolicyInventory(policy);
  `;
  const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,JSON.stringify({policy,stateDir,phase,oldPins:physical.storage.segments.map((pin:{sha256:string})=>pin.sha256),module})],{stdio:['pipe','pipe','pipe']}),ready=Promise.withResolvers<void>(),closed=Promise.withResolvers<void>();let stdout='',stderr='';
  child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.includes('ready\n'))ready.resolve();});child.stderr.on('data',chunk=>{stderr+=chunk;});
  child.once('error',error=>{ready.reject(error);closed.reject(error);});child.once('close',()=>{if(!stdout.includes('ready\n'))ready.reject(new Error(stderr||'Repack child exited before crash barrier'));closed.resolve();});
  t.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
- await ready.promise;child.kill('SIGKILL');await closed.promise;assert.equal(child.signalCode,'SIGKILL');
+ await ready.promise;
+ if(phase==='candidate_linked'||phase==='candidate_rename'){
+  const name=(await readdir(stateDir)).find(name=>name.startsWith('inventory.repack-')&&name.endsWith('.json'));assert.ok(name);
+  const candidate=await lstat(join(stateDir,name));assert.equal(candidate.nlink,phase==='candidate_linked'?2:1);
+  const linkedTemporaries=await Promise.all((await readdir(stateDir)).filter(name=>name.startsWith('.')&&name.endsWith('.tmp')).map(async name=>await lstat(join(stateDir,name))));
+  assert.equal(linkedTemporaries.filter(stat=>stat.dev===candidate.dev&&stat.ino===candidate.ino).length,phase==='candidate_linked'?1:0);
+ }
+ child.kill('SIGKILL');await closed.promise;assert.equal(child.signalCode,'SIGKILL');
  if(phase!=='after_rename')assert.deepEqual(await readFile(path),before);else assert.notDeepEqual(await readFile(path),before);
  assert.equal((await recoverCivicPolicyLock(policy)).status,'recovered');
  assert.deepEqual(await readCivicPolicyInventory(policy),logical);
@@ -1672,6 +1686,7 @@ for(const phase of ['segment','candidate','after_rename'] as const)test('repack 
  assert.deepEqual(await readFile(join(stateDir,'inventory.json.backup-'+hash(before))),before);
  for(const pin of physical.storage.segments)assert.equal(hash(await readFile(join(stateDir,'inventory-segments',pin.sha256+'.json'))),pin.sha256);
  assert.deepEqual(await readCivicPolicyInventory(policy),logical);
+ assert.equal((await lstat(path)).nlink,1);
 });
 
 test('sealed read snapshots reuse hydration/index but reopen every current pin on every read',async t=>{
