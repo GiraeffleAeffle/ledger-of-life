@@ -50,6 +50,13 @@ for(const [name,{compute,semantic}] of Object.entries(contracts)){
   assert.notEqual(canonicalJobIdentity(spec(after)).jobKey,key,semantic);
  });
 }
+test('database supervision remains host-only for the five queued R1 semantic contracts',async()=>{
+ const affected=['district-database.ts','district-jobs.ts','district-r1.ts','district-codex-accounting.ts','replay-pipeline.ts','civic-opt-out.ts'];
+ for(const name of ['residualPreparation','residual','assessmentQueue','assessmentB','policyRefresh']){
+  const before=await contracts[name].compute(hash);
+  for(const file of affected)assert.deepEqual(await contracts[name].compute(change(file)),before,name+': '+file);
+ }
+});
 test('preparation jobs are independent of extraction prompts/model/decoding/chunking and output assembly',async()=>{
  const preparation=await residualPreparationContract(hash),extraction=await residualJobContract(hash);
  assert.deepEqual(Object.keys(preparation),['preparationSha256']);
@@ -90,7 +97,7 @@ test('complete host-code manifest records actual per-file bytes and a canonical 
  const versions=await hostCodeVersions(),manifest=Object.entries(versions).filter(([key])=>key.startsWith('hostCode.')).map(([key,sha256])=>({file:key.slice('hostCode.'.length),sha256}));
  assert.equal(versions.hostCodeManifestVersion,'district-host-code-v1');
  assert.equal(versions.hostCodeManifestSha256,semanticHash(manifest));
- for(const file of ['civic-opt-out.ts','district-jobs.ts','source-policy.ts','district-policy-refresh.ts','district-cas.ts','district-model-usage.ts'])assert.equal(versions['hostCode.src/'+file],digest(await readFile(new URL('../src/'+file,import.meta.url))));
+ for(const file of ['civic-opt-out.ts','district-jobs.ts','district-database.ts','source-policy.ts','district-policy-refresh.ts','district-cas.ts','district-model-usage.ts'])assert.equal(versions['hostCode.src/'+file],digest(await readFile(new URL('../src/'+file,import.meta.url))));
  const modified=manifest.map(entry=>entry.file==='src/civic-opt-out.ts'?{...entry,sha256:digest('Synthetic alternate host bytes')}:entry);
  assert.notEqual(semanticHash(modified),versions.hostCodeManifestSha256);
  assert.equal('hostCodeManifestSha256' in spec(await residualJobContract(hash)),false);

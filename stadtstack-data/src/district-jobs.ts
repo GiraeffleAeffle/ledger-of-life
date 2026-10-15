@@ -8,8 +8,9 @@ import {z} from 'zod';
 import {canonicalJson, digest, HashSchema, ScopeSchema, type AdapterScope} from './district-adapter-contract.ts';
 import {DistrictCas, type CasArtifact} from './district-cas.ts';
 import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encodeStepReceipt, unknownReceiptCounts, type JobOutcome, type ReasonCode, type StepReceipt} from './district-step-receipt.ts';
-import {CivicPolicyStateError} from './civic-opt-out.ts';
+import {CivicPolicyStateError,withCivicPolicyShutdown} from './civic-opt-out.ts';
 import {hostCodeVersions} from './district-host-provenance.ts';
+import {DistrictDatabaseConnectionLost,DistrictDatabaseScope,guardDistrictPool,isDistrictDatabaseConnectionError,withDistrictDatabaseScope} from './district-database.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
 export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
@@ -58,6 +59,7 @@ export function canonicalResourceIdentity(raw:string):string {
  * A failure in 002 cannot roll back already-applied 001 or silently rewrite it.
  */
 export async function migrateDistrictJobs(pool:Pool):Promise<void> {
+  guardDistrictPool(pool);
   const migrations=[
     {version:1,file:new URL('../migrations/001_district_jobs.sql',import.meta.url)},
     {version:2,file:new URL('../migrations/002_r1_metadata.sql',import.meta.url)},
@@ -81,7 +83,7 @@ export async function migrateDistrictJobs(pool:Pool):Promise<void> {
         if(previous.rowCount){if(previous.rows[0].sha256!==hash)throw Error('Applied migration byte hash changed');}
         else {await client.query(bytes.toString('utf8'));await client.query('INSERT INTO district_pipeline.schema_migrations(version,sha256) VALUES($1,$2)',[migration.version,hash]);}
         await client.query('COMMIT');
-      } catch(error) {await client.query('ROLLBACK');throw error;}
+      } catch(error) {await client.query('ROLLBACK').catch(()=>{});throw error;}
     }
   } finally {client.release();}
 }
@@ -109,11 +111,11 @@ export async function insertR1MetadataSnapshot(pool:Pool,input:R1MetadataSnapsho
 
 export class DistrictJobStore {
   readonly pool:Pool;
-  constructor(pool:Pool){this.pool=pool;}
+  constructor(pool:Pool){this.pool=guardDistrictPool(pool);}
   private async transaction<T>(body:(client:PoolClient)=>Promise<T>):Promise<T> {
     const client=await this.pool.connect();
     try {await client.query('BEGIN');const result=await body(client);await client.query('COMMIT');return result;}
-    catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+    catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}finally{client.release();}
   }
   async addArtifact(artifact:CasArtifact):Promise<void> {
     HashSchema.parse(artifact.sha256);
@@ -547,6 +549,35 @@ async function deliverDisposition(store:DistrictJobStore,config:NotificationConf
   try{await deliverDistrictOwnerNotifications(store,config,60000,runId);return undefined;}
   catch(error){return error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';}
 }
+/** Recovery repeats only fenced metadata finalization, never a handler, provider
+ * submission, command or successful job effect. Lost sessions stay lost.
+ */
+async function finalizeAfterDatabaseLoss(store:DistrictJobStore,run:RunBounds,job:ClaimedJob|undefined,receipt:StepReceipt|undefined,lostAt:number):Promise<void> {
+  const remaining=60000-(performance.now()-lostAt);
+  if(remaining<=0)return;
+  const pool=guardDistrictPool(new Pool({...store.pool.options,max:2,connectionTimeoutMillis:1000,statement_timeout:1000,query_timeout:1000,onConnect:undefined,verify:undefined,application_name:'stadtstack-r1-recovery'}));
+  const clients=new Set<PoolClient>();let expired=false;
+  pool.on('acquire',client=>clients.add(client));pool.on('release',(_error,client)=>clients.delete(client));
+  const deadline=setTimeout(()=>{
+    expired=true;
+    // Public Client.end aborts outstanding queries. Transactions then roll back
+    // and release normally; no checked-out client is released twice.
+    for(const client of clients)void client.end().catch(()=>{});
+  },remaining);
+  const recovered=new DistrictJobStore(pool);
+  try{
+    while(!expired&&performance.now()-lostAt<60000){
+      try{
+        if(job&&receipt)await recovered.hold(job,'lease_lost',receipt);
+        if(expired)return;
+        await recovered.endRun(run.runId,'held','lease_lost');return;
+      }catch(error){
+        if(!isDistrictDatabaseConnectionError(error))return;
+        await delay(Math.max(1,Math.min(1000,60000-(performance.now()-lostAt))));
+      }
+    }
+  }finally{clearTimeout(deadline);await pool.end().catch(()=>{});}
+}
 /** No polling daemon, subprocess, arbitrary module loading, or automatic retries.
  * Inject trusted, signal-aware handlers; the only accepted effects are fenced receipts.
  * Late asynchronous results are discarded. JavaScript cannot preempt synchronous
@@ -554,6 +585,10 @@ async function deliverDisposition(store:DistrictJobStore,config:NotificationConf
  * must have an OS hard deadline. Postgres rejects effects past authorization/lease expiry.
  */
 export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorResult> {
+  return withDistrictDatabaseScope(database=>runDistrictJobsInScope(options,database));
+}
+async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictDatabaseScope):Promise<ExecutorResult> {
+  database.observe(options.store.pool);
   const mode=options.mode??'attended';
   if(mode!=='attended'&&mode!=='bounded_unattended')throw Error('Execution mode rejected');
   if(mode==='attended'&&options.ownerPresent!==true)throw new DistrictExecutionHold('owner_absent');
@@ -569,11 +604,15 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
   Object.values(resourceLimits).forEach(validateResourceLimit);
   const invocationStart=performance.now();
   const lock=await options.store.pool.connect();let run:RunBounds|undefined;let jobsStarted=0;const receiptIds:string[]=[];
+  let activeJob:ClaimedJob|undefined,recoveryReceipt:StepReceipt|undefined;
   let stopped:ReasonCode|null=null;const stopController=new AbortController();
   const ownerStop=()=>{stopped='owner_stopped';stopController.abort(new DistrictExecutionHold('owner_stopped'));};
-  const lockLost=()=>{stopped='lease_lost';stopController.abort(new DistrictExecutionHold('lease_lost'));};
+  const databaseLost=()=>{stopped='lease_lost';stopController.abort(database.failure??new DistrictDatabaseConnectionLost());};
+  const lockLost=()=>database.lose();
   options.signal?.addEventListener('abort',ownerStop,{once:true});lock.on('error',lockLost);
+  database.signal.addEventListener('abort',databaseLost,{once:true});if(database.signal.aborted)databaseLost();
   try {
+    database.throwIfLost();
     await lock.query('SELECT pg_advisory_lock(18441,2)');
     try {
       if(options.signal?.aborted)throw new DistrictExecutionHold('owner_stopped');
@@ -591,7 +630,8 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
       if(performance.now()-monotonicStart>=availableMs){stopped=deadlineReason;break;}
       const claim=await options.store.claim(run,leaseMs,currentPolicy);
       if(claim.kind==='stop'){stopped=claim.reasonCode;break;}
-      const job=claim.job; jobsStarted++;
+      const job=claim.job;activeJob=job;jobsStarted++;
+      stopController.signal.throwIfAborted();
       const controller=new AbortController();const abortRun=()=>controller.abort(stopController.signal.reason);stopController.signal.addEventListener('abort',abortRun,{once:true});
       const start=performance.now(),cpu=process.cpuUsage();let renewal:Promise<void>|undefined;let timer:NodeJS.Timeout|undefined;let leaseTimer:NodeJS.Timeout|undefined;
       const deadline=setTimeout(()=>controller.abort(new DistrictExecutionHold(deadlineReason)),Math.max(1,availableMs-(performance.now()-monotonicStart)));
@@ -601,9 +641,10 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         leaseTimer=setTimeout(()=>controller.abort(new DistrictExecutionHold(reason)),Math.max(1,Date.parse(expiresAt)-Date.now()));
       };
       armLease(job.leaseExpiresAt);
-      const renew=()=>{timer=setTimeout(()=>{renewal=options.store.renew(run!,job,leaseMs).then(expiresAt=>{if(!controller.signal.aborted){armLease(expiresAt);renew();}},error=>controller.abort(error instanceof DistrictExecutionHold?error:new DistrictExecutionHold('lease_lost')));},Math.max(10,Math.floor(leaseMs/3)));};
+      const renew=()=>{timer=setTimeout(()=>{renewal=options.store.renew(run!,job,leaseMs).then(expiresAt=>{if(!controller.signal.aborted){armLease(expiresAt);renew();}},error=>{if(isDistrictDatabaseConnectionError(error))database.lose();controller.abort(database.failure??(error instanceof DistrictExecutionHold?error:new DistrictExecutionHold('lease_lost')));});},Math.max(10,Math.floor(leaseMs/3)));};
       renew();let receipt:StepReceipt|undefined;
       let rejectAbort:((reason:unknown)=>void)|undefined;
+      let invocation:Promise<JobHandlerResult>|undefined;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -622,7 +663,8 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         };
         // An aborted but still-unwinding handler keeps its slot until it settles
         // (or the fenced job lease expires); it cannot release a newer holder.
-        const result=await Promise.race([invoke(),aborted]);
+        invocation=invoke();
+        const result=await Promise.race([invocation,aborted]);
         if(controller.signal.aborted)throw controller.signal.reason;
         if(result.provider){
           const provider=result.provider;
@@ -632,15 +674,27 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         }
         for(const output of result.outputs??[]){controller.signal.throwIfAborted();await options.cas.verify(output.sha256);await options.store.addArtifact(output);}
         receipt=await makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
+        database.throwIfLost();
         await options.store.finish(run,job,receipt,currentPolicy);receiptIds.push(receipt.id);
+        activeJob=undefined;
         if(result.outcome!=='succeeded'&&result.outcome!=='no_supported_case'){stopped=result.reasonCode;break;}
       } catch(error) {
+        if(database.failure||isDistrictDatabaseConnectionError(error)){
+          database.lose();controller.abort(database.failure);
+          recoveryReceipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:'lease_lost'},performance.now()-start,process.cpuUsage(cpu));
+          throw database.failure;
+        }
         const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
         receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
         if(await options.store.hold(job,reason,receipt))receiptIds.push(receipt.id);
+        activeJob=undefined;
         stopped=reason;break;
       } finally {
         clearTimeout(deadline);clearTimeout(timer);clearTimeout(leaseTimer);controller.signal.removeEventListener('abort',onAbort);controller.abort(new DistrictExecutionHold('owner_stopped'));stopController.signal.removeEventListener('abort',abortRun);await renewal;
+        // The abort race fences results, not cleanup. Do not print a run result,
+        // close pools or remove signal protection while scratch/daemon teardown
+        // can still acquire an inventory lock or hold live process handles.
+        await invocation?.catch(()=>{});
       }
     }
     const reasonCode:ReasonCode=stopped??'max_jobs_reached';
@@ -649,6 +703,14 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
     const notificationReasonCode=await deliverDisposition(options.store,notificationConfig,run.runId);
     return {runId:run.runId,state,reasonCode,jobsStarted,receiptIds,...(notificationReasonCode?{notificationReasonCode}:{})};
   } catch(error) {
+    if(database.failure||isDistrictDatabaseConnectionError(error)){
+      database.lose();
+      if(run){
+        if(activeJob&&!recoveryReceipt)recoveryReceipt=await makeReceipt(activeJob,{outcome:'held_execution',reasonCode:'lease_lost'},null,null);
+        await finalizeAfterDatabaseLoss(options.store,run,activeJob,recoveryReceipt,database.lostAt!);
+      }
+      throw database.failure;
+    }
     const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
     if(run){
       await options.store.endRun(run.runId,'held',reason);
@@ -657,8 +719,8 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
     }
     throw error;
   } finally {
-    options.signal?.removeEventListener('abort',ownerStop);lock.removeListener('error',lockLost);
-    try{if(run)await lock.query('SELECT pg_advisory_unlock(18442,hashtext($1))',[run.runId]);}finally{lock.release();}
+    options.signal?.removeEventListener('abort',ownerStop);lock.removeListener('error',lockLost);database.signal.removeEventListener('abort',databaseLost);
+    try{if(run&&!database.failure)await lock.query('SELECT pg_advisory_unlock(18442,hashtext($1))',[run.runId]);}finally{lock.release(Boolean(database.failure));}
   }
 }
 
@@ -724,6 +786,9 @@ export const artifactVerificationHandler:JobHandler=async ({job,signal,cas})=>{
  * DATABASE_URL is read only by the runner; it is never logged or passed as context.
  */
 export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<ExecutorResult|undefined> {
+  return withDistrictDatabaseScope(database=>withCivicPolicyShutdown(signal=>runDistrictJobsCommand(handlers,argv,notificationConfig,signal),database.signal));
+}
+async function runDistrictJobsCommand(handlers:Readonly<Record<string,JobHandler>>,argv:string[],notificationConfig:NotificationConfig|undefined,shutdown:AbortSignal):Promise<ExecutorResult|undefined> {
   const [command,...args]=argv;
   if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH]');
   const flags:Record<string,string|true>={};
@@ -734,21 +799,21 @@ export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHand
   if(mode!=='attended'&&mode!=='bounded_unattended')throw Error('Execution mode rejected');
   if(command==='run'&&mode==='attended'&&(!process.stdin.isTTY||flags['--owner-present']!==true))throw new DistrictExecutionHold('owner_absent');
   if(command==='run'&&mode==='bounded_unattended'&&(!notificationConfig||flags['--owner-present']))throw new DistrictExecutionHold('notification_unavailable');
-  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-bounded'});
+  const pool=guardDistrictPool(new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-bounded'}));
   const abort=new AbortController();const stop=()=>abort.abort(new DistrictExecutionHold('owner_stopped'));
+  shutdown.addEventListener('abort',stop,{once:true});if(shutdown.aborted)stop();
   try {
     if(command==='migrate'){await migrateDistrictJobs(pool);process.stdout.write('District job migration applied.\n');return;}
     const id=flags['--authorization-id'];const jobs=Number(flags['--max-jobs']),seconds=Number(flags['--max-seconds']);
     if(typeof id!=='string'||!Number.isInteger(jobs)||!Number.isInteger(seconds)||seconds<1)throw Error('Explicit authorization and positive job/time bounds required');
-    process.on('SIGINT',stop);process.on('SIGTERM',stop);process.on('SIGHUP',stop);
     if(mode==='attended'){process.stdin.on('end',stop);process.stdin.on('close',stop);process.stdin.resume();}
     const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})}});
     process.stdout.write(JSON.stringify(result)+'\n');if(result.state==='held')process.exitCode=2;
     return result;
   } finally {
-    process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);process.removeListener('SIGHUP',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
+    shutdown.removeEventListener('abort',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
   }
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
-  runDistrictJobsCli({verify_artifacts:artifactVerificationHandler}).catch(error=>{process.stderr.write((error instanceof DistrictExecutionHold?error.reasonCode:'District jobs command failed; inspect private state and configuration.')+'\n');process.exitCode=2;});
+  runDistrictJobsCli({verify_artifacts:artifactVerificationHandler}).catch(error=>{process.stderr.write(isDistrictDatabaseConnectionError(error)?'R1_FAILURE phase=execution code=DATABASE_CONNECTION_LOST\n':(error instanceof DistrictExecutionHold?error.reasonCode:'District jobs command failed; inspect private state and configuration.')+'\n');process.exitCode=2;});
 }

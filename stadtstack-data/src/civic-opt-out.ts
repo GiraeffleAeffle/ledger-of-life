@@ -1,5 +1,5 @@
 import {constants,watch} from 'node:fs';
-import {mkdir,lstat,open,rename,unlink,link,opendir,rmdir,statfs} from 'node:fs/promises';
+import {mkdir,lstat,stat,readFile,open,rename,unlink,link,opendir,rmdir,statfs} from 'node:fs/promises';
 import type {FileHandle} from 'node:fs/promises';
 import type {Stats,BigIntStats,FSWatcher} from 'node:fs';
 import {spawn} from 'node:child_process';
@@ -507,6 +507,25 @@ export async function readCivicOptOutSnapshot(options:CivicPolicyOptions={}):Pro
  const objections=[...selected.values()].sort((a,b)=>a.hostSha256<b.hostSha256?-1:a.hostSha256>b.hostSha256?1:0),body={schemaVersion,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256,objections};
  return {...body,sha256:digest(JSON.stringify(body))};
 }
+// TERM is a stop-admission barrier, not an interrupt inside a transaction.
+// Keep handlers installed until all already-started inventory operations drain.
+let inventoryLifetime:{controller:AbortController;operations:Set<Promise<void>>;scopes:number}|undefined;
+export async function withCivicPolicyShutdown<T>(work:(signal:AbortSignal)=>Promise<T>,externalStop?:AbortSignal):Promise<T>{
+ const lifetime=inventoryLifetime??={controller:new AbortController(),operations:new Set(),scopes:0};
+ lifetime.scopes++;
+ const stop=()=>lifetime.controller.abort(new CivicPolicyStateError('CIVIC_POLICY_SHUTDOWN'));
+ process.on('SIGTERM',stop);process.on('SIGINT',stop);process.on('SIGHUP',stop);
+ externalStop?.addEventListener('abort',stop,{once:true});if(externalStop?.aborted)stop();
+ try{return await work(lifetime.controller.signal);}
+ finally{
+  while(lifetime.operations.size)await Promise.allSettled([...lifetime.operations]);
+  process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);process.removeListener('SIGHUP',stop);
+  externalStop?.removeEventListener('abort',stop);
+  // Retain an aborted barrier even after the CLI returns: a late callback must
+  // never acquire a fresh lock after termination was requested.
+  if(!--lifetime.scopes&&!lifetime.controller.signal.aborted)inventoryLifetime=undefined;
+ }
+}
 const queues=new Map<string,Promise<void>>();
 const nextLockAttempt=new Map<string,number>();
 async function hasInventoryWaiters(state:string):Promise<boolean>{
@@ -526,6 +545,122 @@ function inventoryLockWaitMs(options:CivicPolicyOptions):number{
  if(!Number.isSafeInteger(value)||value<1||value>600_000)throw new CivicPolicyStateError('INVALID_LOCK_WAIT');
  return value;
 }
+const lockRecordSchema=z.object({pid:z.number().int().positive().max(0x7fffffff),nonce:z.string().uuid(),boot_id:z.string().uuid(),starttime:z.string().regex(/^\d{1,24}$/)}).strict();
+const legacyLockSchema=lockRecordSchema.omit({boot_id:true,starttime:true});
+type InventoryLockRecord=z.infer<typeof lockRecordSchema>;
+type LegacyLockRecord=z.infer<typeof legacyLockSchema>;
+let lockProcessIdentity:Promise<{boot_id:string;starttime:string}>|undefined;
+export interface CivicLockRecoveryReceipt {
+ schemaVersion:'civic-policy-lock-recovery-v1';status:'recovered'|'absent'|'refused';
+ reasonCode:'DEAD_HOLDER_QUARANTINED'|'LOCK_ABSENT'|'HOLDER_ALIVE_OR_UNPROVEN'|'LEGACY_OPERATOR_REQUIRED'|'LOCK_OPEN_OR_UNINSPECTABLE'|'RECOVERY_MUTEX_BUSY'|'LOCK_REPLACED'|'LOCK_RECORD_INVALID';
+ legacy:boolean;
+}
+async function linuxBootId():Promise<string>{
+ return z.string().uuid().parse((await readFile('/proc/sys/kernel/random/boot_id','utf8')).trim());
+}
+async function linuxProcessStarttime(pid:number):Promise<string>{
+ const value=await readFile(`/proc/${pid}/stat`,'utf8'),end=value.lastIndexOf(')'),fields=value.slice(end+2).trim().split(/\s+/),starttime=fields[19];
+ if(!value.startsWith(pid+' (')||end<0||!starttime||!/^\d{1,24}$/.test(starttime))throw new CivicPolicyStateError('LOCK_IDENTITY_UNAVAILABLE');
+ return starttime;
+}
+async function holderIsDead(record:InventoryLockRecord|LegacyLockRecord):Promise<boolean>{
+ try{
+  const boot=await linuxBootId();
+  if('boot_id' in record&&record.boot_id!==boot)return true;
+  try{
+   const starttime=await linuxProcessStarttime(record.pid);
+   return 'starttime' in record&&record.starttime!==starttime;
+  }catch(error){return missing(error);}
+ }catch{return false;}
+}
+async function inspectInventoryLock(state:string):Promise<{record:InventoryLockRecord|LegacyLockRecord|null;stat:Stats;changed?:true}|undefined>{
+ const path=join(state,'inventory.lock');let before:Stats|undefined;
+ try{
+  before=await lstat(path);
+  const value=await fileBytes(path,8192,true);
+  if(value.stat.nlink!==1)throw new CivicPolicyStateError('LOCK_IDENTITY_UNAVAILABLE');
+  let parsed:unknown;try{parsed=JSON.parse(value.bytes.toString('utf8'));}catch{return {...value,record:null};}
+  const current=lockRecordSchema.safeParse(parsed),legacy=legacyLockSchema.safeParse(parsed);
+  return {stat:value.stat,record:current.success?current.data:legacy.success?legacy.data:null};
+ }catch(error){
+  if(missing(error))return undefined;
+  if(before&&error instanceof CivicPolicyStateError){
+   // Unlike immutable authority files, this short-lived inode may be unlinked
+   // between open() and fstat() (nlink=0), or populated while we read. Defer
+   // only on proven path/metadata movement; never infer a dead holder from it.
+   const after=await lstat(path).catch(error=>{if(missing(error))return undefined;throw error;});
+   if(!after)return undefined;
+   if(!sameIdentity(before,after)||before.size!==after.size||before.mtimeMs!==after.mtimeMs||before.ctimeMs!==after.ctimeMs)return {record:null,stat:after,changed:true};
+  }
+  throw error;
+ }
+}
+async function legacyLockHasNoOpenDescriptors(identity:Stats):Promise<boolean>{
+ let complete=true;
+ // An unreadable process/fd directory is not evidence of absence. Operators
+ // need sufficient /proc visibility; uncertainty deliberately refuses repair.
+ for await(const processEntry of await opendir('/proc')){
+  if(!/^\d+$/.test(processEntry.name))continue;
+  try{
+   for await(const fd of await opendir(`/proc/${processEntry.name}/fd`)){
+    try{if(sameIdentity(identity,await stat(`/proc/${processEntry.name}/fd/${fd.name}`)))return false;}
+    catch(error){if(!missing(error))complete=false;}
+   }
+  }catch(error){if(!missing(error))complete=false;}
+ }
+ return complete;
+}
+async function withLockBreakMutex<T>(state:string,work:()=>Promise<T>):Promise<{acquired:true;value:T}|{acquired:false}>{
+ // flock's inherited-fd form locks the shared open-file description. Its short
+ // subprocess can exit: our descriptor retains the mutex through TERM/helper
+ // death, and kernel close releases it if this process dies. No stale mutex.
+ const path=join(state,'inventory.break.lock'),handle=await open(path,constants.O_RDWR|constants.O_CREAT|constants.O_NOFOLLOW,0o600);
+ try{
+  const identity=await handle.stat();
+  if(!identity.isFile()||identity.uid!==process.getuid?.()||identity.nlink!==1||(identity.mode&0o777)!==0o600||identity.size!==0||!sameIdentity(identity,await lstat(path)))throw new CivicPolicyStateError('LOCK_IDENTITY_UNAVAILABLE');
+  const child=spawn('/usr/bin/flock',['--exclusive','--nonblock','3'],{stdio:['ignore','ignore','ignore',handle.fd]});
+  const acquired=Promise.withResolvers<boolean>();
+  child.once('error',acquired.reject);child.once('close',code=>acquired.resolve(code===0));
+  if(!await acquired.promise)return {acquired:false};
+  if(!sameIdentity(identity,await lstat(path)))throw new CivicPolicyStateError('LOCK_IDENTITY_UNAVAILABLE');
+  return {acquired:true,value:await work()};
+ }finally{await handle.close();}
+}
+async function recoverInventoryLock(state:string,legacyAllowed:boolean,signal?:AbortSignal):Promise<CivicLockRecoveryReceipt>{
+ const receipt=(status:CivicLockRecoveryReceipt['status'],reasonCode:CivicLockRecoveryReceipt['reasonCode'],legacy=false):CivicLockRecoveryReceipt=>({schemaVersion:'civic-policy-lock-recovery-v1',status,reasonCode,legacy});
+ signal?.throwIfAborted();
+ const candidate=await inspectInventoryLock(state);
+ if(!candidate)return receipt('absent','LOCK_ABSENT');
+ if(candidate.changed)return receipt('refused','LOCK_REPLACED');
+ if(!candidate.record)return receipt('refused','LOCK_RECORD_INVALID');
+ const legacy=!('boot_id' in candidate.record);
+ if(legacy&&!legacyAllowed)return receipt('refused','LEGACY_OPERATOR_REQUIRED',true);
+ if(!await holderIsDead(candidate.record))return receipt('refused','HOLDER_ALIVE_OR_UNPROVEN',legacy);
+ signal?.throwIfAborted();
+ const result=await withLockBreakMutex(state,async()=>{
+  signal?.throwIfAborted();
+  // Every breaker re-inspects under the same kernel mutex. A provably dead
+  // holder cannot unlink/release its inode, so only another serialized breaker
+  // could replace it. New acquirers cannot create until this rename completes.
+  const current=await inspectInventoryLock(state);
+  if(!current||!sameIdentity(candidate.stat,current.stat)||JSON.stringify(candidate.record)!==JSON.stringify(current.record))return receipt('refused','LOCK_REPLACED',legacy);
+  if(!current.record||!await holderIsDead(current.record))return receipt('refused','HOLDER_ALIVE_OR_UNPROVEN',legacy);
+  if(legacy&&!await legacyLockHasNoOpenDescriptors(current.stat))return receipt('refused','LOCK_OPEN_OR_UNINSPECTABLE',true);
+  const final=await lstat(join(state,'inventory.lock'));
+  if(!sameIdentity(current.stat,final)||final.isSymbolicLink()||final.nlink!==1)return receipt('refused','LOCK_REPLACED',legacy);
+  signal?.throwIfAborted();
+  await rename(join(state,'inventory.lock'),join(state,'inventory.lock.quarantine-'+randomUUID()));
+  const directory=await open(state,constants.O_RDONLY|constants.O_DIRECTORY);
+  try{await directory.sync();}finally{await directory.close();}
+  return receipt('recovered','DEAD_HOLDER_QUARANTINED',legacy);
+ });
+ return result.acquired?result.value:receipt('refused','RECOVERY_MUTEX_BUSY',legacy);
+}
+/** Explicit legacy repair: no inventory/lease mutation or completion claim. */
+export async function recoverCivicPolicyLock(options:CivicPolicyOptions={}):Promise<CivicLockRecoveryReceipt>{
+ await assertCivicPolicyAuthority(options);
+ return recoverInventoryLock(statePath(options),true,inventoryLifetime?.controller.signal);
+}
 async function waitForInventoryTurn(prior:Promise<void>,signal?:AbortSignal):Promise<void>{
  if(!signal){await prior;return;}
  signal.throwIfAborted();
@@ -539,11 +674,14 @@ async function waitForInventoryPoll(ms:number,signal?:AbortSignal):Promise<void>
  catch(error){signal?.throwIfAborted();throw error;}
 }
 async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false,signal?:AbortSignal):Promise<T>{
+ const lifetime=inventoryLifetime;
+ signal=signal&&lifetime?AbortSignal.any([signal,lifetime.controller.signal]):signal??lifetime?.controller.signal;
  signal?.throwIfAborted();
  const waitMs=inventoryLockWaitMs(options);
  const state=statePath(options);
  const prior=queues.get(state)??Promise.resolve(),gate=Promise.withResolvers<void>(),queued=prior.then(()=>gate.promise);
  queues.set(state,queued);
+ const finished=Promise.withResolvers<void>();lifetime?.operations.add(finished.promise);
  const path=join(state,'inventory.lock');let handle:FileHandle|undefined,waiting:FileHandle|undefined,waitingIdentity:Stats|undefined;
  let waitingPath:string|undefined;
  const stopWaiting=async()=>{
@@ -555,6 +693,8 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   await waitForInventoryTurn(prior,signal);
   if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
   if(!provisioning)await warmInventorySegments(state);
+  // Resolve the immutable identity before acquiring the inventory lock.
+  const identity=await(lockProcessIdentity??=Promise.all([linuxBootId(),linuxProcessStarttime(process.pid)]).then(([boot_id,starttime])=>({boot_id,starttime})));
   const cooldown=(nextLockAttempt.get(state)??0)-performance.now();
   signal?.throwIfAborted();
   if(cooldown>0&&await hasInventoryWaiters(state))await waitForInventoryPoll(cooldown,signal);
@@ -565,8 +705,10 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
    catch(error){
     if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;
     if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
-    try{const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();}
-    catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
+    try{
+     const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
+     if(!provisioning&&(await recoverInventoryLock(state,false,signal)).status==='recovered')continue;
+    }catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
     if(!provisioning&&!waiting){waitingPath=join(state,'inventory.wait-'+randomUUID());waiting=await open(waitingPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);waitingIdentity=await waiting.stat();}
     await waitForInventoryPoll(25,signal);
    }
@@ -575,12 +717,12 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   try{
    await stopWaiting();
    signal?.throwIfAborted();
-   await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID()})+'\n');await handle.sync();
+   await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID(),...identity})+'\n');await handle.sync();
    if(!provisioning)await assertCivicPolicyAuthority(options);
    signal?.throwIfAborted();
    return await work();
   }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
- }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{gate.resolve();void queued.then(()=>{if(queues.get(state)===queued)queues.delete(state);});}}
+ }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{gate.resolve();finished.resolve();lifetime?.operations.delete(finished.promise);void queued.then(()=>{if(queues.get(state)===queued)queues.delete(state);});}}
 }
 function entryId(entry:Omit<Entry,'id'|'state'>):string{return digest(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));}
 function checkedRelative(root:Root,path:string,contentSha256:string,receiptSha256?:string):string{
@@ -1643,6 +1785,7 @@ export async function civicOptOutMain(args:string[]=process.argv.slice(2)):Promi
  const options={stateDir:values['state-dir'],authorityId:values['authority-id'],authoritySha256:values['authority-sha256']};
  if(options.authorityId!==undefined&&options.authorityId!==CIVIC_POLICY_AUTHORITY_ID||statePath(options)!==CIVIC_POLICY_STATE_DIR)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
  if(command==='provision'){console.log(JSON.stringify(await provisionCivicPolicyAuthority(options)));return;}
+ if(command==='recover-lock'){const receipt=await recoverCivicPolicyLock(options);console.log(JSON.stringify(receipt));if(receipt.status==='refused')process.exitCode=2;return;}
  if(command==='compact-inventory'){console.log(JSON.stringify(await compactCivicPolicyInventory({...options,dryRun:values['dry-run'],backupPath:values.backup})));return;}
  if(command==='recover-scratch'){const receipt=await recoverManagedSourceScratch(options);console.log(JSON.stringify(receipt));if(receipt.status!=='complete')process.exitCode=2;return;}
  if(command==='retire-root'){if(!values.root||!values.reason)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');const receipt=await retireManagedRoot(values.root,{reason:values.reason},options);console.log(JSON.stringify(receipt));if(receipt.status!=='retired')process.exitCode=2;return;}
@@ -1650,4 +1793,4 @@ export async function civicOptOutMain(args:string[]=process.argv.slice(2)):Promi
  const receipt=command==='register'?await recordHostOptOut({host:values.host,reason:reasonSchema.parse(values.reason),reference:values.reference,receivedAt:values['received-at']},options):await purgeOptedOutHost(values.host,options);
  console.log(JSON.stringify(receipt));const purge='purge' in receipt?receipt.purge:receipt;if(purge.status!=='purged')process.exitCode=2;
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)civicOptOutMain().catch(()=>{console.error('Civic opt-out operation failed; acquisition remains fail-closed. Operator review required.');process.exitCode=2;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)withCivicPolicyShutdown(()=>civicOptOutMain()).catch(()=>{console.error('Civic opt-out operation failed; acquisition remains fail-closed. Operator review required.');process.exitCode=2;});
