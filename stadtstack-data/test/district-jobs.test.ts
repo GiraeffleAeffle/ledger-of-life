@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
+import {readFile} from 'node:fs/promises';
+import {setTimeout as delay} from 'node:timers/promises';
+import {DatabaseError} from 'pg';
+import {z} from 'zod';
+import {CivicPolicyStateError,HostOptedOutError} from '../src/civic-opt-out.ts';
+import {formatDistrictJobException} from '../src/district-exception-diagnostics.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import {canonicalJobIdentity,canonicalResourceIdentity,runDistrictJobsCli,R1_MUNICIPALITIES,type DistrictJobSpec} from '../src/district-jobs.ts';
 
@@ -44,4 +51,59 @@ test('resource identities retain portal tenant/query selectors and strip only no
 test('CLI never accepts shell or arbitrary module-loading flags',async()=>{
   await assert.rejects(runDistrictJobsCli({},['run','--shell','touch /tmp/not-executed']),/Unknown CLI flag/);
   await assert.rejects(runDistrictJobsCli({},['run','--handler-module','arbitrary.ts']),/Unknown CLI flag/);
+});
+
+test('exception diagnostics admit only a real first src frame and a bounded existing line',async()=>{
+  const key=digest('synthetic diagnostic job'),prefix=`R1_EXCEPTION job=${key.slice(0,12)} step=residual_prepare `,source=new URL('../src/district-jobs.ts',import.meta.url);
+  const error=Object.assign(new TypeError('synthetic-secret-message'),{code:'CIVIC_POLICY_BUSY',stack:`TypeError: synthetic-secret-message\n    at hiddenFunction (${source.href}:42:9)\n    at /private/secret.ts:3:4`});
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=src/district-jobs.ts:42\n');
+  error.stack=`TypeError: synthetic-secret-message\n    at async ${fileURLToPath(source)}:123:4`;
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=src/district-jobs.ts:123\n');
+  for(const frame of ['at parse (node:internal/parser:2:3)','at parse (/private/src/secret.ts:2:3)','at parse ('+new URL('../README.md',import.meta.url).href+':2:3)','at parse ('+source.href.replace('/src/','/src/../')+':2:3)']){
+    error.stack=`TypeError: synthetic-secret-message\n    ${frame}\n    at later (${source.href}:99:1)`;
+    assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=none\n');
+  }
+  const text=await readFile(source,'utf8'),lineCount=text.split('\n').length-(text.endsWith('\n')?1:0);
+  for(const location of [new URL('../src/SECRET_TOKEN.ts',import.meta.url).href+':42:9',source.href+':'+(lineCount+1)+':9',source.href+':0:9']){
+    error.stack=`TypeError: synthetic-secret-message\n    at forged (${location})`;
+    assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=none\n');
+  }
+  const injected=new Error(`synthetic-secret-message\n    at forged (${source.href}:42:9)`);
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',injected),prefix+'class=Error code=other at=none\n');
+});
+test('exception diagnostics use closed constructor/code vocabularies and survive hostile accessors',async()=>{
+  const key=digest('synthetic diagnostic job'),prefix=`R1_EXCEPTION job=${key.slice(0,12)} step=residual_prepare `;
+  for(const name of ['PrivateDocumentName','Error','Bad Class','bad\nclass','x'.repeat(65),''])for(const code of ['SECRET_TOKEN_VALUE','ERR_SYNTHETIC','bad-code','lowercase','BAD\nCODE','X'.repeat(65),1,undefined]){
+    const error={constructor:{name},code,message:'synthetic-secret-message',stack:'synthetic-secret-stack'};
+    assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=other code=other at=none\n');
+  }
+  const hostile=new Proxy({},{get(){throw Error('synthetic-secret-accessor');}});
+  for(const error of [hostile,null,undefined])assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=other code=other at=none\n');
+  const error={constructor:{name:'X'.repeat(64)},code:'C'.repeat(64),stack:42};
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',error),prefix+'class=other code=other at=none\n');
+  const spoofed=Object.assign(new Error('secret'),{constructor:{name:'PrivateDocumentName'},code:'SECRET_TOKEN_VALUE'});
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',spoofed),prefix+'class=Error code=other at=none\n');
+});
+test('exception diagnostics identify real built-in, library and project constructors',async()=>{
+  const key=digest('synthetic diagnostic job'),prefix=`R1_EXCEPTION job=${key.slice(0,12)} step=residual_prepare `;
+  const abort=await delay(0,undefined,{signal:AbortSignal.abort()}).catch(error=>error);
+  const parsed=z.string().safeParse(null);assert.equal(parsed.success,false);
+  for(const [error,name,code] of [
+    [new Error('secret'),'Error','other'],[new RangeError('secret'),'RangeError','other'],
+    [new SyntaxError('secret'),'SyntaxError','other'],[new ReferenceError('secret'),'ReferenceError','other'],
+    [new AggregateError([],'secret'),'AggregateError','other'],[new DOMException('secret','AbortError'),'DOMException','other'],
+    [new z.ZodError([]),'ZodError','other'],[new DatabaseError('secret',0,'error'),'DatabaseError','other'],
+    [parsed.error,'ZodError','other'],
+    [new CivicPolicyStateError('CIVIC_POLICY_BUSY'),'CivicPolicyStateError','CIVIC_POLICY_BUSY'],
+    [new HostOptedOutError('private.example'),'HostOptedOutError','HOST_OPTED_OUT'],[abort,'AbortError','ABORT_ERR'],
+    [new CivicPolicyStateError('SECRET_TOKEN_VALUE'),'CivicPolicyStateError','other'],
+    [Object.assign(new Error('secret'),{code:'ENOENT'}),'Error','ENOENT'],
+    [Object.assign(new Error('secret'),{code:'ERR_INVALID_ARG_TYPE'}),'Error','ERR_INVALID_ARG_TYPE'],
+    [Object.assign(new Error('secret'),{code:'execution_exception'}),'Error','execution_exception'],
+  ] as const){
+    const line=await formatDistrictJobException(key,'residual_prepare',error);
+    assert.ok(line.startsWith(prefix+'class='+name+' code='+code+' at='),line);
+  }
+  class PrivateDocumentName extends Error {}
+  assert.equal(await formatDistrictJobException(key,'residual_prepare',new PrivateDocumentName('secret')),prefix+'class=other code=other at=none\n');
 });

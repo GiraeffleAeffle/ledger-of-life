@@ -11,6 +11,7 @@ import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encode
 import {CivicPolicyStateError,withCivicPolicyShutdown} from './civic-opt-out.ts';
 import {hostCodeVersions} from './district-host-provenance.ts';
 import {DistrictDatabaseConnectionLost,DistrictDatabaseScope,guardDistrictPool,isDistrictDatabaseConnectionError,withDistrictDatabaseScope} from './district-database.ts';
+import {formatDistrictJobException} from './district-exception-diagnostics.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
 export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
@@ -646,6 +647,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
       renew();let receipt:StepReceipt|undefined;
       let rejectAbort:((reason:unknown)=>void)|undefined;
       let invocation:Promise<JobHandlerResult>|undefined;
+      let handlerThrew=false;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -659,7 +661,8 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
           if(resource)while(!await options.store.acquireResourceSlot(run!,job,resource,resourceLimits[resource]))await waitForSlot(controller.signal);
           try {
             controller.signal.throwIfAborted();
-            return await handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)});
+            try{return await handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)});}
+            catch(error){handlerThrew=true;throw error;}
           } finally {if(resource)await options.store.releaseResourceSlot(job,resource);}
         };
         // An aborted but still-unwinding handler keeps its slot until it settles
@@ -687,7 +690,10 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         }
         const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
         receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
-        if(await options.store.hold(job,reason,receipt))receiptIds.push(receipt.id);
+        if(await options.store.hold(job,reason,receipt)){
+          receiptIds.push(receipt.id);
+          if(reason==='execution_exception'&&handlerThrew)process.stderr.write(await formatDistrictJobException(job.jobKey,job.spec.step,error));
+        }
         activeJob=undefined;
         stopped=reason;break;
       } finally {

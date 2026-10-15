@@ -9,7 +9,7 @@ import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,runDistrictJobsCli,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,runDistrictJobsCli,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement,type ExecutionResource} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
 import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
@@ -290,6 +290,39 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const unattended=await store.enqueue(jobSpec('absent-owner'));const authorizationId=await authorize([unattended]);
     await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='owner_absent');
     await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
+  });
+
+  await t.test('a committed handler execution exception emits exactly one content-free stderr line',async st=>{
+    let stderr='';st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+    try{
+      const secret='synthetic-secret-message',key=await store.enqueue(jobSpec('exception-diagnostic','diagnostic_throw'));
+      const error=Object.assign(new TypeError(secret),{code:'ERR_SYNTHETIC'});
+      const result=await run(await authorize([key]),1,{diagnostic_throw:async()=>{throw error;}});
+      assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');
+      assert.equal(stderr,`R1_EXCEPTION job=${key.slice(0,12)} step=diagnostic_throw class=TypeError code=other at=none\n`);
+      const saved=await pool.query<{state:string;receipt:StepReceipt}>('SELECT j.state,r.receipt FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1',[key]);
+      assert.equal(saved.rowCount,1);assert.equal(saved.rows[0].state,'held_execution');assert.equal(saved.rows[0].receipt.reasonCode,'execution_exception');
+      assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/synthetic-secret-message|ERR_SYNTHETIC|R1_EXCEPTION/);
+      stderr='';
+      const returned=await store.enqueue(jobSpec('returned-exception-hold','diagnostic_return'));
+      assert.equal((await run(await authorize([returned]),1,{diagnostic_return:async()=>({outcome:'held_execution',reasonCode:'execution_exception'})})).state,'held');
+      const controlled=await store.enqueue(jobSpec('controlled-exception-hold','diagnostic_controlled'));
+      assert.equal((await run(await authorize([controlled]),1,{diagnostic_controlled:async()=>{throw new DistrictExecutionHold('quality_failed');}})).reasonCode,'quality_failed');
+      assert.equal(stderr,'');
+      const hostile=await store.enqueue(jobSpec('hostile-exception-diagnostic','diagnostic_hostile'));
+      const forged={constructor:{name:'PrivateDocumentName'},code:'SECRET_TOKEN_VALUE',stack:`Error: secret\n    at forged (${new URL('../src/SECRET_TOKEN.ts',import.meta.url).href}:42:9)`};
+      assert.equal((await run(await authorize([hostile]),1,{diagnostic_hostile:async()=>{throw forged;}})).reasonCode,'execution_exception');
+      assert.equal(stderr,`R1_EXCEPTION job=${hostile.slice(0,12)} step=diagnostic_hostile class=other code=other at=none\n`);
+      stderr='';
+      // Cleanup can replace a handler's exception. Diagnose the actual error
+      // that caused the committed exception hold, still exactly once.
+      const release=store.releaseResourceSlot.bind(store);
+      st.mock.method(store,'releaseResourceSlot',async(job:ClaimedJob,resource:ExecutionResource)=>{await release(job,resource);throw Object.assign(Error(secret),{code:'ERR_CLEANUP'});});
+      const cleanup=await store.enqueue(jobSpec('exception-cleanup-diagnostic','residual_extract'));
+      const cleaned=await run(await authorize([cleanup]),1,{residual_extract:async()=>{throw new TypeError(secret);}});
+      assert.equal(cleaned.reasonCode,'execution_exception');
+      assert.equal(stderr,`R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=other at=none\n`);
+    }finally{st.mock.restoreAll();}
   });
 
   await t.test('independent executors progress concurrently without holding live siblings',async()=>{
