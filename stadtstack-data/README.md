@@ -746,6 +746,158 @@ Protected hosting defaults to60 authenticated HTTP/RPC requests per minute and4 
 
 The fixed 30-question bank is `evaluation/pilot-questions.json`. The [baseline](reports/PILOT_VALUE_BASELINE.md) used the immutable 16-tool release: no complete answers, four partially useful answers and 26 correct abstentions. The [enhanced evaluation](reports/PILOT_VALUE_ENHANCED.md) has one complete, ten partially useful answers and 19 correct abstentions, with explicit AI-assisted source reviews rather than claimed human approval. Correct abstention is not useful substantive success. All seven graph/no-graph pairs show zero usefulness gain; dataset growth is not attributed to the graph. Frozen reports retain their actual collection/source provenance. The owner's next sequence is reproducibility first, then the planned triage/span/batch/incremental runner rebuild, concentric expansion and graph communities, then Braid import.
 
+### Frozen R1 step-9 runbook: value verdict and post-release owner sample
+
+The read-only contract is [R1_STATUS.md §4 step 9](docs/R1_STATUS.md) and
+[CIVIC_PIPELINE_REBUILD.md §4.1/§6](docs/CIVIC_PIPELINE_REBUILD.md). Do not edit
+the question bank, rubric, denominators or acceptance thresholds. The value gate
+requires **without-graph usefulness ≥30/60**, **≥8 complete substantive answers**,
+**correctness 60/60**, **sources ≥46/60**, and **≥2 total same-release graph
+usefulness points across W03/W04/E03/B03/K03/M03/H03**, with no question-level
+graph correctness loss. All thirty answers and all seven pairs remain required.
+Correct abstention is safety, not useful substantive success.
+
+The [owner's option-B decision](reports/approvals/r1-autonomy-and-release-2026-10-14.json)
+defers **only the sampled owner audit until after release**. Rights questions,
+unresolved disagreements and unsupported finalization/payment/identity findings
+still block release; owner absence never grants a waiver. A step-9 pass is not a
+source/security/runtime/seal/replay pass and does not itself authorize deployment.
+These audit commands make no provider calls, network requests or production writes.
+The separately authorized queue assessment stages below do make provider calls.
+
+Run from `stadtstack-data` with `umask 022`. Keep the report, triplet manifest,
+packet and owner checks in a private local operator directory, not tracked public
+reports or hosted release members; audit files contain original source excerpts.
+Use actual pinned paths/IDs in the shell variables below. Never invent policy,
+parser, provider, authorization or owner-check receipts.
+
+1. **Collect through the real candidate MCP.** Record actual MCP calls and
+   pagination, including graph calls. No direct private-record import may replace
+   retrieval. Store its awaiting-review report as `$COLLECTED`.
+
+   ```sh
+   npm run evaluate:pilot -- collect --server-root "$SERVER_ROOT" \
+     --release "$RELEASE_ID" --tools 20 --mode vm_candidate \
+     --candidate-directory "$CANDIDATE_DIRECTORY" \
+     --policy-state-dir "$POLICY_STATE_DIR" --output "$COLLECTED"
+   ```
+
+   Use `sealed` mode instead only for a genuinely sealed reader. Source/security/
+   runtime checks, exact replay and step-8 `release-gate.json` are independent
+   prerequisites; this value verdict does not replace them or enumerate private
+   step-8 holds. Append the step-8 critical/rights exception inventory below before
+   claiming whole-release acceptance.
+2. **Queue the value lane.** `knowledge:r1 enqueue-value-assessments`, with the
+   standard pinned `--registry-config`/`--registry-descriptor` arguments, consumes
+   stdin `{reportPath,sourceBindings,custodyReceiptSha256,maxModelCalls}`.
+   `reportPath` is the absolute collector-report path. `sourceBindings` must cover
+   every MCP source with its `mcpSourceId`, original/prepared-text/parser/admission
+   hashes and authentic text/native locators. Text attribution must expose
+   `text-sha256:<prepared-sha>;chars:<start>-<end>`; fixed ±256 context windows
+   are clipped to that immutable MCP interval, never operator-expanded. Native
+   selectors match both published attribution and verified parser locators;
+   full native parser JSON is not sent to assessors. Stale, missing or oversized
+   original/parser/public-locator closure holds without trimming or network refresh.
+   Collection and every value-item original-evidence read also require exact
+   canonical equality with the unique primary `get_signal`/`get_source` responses.
+   Question membership and completeness are re-derived from the recorded bounded
+   search/graph queries: recomputing report hashes cannot widen MCP attribution
+   or move another question's evidence into an answer.
+   The custody anchor is a genuine current policy receipt whose original remains
+   a retained governed job input, including for empty answers. It is never implied
+   answer evidence; actual answer sources still obey the question's town filter.
+   The default ceiling is 2 total Codex calls (A+C; allowed
+   2–48) per answer-unit SHA(bank, release, question, lane); evidence changes do
+   not reset it. B uses the separately authorized Haiku Max lane.
+   The atomic enqueue produces thirty
+   without-graph units plus seven graph units and their A/B job keys.
+   Execute separately authorized bounded A (Codex) and blind B (VM-OMP Haiku)
+   stages using the existing preauthorize/run workflow. Enqueue C with
+   `enqueue-assessment-c` stdin `{jobs:[{AJobKey,BJobKey}]}`, run genuine C,
+   then enqueue/run `enqueue-assessment-reconciliation` with
+   `{jobs:[{AJobKey,BJobKey,CJobKey}]}`. Never substitute a missing role or trim
+   oversized evidence to obtain a score. A/B requests are capped at 22,000
+   canonical UTF-8 bytes; C at 36,000.
+3. **Export, ingest and finalize.** `knowledge:r1 value-assessment-results`
+   consumes `{jobKeys:[...]}` with the 37 committed reconciliation keys and emits
+   `$ASSESSMENTS`, an array of `{item,A,B,C}` paths to the actual CAS artifacts.
+   Include **all relevant critical/exception triplets**, not just passing value
+   answers, in the audit inventory `$AUDIT_ASSESSMENTS`. Additional entries may
+   carry a positive `exceptionMinutes` reservation (default 10). It is an error
+   to omit a known rights/disagreement/critical exception. An unresolved value
+   answer cannot be finalized: resolve the evidence and rerun the governed
+   assessment path, rather than importing hand-written scores.
+
+   ```sh
+   npm run evaluate:pilot -- ingest-assessments --input "$COLLECTED" \
+     --assessments "$ASSESSMENTS" --cas-root "$CAS_ROOT" \
+     --policy-state-dir "$POLICY_STATE_DIR" --current-policy-map "$POLICY_MAP" \
+     --output "$FINALIZED"
+   npm run evaluate:pilot -- finalize --input "$FINALIZED" \
+     --baseline reports/pilot-value-enhanced.json --markdown "$VALUE_MARKDOWN"
+   ```
+
+4. **Compute the frozen machine verdict, then emit the matching owner packet.**
+   Precommit and retain `$AUDIT_SEED` before inspecting the sample; do not choose
+   a seed to get easier cases. Both commands reauthenticate original evidence and
+   recompute A/B/C reconciliation; they do not call a model. A failed verdict
+   writes the per-gate numbers/reasons and exits nonzero. Prepare the packet even
+   on failure, but do not deploy. Output paths are immutable/exclusive; choose
+   new paths for new evidence. A replay with the same finalized report, manifest
+   and seed yields the same packet hash.
+
+   ```sh
+   npm run evaluate:pilot -- verdict --input "$FINALIZED" \
+     --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$VALUE_VERDICT"
+   npm run evaluate:pilot -- audit-packet --input "$FINALIZED" \
+     --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$AUDIT_PACKET" \
+     --markdown "$AUDIT_MARKDOWN"
+   ```
+
+   The JSON inventory contains every answer/lane, original excerpts and their
+   UTF-8 hashes (or native cells/locator hashes), complete MCP attribution,
+   original/parser/policy bindings and A/B/C outcomes plus deterministic
+   discrepancies. The Markdown contains the **selected samples plus every
+   exception**, not an instruction to read all thirty-seven units. Sampling uses
+   the existing `sha256-stratified-rank-v1` frame hash, recorded seed and inclusion
+   probabilities: a genuine routine draw and oversampling stage/finance/identity/
+   OCR strata. The workload gate reserves up to **8 × 10 = 80 sample minutes**
+   plus **40 exception minutes**, **120 total**. Over-budget packets block
+   acceptance and require explicit scope/time authorization; exceptions are
+   never silently dropped. `pending_owner_audit` is permitted only for the
+   post-release sample under option B, never for critical or rights exceptions.
+
+5. **Record what the owner actually checked after release.** `$OWNER_CHECKS`
+   has version `pilot-value-owner-checks-v1`, the exact `releaseId` and
+   `packetSha256`, and `checks` containing each actually checked
+   `{itemId,evidenceSha256,minutes,findings,reviewer,verdict,blockers}`.
+   `verdict` is `pass`, `fail` or `unresolved`; `blockers` is an explicit array
+   of findings. Do not prefill checks with fabricated passes. Checks bind to
+   exact packet item hashes, not just question titles.
+
+   ```sh
+   npm run evaluate:pilot -- ingest-owner-audit --input "$FINALIZED" \
+     --packet "$AUDIT_PACKET" --audit "$OWNER_CHECKS" --output "$AUDITED_REPORT"
+   npm run evaluate:pilot -- verdict --input "$AUDITED_REPORT" \
+     --packet "$AUDIT_PACKET" --assessments "$AUDIT_ASSESSMENTS" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$AUDITED_VERDICT"
+   ```
+
+   Ingest delegates checked IDs/evidence/time/completeness to `recordOwnerAudit`
+   and additionally binds verdicts/blockers to the packet, release and unchanged
+   finalized report hash. It never overwrites an existing audit. Failed checks,
+   incomplete required checks or actual time over 120 minutes block acceptance.
+   A resolved rights/critical issue needs an actual new policy/evidence/assessment
+   disposition and new report/packet; a check mark does not waive the old blocker.
+   Only individually checked evidence is owner-audited. Other evidence remains
+   AI-assessed; neither consensus nor a passing sample makes the full set
+   independently validated gold.
+
 ## Consumers
 
 The owner's Stadtstack Projektatlas reads this `out/` snapshot for its optional city views via `GET /api/signals`, `GET /api/signals/<city>?kind=<kind>` (compact map data), and `GET /api/signals/<city>/<encoded-id>` (full record). Its existing `/api/atlas/<city>` and `/map` remain the pipeline's curated-project input, not pipeline output.

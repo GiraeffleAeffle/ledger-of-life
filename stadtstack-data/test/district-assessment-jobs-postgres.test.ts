@@ -21,6 +21,7 @@ import {buildPreparedAssessmentContext,AssessmentContextHold} from '../src/distr
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
+// The entire sequential matrix shares this parent allowance on the two-CPU R1 gate.
 test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionString,timeout:300000},async t=>{
  const base=new URL(connectionString!);if(!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Fixture refuses remote PostgreSQL');
  const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Fixture refuses remote host override');

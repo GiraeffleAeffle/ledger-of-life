@@ -18,6 +18,8 @@ import {assertCivicPolicyAuthority,assertManagedSourceReadable,initializeManaged
 import type {ModelAnswer} from './district-model-contract.ts';
 import {recheckResidualPolicy} from './district-policy-refresh.ts';
 import {buildPreparedAssessmentContext,AssessmentContextHold} from './district-assessment-context.ts';
+import {assertValueAssessmentContext} from './district-value-context.ts';
+import {bankSchema,parseCandidateCollection,prepareValueAssessment,bindCandidateValueContext,valueAssessmentTarget,canonical as valueCanonical,type Report} from './evaluate-pilot-value.ts';
 
 export const R1_ASSESSMENT_RUBRIC='Assess only the admissible original evidence. Verify exact source quotations, claim and entity identity, date and date role, stage and modality, and financial plan/approval/payment/actual roles. Hold missing evidence, suspected OCR and unsupported critical claims. Score correctness, sources and usefulness 0–2. Abstention has zero usefulness. AI agreement is not independent validation.';
 const PredecessorSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict();
@@ -26,7 +28,7 @@ const PassSelectorSchema=z.object({version:z.literal('r1-assessment-pass-job-v1'
 const ItemBundleSchema=z.object({version:z.literal('r1-assessment-items-v1'),items:z.array(z.object({itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48)}).strict())}).strict();
 export async function assessmentQueueContract(hash?:(file:string)=>Promise<string>){
  // Item building, evidence context, reconciliation and model framing are semantic.
- const files=['district-assessment-jobs.ts','district-assessment-context.ts','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
+ const files=['district-assessment-jobs.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','evaluate-pilot-value.ts','../evaluation/pilot-questions.json','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
  return semanticHash(await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))}))));
 }
 /** Operational usage/failure metadata is not CAS content or a nested managed lane. */
@@ -45,8 +47,9 @@ async function committed(pool:Pool,jobKey:string,step:string){
 async function json(cas:DistrictCas,hash:string){return JSON.parse((await cas.read(HashSchema.parse(hash))).toString('utf8'));}
 async function persist(store:DistrictJobStore,cas:DistrictCas,item:AssessmentItem,value:unknown,options:Omit<AssessmentEvidenceContext,'cas'>,kind:'derived'|'receipt'='derived'){
  const bytes=Buffer.from(canonicalJson(value)),hash=digest(bytes),relativePath=`sha256/${hash.slice(0,2)}/${hash}`,policy=options.policyOptions??{};
- const originals=await Promise.all(item.sources.map(source=>loadPolicyReceipt(cas,source.admissionReceiptSha256)));
- const receipts=await Promise.all(item.sources.map((source,index)=>options.currentAdmissionReceipts?.[source.admissionReceiptSha256]?loadPolicyReceipt(cas,options.currentAdmissionReceipts[source.admissionReceiptSha256]):originals[index]));
+ const proofs=[...new Set([...item.sources.map(source=>source.admissionReceiptSha256),...(item.valueContext?[item.valueContext.custodyReceiptSha256]:[])])];
+ const originals=await Promise.all(proofs.map(hash=>loadPolicyReceipt(cas,hash)));
+ const receipts=await Promise.all(proofs.map((hash,index)=>options.currentAdmissionReceipts?.[hash]?loadPolicyReceipt(cas,options.currentAdmissionReceipts[hash]):originals[index]));
  const recheck=async()=>{for(let index=0;index<originals.length;index++)await recheckPolicyReceipt(originals[index],{...policy,evaluationAt:new Date().toISOString(),currentProof:receipts[index]});};
  await recheck();
  await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
@@ -104,6 +107,75 @@ export async function enqueueResidualAssessmentItems(pool:Pool,store:DistrictJob
  await cas.verify(selector.extractionArtifactSha256);
  return store.enqueue({...row.spec,step:'assessment_prepare',lane:'assessment',semanticContractSha256:await assessmentQueueContract(),selector,inputArtifactHashes:[...row.spec.inputArtifactHashes,selector.extractionArtifactSha256]},{dependencies:[{jobKey:extractionJobKey,expectedReceiptSha256:row.pin.receiptSha256}]});
 }
+export const ValueAssessmentEnqueueSchema=z.object({reportPath:z.string().min(1),
+  sourceBindings:assessmentItemSchema.shape.sources,custodyReceiptSha256:HashSchema,
+  maxModelCalls:z.number().int().min(2).max(48).default(2)}).strict();
+export async function buildValueAssessmentItem(report:Report,questionId:string,lane:'withoutGraph'|'withGraph',
+  bindings:AssessmentItem['sources'],custodyReceiptSha256:string,context:AssessmentEvidenceContext){
+ const row=report.evaluations.find(row=>row.question.id===questionId);if(!row)throw new AssessmentContextHold();
+ const target=valueAssessmentTarget(report,row,lane),sources:AssessmentItem['sources']=[];
+ for(const [id,attribution] of Object.entries(target.sources)){
+  const matches=bindings.filter(source=>source.mcpSourceId===id);
+  if(matches.length!==1||matches[0].originalSha256!==attribution.sha256)throw new AssessmentContextHold();
+  const source=matches[0];
+  const proof=await loadPolicyReceipt(context.cas,source.admissionReceiptSha256);
+  if(!row.question.cityIds.includes(proof.scope.municipalityId))throw new AssessmentContextHold();
+  sources.push(source);
+ }
+ const rubric=z.string().parse(report.method.grading);
+ const claimLocators=sources.flatMap(source=>[
+  ...source.locators.map(locator=>({claimId:'value-claim:'+semanticHash({sourceId:source.mcpSourceId,locatorId:locator.id}),sourceId:source.mcpSourceId,locatorId:locator.id})),
+  ...(source.nativeLocators??[]).map(locator=>({claimId:'value-claim:'+semanticHash({sourceId:source.mcpSourceId,nativeEvidence:locator}),sourceId:source.mcpSourceId,nativeEvidence:locator}))]);
+ const entityIds=new Set<string>();
+ const visit=(value:unknown):void=>{
+  if(Array.isArray(value))value.forEach(visit);
+  else if(value&&typeof value==='object')for(const [key,member] of Object.entries(value)){
+   if(typeof member==='string'&&['id','subjectId','objectId','fromId','toId'].includes(key)&&member.startsWith('entity:'))entityIds.add(member);
+   else visit(member);
+  }
+ };
+ visit(target);
+ const item=prepareValueAssessment(report,{version:'assessment-item-v1',itemId:questionId,question:row.question.question,
+  claim:canonicalJson({instruction:'Answer the frozen question from this lane only. Assess every material stage, finance and identity claim with typed evidence assertions. Use the supplied claimId for each cited locator; omitted evidence is unavailable, never inferred.',claimLocators}),
+  rubric,rubricSha256:digest(rubric),sources,claimIds:claimLocators.length?claimLocators.map(claim=>claim.claimId):['question:'+questionId],entityIds:[...entityIds].sort(),constraints:[],
+  criticalKinds:sources.length?['stage','finance','identity',...(sources.some(source=>source.ocrSuspected)?['ocr']:[])]:[]},lane);
+ return bindCandidateValueContext(item,context,custodyReceiptSha256);
+}
+export async function enqueueValueAssessments(pool:Pool,store:DistrictJobStore,cas:DistrictCas,input:unknown,
+ options:Omit<AssessmentEvidenceContext,'cas'>={}){
+ const manifest=ValueAssessmentEnqueueSchema.parse(input);
+ const reportBytes=await readFile(manifest.reportPath);if(reportBytes.length>64*1024*1024)throw new AssessmentContextHold('assessment_context_exceeded');
+ const report=parseCandidateCollection(JSON.parse(reportBytes.toString('utf8')));
+ const bytes=await readFile(new URL('../evaluation/pilot-questions.json',import.meta.url)),bank=bankSchema.parse(JSON.parse(bytes.toString('utf8')));
+ const release=z.object({id:HashSchema}).passthrough().parse(report.releaseStatus.dataManifest);
+ if(report.questionBankSha256!==digest(bytes)||report.server.mode!=='vm_candidate'||report.server.toolCount!==20
+  ||report.server.releaseId!==release.id||valueCanonical(report.evaluations.map(row=>row.question))!==valueCanonical(bank.questions)
+  ||report.evaluations.some(row=>row.review))throw new AssessmentContextHold();
+ const sourceIds=Object.keys(report.sources);
+ if(manifest.sourceBindings.length!==sourceIds.length||new Set(manifest.sourceBindings.map(source=>source.mcpSourceId)).size!==sourceIds.length
+  ||manifest.sourceBindings.some(source=>!source.mcpSourceId||report.sources[source.mcpSourceId]?.sha256!==source.originalSha256
+    ||report.sources[source.mcpSourceId]?.registrySourceId!==source.sourceId))throw new AssessmentContextHold();
+ const items:AssessmentItem[]=[];
+ for(const row of report.evaluations)for(const lane of row.question.graphDependent?['withoutGraph','withGraph'] as const:['withoutGraph'] as const)
+  items.push(await buildValueAssessmentItem(report,row.question.id,lane,manifest.sourceBindings,manifest.custodyReceiptSha256,{cas,...options}));
+ // Validate the complete 37-lane bounded frame before enqueueing any jobs.
+ const broker=new DistrictAssessmentBroker(pool,cas,options),jobs=[];
+ const transcript=await persist(store,cas,{...items[0],sources:manifest.sourceBindings},report,options);
+ for(const item of items){
+  const proof=await loadPolicyReceipt(cas,item.valueContext!.custodyReceiptSha256);
+  const artifact=await persist(store,cas,item,item,options);
+  const selector=PassSelectorSchema.parse({version:'r1-assessment-pass-job-v1',itemArtifactSha256:artifact.sha256,
+    recordArtifactSha256:transcript.sha256,maxModelCalls:manifest.maxModelCalls,predecessors:[]});
+  const AJobKey=await store.enqueue({step:'assessment_a',lane:'assessment',semanticContractSha256:await assessmentQueueContract(),
+    inputArtifactHashes:[artifact.sha256,transcript.sha256,proof.source.sha256,...assessmentEvidenceArtifactHashes(item)],sourceScope:proof.scope,
+    selector,policyProofSha256:semanticHash(proof)});
+  const BJobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:artifact.sha256,sourceScope:proof.scope,
+    policyProofSha256:semanticHash(proof),transport:'vm-omp'});
+  jobs.push({questionId:item.itemId,lane:item.valueTarget!.lane,itemArtifactSha256:artifact.sha256,
+    reportArtifactSha256:transcript.sha256,answerUnitSha256:item.valueContext!.answerUnitSha256,AJobKey,BJobKey});
+ }
+ return {version:'r1-value-assessment-jobs-v1',releaseId:report.server.releaseId,maxModelCalls:manifest.maxModelCalls,jobs};
+}
 async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<typeof PassSelectorSchema>,options:Omit<AssessmentEvidenceContext,'cas'>){
  for(const pin of selector.predecessors){
   const steps=await pool.query<{step:string}>('SELECT step FROM district_pipeline.jobs WHERE job_key=$1',[pin.jobKey]);
@@ -111,39 +183,44 @@ async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<
   if(canonicalJson(row.pin)!==canonicalJson(pin)||!context.job.dependencyReceiptIds.includes(pin.receiptId))throw new DistrictExecutionHold('quality_failed');
  }
  const item=assessmentItemSchema.parse(await json(context.cas,selector.itemArtifactSha256));
- assertResidualAssessmentContext(item);
+ if(item.valueTarget)assertValueAssessmentContext(item);else assertResidualAssessmentContext(item);
  for(const hash of [selector.itemArtifactSha256,selector.recordArtifactSha256,...assessmentEvidenceArtifactHashes(item)]){
   if(!context.job.spec.inputArtifactHashes.includes(hash))throw new DistrictExecutionHold('quality_failed');
   await assertManagedSourceReadable(join(context.cas.root,'sha256',hash.slice(0,2),hash),options.policyOptions);
  }
  const primary=await loadPolicyReceipt(context.cas,context.job.spec.policyProofSha256!);
- if(!item.sources.some(source=>source.admissionReceiptSha256===semanticHash(primary))||canonicalJson(primary.scope)!==canonicalJson(context.job.spec.sourceScope))throw new DistrictExecutionHold('policy_excluded');
+ if((item.valueContext?item.valueContext.custodyReceiptSha256!==semanticHash(primary):!item.sources.some(source=>source.admissionReceiptSha256===semanticHash(primary)))||canonicalJson(primary.scope)!==canonicalJson(context.job.spec.sourceScope))throw new DistrictExecutionHold('policy_excluded');
  const record=await json(context.cas,selector.recordArtifactSha256);
- if(record.id!==item.itemId)throw new DistrictExecutionHold('quality_failed');
- if(criticalKnowledgeTarget(record)&&canonicalJson(prepareCriticalAssessment(record,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
- if(!criticalKnowledgeTarget(record)){
-  const projection=residualRecordPropositions(record);
-  if(item.claim!==canonicalJson(projection)||canonicalJson(item.claimIds)!==canonicalJson(projection.propositions.map(proposition=>proposition.claimId)))throw new DistrictExecutionHold('quality_failed');
+ if(item.valueTarget){
+  const report=parseCandidateCollection(record),row=report.evaluations.find(row=>row.question.id===item.itemId);
+  if(!row||valueCanonical(valueAssessmentTarget(report,row,item.valueTarget.lane))!==valueCanonical(item.valueTarget))throw new DistrictExecutionHold('quality_failed');
+ }else{
+  if(record.id!==item.itemId)throw new DistrictExecutionHold('quality_failed');
+  if(criticalKnowledgeTarget(record)&&canonicalJson(prepareCriticalAssessment(record,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
+  if(!criticalKnowledgeTarget(record)){
+   const projection=residualRecordPropositions(record);
+   if(item.claim!==canonicalJson(projection)||canonicalJson(item.claimIds)!==canonicalJson(projection.propositions.map(proposition=>proposition.claimId)))throw new DistrictExecutionHold('quality_failed');
+  }
  }
  const evidence=await originalEvidence(item,{cas:context.cas,...options});
  return {item,evidence};
 }
 async function assessmentFromJob(pool:Pool,cas:DistrictCas,jobKey:string,role:'A'|'B'|'C',item:AssessmentItem,policy:CivicPolicyOptions={}){
  const row=await committed(pool,jobKey,'assessment_'+role.toLowerCase());
- const receipts:AssessmentReceipt[]=[];
+ const receipts:Array<{receipt:AssessmentReceipt;artifactSha256:string}>=[];
  for(const hash of row.receipt.outputHashes){
   await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);
   let raw;
   try{raw=await json(cas,hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}
-  if(raw.version==='assessment-receipt-v1')receipts.push(validateReceipt(raw,item,role));
+  if(raw.version==='assessment-receipt-v1')receipts.push({receipt:validateReceipt(raw,item,role),artifactSha256:hash});
  }
- if(receipts.length!==1||row.spec.policyProofSha256!==item.sources[0].admissionReceiptSha256)throw new DistrictExecutionHold('quality_failed');
- const receipt=receipts[0];if(receipt.provider!==(role==='B'?'anthropic-subscription':'openai-subscription'))throw new DistrictExecutionHold('quality_failed');
+ if(receipts.length!==1||row.spec.policyProofSha256!==(item.valueContext?.custodyReceiptSha256??item.sources[0].admissionReceiptSha256))throw new DistrictExecutionHold('quality_failed');
+ const {receipt,artifactSha256}=receipts[0];if(receipt.provider!==(role==='B'?'anthropic-subscription':'openai-subscription'))throw new DistrictExecutionHold('quality_failed');
  if(role==='B'&&(await assertCivicPolicyAuthority(policy)).mode!=='isolated-fixture'){
   const transport=z.object({transport:z.literal('vm-omp')}).passthrough().parse(row.spec.selector);
   if(transport.transport!=='vm-omp'||receipt.modelEvidence.tool!=='omp-cli')throw new DistrictExecutionHold('authorization_revoked');
  }
- return {row,receipt};
+ return {row,receipt,artifactSha256};
 }
 async function assessmentResidualInput(pool:Pool,spec:DistrictJobSpec):Promise<z.infer<typeof ResidualInputSchema>>{
  let preparation;
@@ -242,16 +319,18 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
    if(role==='C')previous={A:(await assessmentFromJob(pool,context.cas,selector.AJobKey!,'A',item,options.policyOptions)).receipt,B:(await assessmentFromJob(pool,context.cas,selector.BJobKey!,'B',item,options.policyOptions)).receipt};
    else if(selector.AJobKey||selector.BJobKey||selector.CJobKey)throw new DistrictExecutionHold('quality_failed');
    const input=buildAssessmentPassInput(item,evidence,role,previous);
-   if(item.sources.length!==1)throw new DistrictExecutionHold('quality_failed');
+   if(!item.valueTarget&&item.sources.length!==1)throw new DistrictExecutionHold('quality_failed');
    const requestArtifact=await persist(store,context.cas,item,input.data,evidenceOptions);
-   await reserveR1CodexCall(pool,context.job,item.sources[0].originalSha256,input.requestSha256,selector.maxModelCalls);
-   const policies=await Promise.all(item.sources.map(source=>loadPolicyReceipt(context.cas,evidenceOptions.currentAdmissionReceipts?.[source.admissionReceiptSha256]??source.admissionReceiptSha256)));
+   const accountingOriginal=item.valueContext?.answerUnitSha256??item.sources[0].originalSha256;
+   await reserveR1CodexCall(pool,context.job,accountingOriginal,input.requestSha256,selector.maxModelCalls);
+   const proofs=item.sources.length?item.sources.map(source=>source.admissionReceiptSha256):[item.valueContext!.custodyReceiptSha256];
+   const policies=await Promise.all(proofs.map(hash=>loadPolicyReceipt(context.cas,evidenceOptions.currentAdmissionReceipts?.[hash]??hash)));
    const sourceContext={root:context.cas.root,kind:'artifacts' as const,decisionId:CIVIC_ACQUISITION_DECISION_ID,...options.policyOptions,bindings:policies.map(receipt=>({kind:'prepared_source' as const,url:receipt.source.url,sourceSha256:receipt.source.sha256,observationId:receipt.scope.sourceId,receiptSha256:semanticHash(receipt)}))};
    const paths=assessmentModelUsagePaths(context.cas.root,context.job.jobKey,context.job.runId);
    const startedAt=new Date().toISOString();
    const receipt=await (options.fixtureProvider
     ? options.fixtureProvider(input).then(answer=>createAssessmentReceipt(item,role,answer,{startedAt,finishedAt:new Date().toISOString()},evidence,input))
-    : runAssessmentPass(item,role,'openai-subscription',{...paths,signal:context.signal},previous,{cas:context.cas,...evidenceOptions,sourceContext})).catch(error=>holdR1CodexFailure(pool,context.job,item.sources[0].originalSha256,error));
+    : runAssessmentPass(item,role,'openai-subscription',{...paths,signal:context.signal},previous,{cas:context.cas,...evidenceOptions,sourceContext})).catch(error=>holdR1CodexFailure(pool,context.job,accountingOriginal,error));
    context.signal.throwIfAborted();await originalEvidence(item,{cas:context.cas,...evidenceOptions});
    return {outcome:'succeeded',reasonCode:'completed',outputs:[requestArtifact,await persist(store,context.cas,item,receipt,evidenceOptions,'receipt')]};
   })])),
@@ -267,7 +346,9 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
     }
     const C=selector.CJobKey?(await assessmentFromJob(pool,context.cas,selector.CJobKey,'C',item,options.policyOptions)).receipt:undefined;
     const final=C?await reconcile(item,{A,B,C},{cas:context.cas,...evidenceOptions}):null;
-    const admitted=final?.disposition==='ai_reconciled'&&final.output?.outcome==='supported'&&!final.output.holdReasons.length&&item.claimIds.every(id=>final.output!.assertions.some(assertion=>assertion.claimId===id));
+    const admitted=final?.disposition==='ai_reconciled'&&!final.output?.holdReasons.length&&(item.valueTarget
+      ?!!final.output?.valueReview
+      :final.output?.outcome==='supported'&&item.claimIds.every(id=>final.output!.assertions.some(assertion=>assertion.claimId===id)));
     return {outcome:admitted?'succeeded':'held_quality',reasonCode:admitted?'completed':'quality_failed',outputs:final?[await persist(store,context.cas,item,final,evidenceOptions)]:[],counts:{acceptedFacts:admitted?1:0,heldFacts:admitted?0:1}};
    }catch(error){if(error instanceof CivicPolicyStateError||error instanceof DistrictExecutionHold&&error.reasonCode!=='quality_failed')throw error;return {outcome:'held_quality',reasonCode:'quality_failed'};}
   }),
@@ -292,7 +373,7 @@ export async function enqueuePreparedAssessmentPass(pool:Pool,store:DistrictJobS
 }
 export async function enqueueAssessmentResolution(pool:Pool,store:DistrictJobStore,cas:DistrictCas,input:{AJobKey:string;BJobKey:string;CJobKey?:string},stage:'C'|'reconcile',policy:CivicPolicyOptions={}){
  const A=await committed(pool,input.AJobKey,'assessment_a'),selector=PassSelectorSchema.parse(A.spec.selector),item=assessmentItemSchema.parse(await json(cas,selector.itemArtifactSha256));
- assertResidualAssessmentContext(item);
+ if(item.valueTarget)assertValueAssessmentContext(item);else assertResidualAssessmentContext(item);
  const B=await assessmentFromJob(pool,cas,input.BJobKey,'B',item,policy);await assessmentFromJob(pool,cas,input.AJobKey,'A',item,policy);
  const C=input.CJobKey?await assessmentFromJob(pool,cas,input.CJobKey,'C',item,policy):undefined;
  if(stage==='C'&&C)throw new DistrictExecutionHold('quality_failed');
@@ -325,4 +406,27 @@ export async function exportAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:
   results.push({jobKey,step:row.spec.step,outcome:row.receipt.outcome,reasonCode:row.receipt.reasonCode,stepReceiptId:row.receipt.id,stepReceiptSha256:encoded.sha256,inputHashes:row.receipt.inputHashes,outputHashes:row.receipt.outputHashes,selector:row.spec.step==='assessment_prepare'?null:PassSelectorSchema.safeParse(row.spec.selector).success?PassSelectorSchema.parse(row.spec.selector):{itemArtifactSha256:z.object({itemArtifactSha256:HashSchema}).passthrough().parse(row.spec.selector).itemArtifactSha256},receipts,items});
  }
  return {version:'r1-assessment-results-v1',results};
+}
+/** Export only committed value reconciliation chains, as private CAS file references. */
+export async function exportValueAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],policy:CivicPolicyOptions={}){
+ const entries=[];
+ for(const jobKey of jobKeys){
+  const final=await committed(pool,jobKey,'assessment_reconcile'),selector=PassSelectorSchema.parse(final.spec.selector);
+  const item=assessmentItemSchema.parse(await json(cas,selector.itemArtifactSha256));assertValueAssessmentContext(item);
+  if(!selector.CJobKey)throw new DistrictExecutionHold('dependency_uncommitted');
+  const roles=await Promise.all((['A','B','C'] as const).map(async role=>{
+   const key=role==='A'?selector.AJobKey:role==='B'?selector.BJobKey:selector.CJobKey;
+   const selected=await assessmentFromJob(pool,cas,key!,role,item,policy);
+   return selected.artifactSha256;
+  }));
+  for(const hash of [selector.itemArtifactSha256,...roles,...final.receipt.outputHashes])await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);
+  const original=await originalEvidence(item,{cas,policyOptions:policy});
+  const A=validateReceipt(await json(cas,roles[0]),item,'A'),B=validateReceipt(await json(cas,roles[1]),item,'B'),C=validateReceipt(await json(cas,roles[2]),item,'C');
+  buildAssessmentPassInput(item,original,'C',{A,B});
+  const disposition=await reconcile(item,{A,B,C},{cas,policyOptions:policy});
+  if(disposition.disposition!=='ai_reconciled'||!final.receipt.outputHashes.includes(semanticHash(disposition)))throw new DistrictExecutionHold('quality_failed');
+  const paths=[selector.itemArtifactSha256,...roles].map(hash=>join(cas.root,'sha256',hash.slice(0,2),hash));
+  entries.push({item:paths[0],A:paths[1],B:paths[2],C:paths[3]});
+ }
+ return entries;
 }

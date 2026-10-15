@@ -13,6 +13,8 @@ import { StepReceiptSchema, CANONICALIZATION_VERSION } from './district-step-rec
 import { PreparedDocumentSchema, verifyPreparedDocument } from './district-prepared-document.ts';
 import { CIVIC_ACQUISITION_DECISION_ID, ManagedSourceBindingSchema, type CivicPolicyOptions, type ManagedSourceContext } from './civic-opt-out.ts';
 import {AssessmentContextSchema,AssessmentContextHold,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
+import {ValueAssessmentContextSchema,assertValueAssessmentContext,assertValueSourceContext} from './district-value-context.ts';
+import {validateValueTargetTranscript,valueCallSchema} from './pilot-value-transcript.ts';
 export interface AssessmentEvidenceContext {
   cas: DistrictCas; policyOptions?: CivicPolicyOptions;
   currentAdmissionReceipts?: Readonly<Record<string,string>>;
@@ -105,6 +107,7 @@ export const assessmentItemSchema = z.object({
   // Only independently source-verified constraints belong here. Unknown semantics remain model decisions.
   constraints: z.array(assertionSchema), criticalKinds: z.array(z.enum(['stage', 'finance', 'identity', 'ocr'])),
   valueTarget: valueTargetSchema.optional(),
+  valueContext: ValueAssessmentContextSchema.optional(),
   criticalTarget: CriticalRecordTargetSchema.optional(),
 }).strict();
 export type AssessmentItem = z.infer<typeof assessmentItemSchema>;
@@ -125,6 +128,7 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
   if (new Set(item.sources.map(s => s.mcpSourceId ?? s.sourceId)).size !== item.sources.length) throw Error('Duplicate source identities');
   if (bytesHash(item.rubric) !== item.rubricSha256) throw Error('Rubric binding failed');
   if (!item.sources.length && (!item.valueTarget || Object.keys(item.valueTarget.sources).length)) throw Error('Missing original evidence');
+  if(item.valueContext){assertValueAssessmentContext(item);validateValueTargetTranscript(item.valueTarget!);}
   if (item.valueTarget && Object.keys(item.valueTarget.sources).length !== item.sources.length) throw Error('Value target original source coverage mismatch');
   let residualProjection = false;
   if (!item.valueTarget && !item.criticalTarget) {
@@ -163,6 +167,7 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
     const [original, textBytes] = await Promise.all([context.cas.read(source.originalSha256), context.cas.read(source.textSha256)]);
     if (bytesHash(original) !== source.originalSha256 || bytesHash(textBytes) !== source.textSha256) throw Error('Original evidence binding failed');
     const text = textBytes.toString('utf8');
+    if(item.valueContext)assertValueSourceContext(source,text,item.valueTarget!.sources[source.mcpSourceId??source.sourceId]);
     const ids = new Set<string>();
     const locators = source.locators.map(locator => {
       if (ids.has(locator.id) || locator.start >= locator.end || locator.end > text.length) throw Error('Invalid locator');
@@ -207,7 +212,7 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
     return { sourceId: source.mcpSourceId ?? source.sourceId, admittedSourceId: source.sourceId, url: policy.source.url,
       originalSha256: source.originalSha256, textSha256: source.textSha256,
       parserVersion: source.parserVersion, parserReceiptSha256: source.parserReceiptSha256,
-      admissionReceiptSha256: source.admissionReceiptSha256, ocrSuspected: source.ocrSuspected, text: selection || source.assessmentContext ? null : text, locators,
+      admissionReceiptSha256: source.admissionReceiptSha256, ocrSuspected: source.ocrSuspected, text: selection || source.assessmentContext || item.valueContext ? null : text, locators,
       ...(source.assessmentContext ? { assessmentContext: source.assessmentContext } : {}),
       ...(selectedContext ? { selectedContext } : {}), ...(source.nativeLocators ? { nativeLocators } : {}) };
   }));
@@ -296,7 +301,8 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
     data.valueTarget = { ...target, projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(target),
       records: Object.fromEntries(Object.entries(target.records).map(([id, record]) => [id, project(record)])),
       sources: Object.fromEntries(Object.entries(target.sources).map(([id, source]) => [id, project(source)])),
-      calls: target.calls.map(project) };
+      calls: item.valueContext?target.calls.map(call=>valueCallSchema.parse(call)).map(call=>({id:call.id,tool:call.tool,selection:call.selection,responseSha256:call.responseSha256,
+        ...(['entity_search','graph_neighbors','graph_path'].includes(call.tool)?{response:project(call.response)}:{})})):target.calls.map(project) };
   }
   if (item.criticalTarget) data.criticalTarget = { ...item.criticalTarget,
     projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(item.criticalTarget),
@@ -345,6 +351,7 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
       if (review.kind === 'abstention' && review.usefulness.score !== 0) issues.push('abstention_usefulness');
       if (review.data_missing !== (review.missing.length > 0)) issues.push('value_missing_roles');
       if (review.kind === 'substantive' && review.data_missing) issues.push('value_incomplete_substantive');
+      if(item.valueContext&&review.kind!=='abstention'&&!review.citations.length)issues.push('value_missing_citations');
       for (const citation of review.citations) {
         const source = evidence.find(s => s.sourceId === citation.sourceId);
         if (!source || source.url !== citation.url) issues.push('value_original_attribution');
@@ -370,6 +377,9 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
         if ('quote' in citation) {
           if (!source?.locators.some(l => l.quote.includes(citation.quote))) issues.push('value_original_quote');
         } else if (!source?.nativeLocators?.some(l => canonical(l) === canonical(citation.evidence))) issues.push('value_original_native');
+        if(item.valueContext&&!output.assertions.some(assertion=>assertion.sourceId===citation.sourceId&&(
+          'quote' in citation?('quote' in assertion&&assertion.quote.includes(citation.quote)):
+            ('nativeEvidence' in assertion&&canonical(assertion.nativeEvidence)===canonical(citation.evidence)))))issues.push('value_unassessed_citation');
       }
     }
   }
