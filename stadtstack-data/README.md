@@ -874,10 +874,10 @@ parser, provider, authorization or owner-check receipts.
    ```
 
    Use `sealed` mode instead only for a genuinely sealed reader. Source/security/
-   runtime checks, exact replay and step-8 `release-gate.json` are independent
-   prerequisites; this value verdict does not replace them or enumerate private
-   step-8 holds. Append the step-8 critical/rights exception inventory below before
-   claiming whole-release acceptance.
+   runtime checks, exact replay and step-8 `release-gate.json` remain separate
+   prerequisites. The single whole-release decision below combines these with
+   the value result and the complete exception inventory; the technical step-8
+   gate alone never authorizes release.
 2. **Queue the value lane.** `knowledge:r1 enqueue-value-assessments`, with the
    standard pinned `--registry-config`/`--registry-descriptor` arguments, consumes
    stdin `{reportPath,sourceBindings,custodyReceiptSha256,maxModelCalls}`.
@@ -912,12 +912,26 @@ parser, provider, authorization or owner-check receipts.
 3. **Export, ingest and finalize.** `knowledge:r1 value-assessment-results`
    consumes `{jobKeys:[...]}` with the 37 committed reconciliation keys and emits
    `$ASSESSMENTS`, an array of `{item,A,B,C}` paths to the actual CAS artifacts.
-   Include **all relevant critical/exception triplets**, not just passing value
-   answers, in the audit inventory `$AUDIT_ASSESSMENTS`. Additional entries may
-   carry a positive `exceptionMinutes` reservation (default 10). It is an error
-   to omit a known rights/disagreement/critical exception. An unresolved value
-   answer cannot be finalized: resolve the evidence and rerun the governed
-   assessment path, rather than importing hand-written scores.
+   Build `$AUDIT_ASSESSMENTS` from **all 37 value entries plus every triplet** in
+   the `assessmentManifest` pinned by `step9-handoff.json`. These include the
+   admitted step-8 critical claims, not merely their inventory labels. Additional
+   actual exception triplets may carry a positive `exceptionMinutes` reservation
+   (default 10). **A/B/C manifests are not the complete exception
+   inventory.** Prepare `$STEP8_PINS` as a private JSON object with `gate`,
+   `exceptions` and `handoff`, each an absolute `{path,sha256}` pin to the
+   corresponding `release-gate.json`, `exception-inventory.json` and
+   `step9-handoff.json`. Every audit/verdict command below requires it.
+   The handoff/gate must pin the identical inventory, release and candidate,
+   including terminal document/assessment exceptions without A/B/C artifacts.
+   Campaign membership and any source-disposition precursor pin are checked.
+   The handed-off assessment manifest is hash-verified; each item/A/B/C file is
+   verified against the selected source-assessment artifact pins and inventory.
+   Missing triplets, substitutions, extra unselected triplets in the handoff, or
+   selected triplets omitted from the inventory fail closed. Audit/verdict
+   generation rejects a 37-lane-only manifest when any handed-off claim triplet
+   is missing; it does not silently downgrade that claim to metadata-only audit.
+   An unresolved value answer cannot be finalized: resolve the evidence and rerun
+   the governed assessment path, rather than importing hand-written scores.
 
    ```sh
    npm run evaluate:pilot -- ingest-assessments --input "$COLLECTED" \
@@ -940,10 +954,12 @@ parser, provider, authorization or owner-check receipts.
    ```sh
    npm run evaluate:pilot -- verdict --input "$FINALIZED" \
      --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --step8-input "$STEP8_PINS" \
      --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
      --current-policy-map "$POLICY_MAP" --output "$VALUE_VERDICT"
    npm run evaluate:pilot -- audit-packet --input "$FINALIZED" \
      --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --step8-input "$STEP8_PINS" \
      --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
      --current-policy-map "$POLICY_MAP" --output "$AUDIT_PACKET" \
      --markdown "$AUDIT_MARKDOWN"
@@ -952,15 +968,17 @@ parser, provider, authorization or owner-check receipts.
    The JSON inventory contains every answer/lane, original excerpts and their
    UTF-8 hashes (or native cells/locator hashes), complete MCP attribution,
    original/parser/policy bindings and A/B/C outcomes plus deterministic
-   discrepancies. The Markdown contains the **selected samples plus every
-   exception**, not an instruction to read all thirty-seven units. Sampling uses
-   the existing `sha256-stratified-rank-v1` frame hash, recorded seed and inclusion
+   discrepancies. The Markdown contains the **selected samples plus every blocking
+   exception**, not an instruction to read all thirty-seven units. Authenticated
+   excluded risks remain in the complete inventory with high owner-audit priority.
+   Sampling uses the existing `sha256-stratified-rank-v1` frame hash, recorded seed and inclusion
    probabilities: a genuine routine draw and oversampling stage/finance/identity/
    OCR strata. The workload gate reserves up to **8 × 10 = 80 sample minutes**
    plus **40 exception minutes**, **120 total**. Over-budget packets block
    acceptance and require explicit scope/time authorization; exceptions are
    never silently dropped. `pending_owner_audit` is permitted only for the
-   post-release sample under option B, never for critical or rights exceptions.
+   post-release sample under option B, never for an unresolved issue affecting
+   candidate material or applicable source-level rights.
 
 5. **Record what the owner actually checked after release.** `$OWNER_CHECKS`
    has version `pilot-value-owner-checks-v1`, the exact `releaseId` and
@@ -972,9 +990,11 @@ parser, provider, authorization or owner-check receipts.
 
    ```sh
    npm run evaluate:pilot -- ingest-owner-audit --input "$FINALIZED" \
+     --step8-input "$STEP8_PINS" \
      --packet "$AUDIT_PACKET" --audit "$OWNER_CHECKS" --output "$AUDITED_REPORT"
    npm run evaluate:pilot -- verdict --input "$AUDITED_REPORT" \
      --packet "$AUDIT_PACKET" --assessments "$AUDIT_ASSESSMENTS" \
+     --step8-input "$STEP8_PINS" \
      --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
      --current-policy-map "$POLICY_MAP" --output "$AUDITED_VERDICT"
    ```
@@ -988,6 +1008,113 @@ parser, provider, authorization or owner-check receipts.
    Only individually checked evidence is owner-audited. Other evidence remains
    AI-assessed; neither consensus nor a passing sample makes the full set
    independently validated gold.
+
+### Whole-release option-B acceptance
+
+Before any governed deployment, compute **one immutable release acceptance
+record**, not a conjunction assembled by reading selected human summaries:
+
+```sh
+npm run evaluate:pilot -- release-acceptance \
+  --input "$RELEASE_ACCEPTANCE_INPUT" --output "$RELEASE_ACCEPTANCE_RECORD"
+```
+
+`$RELEASE_ACCEPTANCE_INPUT` is a private JSON object with:
+
+- `step8`: the same `{gate,exceptions,handoff}` absolute path/SHA-256 pins used
+  for the owner packet and frozen value verdict;
+- `valueVerdict`: an absolute `{path,sha256}` pin to the actual frozen verdict;
+- `ownerApproval`: an absolute `{path,sha256}` pin to
+  `reports/approvals/r1-autonomy-and-release-2026-10-14.json`, whose required SHA-256
+  is `865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5`.
+
+All artifact hashes refer to exact file bytes. The command writes a new exclusive
+`stadtstack-r1-release-acceptance-v1` record containing `releaseId`,
+`manifestSha256`, `accepted`, blockers, input pins and replay audit binding.
+`accepted:false` exits nonzero. Missing, changed or malformed pinned inputs fail
+closed and cannot produce an accepted record. Nothing is deployed, fetched,
+assessed or written to production by this command.
+
+Acceptance requires the complete step-8 technical check set and passed status,
+the exact byte-verified candidate manifest and every member, a committed replay
+audit bound to the same replay receipt/manifest/member set, and its hash-bound
+zero-call exact-replay proof. It then checks the frozen value verdict's actual
+numbers, graph pairs, unchanged denominators, all pass flags and same step-8
+pins. A stale value-only verdict without the inventory binding cannot authorize
+release.
+The value verdict and acceptance record also carry `step8AssessmentCoverage`:
+the handed-off manifest pin, required/included triplet counts and a digest of
+the exact selected artifact/content bindings. Counts alone cannot satisfy this
+binding. Older value-only verdicts without that coverage are rejected.
+
+
+The release classifier reuses `classifyStep8Exception`, also recognizing terminal
+`reasonCode`, legal/permission/contact risks and native/publication holds. It
+binds exceptions to **actual candidate membership**, not diagnostic quarantine
+counts or the mere existence of a source in the registry. Original source hashes,
+municipality/source identities, attributed source URLs and record/claim/graph
+references establish direct or derived contribution. For origin, critical and
+rights/legal issues, candidate IDs and original-document hashes are **OR** evidence:
+an excluded ID cannot mask a published sibling derived from the same original.
+Only a record-specific noncritical hold can rely solely on per-record exclusion.
+Unknown/ambiguous evidence,
+unrecognized reason codes/classes, missing current receipts and unclassified
+native observations always block; an operator label never authenticates exclusion.
+A genuine `no_supported_case` remains a negative, without value credit.
+Authenticated `held_quality`, `assessment_context_exceeded`, controlled terminal
+infrastructure/access holds and partial native coverage are **known gaps**, not
+blanket blockers, when their affected material is excluded. Known native
+narrative/short-quote/contact exclusions remain excluded gaps, not published evidence.
+The current extraction receipt is inspected even for a negative-looking legacy
+case without attempt history: held quality stays a known gap, never a successful
+negative. Historical attempts are retained as history, not promoted to success.
+
+The acceptance record embeds the versioned rule table
+`exceptionRuleSet.version = r1-option-b-candidate-scope-v1`:
+
+| Class | Candidate-bound decision |
+| --- | --- |
+| Technical, replay or frozen value failure | **Block**, including changed/missing pinned bindings. |
+| Unknown, ambiguous, incomplete or unprovable exclusion | **Block**, regardless of a purported operator clearance. |
+| Quarantined/withheld material, or derived references, actually published | **Block**; exclusion is mandatory. |
+| Origin-unresolved or disagreement | **Block** only when the affected document, claim, record or material derived from it is in the candidate. Authenticated exclusion is `known_gap`, `ownerAuditPriority:high`. |
+| Finalization/payment/identity or other unresolved critical claim | Admitted without full resolution: **block**. Authenticated excluded claim: `known_gap`, high priority; never usefulness credit. |
+| Rights/legal/copyright/permission/privacy concerning particular material | **Block** when affected material or derivatives are in the candidate; authenticated exclusion is a high-priority known gap. |
+| Source-level TDM, opt-out, policy or permission question | **Block** if that source contributes **any** candidate material, including retained material from a different document. Only a source contributing nothing may be a high-priority known gap. Missing/ambiguous source attribution blocks. |
+| Controlled quality/context/infrastructure/access non-admission | Excluded material: known gap, not a successful negative; publication/leakage blocks. |
+| Genuine `no_supported_case` | Negative, not a blocker or a substantive answer. |
+| Authenticated selected full A/B/C supersedes an older assessment job | Informational only; never clears rights/legal issues. |
+| Outstanding owner sample | May follow release under option B **only after all release gates pass**. |
+
+The original `riskClassification`, effective `classification`, contribution
+decisions and `ownerAuditPriority` are retained in the machine record and packet.
+This distinguishes an excluded unresolved risk from an admitted unresolved claim
+without pretending that either was owner-reviewed.
+
+
+An older held assessment job is superseded only when **every affected record**
+has a selected complete A/B/C admission and is in the authenticated current
+admitted-record set; that does not clear a rights/legal hold. Otherwise its
+controlled noncritical terminal hold is an excluded known gap. Terminal assessment
+record IDs are not blindly treated as excluded when a genuine selected admission
+supersedes them. Actual quarantine/publication-held and nonsuperseded terminal
+IDs are checked against published records, graph, city, regional and core members.
+Withheld/quarantined material in the candidate blocks release, including native
+fields rejected by the canonical publication predicate. Diagnostic counts of
+excluded cases are not themselves leaked source material.
+
+The owner packet now embeds the pinned complete exception inventory, including
+terminal and native/publication items with no A/B/C or original excerpt. Their
+absence is disclosed, never replaced by fabricated evidence. Every blocking
+inventory item is a mandatory owner exception with a ten-minute reservation;
+unknown risk is conservatively stratified as critical. Authenticated excluded
+risks are high-priority **sample** candidates within the same 80-minute sample
+budget, not mandatory pre-release exceptions; all remain visible in the packet.
+True blockers remain blockers even if the owner checks the packet. Excess workload
+is never truncated. The record always states `ownerReviewed:false` and
+`independentlyValidated:false`: only the **sample audit**, not an unresolved
+candidate-critical or applicable source-rights decision, may remain pending
+after option-B acceptance.
 
 ## Consumers
 

@@ -7,6 +7,8 @@ import {assessmentItemSchema,assessmentOutputSchema,ownerAudit,type AssessmentIt
 import {admittedAssessmentFixture,syntheticAssessmentTriplet} from './district-assessment.fixture.ts';
 import {buildPilotAuditPacket,computeFrozenVerdict,ingestPilotOwnerAudit,auditPacketMarkdown,auditReportHash,
   validatePilotAuditPacket,FROZEN_R1_INPUTS,type AuditAssessmentEntry,type PilotAuditPacket} from '../src/pilot-value-audit.ts';
+import {Step8ExceptionInventorySchema,inventoryExceptionItems,type Step8ExceptionBundle} from '../src/r1-release-acceptance.ts';
+import {bindReleaseExceptionContext,type CandidateMaterialContext} from '../src/r1-release-context.ts';
 
 const bank=bankSchema.parse(JSON.parse(await readFile(new URL('../evaluation/pilot-questions.json',import.meta.url),'utf8')));
 const quote='Der Haushaltsplan nennt geplante Auszahlungen von 10 Euro; ein Zahlungsnachweis fehlt.';
@@ -45,7 +47,7 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
     });
     const report:Report={schemaVersion:'pilot-value-evaluation-v1',status:'awaiting_review',generatedAt:'2026-10-15T00:00:00Z',
       questionBankSha256:FROZEN_R1_INPUTS.questionBankSha256,evaluatorSha256:'a'.repeat(64),server:{root:'/synthetic',gitCommit:'b'.repeat(40),
-        sourceSha256:'c'.repeat(64),sourceFiles:[],releaseId:'synthetic-audit-release',toolCount:20,tools:[],transport:'stdio',protocol:'synthetic-only'},
+        sourceSha256:'c'.repeat(64),sourceFiles:[],releaseId:'d'.repeat(64),toolCount:20,tools:[],transport:'stdio',protocol:'synthetic-only'},
       method:{grading:rubric},releaseStatus:{},coverage:null,records:{[record.id]:record},sources:{[source.id]:source},calls:[],evaluations:rows};
     const entries:AuditAssessmentEntry[]=[];
     for(const [index,row] of rows.entries())for(const lane of row.question.graphDependent?['withoutGraph','withGraph'] as const:['withoutGraph'] as const){
@@ -140,6 +142,78 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
       assert.equal(verdict.verdict,'fail');assert.equal(verdict.pending_owner_audit,false);
       assert.equal(verdict.gates.unresolvedCriticalAndRights.actual,5);
       assert.ok(verdict.blockingReasons.includes('owner_packet_exceeds_80_sample_40_exception_120_total_minutes'));
+    });
+    await t.test('noncritical excluded A/B/C quality holds remain explicit known gaps',async()=>{
+      const {valueTarget:ignored,...base}=assessmentItemSchema.parse(entries[0].item);
+      const item=assessmentItemSchema.parse({...base,itemId:'noncritical-quality-gap',criticalKinds:[]});
+      const output=assessmentOutputSchema.parse({itemId:item.itemId,outcome:'abstain',assertions:[],scores:{correctness:2,sources:0,usefulness:0},
+        holdReasons:['insufficient_evidence'],rationale:'Synthetic excluded noncritical quality gap, not a final claim.'});
+      const packetWithGap=await buildPilotAuditPacket(finalized,[...entries,{item,...await syntheticAssessmentTriplet(item,output,admitted.context)}],packet.seed,admitted.context);
+      assert.equal(packetWithGap.items.filter(item=>item.validationDisposition==='known_gap').length,1);
+      assert.equal(computeFrozenVerdict(finalized,packetWithGap).verdict,'pass');
+    });
+    await t.test('owner packet includes non-A/B/C step8 inventory exceptions and cannot defer them',async()=>{
+      const pin={path:'/synthetic/pinned-input.json',sha256:'e'.repeat(64)};
+      const inventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:finalized.server.releaseId,campaign:pin,complete:true,
+        sourceDispositions:[{municipalityId:'synthetic',sourceId:'source1',documentId:'document:held',sourceSha256:'f'.repeat(64),jobKey:'b'.repeat(64),
+          admittedRecordIds:[],cases:[{reason:'rights_pending'}],classification:{critical:false,rights:true,disagreement:false},assessments:[],
+          terminalDocumentException:{reasonCode:'policy_excluded'},queueEvidence:{stepReceipts:[{receipt:{jobKey:'b'.repeat(64),step:'residual_prepare',outcome:'blocked_policy',reasonCode:'policy_excluded'}}]}}],
+        native:{coverage:[],fieldHolds:{unpublishedObservations:0,counts:{contact_field:0}}},preparation:{publicationQuarantine:{schemaVersion:'stadtstack-publication-quarantine-v1',records:[]},
+          criticalHolds:[],classification:{critical:false,rights:false,disagreement:false}},assessments:[]});
+      const candidateContext:CandidateMaterialContext={manifestSha256:'1'.repeat(64),ids:[],sourceHashes:[],sourceUrls:[],sourceScopes:['synthetic\nsource1'],materialBlockers:[]};
+      const step8:Step8ExceptionBundle={version:'r1-step8-exception-bundle-v1',releaseId:finalized.server.releaseId,manifestSha256:'1'.repeat(64),
+        pins:{gate:pin,exceptions:pin,handoff:pin},inventory,candidateContext,assessmentManifest:pin,requiredAssessments:[],
+        items:bindReleaseExceptionContext(inventoryExceptionItems(inventory),candidateContext,inventory.sourceDispositions)};
+      const withInventory=await buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,step8);
+      assert.ok(withInventory.step8?.items.length);assert.ok(withInventory.sample.exceptions.every(item=>item.itemId.startsWith('step8:')));
+      assert.match(auditPacketMarkdown(withInventory),/Step-8 exception inventory/);
+      assert.match(auditPacketMarkdown(withInventory),/policy_excluded/);
+      const verdict=computeFrozenVerdict(finalized,withInventory);
+      assert.equal(verdict.verdict,'fail');assert.equal(verdict.pending_owner_audit,false);
+      assert.equal(verdict.manifestSha256,step8.manifestSha256);
+      const required=[...new Map([...withInventory.sample.selected,...withInventory.sample.exceptions].map(item=>[item.itemId,item])).values()];
+      const checked=ingestPilotOwnerAudit(finalized,withInventory,{version:'pilot-value-owner-checks-v1',releaseId:withInventory.releaseId,packetSha256:withInventory.packetSha256,
+        checks:required.map(item=>({itemId:item.itemId,evidenceSha256:item.evidenceSha256,minutes:1,findings:'Synthetic check; no waiver of unresolved policy.',reviewer:'synthetic-owner',verdict:'pass',blockers:[]}))});
+      assert.equal(computeFrozenVerdict(checked,withInventory).verdict,'fail');
+      const excludedContext={...candidateContext,sourceScopes:[]};
+      const excludedStep8={...step8,candidateContext:excludedContext,items:bindReleaseExceptionContext(inventoryExceptionItems(inventory),excludedContext,inventory.sourceDispositions)};
+      const excludedPacket=await buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,excludedStep8);
+      assert.ok(excludedPacket.step8!.items.every(item=>item.classification==='known_gap'&&item.ownerAuditPriority==='high'&&!item.blocking));
+      assert.equal(excludedPacket.sample.exceptions.length,0);assert.ok(excludedPacket.sample.plannedMinutes<=80);
+      assert.ok(excludedPacket.sample.frame.some(item=>item.itemId.startsWith('step8:')));
+      const excludedVerdict=computeFrozenVerdict(finalized,excludedPacket);
+      assert.equal(excludedVerdict.verdict,'pass');assert.equal(excludedVerdict.pending_owner_audit,true);
+      assert.match(auditPacketMarkdown(excludedPacket),/r1-option-b-candidate-scope-v1/);
+      const {valueTarget:ignored,...base}=assessmentItemSchema.parse(entries[0].item);
+      const item=assessmentItemSchema.parse({...base,itemId:'excluded:critical',criticalKinds:['identity']});
+      const output=assessmentOutputSchema.parse({itemId:item.itemId,outcome:'unresolved',assertions:[],scores:{correctness:0,sources:0,usefulness:0},
+        holdReasons:['disagreement'],rationale:'Synthetic excluded critical disagreement, not a candidate member.'});
+      const extendedInventory=Step8ExceptionInventorySchema.parse({...inventory,sourceDispositions:inventory.sourceDispositions.map(source=>({...source,
+        cases:[...source.cases,{reason:'assessment_held',candidate:{id:item.itemId}}],classification:{critical:true,rights:true,disagreement:true}}))});
+      const extendedStep8={...excludedStep8,inventory:extendedInventory,items:bindReleaseExceptionContext(inventoryExceptionItems(extendedInventory),excludedContext,extendedInventory.sourceDispositions)};
+      const extendedPacket=await buildPilotAuditPacket(finalized,[...entries,{item,...await syntheticAssessmentTriplet(item,output,admitted.context)}],packet.seed,admitted.context,extendedStep8);
+      assert.ok(extendedPacket.items.some(row=>row.assessmentItem.itemId===item.itemId&&row.ownerAuditPriority==='high'&&row.validationDisposition==='known_gap'));
+      assert.equal(computeFrozenVerdict(finalized,extendedPacket).verdict,'pass');
+      const {valueTarget:ignoredTarget,valueContext:ignoredContext,...claimBase}=assessmentItemSchema.parse(entries[0].item);
+      const admittedItem=assessmentItemSchema.parse({...claimBase,itemId:'record:handed-off-critical',criticalKinds:['stage','finance']});
+      const {valueReview:ignoredReview,...claimOutput}=assessmentOutputSchema.parse((entries[0].A as {output:unknown}).output);
+      const admittedOutput=assessmentOutputSchema.parse({...claimOutput,itemId:admittedItem.itemId});
+      const admittedEntry={item:admittedItem,...await syntheticAssessmentTriplet(admittedItem,admittedOutput,admitted.context)};
+      const requiredStep8:Step8ExceptionBundle={...excludedStep8,inventory:{...inventory,sourceDispositions:[]},items:[],
+        candidateContext:{...excludedContext,ids:[admittedItem.itemId],sourceHashes:[source.sha256]},
+        requiredAssessments:[{recordId:admittedItem.itemId,artifactSha256:{item:pin.sha256,A:pin.sha256,B:pin.sha256,C:pin.sha256},
+          contentSha256:{item:digest(admittedEntry.item),A:digest(admittedEntry.A),B:digest(admittedEntry.B),C:digest(admittedEntry.C)}}]};
+      await assert.rejects(buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,requiredStep8),/handed-off assessment triplet missing/);
+      const requiredPacket=await buildPilotAuditPacket(finalized,[...entries,admittedEntry],packet.seed,admitted.context,requiredStep8);
+      assert.equal(requiredPacket.step8AssessmentCoverage!.required,1);assert.equal(requiredPacket.step8AssessmentCoverage!.included,1);
+      const criticalEvidence=requiredPacket.items.filter(row=>row.assessmentItem.itemId===admittedItem.itemId);
+      assert.ok(criticalEvidence.length&&criticalEvidence.every(row=>row.originalEvidence.length&&Object.keys(row.mcpSources).length));
+      assert.equal(computeFrozenVerdict(finalized,requiredPacket).verdict,'pass');
+      assert.equal(computeFrozenVerdict(finalized,requiredPacket).step8AssessmentCoverage!.included,1);
+      const truncated=structuredClone(requiredPacket);
+      truncated.items=truncated.items.filter(row=>row.assessmentItem.itemId!==admittedItem.itemId);
+      const {packetSha256:ignoredPacketHash,...truncatedBody}=truncated;truncated.packetSha256=digest(truncatedBody);
+      assert.throws(()=>validatePilotAuditPacket(finalized,truncated),/handed-off assessment triplet missing/);
     });
   }finally{await rm(admitted.directory,{recursive:true,force:true});}
 });
