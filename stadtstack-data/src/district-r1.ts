@@ -342,7 +342,7 @@ export async function loadDescriptor(store:DistrictJobStore,cas:DistrictCas,hash
 }
 async function stdinJson(){let bytes=0;const chunks:Buffer[]=[];for await(const chunk of process.stdin){const value=Buffer.from(chunk);bytes+=value.length;if(bytes>4*1024*1024)throw Error('Operator manifest too large');chunks.push(value);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
 
-async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:DistrictRegistry,input:unknown){
+export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:DistrictRegistry,input:unknown,readOnly?:{generatedAt:string;policy:CivicPolicyOptions}){
  const selection=z.object({runIds:z.array(z.uuid()).min(1).max(1000)}).strict().parse(input);
  const rows=await store.pool.query<{receipt_sha256:string;receipt:unknown;spec:DistrictJobSpec}>(`SELECT r.receipt_sha256,r.receipt,j.spec FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE r.run_id=ANY($1::uuid[]) AND r.receipt->>'step' IN ('structured_parse','structured_discover') ORDER BY r.committed_at,r.receipt_sha256`,[selection.runIds]);
  if(!rows.rowCount)throw Error('No committed structured outputs in selected runs');
@@ -353,8 +353,8 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
   if(!receipt.outputHashes.length){
    const selector=z.object({worker:StructuredWorkerRequestSchema}).passthrough().parse(row.spec.selector),worker=selector.worker;
    if(receipt.outcome==='succeeded'||semanticHash(worker.scope)!==semanticHash(row.spec.sourceScope)||receipt.policyProofSha256!==worker.snapshot.policyReceiptSha256)throw Error('Technical receipt job binding mismatch');
-   const source=await sourceHttpReference(store,cas,{url:worker.snapshot.url,sha256:worker.snapshot.sourceSha256,policyReceiptSha256:worker.snapshot.policyReceiptSha256});
-   await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});
+   if(!readOnly){const source=await sourceHttpReference(store,cas,{url:worker.snapshot.url,sha256:worker.snapshot.sourceSha256,policyReceiptSha256:worker.snapshot.policyReceiptSha256});
+   await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});}
    const state=structuredCoverageStateForNoOutput(receipt.outcome);
    technical.push({family:worker.adapter,operation:worker.operation,adapterId:worker.adapter,adapterVersion:null,municipalityId:worker.scope.municipalityId,sourceId:worker.scope.sourceId,scopeSha256:semanticHash(worker.scope),sourceSha256:worker.snapshot.sourceSha256,policyReceiptSha256:worker.snapshot.policyReceiptSha256,stepReceiptSha256:row.receipt_sha256,additionalStepReceiptSha256s:[],coverage:{state,scope:canonicalJson(worker.scope),reason:`Actual committed ${receipt.outcome}: ${receipt.reasonCode}; no parser output was committed.`,checkedAt:state==='not_checked'?null:receipt.finishedAt,nextCursor:null,observedRows:0,limitations:['Technical execution disposition, not operational adapter or source-completeness evidence.']}});
    continue;
@@ -362,9 +362,9 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
   if(receipt.outputHashes.length!==1)throw Error('Unexpected structured output count');
   const {result}=await committedResult(store,cas,row.receipt_sha256,receipt.outputHashes[0]);
   const proof=PolicyReceiptSchema.parse(JSON.parse((await cas.read(result.policyReceiptSha256)).toString('utf8')));
-  await recheckPolicyReceipt(proof,{evaluationAt:new Date().toISOString()});
-  const source=await sourceHttpReference(store,cas,{url:proof.source.url,sha256:result.sourceSha256,policyReceiptSha256:result.policyReceiptSha256});
-  await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});
+  await recheckPolicyReceipt(proof,{...readOnly?.policy,evaluationAt:new Date().toISOString()});
+  if(!readOnly){const source=await sourceHttpReference(store,cas,{url:proof.source.url,sha256:result.sourceSha256,policyReceiptSha256:result.policyReceiptSha256});
+  await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});}
   const key=semanticHash({adapter:result.adapterId,version:result.adapterVersion,scope:result.scope,source:result.sourceSha256,policy:result.policyReceiptSha256,operation:receipt.step});
   let group=groups.get(key);if(!group){group={result,pages:[]};groups.set(key,group);}
   group.pages.push({result,receipt,hash:row.receipt_sha256});
@@ -392,7 +392,8 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
   for(const page of pages){contracts.add(page.result.adapterContractSha256);for(const record of page.result.records){const previous=records.get(record.id);if(previous&&canonicalJson(previous)!==canonicalJson(record))throw Error('Conflicting committed record identity');records.set(record.id,record);}}
  }
  const checked=districtRegistrySchema.parse(updated),registryBytes=Buffer.from(canonicalJson(checked)+'\n');
- const run=structuredRunSchema.parse({schemaVersion:'district-structured-run-v1',generatedAt:new Date().toISOString(),registrySha256:digest(registryBytes),questionDispositionSha256:digest(await readFile(join(REPO,'reports/pilot-question-source-disposition.json'))),adapterContractSha256:semanticHash([...contracts].sort()),records:[...records.values()].sort((a,b)=>a.id.localeCompare(b.id)),coverage});
+ const run=structuredRunSchema.parse({schemaVersion:'district-structured-run-v1',generatedAt:readOnly?.generatedAt??new Date().toISOString(),registrySha256:digest(registryBytes),questionDispositionSha256:digest(await readFile(join(REPO,'reports/pilot-question-source-disposition.json'))),adapterContractSha256:semanticHash([...contracts].sort()),records:[...records.values()].sort((a,b)=>a.id.localeCompare(b.id)),coverage});
+ if(readOnly)return {run,registry:checked,registryBytes,receipts:rows.rows.map(row=>({sha256:row.receipt_sha256,receipt:StepReceiptSchema.parse(row.receipt)}))};
  await verifyStructuredRunReceipts(run,cas,{evaluationAt:new Date().toISOString()});
  const references=new Map<string,HttpSourceAuditReference>();
  for(const row of run.coverage)if(row.sourceSha256&&row.policyReceiptSha256){

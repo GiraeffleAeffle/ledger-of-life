@@ -6,6 +6,7 @@ import * as filesystem from 'node:fs/promises';
 import {join,relative,dirname} from 'node:path';
 import {userInfo} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
+import {inspect} from 'node:util';
 import {Pool} from 'pg';
 import type {ParserSourceContext,ParserSandbox} from '../../src/district-parser-isolation.ts';
 import type {AssessmentPassInput,AssessmentOutput} from '../../src/district-assessment.ts';
@@ -20,8 +21,11 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
  let extractionGeneration=0,preparationGeneration=0,toolProbes=0;
  // Module loading boundary: contract/archive readers see the same explicitly
  // synthetic source edit; physical checkout bytes are never changed by a test.
+ // Capture before mocking: the offline bootstrap later synchronizes live ESM
+ // builtin exports, which must not turn this delegate into self-recursion.
+ const originalReadFile=readFile;
  const contractReadFile=(async(path:Parameters<typeof readFile>[0],options?:Parameters<typeof readFile>[1])=>{
-  const bytes=await readFile(path,options);
+  const bytes=await originalReadFile(path,options);
   const generation=path instanceof URL?path.pathname.endsWith('/src/district-model.ts')?extractionGeneration:path.pathname.endsWith('/src/district-document.ts')?preparationGeneration:0:0;
   if(!generation)return bytes;
   const suffix='\n// Synthetic topology contract generation '+generation+'\n';
@@ -117,6 +121,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
  const admin=new Pool({connectionString:url.href,user:userInfo().username,max:2}),closeAdmin=poolShutdownBarrier(admin),database='residual_topology_'+randomUUID().replaceAll('-','');
  await admin.query('CREATE DATABASE "'+database+'"');url.pathname='/'+database;
  const pool=new Pool({connectionString:url.href,user:userInfo().username,max:2}),closePool=poolShutdownBarrier(pool);
+ let pendingBridge:Promise<unknown>|undefined,bridgeFailure:{error:unknown}|undefined;
  try{
   await migrateDistrictJobs(pool);const store=new DistrictJobStore(pool);
   const value=operatorRegistryFixtureValue(),city=value.municipalities[0];city.id='strausberg';city.ags='12064472';city.name='Synthetic Strausberg fixture';value.inventory[0].ags=city.ags;
@@ -199,8 +204,12 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    const AJobKey=(await assessments.enqueuePreparedAssessmentPass(pool,store,cas,assessmentPreparation,'A'))[0];await run(AJobKey,assessmentHandlers);
    const aSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[AJobKey])).rows[0].spec,item=assessment.assessmentItemSchema.parse(JSON.parse((await cas.read(aSpec.selector.itemArtifactSha256)).toString('utf8'))),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions:policy,fixtureProtocol:true}),clientContractSha256=digest('synthetic topology B client'),BJobKey=await enqueueAssessmentB(broker,{itemArtifactSha256:aSpec.selector.itemArtifactSha256,sourceScope:scope,policyProofSha256:imported.jobs[0].policyReceiptSha256,transport:'mac-bridge',clientContractSha256});
    hostGeneration++; // B was enqueued under an older host manifest.
-   const pendingB=run(BJobKey,assessmentHandlers),deadline=Date.now()+50000;
-   for(;;){const ready=await pool.query("SELECT 1 FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'",[BJobKey]);if(ready.rowCount)break;if(Date.now()>deadline)throw Error('Synthetic B lease did not become ready');await delay(10);}
+   const pendingB=run(BJobKey,assessmentHandlers),deadline=Date.now()+50000;pendingBridge=pendingB;
+   let bridgeFinished=false;
+   // Observe immediately and drain before pool teardown; otherwise an early
+   // fixture error is hidden by the worker's later endRun on a closed pool.
+   void pendingB.then(()=>{bridgeFinished=true;},(error:unknown)=>{bridgeFailure={error};bridgeFinished=true;});
+   for(;;){if(bridgeFailure)throw bridgeFailure.error;const ready=await pool.query("SELECT 1 FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'",[BJobKey]);if(ready.rowCount)break;if(bridgeFinished||Date.now()>deadline)throw Error('Synthetic B lease did not become ready: '+canonicalJson((await pool.query("SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>'jobKey'=$1",[BJobKey])).rows));await delay(10);}
    const lease=BridgeLeaseSchema.parse(await broker.dispatch({operation:'claim',jobKey:BJobKey,clientId:'synthetic-topology-client',clientContractSha256})),input=assessment.buildAssessmentPassInput(item,await assessment.originalEvidence(item,{cas,policyOptions:policy}),'B'),output=groundedAnswer(input).value,config=PROVIDER_CONFIGS['anthropic-subscription'],startedAt=new Date().toISOString(),evidence={provider:'anthropic-subscription' as const,tool:'claude-cli' as const,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
    const stdout=[{type:'system',subtype:'init',tools:[],mcp_servers:[],model:config.model},{type:'assistant',message:{id:'msg_synthetic_topology',model:config.model,content:[]}},{type:'result',subtype:'success',is_error:false,model:config.model,request_id:'req_synthetic_topology',structured_output:output,usage:{input_tokens:1,output_tokens:1}}].map(value=>JSON.stringify(value)).join('\n')+'\n';
    assert.equal(BridgeStatusSchema.parse(await broker.dispatch({operation:'submit',leaseId:lease.leaseId,inputSha256:lease.inputSha256,purgeAck:{sourceFiles:0,responseFiles:0,modelFileWritesDenied:true,completedAt:new Date().toISOString()},answer:{stdout,evidence:{...evidence,modelIdentitySha256:digest(JSON.stringify(evidence))},startedAt,finishedAt:new Date().toISOString()}})).state,'submitted');await pendingB;
@@ -213,7 +222,10 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    const sealed=await sealQueueTextContribution(pool,cas,{jobKeys:[extractionKey],reconciliationJobKeys:[reconcileKey]});assert.equal(sealed.records,1);
    const provenance=await authenticatePublicationProvenance(sealed.privateProvenance.path,sealed.privateProvenance.sha256,policy);
    const composition=await loadR1TextCompositionInput(JSON.parse((await cas.read(sealed.compositionArtifactSha256)).toString('utf8')),pin=>provenance.read(pin.path));assert.equal((await residual.exportResidualTextContribution(pool,cas,[extractionKey],composition.contributions[0])).results.length,1);
+   const {exerciseStep8}=await import('../helpers/step8-fixture.ts'),callsBeforeStep8=modelCalls,probesBeforeStep8=toolProbes;
+   await exerciseStep8(t,{pool,cas,policy,fixtureRoot:root,sealed,jobKey:extractionKey,reconcileKey,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
+   assert.equal(modelCalls,callsBeforeStep8);assert.equal(toolProbes,probesBeforeStep8);
    await complete();assert.deepEqual(await readFile(bodyPath),body);assert.deepEqual(await readFile(observationPath),observationBytes);
   });
- }finally{await closePool();await admin.query('DROP DATABASE "'+database+'"');await closeAdmin();}
+ }finally{await pendingBridge?.catch(()=>{});await closePool();await admin.query('DROP DATABASE "'+database+'"');await closeAdmin();}
 });

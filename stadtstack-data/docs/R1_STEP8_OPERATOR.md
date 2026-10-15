@@ -1,0 +1,244 @@
+# R1 step 8: governed candidate and exact replay
+
+This is the executable operator procedure for step 8, not a change to the frozen
+`CIVIC_PIPELINE_REBUILD.md` plan or permission to deploy. The owner option-B gates
+still require step 9's frozen value test before hosted release.
+
+## One command
+
+From `stadtstack-data`, with Node 24.21.0 selected:
+
+```sh
+DATABASE_URL='postgresql://max@/civic_r1?host=/var/run/postgresql' \
+  ./scripts/r1-step8.sh plan /absolute/path/step8-input.json INPUT_SHA256
+
+# Only in an explicitly authorized execution realm, after the full seal set exists:
+DATABASE_URL='postgresql://OPERATOR@/ISOLATED_DATABASE?host=/absolute/socket-directory' \
+  ./scripts/r1-step8.sh execute /absolute/path/step8-input.json INPUT_SHA256
+```
+
+The input hash is independently pinned by the operator; it is not read from a
+neighboring mutable checksum file. Every path in the input must be absolute.
+`plan` only reads that input file and prints the complete declared read set and
+would-write destinations. It never calls a managed reader, takes an authority
+lock, exports a receipt, or connects to PostgreSQL. `execute` has real managed
+CAS/authority/audit writes: **do not run it against production as a dry run**.
+The implementation exercise uses only a disposable PG database and isolated
+fixture authority. Production processing and historical `out/` and `release/`
+are not modified by this work.
+
+The wrapper strips the environment (including provider tokens, proxies and
+`NODE_OPTIONS`), and preloads `r1-step8-offline.cjs` before application imports.
+The guard denies HTTP/fetch, DNS, UDP, HTTP/2, TLS/TCP and arbitrary child processes/model
+CLIs. Only Unix-domain sockets (the same-host PG audit connection) and the
+predecessor reader's bounded `git --no-replace-objects show COMMIT:./out|release/MEMBER`
+are permitted. Git lazy fetch and prompts are disabled by the predecessor
+reader. This is an enforced Node transport/process guard for trusted replay,
+**not a claim of OS/network-namespace isolation**. There is no cache-miss model,
+readiness, acquisition or live fallback. The replay proof retains its existing
+honest `networkIsolation` wording; the wrapper's guard is tested separately.
+
+## Complete input contract
+
+`src/r1-step8.ts` exports the strict `Step8InputSchema`. Its version is
+`stadtstack-r1-step8-v1`. Unknown fields fail closed. Required fields:
+
+- `expectedSources`: **27** and `expectedDocuments`: **208** for this production
+  campaign. The command rejects an incomplete count or duplicate extraction
+  jobs; the isolated synthetic fixture declares its own 1-source/1-document scope.
+- `seals`: in explicitly approved source/run order. Each element contains
+  `sealResult: {path, sha256}`, `jobKeys` (extraction keys), and
+  `reconciliationJobKeys` from that source's completed seal inputs/results.
+  The result must contain the real composition hash and pinned private
+  provenance, policy inventory and critical inventory emitted by
+  `seal-text-contribution`. No aggregate rows, invented lineage or substituted
+  model receipts are accepted. The declared reconciliation set is checked
+  against the extraction-run queue closure.
+- `structuredRunIds`: the committed K1/K2 runs listed below. They are exported
+  together, not merged by title or relabeled as text-model work.
+- `registry: {path, sha256}`: the admitted registry artifact against which the
+  selected native runs are exported; native checked-source evidence produces
+  a new bound registry artifact, preserving the originals.
+- `privateProvenance: {path, sha256}`: existing
+  `stadtstack-private-publication-provenance-v1` inventory for every external
+  staging/control member. This is the existing managed provenance contract,
+  not a path-based permission assertion. Seal inventories are authenticated and
+  combined with it. Original native raw bytes, policy receipts and parser outputs
+  must already be in managed CAS with their actual custody.
+- `staging`: independently pinned `{path, sha256, destination}` for precisely
+  `catalogue.json`, `regions/brandenburg-mol/topics.json`,
+  `core/strausberg-facts.json`, and **each staged catalogue city's**
+  `cities/ID/signals.geojson` and `cities/ID/feed.json`. No target output member
+  is used as reconstruction input. The core must equal the authentic prior core.
+- Optional pinned `identityAssessments`, `criticalAssessments` (additional native
+  claims), and `regionalPolicyReceipts` use the existing original-evidence
+  contracts. Missing mandatory evidence holds/rejects admission; omission is not
+  a bypass. Source-seal critical inventories are always included.
+- `priorRelease` and, when necessary for unchanged legacy change feeds,
+  `legacyPreviousReleases`: authentic Git commit, release-manifest digest and
+  data release ID. A new optional `directory: "release" | "out"` identifies the
+  **committed** release tree. Existing historical callers default to `out`.
+  Directory selection is bound in publication dependencies and replay and in
+  authenticated predecessor cache keys, never inferred from the mutable target.
+  Both initial publication and replay preload supplied legacy predecessors before
+  entering managed source scopes; a missing earlier snapshot is never guessed.
+- `asOf`: one graph day. `clocks` contains explicit
+  `recordsGeneratedAt`, `quarantineGeneratedAt`, `coverageGeneratedAt`,
+  `qualityGeneratedAt`, `manifestGeneratedAt`. Original generation/assessment
+  clocks in sealed members are never rewritten.
+- `casRoot`, `policy: {stateDir, authorityId, authoritySha256}`, and `outputRoot`.
+  The latter must be a **new** real-directory generation below this package's
+  `cache/`, with an existing real parent. It cannot contain an `out` or `release`
+  path component. Existing/partial generations are rejected, not reused.
+  Preparation and replay use the disjoint sibling managed lanes
+  `OUTPUT_ROOT-preparation` and `OUTPUT_ROOT-replay`; nested registered roots are
+  never created inside the persistent candidate artifacts lane.
+
+The input file is an operator control artifact: generate it from real completed
+seal results and admitted staging provenance, then independently pin its digest.
+Do not fill missing campaign results with empty arrays or invented predecessors.
+
+### Native runs found read-only in the canonical DB
+
+The explicit `BEGIN READ ONLY` query found these exact committed run IDs:
+
+| Lane | Run ID |
+| --- | --- |
+| K1 | `3fe33cb6-fb63-4151-b56d-e94271c0d0af` |
+| K2 PEGELONLINE | `6a60345b-850c-4130-9105-aa6b89e99cf3` |
+| K2 PEGELONLINE | `f311d068-1f14-47f2-856f-d3213098821a` |
+| K2 PEGELONLINE | `5f582f17-d494-4fd5-8aea-a6c7a2a22dcc` |
+| K2 PEGELONLINE | `329d949b-e87f-4942-98d2-767188cf1947` |
+
+### Authentic live 0.3.2 predecessor
+
+`/home/max/stadtstack-ops/STATUS_0.3.2.md` identifies the live source as
+`57bddbbd8b84b0634229ad9cd45b689bda7271ea`. Its committed **release/** manifest is:
+
+```json
+{
+  "gitCommit": "57bddbbd8b84b0634229ad9cd45b689bda7271ea",
+  "directory": "release",
+  "manifestSha256": "85b9236328402364ee1211ffe274933d3eaf0ff52c976a39720920337cc866b8",
+  "releaseId": "4ceebf75374df54c51bcf4a212c73770186a1a6db502423be7f108b665096691"
+}
+```
+
+The same commit's **out/** manifest has a different SHA-256
+(`89d48df832f0a7fc12875af715bfa5fc03bb9ea096fdf8667e056d37c895130b`).
+Using it would not authenticate the actually released 0.3.2 predecessor. This
+was a genuine implementation gap: the old reader hardcoded `out/`.
+
+The authentic release also contains v2 `municipality_scoped_name` entity bases.
+The historical changes reader now validates that archived representation using
+a temporary validation view, while returning the original records and evidence
+hashes unchanged. This is not current identity admission: the current public
+record schema still rejects the old grouping, and no historical record enters
+the new knowledge/graph slice merely because it existed in 0.3.2.
+Changes compare the authenticated archive only within the new release's explicit
+knowledge registry scope. In-scope removals remain visible; a municipality not
+covered by the new release is not reported absent. The candidate loader's strict
+change-scope gate is unchanged.
+
+## Existing machinery, now wired together
+
+No new extraction or publication engine is introduced:
+
+1. `knowledge:r1 export-text-contribution`'s actual
+   `exportResidualTextContribution` authenticates each source's whole committed
+   queue closure, including original generation/judge/A/B/C and reconciliation.
+2. `knowledge:r1 export`'s `exportRun` now also exposes the same native grouping,
+   page/coverage and checked-registry assembly without its CLI persistence side
+   effects. The operator persists exact native StepReceipts in managed CAS.
+3. The shared composition and private provenance contracts bind all contributions;
+   the command writes managed candidate records, quarantine, policy/critical and
+   identity state. Native rows remain a separate structured run.
+4. `knowledge:prepare`'s `withPreparedKnowledge` performs the real current policy,
+   quality, coverage/action-stage, critical and identity gates within an actual
+   managed scratch lease. `publish` builds the full candidate against its
+   authenticated earlier predecessor and complete non-knowledge staging.
+5. Public members are copied into `OUTPUT_ROOT/release/` through managed writes.
+   The exact publication-input seal and independently pinned replay receipt are
+   saved outside it. Target release members are excluded from reconstruction
+   provenance; the manifest alone is the expected comparison target.
+6. `knowledge:replay`'s `replayPipeline` reconstructs in a separate fresh leased
+   workspace, verifies **every member digest and byte count**, and compares the
+   **manifest bytes, digest and ID**. It records actual artifact/proof metadata
+   in the isolated/same-host canonical audit DB and managed CAS. New execution
+   clocks are only in receipts, not substituted into publication artifacts.
+7. `loadRelease(..., {mode: 'vm_candidate', policyOptions})` checks the candidate
+   serving/read-view contracts and current policy. Only then is
+   `OUTPUT_ROOT/release-gate.json` written with `status: "passed"`, exact directory,
+   release ID, manifest SHA, replay receipt/audit hash and explicit checks.
+   No gate file is issued on failure. It explicitly states
+   `valueAccepted: false` and `hostedReleaseAuthorized: false`.
+
+Hand step 9 the exact `candidateDirectory`, `releaseId` and policy realm, not a
+mutable `out/` alias. Its actual MCP/value harness owns value acceptance.
+
+## Production discovery without production writes
+
+The following command was exercised read-only from the isolated worktree:
+
+```sh
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:/usr/bin:/bin \
+DATABASE_URL='postgresql://max@/civic_r1?host=/var/run/postgresql' \
+./scripts/r1-step8.sh discover \
+  /home/max/civic-rebuild-r1/stadtstack-data \
+  /home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full
+```
+
+Observed: all five selected runs exist, with one committed receipt each; the
+inspected driver `runs/` tree contained **zero completed seal-result files** at
+that observation. Its output lists the real release ID/digest above, the driver
+catalogue, managed CAS/operator registry roots, released predecessor tree,
+external staging/provenance/control requirements and exact native run IDs.
+`writes: []`, no managed authority reader, source acquisition, model call,
+publication or replay was invoked. This is a time-specific discovery, not a
+claim that processing subsequently remained at that state. An initial invocation
+without an explicit DSN user failed before reading the DB because the scrubbed
+environment deliberately has no `USER`; the documented explicit-user DSN succeeds.
+
+## Fixture and verification
+
+`test/fixtures/residual-production-topology.ts` extends the real disposable-PG,
+isolated-authority preparation/extraction/A/B/C/seal/export fixture through
+`test/helpers/step8-fixture.ts` into this command's shared execution function.
+It uses explicitly synthetic queue/native evidence, the **authentic retained
+0.3.2 core**, real managed preparation/publication, real offline replay and audit
+persistence, and the actual `vm_candidate` loader. It checks all member evidence,
+manifest identity and replay proof, and that no additional model/readiness calls
+occur. No production rights, civic source coverage or independent human review
+are inferred from the synthetic fixture. Separate tests exercise the closed
+operator plan, offline guard, distinct `release/` vs `out/` authentication and
+cache separation, missing prerequisites and target-as-predecessor rejection.
+
+The operator's actual offline bootstrap is installed at the build/replay phase
+boundary after fixture extraction. Its code and both operator entrypoints are
+runtime-pinned in the replay receipt. The native byte-count fixture retains its
+source-explicit `Stand:` reference date and locator, not an invented retrieval-
+as-event date.
+
+Run the coordinated gate only once all slice edits have landed:
+
+```sh
+umask 022
+PYTHONDONTWRITEBYTECODE=1 \
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
+R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all
+```
+
+Observed final gate (`tests-20261015T024453Z.tap` under the operator's
+`r1-verify` state directory): TypeScript passed; 1,781 tests, 1,724 passed,
+7 failed, 2 cancelled, 48 skipped. The full guarded text/native
+publication/replay/candidate-loader fixture passed, as did all three step-8
+regressions. The full gate is **not green**: the existing
+`governed A/B/C queue and original-wide Codex ceilings` parent exceeded its
+120,000-ms timeout, cancelling a child and preventing its later tests from
+starting. That separate test file was not changed; no failure was suppressed
+or reclassified, and no hosted release is authorized by these results.
+
+The real production candidate remains blocked until its complete 27-source,
+208-document seal set and admitted full staging/control provenance exist. This
+command does not waive any processing, replay, quality, identity, policy or value
+acceptance gate and never performs hosted rollout.

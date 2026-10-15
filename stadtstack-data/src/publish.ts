@@ -39,6 +39,7 @@ import {parserIsolationContractSha256} from './district-parser-isolation.ts';
 import {authenticatePublicationProvenance,assertAuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
 import {loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
 import {textLineageRecordSha256} from './text-run-lineage.ts';
+import {IdentityBasisSchema,NormalizedEntitySchema} from './district-graph-claims.ts';
 import {assertAuthenticatedPreparedPublication,type AuthenticatedPreparedPublication} from './prepare-knowledge.ts';
 
 export const PublicationOptionsSchema=z.object({stagingDir:z.string().min(1),outDir:z.string().min(1),asOf:identityDaySchema,priorRelease:priorReleaseSchema,legacyPreviousReleases:z.record(z.string().regex(/^[a-z0-9-]+$/),priorReleaseSchema).optional(),policyReceipts:z.string().min(1),regionalPolicyReceipts:z.string().min(1).optional(),identityAssessments:z.string().min(1).optional(),criticalAssessments:z.string().min(1).optional(),structuredRun:z.string().min(1).optional(),textComposition:z.string().min(1).optional(),casRoot:z.string().min(1).optional(),policyStateDir:z.string().min(1).optional(),policyAuthorityId:z.string().min(1).optional(),policyAuthoritySha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),qualityGeneratedAt:z.iso.datetime(),manifestGeneratedAt:z.iso.datetime(),offlineReplay:z.boolean().optional(),priorCityRoot:z.string().min(1).optional(),publicationInputs:z.string().min(1).optional(),privateProvenance:z.object({path:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()}).strict().superRefine((value,ctx)=>{if(value.offlineReplay&&(!value.priorCityRoot||!value.publicationInputs))ctx.addIssue({code:'custom',message:'Exact replay requires authentic staged predecessor and original publication input seal'});});
@@ -53,6 +54,7 @@ async function publicationDirectory(path:string):Promise<string>{
  const absolute=resolve(path);
  try{return await realpath(absolute);}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;const parent=dirname(absolute);if(parent===absolute)throw error;return join(await publicationDirectory(parent),basename(absolute));}
 }
+const historicalV2EntitySchema=NormalizedEntitySchema.extend({identityBasis:IdentityBasisSchema.extend({kind:z.enum([...IdentityBasisSchema.shape.kind.options,'municipality_scoped_name'])})});
 /** Historical members supply original change state, never current admission. */
 export function historicalKnowledgeRecords(input:unknown):PublicKnowledgeRecord[]{
  const envelope=z.object({schemaVersion:z.enum(['stadtstack-knowledge-v2','stadtstack-knowledge-v3']),records:z.array(z.unknown())}).passthrough().parse(input);
@@ -60,7 +62,11 @@ export function historicalKnowledgeRecords(input:unknown):PublicKnowledgeRecord[
   const record=raw as PublicKnowledgeRecord;
   if(!record?.verification||record.verification.evidenceHash!==knowledgeEvidenceHash(record))throw Error('Authentic prior knowledge evidence hash mismatch');
   const marked=envelope.schemaVersion==='stadtstack-knowledge-v2'&&!Object.hasOwn(record,'kind')?{...record,kind:'text_model' as const,verification:{...record.verification,kind:'text_model' as const}}:record;
-  const validation=PublicKnowledgeRecordSchema.safeParse({...marked,verification:{...marked.verification,evidenceHash:knowledgeEvidenceHash(marked)}});
+  // The authenticated v2 archive predates source-scoped identities. Validate its
+  // historical representation without admitting that old grouping today or
+  // rewriting the original record/evidence hash used by the changes feed.
+  const validationRecord=envelope.schemaVersion==='stadtstack-knowledge-v2'&&marked.kind==='text_model'&&'entities' in marked?{...marked,entities:z.array(historicalV2EntitySchema).parse(marked.entities).map(entity=>({...entity,identityBasis:{...entity.identityBasis,kind:entity.identityBasis.kind==='municipality_scoped_name'?'source_scoped_mention' as const:entity.identityBasis.kind}}))}:marked;
+  const validation=PublicKnowledgeRecordSchema.safeParse({...validationRecord,verification:{...validationRecord.verification,evidenceHash:knowledgeEvidenceHash(validationRecord)}});
   if(!validation.success&&validation.error.issues.some(issue=>issue.code!=='custom'||issue.message!=='Pipeline graph identity mismatch'))throw validation.error;
   return record;
  });
@@ -207,14 +213,17 @@ for(const {city,collection} of prepared){
  }else changes=diff(beforeRecords,current,catalogue.generatedAt,[],[{cityId:city.id,recordType:'signal'}]);
  cityChanges.set(city.id,retained??JSON.stringify(changes,null,2)+'\n');
 }
-const priorKnowledge=historicalKnowledgeRecords(JSON.parse(baseline.files.get('knowledge/records.json')!.toString('utf8')));
+const historicalKnowledge=historicalKnowledgeRecords(JSON.parse(baseline.files.get('knowledge/records.json')!.toString('utf8'))),knowledgeMunicipalities=new Set(knowledgeRegistry.municipalities.map(city=>city.id));
+// A narrower release cannot imply absence in municipalities it does not cover.
+// Authenticate the full archive first, then compare only this release's scope.
+const priorKnowledge=historicalKnowledge.filter(record=>knowledgeMunicipalities.has(record.municipalityId));
 const currentText=knowledge.records.filter((record):record is DistrictKnowledgeRecord=>record.kind==='text_model'),oldText=priorKnowledge.filter(record=>!('kind' in record)||record.kind==='text_model');
 const textChanges=knowledgeChanges(oldText as DistrictKnowledgeRecord[],currentText,knowledge.generatedAt);
 const explicit=textChanges.events.flatMap(event=>event.evidence&&event.targetRevision!==null&&(event.kind==='withdrawn'||event.kind==='superseded')?[{id:event.id,cityId:event.cityId,recordType:event.recordType,kind:event.kind,targetRevision:event.targetRevision,reason:event.reason,evidence:event.evidence}]:[]);
 const knowledgeChangesFeed=validateChanges(diff(priorKnowledge.map(knowledgeChangeRecord),knowledge.records.map(knowledgeChangeRecord),knowledge.generatedAt,explicit,knowledgeRegistry.municipalities.map(city=>({cityId:city.id,recordType:'knowledge' as const}))),knowledge.records.map(knowledgeChangeRecord));
 let knowledgeChangeBytes=JSON.stringify(knowledgeChangesFeed,null,2)+'\n';
 const priorKnowledgeChanges=baseline.files.get('knowledge/changes.json');
-if(priorKnowledgeChanges&&changeSnapshotHash(priorKnowledge.map(knowledgeChangeRecord))===changeSnapshotHash(knowledge.records.map(knowledgeChangeRecord))){
+if(priorKnowledgeChanges&&priorKnowledge.length===historicalKnowledge.length&&changeSnapshotHash(priorKnowledge.map(knowledgeChangeRecord))===changeSnapshotHash(knowledge.records.map(knowledgeChangeRecord))){
  retainChanges(JSON.parse(priorKnowledgeChanges.toString('utf8')),knowledge.records.map(knowledgeChangeRecord),undefined,knowledgeRegistry.municipalities.map(city=>({cityId:city.id,recordType:'knowledge' as const})));
  knowledgeChangeBytes=priorKnowledgeChanges.toString('utf8');
 }

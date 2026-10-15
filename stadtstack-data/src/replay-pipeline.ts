@@ -312,7 +312,10 @@ async function checkRuntime(receipt:ReplayReceipt){
  requireEqual([locale.locale,locale.timeZone],[runtime.locale,runtime.timeZone],'Replay publication locale/timezone mismatch');
  if(hash(await readFile(join(root,'package-lock.json')))!==runtime.packageLockSha256)throw Error('Replay dependency lock mismatch');
  const sources=(await readdir(join(root,'src'),{withFileTypes:true})).filter(item=>item.isFile()&&item.name.endsWith('.ts')).map(item=>'src/'+item.name);
- const required=[...sources,'regional/taxonomy.mjs','package.json'].sort();
+ // Standalone replay has no operator bootstrap; governed step-8 receipts bind
+ // the complete entrypoint/guard trio, never a partial or arbitrary script set.
+ const operator=['scripts/r1-step8.ts','scripts/r1-step8.sh','scripts/r1-step8-offline.cjs'];
+ const required=[...sources,'regional/taxonomy.mjs','package.json',...(runtime.sourceFiles.some(pin=>operator.includes(pin.path))?operator:[])].sort();
  requireEqual(runtime.sourceFiles.map(pin=>pin.path).sort(),required,'Replay implementation source inventory mismatch');
  for(const pin of runtime.sourceFiles)await readReplayPin(pin,root);
 }
@@ -335,6 +338,7 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  const original=publicationInputsSchema.parse(JSON.parse(sealBytes.toString('utf8')));
  const dependency=(role:string)=>original.dependencies.find(dependency=>dependency.role===role)?.sha256;
  if(dependency('registry')!==receipt.registry.sha256||dependency('candidate_records')!==receipt.candidateRecords.sha256||dependency('candidate_quarantine')!==receipt.candidateQuarantine.sha256||original.priorRelease.gitCommit!==receipt.priorRelease.gitCommit||original.priorRelease.manifestSha256!==receipt.priorRelease.manifestSha256||original.priorRelease.releaseId!==receipt.priorRelease.releaseId)throw Error('Replay original publication inputs do not bind supplied authentic prerequisites');
+ if((original.priorRelease.directory??'out')!==(receipt.priorRelease.directory??'out'))throw Error('Replay predecessor directory differs from original publication');
  const quarantine=z.object({schemaVersion:z.literal('stadtstack-quarantine-v1'),generatedAt:z.iso.datetime().optional(),cases:z.array(z.unknown())}).passthrough().parse(JSON.parse(quarantineBytes.toString('utf8')));
  if(quarantine.generatedAt!==receipt.clocks.quarantineGeneratedAt)throw Error('Replay quarantine source clock mismatch');
  if(text)requireEqual(quarantine.cases,text.quarantine,'Replay original quarantine differs from verified cached reconstruction');

@@ -1,0 +1,55 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {fileURLToPath} from 'node:url';
+import {Step8InputSchema,step8ReadPlan} from '../src/r1-step8.ts';
+import {loadPriorPublicationRelease,preloadPriorPublicationReleases} from '../src/district-publication-predecessor.ts';
+import {historicalKnowledgeRecords} from '../src/publish.ts';
+import {PublicKnowledgeRecordSchema,knowledgeEvidenceHash} from '../src/district-schema.ts';
+import {knowledgeChangeRecord} from '../src/changes.ts';
+
+const execute=promisify(execFile),hash='a'.repeat(64),pin={path:'/synthetic/pinned-input',sha256:hash},at='2026-10-15T00:00:00.000Z';
+const input={schemaVersion:'stadtstack-r1-step8-v1',expectedSources:1,expectedDocuments:1,seals:[{sealResult:pin,jobKeys:[hash],reconciliationJobKeys:[]}],structuredRunIds:['3fe33cb6-fb63-4151-b56d-e94271c0d0af'],registry:pin,privateProvenance:pin,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'b'.repeat(40),manifestSha256:hash,releaseId:hash,directory:'release'},asOf:'2026-10-15',clocks:{recordsGeneratedAt:at,quarantineGeneratedAt:at,coverageGeneratedAt:at,qualityGeneratedAt:at,manifestGeneratedAt:at},casRoot:'/synthetic/cas',outputRoot:'/synthetic/cache/candidate',policy:{stateDir:'/synthetic/policy',authorityId:'synthetic',authoritySha256:hash}};
+
+test('operator plan is closed, explicit and never claims execution/value acceptance',()=>{
+ const parsed=Step8InputSchema.parse(input),plan=step8ReadPlan(parsed);
+ assert.deepEqual(plan.writes,[]);assert.equal(plan.network,false);assert.equal(plan.providers,false);
+ assert.equal(plan.reads.priorRelease.directory,'release');assert.ok(plan.notAuthorized.includes('value acceptance (step 9)'));
+ for(const field of ['priorRelease','privateProvenance','clocks','asOf','seals','structuredRunIds'])assert.throws(()=>Step8InputSchema.parse({...input,[field]:undefined}));
+ assert.throws(()=>Step8InputSchema.parse({...input,allowLiveFallback:true}));
+});
+
+test('offline bootstrap denies providers, HTTP, DNS, TCP and arbitrary child processes',async()=>{
+ const guard=fileURLToPath(new URL('../scripts/r1-step8-offline.cjs',import.meta.url));
+ const script=`const assert=require('node:assert/strict'),cp=require('node:child_process'),net=require('node:net'),dns=require('node:dns');
+ assert.throws(()=>fetch('https://example.org'),/offline guard/);
+ assert.throws(()=>require('node:https').get('https://example.org'),/offline guard/);
+ assert.throws(()=>dns.lookup('example.org',()=>{}),/offline guard/);
+ assert.throws(()=>dns.resolveMx('example.org',()=>{}),/offline guard/);
+ assert.throws(()=>dns.promises.resolveTxt('example.org'),/offline guard/);
+ assert.throws(()=>new dns.Resolver(),/offline guard/);
+ assert.throws(()=>new (require('node:dgram').Socket)('udp4'),/offline guard/);
+ assert.throws(()=>net.connect({host:'127.0.0.1',port:443}),/offline guard/);
+ assert.throws(()=>cp.spawn('codex',['--version']),/offline guard/);
+ assert.throws(()=>cp.execFile('git',['fetch']),/offline guard/);
+ assert.equal(process.env.STADTSTACK_STEP8_OFFLINE,'1');`;
+ await execute(process.execPath,['--require',guard,'-e',script]);
+});
+
+test('authentic live 0.3.2 predecessor selects release/, not the distinct historical out/ snapshot',async()=>{
+ const prior={gitCommit:'57bddbbd8b84b0634229ad9cd45b689bda7271ea',directory:'release' as const,manifestSha256:'85b9236328402364ee1211ffe274933d3eaf0ff52c976a39720920337cc866b8',releaseId:'4ceebf75374df54c51bcf4a212c73770186a1a6db502423be7f108b665096691'},paths=['core/strausberg-facts.json','core/release-manifest.json','knowledge/records.json'];
+ const loaded=await loadPriorPublicationRelease(prior,paths,at);
+ assert.equal(loaded.manifest.id,prior.releaseId);assert.equal(loaded.priorRelease.directory,'release');
+ const cache=await preloadPriorPublicationReleases([{prior,paths,targetGeneratedAt:at}]);
+ assert.deepEqual((await loadPriorPublicationRelease(prior,paths,at,undefined,cache)).manifestBytes,loaded.manifestBytes);
+ const archive=JSON.parse(loaded.files.get('knowledge/records.json')!.toString('utf8')),original=JSON.stringify(archive),historical=historicalKnowledgeRecords(archive);
+ assert.ok(historical.length>0);assert.equal(JSON.stringify(archive),original);
+ assert.deepEqual(historical.map(knowledgeChangeRecord).map(record=>record.id),archive.records.map((record:{id:string})=>record.id));
+ const first={...archive.records[0],kind:'text_model',verification:{...archive.records[0].verification,kind:'text_model'}};first.verification.evidenceHash=knowledgeEvidenceHash(first);
+ assert.equal(PublicKnowledgeRecordSchema.safeParse(first).success,false,'historical municipality-name grouping is not current identity admission');
+ assert.throws(()=>historicalKnowledgeRecords({...archive,schemaVersion:'stadtstack-knowledge-v3'}));
+ await assert.rejects(loadPriorPublicationRelease({...prior,directory:'out'},paths,at),/manifest digest mismatch/);
+ await assert.rejects(loadPriorPublicationRelease({...prior,directory:'out'},paths,at,undefined,cache),/cache miss/);
+ await assert.rejects(loadPriorPublicationRelease(prior,paths,at,prior.releaseId),/earlier baseline/);
+});
