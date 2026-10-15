@@ -1,10 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
-import {mkdir,writeFile,chmod,readFile,lstat} from 'node:fs/promises';
+import {mkdir,writeFile,chmod,readFile,lstat,symlink} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {join} from 'node:path';
-import {withManagedSourceScratch,recoverManagedSourceScratch,recordHostOptOut,CivicPolicyStateError,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceScratch} from '../src/civic-opt-out.ts';
+import {spawn} from 'node:child_process';
+import {withManagedSourceScratch,recoverManagedSourceScratch,recordHostOptOut,CivicPolicyStateError,CIVIC_ACQUISITION_DECISION_ID,compactCivicPolicyInventory,repackCivicPolicyInventory,readCivicPolicyInventory} from '../src/civic-opt-out.ts';
+import type { CivicPolicyOptions, ManagedSourceScratch } from '../src/civic-opt-out.ts';
 import {ManagedDockerResourceSchema,type ManagedDockerResource} from '../src/civic-docker.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 
@@ -62,6 +64,33 @@ test('recovery removes an inventoried leftover omp-b container before unlinking 
  const recovered=await recoverManagedSourceScratch(context.policy);assert.equal(recovered.status,'complete');assert.equal(recovered.recoveredLeases.length,1);assert.equal(daemon.value,null);
  await assert.rejects(lstat(scratch),{code:'ENOENT'});
  assert.equal((await inventory(context.policy.stateDir!)).scratch[0]!.resources[0]!.state,'removed');
+}));
+
+test('repack preserves exact known daemon-only pending history without contacting Docker',{timeout:30_000},async t=>fixture(async(context,socket,daemon)=>{
+ const module=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`import {withManagedSourceScratch} from ${JSON.stringify(module)};import {mkdir,writeFile,chmod} from 'node:fs/promises';
+  const {context,socket,binding,source,prompt,controlSha256,contractSha256}=JSON.parse(process.argv[1]);
+  try{await withManagedSourceScratch(context.managedRoot,[binding],async scope=>{
+   await scope.writeSource('source.txt',Buffer.from(source));const directory=scope.directory+'/control';await mkdir(directory,{mode:0o700});await writeFile(directory+'/system-prompt.md',prompt,{mode:0o444});await chmod(directory,0o755);
+   await scope.createContainer({profile:'omp-b',socketPath:socket,daemonId:'synthetic-daemon',imageId:'sha256:'+'b'.repeat(64),contractSha256,controlSha256,controlBytes:Buffer.byteLength(prompt)});
+  },{...context.policy,decisionId:context.decisionId,kind:'artifacts',purpose:'artifact'});}catch(error){if(error.code!=='SCRATCH_CLEANUP_INCOMPLETE')throw error;}`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,JSON.stringify({context,socket,binding,source:source.toString(),prompt,controlSha256:sha(prompt),contractSha256:sha('synthetic-omp-contract')})],{stdio:['ignore','pipe','pipe']}),closed=Promise.withResolvers<void>();let stderr='';
+ child.stderr.on('data',chunk=>{stderr+=chunk;});child.once('error',closed.reject);child.once('close',code=>code===0?closed.resolve():closed.reject(new Error(stderr)));
+ t.after(()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');});await closed.promise;
+ const blocked=await recoverManagedSourceScratch(context.policy);assert.deepEqual(blocked.issues.map(issue=>issue.code),['daemon_resource_pending']);assert.equal(blocked.pendingLeases.length,1);
+ await compactCivicPolicyInventory(context.policy);
+ for(let i=0;i<2;i++)await withManagedSourceScratch(context.managedRoot,[binding],async()=>{},{...context.policy,decisionId:context.decisionId,kind:'artifacts',purpose:'artifact'});
+ const before=await readCivicPolicyInventory(context.policy),lease=before.scratch.find(lease=>lease.state==='partial')!,pin=lease.id+':'+sha(JSON.stringify(lease)),deletes=daemon.deletes;
+ assert.ok(lease.resources.some(resource=>resource.state==='uncertain'));
+ await assert.rejects(repackCivicPolicyInventory({...context.policy,dryRun:true}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+ const result=await repackCivicPolicyInventory({...context.policy,pendingScratch:[pin]});
+ assert.equal(result.status,'repacked');assert.equal(result.authoritativeCandidateReread,true);assert.equal(daemon.deletes,deletes);
+ assert.deepEqual((await readCivicPolicyInventory(context.policy)).scratch.find(item=>item.id===lease.id),lease);
+ const stillBlocked=await recoverManagedSourceScratch(context.policy);assert.deepEqual(stillBlocked.pendingLeases,[lease.id]);assert.deepEqual(stillBlocked.issues.map(issue=>issue.code),['daemon_resource_pending']);
+ assert.deepEqual((await readCivicPolicyInventory(context.policy)).scratch.find(item=>item.id===lease.id),lease);
+ await symlink(join(context.root,'outside'),join(context.managedRoot,lease.directory,'unsafe-extra'));
+ const unsafe=await recoverManagedSourceScratch(context.policy);assert.ok(unsafe.issues.some(issue=>issue.code==='inventory_incomplete'));
+ await assert.rejects(repackCivicPolicyInventory({...context.policy,dryRun:true,pendingScratch:[pin]}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
 }));
 
 test('host objection purges the same leftover omp-b durable resource, with no second state store',async()=>fixture(async(context,socket,daemon)=>{

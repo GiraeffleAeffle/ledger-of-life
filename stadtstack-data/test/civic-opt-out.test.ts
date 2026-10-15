@@ -6,6 +6,7 @@ import {watch,promises as fsPromises} from 'node:fs';
 import {syncBuiltinESMExports} from 'node:module';
 import type {Stats,BigIntStats} from 'node:fs';
 import {join,dirname} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {tmpdir,homedir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
@@ -14,7 +15,7 @@ import {DistrictCas} from '../src/district-cas.ts';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
-import {compactCivicPolicyInventory,readCivicPolicyInventory} from '../src/civic-opt-out.ts';
+import {compactCivicPolicyInventory,repackCivicPolicyInventory,readCivicPolicyInventory,recoverCivicPolicyLock} from '../src/civic-opt-out.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
@@ -1517,6 +1518,287 @@ test('compaction proves every logical record, preserves original backup bytes, i
  assert.equal(again.status,'already_compacted');assert.deepEqual(again.before,receipt.after);assert.deepEqual(again.after,receipt.after);
  assert.equal(again.logicalSha256,receipt.logicalSha256);assert.deepEqual(await readdir(stateDir,{recursive:true}),filesAfter);
  await assert.rejects(compactCivicPolicyInventory({...policy,authoritySha256:undefined}),{code:'CIVIC_POLICY_AUTHORITY_UNPINNED'});
+});
+
+async function fragmentedRepackFixture(t:TestContext){
+ const fixture=await compactionFixture(t),{root,stateDir,policy,binding,bytes}=fixture;
+ await compactCivicPolicyInventory(policy);
+ await publish(root,{...binding,url:'https://second-sealed.test/source',relativePath:'second.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ await withManagedSourceScratch(root,[{phase:'pre-admission',url:binding.url,sourceSha256:hash(bytes)}],async()=>{},{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',...policy});
+ return fixture;
+}
+test('repack folds retirement/state overrides, preserves all logical bytes and old pins, and is idempotent',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await fragmentedRepackFixture(t),retiredRoot=join(dirname(root),'retired-and-reenrolled');
+ await initializeManagedAcquisitionLane(retiredRoot,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ await publish(retiredRoot,{...binding,relativePath:'old.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ await retireManagedRoot(retiredRoot,{reason:'Synthetic retired repack history'},policy);
+ await initializeManagedAcquisitionLane(retiredRoot,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ await publish(retiredRoot,{...binding,url:'https://reenrolled.test/source',relativePath:'new.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
+ const path=join(stateDir,'inventory.json'),physical=JSON.parse(await readFile(path,'utf8'));
+ physical.roots[0].casWatermarks={[hash('Synthetic preserved watermark')]:{stamp:'1:2:33152:1000:1:10:1000000001:1000000002',checkedAtNs:'10000000000'}};
+ await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+ assert.ok(Object.keys(physical.storage.retiredRoots).length);assert.ok(Object.keys(physical.storage.entryStates).length);
+ const before=await readFile(path),logical=await readCivicPolicyInventory(policy),authority=await readFile(join(stateDir,'authority.json')),objections=await readCivicOptOutSnapshot(policy);
+ const originals=new Map<string,Buffer>();for(const pin of physical.storage.segments)originals.set(pin.sha256,await readFile(join(stateDir,'inventory-segments',pin.sha256+'.json')));
+ const files=await readdir(stateDir,{recursive:true}),dry=await repackCivicPolicyInventory({...policy,dryRun:true});
+ assert.equal(dry.status,'dry_run');assert.equal(dry.logicalEquality,true);assert.equal(dry.authoritativeCandidateReread,false);assert.equal(dry.backup,null);
+ assert.ok(dry.after.segments.length<dry.before.segments.length);assert.equal(dry.before.logicalSha256,dry.after.logicalSha256);
+ assert.deepEqual(await readFile(path),before);assert.deepEqual(await readdir(stateDir,{recursive:true}),files);
+ const result=await repackCivicPolicyInventory(policy);
+ assert.equal(result.status,'repacked');assert.equal(result.authoritativeCandidateReread,true);assert.deepEqual(result.before,dry.before);assert.deepEqual(result.after,dry.after);
+ assert.deepEqual(await readFile(result.backup!.manifestPath),before);assert.equal(result.backup!.segmentsDirectory,join(stateDir,'inventory-segments'));
+ assert.deepEqual(await readCivicPolicyInventory(policy),logical);assert.deepEqual(await readFile(join(stateDir,'authority.json')),authority);assert.deepEqual(await readCivicOptOutSnapshot(policy),objections);
+ for(const [sha,original] of originals)assert.deepEqual(await readFile(join(stateDir,'inventory-segments',sha+'.json')),original);
+ const packed=JSON.parse(await readFile(path,'utf8'));assert.deepEqual(packed.storage.retiredRoots,{});assert.deepEqual(packed.storage.entryStates,{});
+ assert.equal(logical.entries.some(entry=>entry.relativePath==='old.json'),false);assert.equal(logical.entries.some(entry=>entry.relativePath==='new.json'),true);assert.ok(logical.entries.some(entry=>entry.state==='deleted'));
+ const afterFiles=await readdir(stateDir,{recursive:true}),again=await repackCivicPolicyInventory(policy);
+ assert.equal(again.status,'already_packed');assert.equal(again.backup,null);assert.deepEqual(await readdir(stateDir,{recursive:true}),afterFiles);
+ assert.equal(JSON.stringify(result).includes(bytes),false);assert.equal(JSON.stringify(result).includes(binding.url),false);
+});
+
+for(const mutation of ['roots','authority','objections','segment','old_segment','backup'] as const)test('repack aborts before the live manifest on changed '+mutation,async t=>{
+ const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),before=await readFile(path),originalOpen=fsPromises.open;let injected=false;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const candidate=String(args[0]);
+  const staged=!injected&&candidate.startsWith(join(stateDir,'inventory.repack-'))&&candidate.endsWith('.json')?await lstat(candidate).catch((error:NodeJS.ErrnoException)=>{if(error.code!=='ENOENT')throw error;return undefined;}):undefined;
+  if(staged){
+   injected=true;
+   if(mutation==='roots'){const value=JSON.parse(await readFile(candidate,'utf8'));value.roots[0].complete=false;await writeFile(candidate,JSON.stringify(value)+'\n',{mode:0o600});}
+   if(mutation==='authority')await writeFile(join(stateDir,'authority.json'),Buffer.concat([await readFile(join(stateDir,'authority.json')),Buffer.from('\n')]),{mode:0o600});
+   if(mutation==='objections')await writeFile(join(stateDir,'hosts',hash('concurrent.test')+'.json'),JSON.stringify({schemaVersion:1,host:'concurrent.test',reason:'municipality_objection',receivedAt:now,purgeDueAt:'2026-10-18T12:00:00.000Z'})+'\n',{mode:0o600});
+   if(mutation==='segment'){const value=JSON.parse(await readFile(candidate,'utf8')),pin=value.storage.segments[0],file=join(stateDir,'inventory-segments',pin.sha256+'.json'),bytes=await readFile(file);bytes[10]^=1;await writeFile(file,bytes,{mode:0o600});}
+   if(mutation==='old_segment'){const pin=JSON.parse(before.toString('utf8')).storage.segments[0],file=join(stateDir,'inventory-segments',pin.sha256+'.json'),bytes=await readFile(file);bytes[10]^=1;await writeFile(file,bytes,{mode:0o600});}
+   if(mutation==='backup')await writeFile(join(stateDir,'inventory.json.backup-'+hash(before)),Buffer.concat([before,Buffer.from('\n')]),{mode:0o600});
+  }
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{await assert.rejects(repackCivicPolicyInventory(policy),CivicPolicyStateError);assert.equal(injected,true);assert.deepEqual(await readFile(path),before);}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+for(const scenario of [
+ {args:[],code:'CIVIC_POLICY_AUTHORITY_UNPINNED'},
+ {args:['--authority-sha256','0'.repeat(64),'--pending-scratch','https://private.test/source-body'],code:'INVALID_OPERATOR_ARGUMENTS'},
+ {args:['--unexpected-source-title','private source body'],code:'CIVIC_POLICY_REPACK_FAILED'},
+])test('repack CLI emits only content-free JSON for '+scenario.code,async t=>{
+ const child=spawn(process.execPath,['--experimental-strip-types',fileURLToPath(new URL('../src/civic-opt-out.ts',import.meta.url)),'repack-inventory',...scenario.args],{stdio:['ignore','pipe','pipe']});t.after(()=>{if(child.exitCode===null)child.kill('SIGKILL');});
+ let stdout='',stderr='';child.stdout.on('data',chunk=>{stdout+=chunk;});child.stderr.on('data',chunk=>{stderr+=chunk;});
+ const code=await new Promise<number|null>((resolve,reject)=>{child.once('error',reject);child.once('close',resolve);});
+ assert.equal(code,2);assert.equal(stdout,'');assert.deepEqual(JSON.parse(stderr),{schemaVersion:'civic-inventory-repack-error-v1',code:scenario.code});assert.equal(stderr.trim().split('\n').length,1);assert.equal(stderr.includes('private'),false);
+});
+
+test('repack refuses live/in-process holders immediately without waiting or stealing',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await fragmentedRepackFixture(t),entered=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
+ const held=withManagedSourceWrite(root,[{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false}],async()=>{entered.resolve();await release.promise;},policy);
+ await entered.promise;const lock=join(stateDir,'inventory.lock'),original=await readFile(lock);
+ try{await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});assert.deepEqual(await readFile(lock),original);assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);}
+ finally{release.resolve();await held;}
+});
+
+test('repack refuses an external live lock without creating a waiter or stealing it',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await fragmentedRepackFixture(t),module=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`import {withManagedSourceWrite} from ${JSON.stringify(module)};
+  const {root,policy,entry}=JSON.parse(process.argv[1]);await withManagedSourceWrite(root,[entry],async()=>{process.stdout.write('ready\\n');await new Promise(resolve=>process.stdin.once('data',resolve));},policy);`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,JSON.stringify({root,policy,entry:{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false}})],{stdio:['pipe','pipe','pipe']}),ready=Promise.withResolvers<void>(),closed=Promise.withResolvers<void>();let stdout='',stderr='';
+ child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.includes('ready\n'))ready.resolve();});child.stderr.on('data',chunk=>{stderr+=chunk;});
+ child.once('error',ready.reject);child.once('close',()=>{if(!stdout.includes('ready\n'))ready.reject(new Error(stderr));closed.resolve();});
+ t.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+ await ready.promise;const lock=join(stateDir,'inventory.lock'),record=await readFile(lock);
+ try{await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});assert.deepEqual(await readFile(lock),record);assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);}
+ finally{child.stdin.end('release');await closed.promise;}
+});
+
+for(const state of ['planned','active','closing','partial'] as const)test('repack requires exact dead-owner partial pins, never an exemption for '+state,async t=>{
+ const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),logical=await readCivicPolicyInventory(policy);
+ const child=spawn(process.execPath,['-e',''],{stdio:'ignore'}),exited=Promise.withResolvers<void>();child.once('error',exited.reject);child.once('close',()=>exited.resolve());await exited.promise;
+ const physical=JSON.parse(await readFile(path,'utf8')),lease={...logical.scratch[0],id:randomUUID(),directory:'',state,identity:null,ownerPid:child.pid!,groups:[],resources:[]};lease.directory='scratch/'+lease.id;
+ physical.scratch.push(lease);await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+ const current=(await readCivicPolicyInventory(policy)).scratch.find(item=>item.id===lease.id)!,pin=lease.id+':'+hash(JSON.stringify(current));
+ await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+ await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true,pendingScratch:[lease.id+':'+'0'.repeat(64)]}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+ if(state==='partial'){
+  const result=await repackCivicPolicyInventory({...policy,dryRun:true,pendingScratch:[pin]});assert.deepEqual(result.preservedPendingScratch,[{id:lease.id,sha256:hash(JSON.stringify(current))}]);
+  assert.deepEqual((await readCivicPolicyInventory(policy)).scratch.find(item=>item.id===lease.id),current);
+  physical.scratch[0].ownerPid=process.pid;await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+  const live=(await readCivicPolicyInventory(policy)).scratch.find(item=>item.id===lease.id)!;
+  await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true,pendingScratch:[lease.id+':'+hash(JSON.stringify(live))]}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+ }else await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true,pendingScratch:[pin]}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+});
+
+test('repack rejects an explicitly pinned partial lease with a live settled process group',async t=>{
+ const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),logical=await readCivicPolicyInventory(policy);
+ const dead=spawn(process.execPath,['-e',''],{stdio:'ignore'}),deadExit=Promise.withResolvers<void>();dead.once('error',deadExit.reject);dead.once('close',()=>deadExit.resolve());await deadExit.promise;
+ const group=spawn(process.execPath,['-e','process.stdin.resume()'],{detached:true,stdio:['pipe','ignore','ignore']}),spawned=Promise.withResolvers<void>(),closed=Promise.withResolvers<void>();
+ group.once('spawn',spawned.resolve);group.once('error',spawned.reject);group.once('close',()=>closed.resolve());t.after(async()=>{group.kill('SIGKILL');await closed.promise;});await spawned.promise;
+ const physical=JSON.parse(await readFile(path,'utf8')),id=randomUUID(),lease={...logical.scratch[0],id,directory:'scratch/'+id,state:'partial',identity:null,ownerPid:dead.pid!,groups:[{pid:group.pid!,settled:true}],resources:[]};
+ physical.scratch.push(lease);await writeFile(path,JSON.stringify(physical)+'\n',{mode:0o600});
+ const current=(await readCivicPolicyInventory(policy)).scratch.find(item=>item.id===id)!;
+ await assert.rejects(repackCivicPolicyInventory({...policy,dryRun:true,pendingScratch:[id+':'+hash(JSON.stringify(current))]}),{code:'CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED'});
+});
+
+test('repack requires pinned sealed state and refuses a mismatched original backup before publication',async t=>{
+ const fixture=await compactionFixture(t),{stateDir,policy}=fixture,path=join(stateDir,'inventory.json'),monolithic=await readFile(path);
+ await assert.rejects(repackCivicPolicyInventory({...policy,authoritySha256:undefined}),{code:'CIVIC_POLICY_AUTHORITY_UNPINNED'});
+ await assert.rejects(repackCivicPolicyInventory(policy),{code:'CIVIC_POLICY_REPACK_SEALED_REQUIRED'});assert.deepEqual(await readFile(path),monolithic);
+ await compactCivicPolicyInventory(policy);
+ await publish(fixture.root,{...fixture.binding,url:'https://backup.test/source',relativePath:'second.json',contentSha256:hash(fixture.bytes),independentAllowed:false},fixture.bytes,stateDir);
+ const before=await readFile(path);await writeFile(join(stateDir,'inventory.json.backup-'+hash(before)),'Synthetic wrong original manifest',{mode:0o600});
+ await assert.rejects(repackCivicPolicyInventory(policy),{code:'CIVIC_POLICY_BACKUP_MISMATCH'});assert.deepEqual(await readFile(path),before);
+});
+
+for(const phase of ['segment','candidate','candidate_rename','candidate_linked','after_rename'] as const)test('repack survives a real process crash at '+phase,{timeout:30_000},async t=>{
+ const {stateDir,policy}=await fragmentedRepackFixture(t),path=join(stateDir,'inventory.json'),before=await readFile(path),logical=await readCivicPolicyInventory(policy),physical=JSON.parse(before.toString('utf8')),module=new URL('../src/civic-opt-out.ts',import.meta.url).href;
+ const script=`
+  // Module-loading boundary: fault hooks must be live before custody imports.
+  import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';
+  const {policy,stateDir,phase,oldPins,module}=JSON.parse(process.argv[1]),originalOpen=fs.open,originalRename=fs.rename;
+  const pause=async()=>{process.stdout.write('ready\\n');await new Promise(resolve=>process.stdin.once('data',resolve));};
+  fs.open=async(...args)=>{const handle=await originalOpen(...args),path=String(args[0]);
+   if(phase==='segment'&&path.startsWith(stateDir+'/inventory-segments/')&&path.endsWith('.json')&&!oldPins.some(sha=>path.endsWith('/'+sha+'.json')))await pause();
+   if(phase==='candidate'&&path.startsWith(stateDir+'/inventory.repack-')&&path.endsWith('.json'))await pause();
+   return handle;};
+  fs.rename=async(...args)=>{
+   const target=String(args[1]),candidate=target.startsWith(stateDir+'/inventory.repack-')&&target.endsWith('.json');
+   // Reproduce the old exclusive staging protocol's precise crash window.
+   if(phase==='candidate_linked'&&candidate){await fs.link(...args);await pause();await fs.unlink(args[0]);return;}
+   await originalRename(...args);
+   if(phase==='candidate_rename'&&candidate||phase==='after_rename'&&target===stateDir+'/inventory.json')await pause();
+  };
+  syncBuiltinESMExports();const {repackCivicPolicyInventory}=await import(module);await repackCivicPolicyInventory(policy);
+ `;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,JSON.stringify({policy,stateDir,phase,oldPins:physical.storage.segments.map((pin:{sha256:string})=>pin.sha256),module})],{stdio:['pipe','pipe','pipe']}),ready=Promise.withResolvers<void>(),closed=Promise.withResolvers<void>();let stdout='',stderr='';
+ child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.includes('ready\n'))ready.resolve();});child.stderr.on('data',chunk=>{stderr+=chunk;});
+ child.once('error',error=>{ready.reject(error);closed.reject(error);});child.once('close',()=>{if(!stdout.includes('ready\n'))ready.reject(new Error(stderr||'Repack child exited before crash barrier'));closed.resolve();});
+ t.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+ await ready.promise;
+ if(phase==='candidate_linked'||phase==='candidate_rename'){
+  const name=(await readdir(stateDir)).find(name=>name.startsWith('inventory.repack-')&&name.endsWith('.json'));assert.ok(name);
+  const candidate=await lstat(join(stateDir,name));assert.equal(candidate.nlink,phase==='candidate_linked'?2:1);
+  const linkedTemporaries=await Promise.all((await readdir(stateDir)).filter(name=>name.startsWith('.')&&name.endsWith('.tmp')).map(async name=>await lstat(join(stateDir,name))));
+  assert.equal(linkedTemporaries.filter(stat=>stat.dev===candidate.dev&&stat.ino===candidate.ino).length,phase==='candidate_linked'?1:0);
+ }
+ child.kill('SIGKILL');await closed.promise;assert.equal(child.signalCode,'SIGKILL');
+ if(phase!=='after_rename')assert.deepEqual(await readFile(path),before);else assert.notDeepEqual(await readFile(path),before);
+ assert.equal((await recoverCivicPolicyLock(policy)).status,'recovered');
+ assert.deepEqual(await readCivicPolicyInventory(policy),logical);
+ const receipt=await repackCivicPolicyInventory(policy);assert.equal(receipt.status,phase==='after_rename'?'already_packed':'repacked');
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json.backup-'+hash(before))),before);
+ for(const pin of physical.storage.segments)assert.equal(hash(await readFile(join(stateDir,'inventory-segments',pin.sha256+'.json'))),pin.sha256);
+ assert.deepEqual(await readCivicPolicyInventory(policy),logical);
+ assert.equal((await lstat(path)).nlink,1);
+});
+
+test('sealed read snapshots reuse hydration/index but reopen every current pin on every read',async t=>{
+ const {root,stateDir,policy,binding}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy),path=join(root,'facts.json');
+ await assertManagedSourceBindings(path,[binding],policy);
+ const detached=await readCivicPolicyInventory(policy),entryId=detached.entries[0].id;
+ detached.entries[0].state='revoked';detached.roots[0].complete=false;detached.scratch[0].sources.length=0;
+ const originalSet=Map.prototype.set,originalOpen=fsPromises.open;let rebuiltEntries=0,pinOpens=0;
+ t.mock.method(Map.prototype,'set',function(this:Map<unknown,unknown>,key:unknown,value:unknown){
+  if(key===entryId&&value&&typeof value==='object'&&'id' in value&&value.id===entryId)rebuiltEntries++;
+  return originalSet.call(this,key,value);
+ });
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(String(args[0]).startsWith(join(stateDir,'inventory-segments')+'/'))pinOpens++;
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{
+  for(let i=0;i<5;i++)await assertManagedSourceReadable(path,policy);
+  assert.equal(rebuiltEntries,0,'unchanged read-only snapshots must not rebuild full entry maps');
+  assert.equal(pinOpens,5*migration.segments.length,'every locked read must reopen every pin; warm caches need no speculative reread');
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ const current=await readCivicPolicyInventory(policy);
+ assert.equal(current.entries[0].state,'active');assert.equal(current.roots[0].complete,true);assert.equal(current.scratch[0].sources.length,1);
+});
+
+test('sealed read snapshot invalidates on manifest state changes and isolates failed mutable transactions',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await compactionFixture(t);await compactCivicPolicyInventory(policy);
+ const path=join(root,'facts.json'),inventoryPath=join(stateDir,'inventory.json');
+ await assertManagedSourceBindings(path,[binding],policy);const before=await readFile(inventoryPath),originalRename=fsPromises.rename;
+ t.mock.method(fsPromises,'rename',async(...args:Parameters<typeof fsPromises.rename>)=>{
+  if(String(args[1])===inventoryPath)throw Object.assign(new Error('Synthetic pre-commit failure'),{code:'EIO'});
+  return originalRename(...args);
+ });syncBuiltinESMExports();
+ try{await assert.rejects(recordManagedSourceContent(root,{...binding,url:'https://uncommitted.test/source',relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},policy),{code:'EIO'});}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ assert.deepEqual(await readFile(inventoryPath),before);
+ await assertManagedSourceBindings(path,[binding],policy);
+ const current=await readCivicPolicyInventory(policy),physical=JSON.parse(before.toString('utf8'));
+ physical.storage.entryStates[current.entries[0].id]='revoked';
+ await writeFile(inventoryPath,JSON.stringify(physical)+'\n',{mode:0o600});
+ await assert.rejects(assertManagedSourceReadable(path,policy),{code:'CONTENT_REFERENCE_REVOKED'});
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'revoked');
+ await writeFile(inventoryPath,before,{mode:0o600});await assertManagedSourceBindings(path,[binding],policy);
+ await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
+ await assert.rejects(assertManagedSourceReadable(path,policy),HostOptedOutError);
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'deleted');
+});
+
+for(const mode of ['missing','identity'] as const)test('speculative warming tolerates concurrent retirement/save across four processes: '+mode,{timeout:30_000},async t=>{
+ const {root,stateDir,policy}=await compactionFixture(t),writerRoot=join(dirname(root),'writer-fetch'),writerBytes='Synthetic concurrent saver',entry=rawEntry(writerBytes);
+ await initializeManagedAcquisitionLane(writerRoot,{...policy,kind:'fetch',decisionId:CIVIC_ACQUISITION_DECISION_ID});await publish(writerRoot,entry,writerBytes,stateDir);
+ const compacted=await compactCivicPolicyInventory(policy),pinPath=join(stateDir,'inventory-segments',compacted.segments[0]!.sha256+'.json'),lock=join(stateDir,'inventory.lock');
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href,configuration=JSON.stringify({root,writerRoot,policy,entry,pinPath,mode});
+ const start=(body:string)=>{
+  const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {readCivicPolicyInventory,retireManagedRoot,withManagedSourceWrite} from ${JSON.stringify(moduleUrl)};const {root,writerRoot,policy,entry,pinPath,mode}=JSON.parse(process.argv[1]);${body}`,configuration],{stdio:['pipe','pipe','pipe']});
+  const closed=Promise.withResolvers<number|null>();let stdout='',stderr='';
+  child.stdout.on('data',chunk=>{stdout+=chunk;});child.stderr.on('data',chunk=>{stderr+=chunk;});child.once('error',closed.reject);child.once('close',closed.resolve);
+  void closed.promise.catch(()=>{});
+  t.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+  const stage=(name:string):Promise<void>=>{
+   if(stdout.split('\n').includes(name))return Promise.resolve();
+   const ready=Promise.withResolvers<void>(),receive=()=>{if(stdout.split('\n').includes(name)){child.stdout.removeListener('data',receive);ready.resolve();}};
+   if(child.exitCode!==null||child.signalCode!==null)return Promise.reject(Error('Fixture exited before '+name+': '+stderr));
+   child.stdout.on('data',receive);child.once('close',()=>ready.reject(Error('Fixture exited before '+name+': '+stderr)));return ready.promise;
+  };
+  return {child,closed:closed.promise,stage,stdout:()=>stdout,stderr:()=>stderr};
+ };
+ // IPC gates, not sleeps: all four independent readers have the old manifest
+ // before a real retire/save transaction changes the segment under its lock.
+ const readers=Array.from({length:4},()=>start(`
+  const original=fs.open;let first=true,waiting=false;
+  fs.open=async(...args)=>{
+   if(String(args[0])===pinPath&&first){
+    first=false;const handle=mode==='identity'?await original(...args):undefined,gate=Promise.withResolvers();
+    process.stdin.once('data',gate.resolve);process.stdout.write('warming\\n');await gate.promise;return handle??original(...args);
+   }
+   try{return await original(...args);}catch(error){if(String(args[0])===join(policy.stateDir,'inventory.lock')&&error.code==='EEXIST'&&!waiting){waiting=true;process.stdout.write('waiting\\n');}throw error;}
+  };syncBuiltinESMExports();
+  const inventory=await readCivicPolicyInventory(policy);process.stdout.write(JSON.stringify({roots:inventory.roots.map(root=>root.path),hashes:inventory.entries.map(entry=>entry.contentSha256),scratch:inventory.scratch.length})+'\\n');
+ `));
+ await Promise.all(readers.map(reader=>reader.stage('warming')));
+ const saver=start(`
+  assert.equal((await retireManagedRoot(root,{reason:'Synthetic concurrent segment retirement'},policy)).status,'retired');
+  await withManagedSourceWrite(writerRoot,[entry],async()=>{
+   // Fixture-only segment turnover inside an actual saver transaction. Missing
+   // pins are restored before release; identity replacement keeps exact bytes.
+   // No production segment garbage collection or relaxed pin codec is added.
+   if(mode==='missing')await fs.rename(pinPath,pinPath+'.retired');
+   else{await fs.writeFile(pinPath+'.replacement',await fs.readFile(pinPath),{mode:0o600});await fs.rename(pinPath+'.replacement',pinPath);}
+   const gate=Promise.withResolvers();process.stdin.once('data',gate.resolve);process.stdout.write('saving\\n');await gate.promise;
+   if(mode==='missing')await fs.rename(pinPath+'.retired',pinPath);
+  },policy);
+ `);
+ await saver.stage('saving');const holder=await lstat(lock);
+ for(const reader of readers)reader.child.stdin.end('resume-warming');
+ await Promise.all(readers.map(reader=>reader.stage('waiting')));
+ assert.equal((await lstat(lock)).ino,holder.ino,'Warm failure must proceed to waiting, not bypass the saver lock');
+ saver.child.stdin.end('finish-save');assert.equal(await saver.closed,0,saver.stderr());
+ for(const reader of readers){assert.equal(await reader.closed,0,reader.stderr());assert.deepEqual(JSON.parse(reader.stdout().trim().split('\n').at(-1)!),{roots:[writerRoot],hashes:[entry.contentSha256],scratch:0});}
+ await assert.rejects(lstat(lock),{code:'ENOENT'});
+});
+
+test('locked load rejects a changed pin after successful speculative warming',async t=>{
+ const {stateDir,policy}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy),path=join(stateDir,'inventory-segments',migration.segments[0]!.sha256+'.json'),lock=join(stateDir,'inventory.lock');
+ await readCivicPolicyInventory(policy);const originalOpen=fsPromises.open;let changed=false;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const handle=await originalOpen(...args);
+  if(String(args[0])===lock&&!changed){changed=true;const bytes=await readFile(path);bytes[10]^=1;await writeFile(path,bytes,{mode:0o600});}
+  return handle;
+ });syncBuiltinESMExports();
+ try{await assert.rejects(readCivicPolicyInventory(policy),{code:'CIVIC_POLICY_INVENTORY_UNAVAILABLE'});assert.equal(changed,true);await assert.rejects(lstat(lock),{code:'ENOENT'});}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
 });
 
 for(const family of ['entries','scratch'])for(const mutation of ['tamper','missing','symlink','hardlink','mode'])test('sealed '+family+' '+mutation+' fails closed even after cache warming',async t=>{
