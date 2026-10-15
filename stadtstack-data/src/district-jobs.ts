@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {resolve,relative,isAbsolute} from 'node:path';
+import {pathToFileURL,fileURLToPath} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {Pool, type PoolClient, type QueryResultRow} from 'pg';
 import {z} from 'zod';
@@ -35,6 +35,27 @@ export interface NotificationAcknowledgement {provider:string;messageId:string;n
 export interface NotificationConfig extends NotificationIdentity {notifyOwner:(notification:OwnerNotification,signal?:AbortSignal)=>Promise<NotificationAcknowledgement>}
 const NotificationAcknowledgementSchema=z.object({provider:token,messageId:z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),notificationId:z.uuid(),payloadSha256:HashSchema,destinationSha256:HashSchema,acknowledgedAt:z.iso.datetime()}).strict();
 export class DistrictExecutionHold extends Error {readonly reasonCode:ReasonCode;constructor(reasonCode:ReasonCode){super(reasonCode);this.name='DistrictExecutionHold';this.reasonCode=reasonCode;}}
+const exceptionSourceRoot=fileURLToPath(new URL('.',import.meta.url));
+/** Content-free stderr projection only; never persisted or used for disposition. */
+export function formatDistrictJobException(jobKey:string,step:string,error:unknown):string {
+  let errorClass='Unknown',code='none',at='none';
+  const value=error as {constructor?:{name?:unknown};code?:unknown;stack?:unknown}|null|undefined;
+  // Exception properties can themselves be accessors; diagnostics must not
+  // replace the already-committed hold with another exception.
+  try{const name=value?.constructor?.name;if(typeof name==='string'&&/^[A-Za-z0-9_]{1,64}$/.test(name))errorClass=name;}catch{}
+  try{const candidate=value?.code;if(typeof candidate==='string'&&/^[A-Z0-9_]{1,64}$/.test(candidate))code=candidate;}catch{}
+  try{
+    const stack=value?.stack,frame=typeof stack==='string'?/^[ \t]*at ([^\r\n]*)/m.exec(stack):null;
+    // Inspect only the first frame: an external/native frame cannot be replaced
+    // by a later in-repository caller. Never retain a function name or column.
+    const location=frame&&/(?:^|[ (])((?:file:\/\/\/|\/)[^()\s]+):([1-9][0-9]{0,9}):[1-9][0-9]{0,9}\)?$/.exec(frame[1]);
+    if(location){
+      const path=location[1].startsWith('file:')?fileURLToPath(location[1]):location[1],source=relative(exceptionSourceRoot,path);
+      if(source!=='..'&&!source.startsWith('../')&&!isAbsolute(source)&&/^[A-Za-z0-9_./-]+$/.test(source))at='src/'+source+':'+location[2];
+    }
+  }catch{}
+  return `R1_EXCEPTION job=${jobKey.slice(0,12)} step=${step} class=${errorClass} code=${code} at=${at}\n`;
+}
 interface JobRow extends QueryResultRow {id:string;job_key:string;spec:DistrictJobSpec;state:string;created_at:Date;attempt_started_at:Date;lease_expires_at:Date;lease_owner:string;attempt:number;fencing_token:string;host_lane_key:string|null;budget_id:string|null;reserved_micro_usd:string;claimed_dependency_receipt_ids:string[];cancellation_requested:boolean}
 interface AuthorizationRow extends QueryResultRow {id:string;expires_at:Date;first_started_at:Date|null;max_elapsed_ms:number;jobs_started:number;max_jobs:number;allowed_job_keys:string[];allowed_ags:string[];state:string;category:ClaimedJob['category'];execution_mode:ExecutionMode;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null;now:Date}
 export interface RunBounds {runId:string;authorizationId:string;maxJobs:number;maxElapsedMs:number;startedAt:Date;deadlineAt:Date;deadlineReason:ReasonCode}
@@ -646,6 +667,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
       renew();let receipt:StepReceipt|undefined;
       let rejectAbort:((reason:unknown)=>void)|undefined;
       let invocation:Promise<JobHandlerResult>|undefined;
+      let handlerThrew=false,handlerError:unknown;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -659,7 +681,8 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
           if(resource)while(!await options.store.acquireResourceSlot(run!,job,resource,resourceLimits[resource]))await waitForSlot(controller.signal);
           try {
             controller.signal.throwIfAborted();
-            return await handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)});
+            try{return await handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)});}
+            catch(error){handlerThrew=true;handlerError=error;throw error;}
           } finally {if(resource)await options.store.releaseResourceSlot(job,resource);}
         };
         // An aborted but still-unwinding handler keeps its slot until it settles
@@ -687,7 +710,10 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         }
         const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
         receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
-        if(await options.store.hold(job,reason,receipt))receiptIds.push(receipt.id);
+        if(await options.store.hold(job,reason,receipt)){
+          receiptIds.push(receipt.id);
+          if(reason==='execution_exception'&&handlerThrew&&Object.is(error,handlerError))process.stderr.write(formatDistrictJobException(job.jobKey,job.spec.step,error));
+        }
         activeJob=undefined;
         stopped=reason;break;
       } finally {

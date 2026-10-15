@@ -292,6 +292,26 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000}),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_unavailable');
   });
 
+  await t.test('a committed handler execution exception emits exactly one content-free stderr line',async st=>{
+    let stderr='';st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+    try{
+      const secret='synthetic-secret-message',key=await store.enqueue(jobSpec('exception-diagnostic','diagnostic_throw'));
+      const error=Object.assign(new TypeError(secret),{code:'ERR_SYNTHETIC'});
+      const result=await run(await authorize([key]),1,{diagnostic_throw:async()=>{throw error;}});
+      assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');
+      assert.equal(stderr,`R1_EXCEPTION job=${key.slice(0,12)} step=diagnostic_throw class=TypeError code=ERR_SYNTHETIC at=none\n`);
+      const saved=await pool.query<{state:string;receipt:StepReceipt}>('SELECT j.state,r.receipt FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1',[key]);
+      assert.equal(saved.rowCount,1);assert.equal(saved.rows[0].state,'held_execution');assert.equal(saved.rows[0].receipt.reasonCode,'execution_exception');
+      assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/synthetic-secret-message|ERR_SYNTHETIC|R1_EXCEPTION/);
+      stderr='';
+      const returned=await store.enqueue(jobSpec('returned-exception-hold','diagnostic_return'));
+      assert.equal((await run(await authorize([returned]),1,{diagnostic_return:async()=>({outcome:'held_execution',reasonCode:'execution_exception'})})).state,'held');
+      const controlled=await store.enqueue(jobSpec('controlled-exception-hold','diagnostic_controlled'));
+      assert.equal((await run(await authorize([controlled]),1,{diagnostic_controlled:async()=>{throw new DistrictExecutionHold('quality_failed');}})).reasonCode,'quality_failed');
+      assert.equal(stderr,'');
+    }finally{st.mock.restoreAll();}
+  });
+
   await t.test('independent executors progress concurrently without holding live siblings',async()=>{
     const started=Promise.withResolvers<void>(),release=Promise.withResolvers<void>();
     const key=await store.enqueue(jobSpec('concurrent','wait_for_release')),other=await store.enqueue(jobSpec('concurrent-other'));

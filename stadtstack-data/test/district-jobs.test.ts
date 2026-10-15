@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {fileURLToPath} from 'node:url';
 import {digest} from '../src/district-adapter-contract.ts';
-import {canonicalJobIdentity,canonicalResourceIdentity,runDistrictJobsCli,R1_MUNICIPALITIES,type DistrictJobSpec} from '../src/district-jobs.ts';
+import {canonicalJobIdentity,canonicalResourceIdentity,runDistrictJobsCli,formatDistrictJobException,R1_MUNICIPALITIES,type DistrictJobSpec} from '../src/district-jobs.ts';
 
 const spec:DistrictJobSpec={step:'parse',lane:'cpu',semanticContractSha256:digest('parser-v1'),inputArtifactHashes:[digest('b'),digest('a')],sourceScope:{publisherId:'synthetic-publisher',sourceId:'synthetic-source',municipalityId:'strausberg',ags:'12064472',tenant:'town-tenant',observationWindow:'2026-10-11'},selector:{query:{b:2,a:1},candidateIds:['candidate-b','candidate-a']},policyProofSha256:digest('policy')};
 test('semantic identity sorts unordered hashes and object keys, preserves meaningful candidate order and scope',()=>{
@@ -44,4 +45,27 @@ test('resource identities retain portal tenant/query selectors and strip only no
 test('CLI never accepts shell or arbitrary module-loading flags',async()=>{
   await assert.rejects(runDistrictJobsCli({},['run','--shell','touch /tmp/not-executed']),/Unknown CLI flag/);
   await assert.rejects(runDistrictJobsCli({},['run','--handler-module','arbitrary.ts']),/Unknown CLI flag/);
+});
+
+test('exception diagnostics project only bounded class/code and the first src frame',()=>{
+  const key=digest('synthetic diagnostic job'),prefix=`R1_EXCEPTION job=${key.slice(0,12)} step=residual_prepare `,source=new URL('../src/district-jobs.ts',import.meta.url);
+  const error=Object.assign(new TypeError('synthetic-secret-message'),{code:'CIVIC_POLICY_BUSY',stack:`TypeError: synthetic-secret-message\n    at hiddenFunction (${source.href}:42:9)\n    at /private/secret.ts:3:4`});
+  assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=src/district-jobs.ts:42\n');
+  error.stack=`TypeError: synthetic-secret-message\n    at async ${fileURLToPath(source)}:123:4`;
+  assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=src/district-jobs.ts:123\n');
+  for(const frame of ['at parse (node:internal/parser:2:3)','at parse (/private/src/secret.ts:2:3)','at parse ('+new URL('../README.md',import.meta.url).href+':2:3)','at parse ('+source.href.replace('/src/','/src/../')+':2:3)']){
+    error.stack=`TypeError: synthetic-secret-message\n    ${frame}\n    at later (${source.href}:99:1)`;
+    assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class=TypeError code=CIVIC_POLICY_BUSY at=none\n');
+  }
+});
+test('exception diagnostics reject malformed fields and survive hostile accessors',()=>{
+  const key=digest('synthetic diagnostic job'),prefix=`R1_EXCEPTION job=${key.slice(0,12)} step=residual_prepare `;
+  for(const name of ['Bad Class','bad\nclass','x'.repeat(65),''])for(const code of ['bad-code','lowercase','BAD\nCODE','X'.repeat(65),1,undefined]){
+    const error={constructor:{name},code,message:'synthetic-secret-message',stack:'synthetic-secret-stack'};
+    assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class=Unknown code=none at=none\n');
+  }
+  const hostile=new Proxy({},{get(){throw Error('synthetic-secret-accessor');}});
+  for(const error of [hostile,null,undefined])assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class=Unknown code=none at=none\n');
+  const error={constructor:{name:'X'.repeat(64)},code:'C'.repeat(64),stack:42};
+  assert.equal(formatDistrictJobException(key,'residual_prepare',error),prefix+'class='+'X'.repeat(64)+' code='+'C'.repeat(64)+' at=none\n');
 });
