@@ -1,13 +1,15 @@
 import {test} from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,realpath,mkdir,writeFile,readFile,rm,lstat,readdir,symlink,link,rename,chmod,cp} from 'node:fs/promises';
+import {mkdtemp,realpath,mkdir,writeFile,readFile,rm,lstat,readdir,symlink,link,rename,chmod,cp,utimes} from 'node:fs/promises';
 import {watch,promises as fsPromises} from 'node:fs';
 import {syncBuiltinESMExports} from 'node:module';
+import type {Stats,BigIntStats} from 'node:fs';
 import {join,dirname} from 'node:path';
 import {tmpdir,homedir} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {spawn} from 'node:child_process';
+import type {ChildProcess} from 'node:child_process';
 import {DistrictCas} from '../src/district-cas.ts';
 import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AUTHORITY_ID,assertManagedSourceReadable,withManagedSourceScratch,recoverManagedSourceScratch,assertHostNotOptedOut,readCivicOptOutSnapshot,registerManagedCacheRoot,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,purgeOptedOutHost,recordManagedSourceContent,withManagedSourceWrite,markManagedCacheInventoryComplete,relinquishManagedSourceContent,HostOptedOutError,CivicPolicyStateError,civicOptOutMain} from '../src/civic-opt-out.ts';
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
@@ -82,7 +84,7 @@ test('past objections retain their overdue deadline and earlier repeat registrat
  const {root,stateDir}=await sandbox(t);t.mock.timers.enable({apis:['Date'],now:Date.parse(now)});
  await registerManagedCacheRoot(root, {kind: 'fetch', ...fixturePolicy(stateDir)});await recordHostOptOut({host:'council.test',reason:'municipality_objection'}, fixturePolicy(stateDir));
  const lock=join(stateDir,'inventory.lock');await writeFile(lock,'operator-held',{mode:0o600});
- const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection',receivedAt:'2026-09-01T00:00:00.000Z'}, fixturePolicy(stateDir));
+ const receipt=await recordHostOptOut({host:'council.test',reason:'municipality_objection',receivedAt:'2026-09-01T00:00:00.000Z'}, {...fixturePolicy(stateDir),lockWaitMs:50});
  assert.equal(receipt.purge.status,'error');assert.equal(receipt.purgeDueAt,'2026-09-08T00:00:00.000Z');assert.equal(receipt.purge.issues[0].code,'inventory_busy');
  assert.equal(await readFile(lock,'utf8'),'operator-held');await rm(lock);
  assert.equal((await purgeOptedOutHost('council.test', fixturePolicy(stateDir))).purgeDueAt,'2026-09-08T00:00:00.000Z');
@@ -1137,6 +1139,161 @@ test('managed root initialization waits for external lock release without steali
   await contended.promise;assert.equal(await readFile(lock,'utf8'),contents);assert.equal((await lstat(lock)).ino,identity.ino);
   await rm(lock);released.resolve();await pending;await markManagedCacheInventoryComplete(root,policy);await assert.rejects(lstat(lock),{code:'ENOENT'});
  }finally{released.resolve();t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+test('independent processes wait beyond the former five-second limit and hand off without stealing', {timeout:30_000},async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),entry=rawEntry('concurrent lock fixture');
+ await initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID});
+ await publish(root,entry,'concurrent lock fixture',stateDir);
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href,children:ChildProcess[]=[];
+ const start=(body:string)=>{
+  const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};const [root,policy,entry]=process.argv.slice(1);const options={...JSON.parse(policy),decisionId:CIVIC_ACQUISITION_DECISION_ID};${body}`,root,JSON.stringify(policy),JSON.stringify(entry)],{stdio:['pipe','pipe','pipe']});
+  children.push(child);let stderr='';child.stderr!.on('data',chunk=>{stderr+=chunk;});
+  const completion=Promise.withResolvers<void>();
+  child.once('error',completion.reject);child.once('close',code=>code===0?completion.resolve():completion.reject(Error('fixture child exit '+code+': '+stderr)));
+  const completed=completion.promise;void completed.catch(()=>{});
+  return {child,completed};
+ };
+ t.after(async()=>{for(const child of children)if(child.exitCode===null)child.kill('SIGKILL');await Promise.all(children.map(child=>{if(child.exitCode!==null||child.signalCode!==null)return Promise.resolve();const closed=Promise.withResolvers<void>();child.once('close',()=>closed.resolve());return closed.promise;}));});
+ const holder=start(`await withManagedSourceWrite(root,[JSON.parse(entry)],async()=>{process.stdout.write('locked\\n');const release=Promise.withResolvers();process.stdin.once('data',release.resolve);await release.promise;},options);`);
+ const held=Promise.withResolvers<void>();holder.child.stdout!.once('data',()=>held.resolve());await held.promise;
+ const lock=join(stateDir,'inventory.lock'),identity=await lstat(lock),contents=await readFile(lock);
+ const queued=Promise.withResolvers<void>(),watcher=watch(stateDir,()=>{void readdir(stateDir).then(names=>{if(names.filter(name=>name.startsWith('inventory.wait-')).length===2)queued.resolve();},queued.reject);});t.after(()=>watcher.close());
+ const waiters=[start(`await initializeManagedAcquisitionLane(root,options);`),start(`await initializeManagedAcquisitionLane(root,options);`)];
+ let finished=0;for(const waiter of waiters)void waiter.completed.then(()=>{finished++;},()=>{});
+ await queued.promise;
+ // Independent processes exercise real O_EXCL timing beyond the former 5 s
+ // platform deadline; fake timers cannot advance the other process clocks.
+ const elapsed=Promise.withResolvers<void>();setTimeout(elapsed.resolve,5_300);await elapsed.promise;
+ assert.equal(finished,0);assert.equal((await lstat(lock)).ino,identity.ino);assert.deepEqual(await readFile(lock),contents);
+ holder.child.stdin!.end('release');await holder.completed;await Promise.all(waiters.map(waiter=>waiter.completed));
+ assert.equal(finished,2);assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);
+ await assert.rejects(lstat(lock),{code:'ENOENT'});
+});
+
+test('configured lock timeout is bounded, cleans waiters, preserves holder and rejects invalid configuration',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),lock=join(stateDir,'inventory.lock');
+ await writeFile(lock,'external holder',{mode:0o600});const identity=await lstat(lock),start=performance.now();
+ await assert.rejects(initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,lockWaitMs:80}),{code:'CIVIC_POLICY_BUSY'});
+ assert.ok(performance.now()-start>=80);assert.equal((await lstat(lock)).ino,identity.ino);assert.equal(await readFile(lock,'utf8'),'external holder');
+ assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);
+ for(const lockWaitMs of [0,-1,NaN,Infinity,1.5,600_001])await assert.rejects(readCivicPolicyInventory({...policy,lockWaitMs}),{code:'INVALID_LOCK_WAIT'});
+ const previous=process.env.CIVIC_POLICY_LOCK_WAIT_MS;
+ t.after(()=>{if(previous===undefined)delete process.env.CIVIC_POLICY_LOCK_WAIT_MS;else process.env.CIVIC_POLICY_LOCK_WAIT_MS=previous;});
+ process.env.CIVIC_POLICY_LOCK_WAIT_MS='25';
+ await assert.rejects(readCivicPolicyInventory(policy),{code:'CIVIC_POLICY_BUSY'});
+ process.env.CIVIC_POLICY_LOCK_WAIT_MS='not-a-duration';
+ await assert.rejects(readCivicPolicyInventory(policy),{code:'INVALID_LOCK_WAIT'});
+});
+
+test('aborted scratch lock wait removes its waiter without later creating a lane or lease',async t=>{
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),lock=join(stateDir,'inventory.lock'),controller=new AbortController(),reason=Error('synthetic cancellation');
+ const initial=await readFile(join(stateDir,'inventory.json'));
+ await writeFile(lock,'external holder',{mode:0o600});const identity=await lstat(lock),queued=Promise.withResolvers<void>();
+ const watcher=watch(stateDir,()=>{void readdir(stateDir).then(names=>{if(names.some(name=>name.startsWith('inventory.wait-')))queued.resolve();},queued.reject);});t.after(()=>watcher.close());
+ let called=false;
+ const attempt=withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://council.test/source',sourceSha256:hash('source')}],async()=>{called=true;},{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',signal:controller.signal});
+ const rejected=assert.rejects(attempt,error=>error===reason);
+ await queued.promise;controller.abort(reason);await rejected;
+ assert.equal(called,false);assert.equal((await lstat(lock)).ino,identity.ino);assert.equal(await readFile(lock,'utf8'),'external holder');
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),initial);
+ assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);await assert.rejects(lstat(root),{code:'ENOENT'});
+ await rm(lock);
+ await assert.rejects(withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://council.test/source',sourceSha256:hash('source')}],async()=>{called=true;},{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,purpose:'classification',signal:controller.signal}),error=>error===reason);
+ await initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID});
+ assert.deepEqual((await readCivicPolicyInventory(policy)).scratch,[]);assert.equal(called,false);
+});
+
+async function shardedCasFixture(t:TestContext){
+ const {root,stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),bytes='Synthetic sharded immutable CAS',contentSha256=hash(bytes);
+ const entry={...rawEntry(bytes),relativePath:`sha256/${contentSha256.slice(0,2)}/${contentSha256}`};
+ await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});
+ await publish(root,entry,bytes,stateDir);
+ // Age only the isolated authority's wall clock; real inode metadata remains
+ // unchanged. This deterministically places the watermark beyond the racy window.
+ t.mock.timers.enable({apis:['Date'],now:Date.now()+60_000});
+ await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});
+ return {root,stateDir,policy,bytes,entry,path:join(root,entry.relativePath)};
+}
+
+test('CAS reconciliation reuses persisted exact-inode watermarks, never source-read authorization',async t=>{
+ const {root,stateDir,policy,path,bytes}=await shardedCasFixture(t),clock=Date.now(),originalOpen=fsPromises.open;let reads=0;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const handle=await originalOpen(...args);
+  if(String(args[0])===path){const originalRead=handle.read;t.mock.method(handle,'read',async(...args:Parameters<typeof handle.read>)=>{reads++;return originalRead.apply(handle,args);});}
+  return handle;
+ });syncBuiltinESMExports();
+ try{
+  await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});assert.equal(reads,0);
+  await assertManagedSourceReadable(path,policy);assert.ok(reads>0);
+  reads=0;await writeFile(path,bytes);
+  await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});assert.ok(reads>0);
+  reads=0;await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});assert.equal(reads,0);
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ const script=`import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(new URL('../src/civic-opt-out.ts',import.meta.url).href)};const [root,policy,path,clock]=process.argv.slice(1),open=fs.open;Date.now=()=>Number(clock);let reads=0;fs.open=async(...args)=>{const h=await open(...args);if(String(args[0])===path){const read=h.read.bind(h);h.read=(...args)=>{reads++;return read(...args);};}return h;};syncBuiltinESMExports();await initializeManagedAcquisitionLane(root,{...JSON.parse(policy),kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});process.exitCode=reads?9:0;`;
+ const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',script,root,JSON.stringify(policy),path,String(clock)],{stdio:'ignore'});
+ const closed=Promise.withResolvers<number|null>();child.once('error',closed.reject);child.once('close',closed.resolve);assert.equal(await closed.promise,0);
+ assert.ok(Object.keys(JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')).roots[0].casWatermarks).length);
+ await rm(path);await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});
+ assert.equal(Object.hasOwn(JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')).roots[0],'casWatermarks'),false);
+});
+
+for(const mutation of ['unregistered','symlink','directory-symlink','tamper-restored-mtime','replacement','hardlink','mode','open-replacement'] as const)test('warm CAS reconciliation fails closed: '+mutation,async t=>{
+ const {root,stateDir,policy,path,bytes}=await shardedCasFixture(t),before=await lstat(path),originalOpen=fsPromises.open;let intercepted=false;
+ if(mutation==='unregistered')await writeFile(join(dirname(path),'f'.repeat(64)),'foreign bytes',{mode:0o600});
+ if(mutation==='symlink'){await rm(path);await symlink(join(stateDir,'inventory.json'),path);}
+ if(mutation==='directory-symlink'){await rename(dirname(path),dirname(path)+'-old');await symlink(dirname(path)+'-old',dirname(path));}
+ if(mutation==='tamper-restored-mtime'){await writeFile(path,'X'.repeat(Buffer.byteLength(bytes)));await utimes(path,before.atime,before.mtime);}
+ if(mutation==='replacement'){const other=path+'-replacement';await writeFile(other,'X'.repeat(Buffer.byteLength(bytes)),{mode:0o600});await utimes(other,before.atime,before.mtime);await rename(other,path);}
+ if(mutation==='hardlink')await link(path,join(stateDir,'hardlink'));
+ if(mutation==='mode')await chmod(path,0o666);
+ if(mutation==='open-replacement'){
+  t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+   const handle=await originalOpen(...args);
+   if(String(args[0])===path&&!intercepted){intercepted=true;await rename(path,path+'-old');await writeFile(path,bytes,{mode:0o600});}
+   return handle;
+  });syncBuiltinESMExports();
+ }
+ try{await assert.rejects(initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID}),{code:'MANAGED_INVENTORY_INCOMPLETE'});}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ assert.equal(JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8')).roots[0].complete,false);
+ if(mutation==='open-replacement')assert.equal(intercepted,true);
+});
+
+for(const mode of ['racy','coarse','unknown-filesystem','tmpfs','clock-rollback'] as const)test('CAS equality never hides same-metadata tampering: '+mode,async t=>{
+ const {root,policy,path,bytes}=await shardedCasFixture(t),metadata=await lstat(path,{bigint:true}),originalOpen=fsPromises.open,originalLstat=fsPromises.lstat,originalStatfs=fsPromises.statfs;
+ let reads=0;
+ const mtimeNs=mode==='coarse'?metadata.mtimeNs/1_000_000_000n*1_000_000_000n:metadata.mtimeNs,ctimeNs=mode==='coarse'?metadata.ctimeNs/1_000_000_000n*1_000_000_000n:metadata.ctimeNs;
+ const mask=<T extends Stats|BigIntStats>(stat:T):T=>Object.assign(stat,typeof stat.mtimeMs==='bigint'?{mtimeNs,ctimeNs,mtimeMs:mtimeNs/1_000_000n,ctimeMs:ctimeNs/1_000_000n}:{mtimeMs:Number(mtimeNs)/1e6,ctimeMs:Number(ctimeNs)/1e6});
+ if(mode==='racy')t.mock.timers.setTime(Number(ctimeNs/1_000_000n)+1_000);
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const handle=await originalOpen(...args);
+  if(String(args[0])===path){
+   const stat=handle.stat,read=handle.read;
+   t.mock.method(handle,'stat',async(...args:Parameters<typeof handle.stat>)=>mask(await stat.apply(handle,args)));
+   t.mock.method(handle,'read',async(...args:Parameters<typeof handle.read>)=>{reads++;return read.apply(handle,args);});
+  }
+  return handle;
+ });
+ t.mock.method(fsPromises,'lstat',async(...args:Parameters<typeof fsPromises.lstat>)=>{const stat=await originalLstat(...args);return String(args[0])===path?mask(stat):stat;});
+ if(mode==='unknown-filesystem'||mode==='tmpfs')t.mock.method(fsPromises,'statfs',async(...args:Parameters<typeof fsPromises.statfs>)=>Object.assign(await originalStatfs(...args),{type:mode==='tmpfs'?0x01021994:0}));
+ syncBuiltinESMExports();
+ try{
+  await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});
+  if(mode==='clock-rollback')t.mock.timers.setTime(Date.now()-100);
+  reads=0;await writeFile(path,'X'.repeat(Buffer.byteLength(bytes)));
+  await assert.rejects(initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID}),{code:'MANAGED_INVENTORY_INCOMPLETE'});
+  assert.ok(reads>0,'unsafe timestamp equality must rehash');
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+test('purge immediately removes a deleted CAS member watermark from committed inventory',async t=>{
+ const {root,stateDir,policy,path}=await shardedCasFixture(t);
+ assert.ok(Object.keys((await readCivicPolicyInventory(policy)).roots[0].casWatermarks??{}).length);
+ const result=await recordHostOptOut({host:'council.test',reason:'rights_holder_objection'},policy);
+ assert.equal(result.purge.status,'purged');await assert.rejects(lstat(path),{code:'ENOENT'});
+ const inventory=JSON.parse(await readFile(join(stateDir,'inventory.json'),'utf8'));
+ assert.equal(inventory.roots.find((item:{path:string})=>item.path===root).casWatermarks,undefined);
 });
 
 test('purged derived ancestor hosts deny omitted contributor reads before missing body access',async t=>{

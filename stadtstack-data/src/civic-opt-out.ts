@@ -1,5 +1,5 @@
 import {constants,watch} from 'node:fs';
-import {mkdir,lstat,open,rename,unlink,link,opendir,rmdir} from 'node:fs/promises';
+import {mkdir,lstat,open,rename,unlink,link,opendir,rmdir,statfs} from 'node:fs/promises';
 import type {FileHandle} from 'node:fs/promises';
 import type {Stats,BigIntStats,FSWatcher} from 'node:fs';
 import {spawn} from 'node:child_process';
@@ -11,6 +11,7 @@ import {homedir,hostname,userInfo} from 'node:os';
 import {createHash,randomUUID} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {setTimeout as inventoryDelay} from 'node:timers/promises';
 import {z} from 'zod';
 import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema} from './district-schema.ts';
 import {effectiveSourcePermission} from './source-policy.ts';
@@ -37,7 +38,10 @@ const LANE_MARKER='.civic-acquisition-lane.json';
 const laneMarkerSchema=z.object({schemaVersion:z.literal(1),decisionId:z.literal(CIVIC_ACQUISITION_DECISION_ID),rootId:hex,identity:identitySchema,kind:kindSchema,authorityId:opaque,authoritySha256:hex}).strict();
 export interface ManagedAcquisitionLaneOptions extends CivicPolicyOptions {decisionId:typeof CIVIC_ACQUISITION_DECISION_ID;kind?:'fetch'|'prepared'|'artifacts'}
 const objectionSchema=z.object({schemaVersion:z.literal(1),host:z.string(),receivedAt:timestamp,purgeDueAt:timestamp,reason:reasonSchema,reference:opaque.optional()}).strict();
-const rootSchema=z.object({id:hex,path:z.string(),kind:kindSchema,identity:identitySchema,complete:z.boolean()}).strict();
+// Only sharded artifact CAS digests are memoized. Directory membership, provenance
+// and safe inode metadata are still checked live on every reconciliation.
+const casWatermarkSchema=z.object({stamp:z.string().max(256).regex(/^\d+(?::\d+){7}$/),checkedAtNs:z.string().regex(/^\d{1,24}$/)}).strict();
+const rootSchema=z.object({id:hex,path:z.string(),kind:kindSchema,identity:identitySchema,complete:z.boolean(),casWatermarks:z.record(hex,casWatermarkSchema).optional()}).strict();
 const publicationBindingSchema=z.object({manifestSha256:hex,releaseId:opaque,memberPath:z.string().min(1).max(2048).refine(value=>!isAbsolute(value)&&!value.includes('\\')&&value.split('/').every(part=>!!part&&part!=='.'&&part!=='..')),memberSha256:hex,memberBytes:z.number().int().nonnegative().max(MAX_CONTENT)}).strict();
 const gitSnapshotBindingSchema=z.object({gitCommit:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),path:z.string().min(1).max(2048).refine(value=>!isAbsolute(value)&&!value.includes('\\')&&value.split('/').every(part=>!!part&&part!=='.'&&part!=='..')),blobOid:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),sha256:hex,bytes:z.number().int().nonnegative().max(MAX_CONTENT)}).strict();
 const registryApprovalSchema=z.object({role:z.literal('district_source_registry'),approver:z.literal('owner'),decisionId:z.literal(CIVIC_ACQUISITION_DECISION_ID),date:z.literal('2026-10-11'),configurationSha256:hex,gitCommit:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)}).strict();
@@ -217,7 +221,7 @@ export interface CivicPolicyAuthorityReceipt {schemaVersion:'civic-policy-author
 export type PurgeReceipt=z.infer<typeof purgeSchema>;
 export type RetireReceipt=z.infer<typeof RetireReceiptSchema>;
 export type OptOutReceipt=Objection&{purge:PurgeReceipt};
-export interface CivicPolicyOptions {stateDir?:string;authorityId?:string;authoritySha256?:string}
+export interface CivicPolicyOptions {stateDir?:string;authorityId?:string;authoritySha256?:string;lockWaitMs?:number}
 export interface CivicOptOutSnapshot {
  schemaVersion:'civic-opt-out-snapshot-v2';authorityId:string;authoritySha256:string;sha256:string;
  objections:Array<{hostSha256:string;receivedAt:string;purgeDueAt:string}>;
@@ -308,15 +312,34 @@ async function fileBytes(path:string,maxBytes:number,privateFile=false):Promise<
   return {bytes:buffer.subarray(0,total),stat};
  }finally{await handle.close();}
 }
-async function fileDigest(path:string):Promise<{sha256:string;stat:Stats}>{
+async function fileDigest(path:string,cached?:{watermark?:z.infer<typeof casWatermarkSchema>;sha256:string;preciseFilesystem:boolean}):Promise<{sha256:string;stat:Stats;watermark?:z.infer<typeof casWatermarkSchema>}>{
  await directory(dirname(path));const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
  try{
   const stat=await handle.stat();
   if(!stat.isFile()||stat.nlink!==1||stat.uid!==process.getuid?.()||(stat.mode&0o022)!==0||stat.size>MAX_CONTENT)throw new CivicPolicyStateError();
-  const hash=createHash('sha256'),buffer=Buffer.allocUnsafe(64*1024);let total=0;
-  for(;;){const {bytesRead}=await handle.read(buffer,0,buffer.length,null);if(!bytesRead)break;total+=bytesRead;if(total>MAX_CONTENT)throw new CivicPolicyStateError();hash.update(buffer.subarray(0,bytesRead));}
-  const after=await handle.stat();if(stat.size!==total||stat.mtimeMs!==after.mtimeMs||stat.ctimeMs!==after.ctimeMs||!sameIdentity(stat,await lstat(path)))throw new CivicPolicyStateError();
-  return {sha256:hash.digest('hex'),stat};
+  // Ordinary authorization/deletion reads retain their original full hash path
+  // and syscall count; only reconciliation asks for persistent nanosecond stamps.
+  const checkedAtNs=cached?BigInt(Date.now())*1_000_000n:0n,metadata=cached?await handle.stat({bigint:true}):undefined,stamp=metadata?snapshotStamp(metadata):'';
+  const prior=cached?.watermark,created=prior?BigInt(prior.checkedAtNs):0n;
+  // Git's racily-clean rule: precise-looking equality alone is insufficient.
+  // A reused digest must predate its watermark by more than the conservative
+  // two-second timestamp window, on a known ns-capable filesystem and a file
+  // whose two live timestamps actually expose sub-millisecond precision.
+  const precise=!!(metadata&&cached?.preciseFilesystem&&metadata.mtimeNs%1_000_000n!==0n&&metadata.ctimeNs%1_000_000n!==0n);
+  const reusable=!!(precise&&metadata&&prior?.stamp===stamp&&created<=checkedAtNs&&
+   created-metadata.mtimeNs>2_000_000_000n&&created-metadata.ctimeNs>2_000_000_000n);
+  let sha256:string;
+  if(reusable)sha256=cached!.sha256;
+  else{
+   const hash=createHash('sha256'),buffer=Buffer.allocUnsafe(64*1024);let total=0;
+   for(;;){const {bytesRead}=await handle.read(buffer,0,buffer.length,null);if(!bytesRead)break;total+=bytesRead;if(total>MAX_CONTENT)throw new CivicPolicyStateError();hash.update(buffer.subarray(0,bytesRead));}
+   if(stat.size!==total)throw new CivicPolicyStateError();
+   sha256=hash.digest('hex');
+  }
+  const after=await handle.stat();if(stat.size!==after.size||stat.mtimeMs!==after.mtimeMs||stat.ctimeMs!==after.ctimeMs||!sameIdentity(stat,await lstat(path)))throw new CivicPolicyStateError();
+  // Cached and hashed CAS paths share the descriptor/path replacement boundary.
+  if(cached&&(snapshotStamp(await handle.stat({bigint:true}))!==stamp||snapshotStamp(await lstat(path,{bigint:true}))!==stamp))throw new CivicPolicyStateError();
+  return {sha256,stat,watermark:precise?{stamp,checkedAtNs:checkedAtNs.toString()}:undefined};
  }finally{await handle.close();}
 }
 async function atomicJson(path:string,value:unknown,exclusive=false,privateDirectory=true,serialized?:string):Promise<void>{
@@ -498,9 +521,29 @@ async function hasInventoryWaiters(state:string):Promise<boolean>{
  }
  return false;
 }
-async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false):Promise<T>{
+function inventoryLockWaitMs(options:CivicPolicyOptions):number{
+ const value=options.lockWaitMs??Number(process.env.CIVIC_POLICY_LOCK_WAIT_MS??120_000);
+ if(!Number.isSafeInteger(value)||value<1||value>600_000)throw new CivicPolicyStateError('INVALID_LOCK_WAIT');
+ return value;
+}
+async function waitForInventoryTurn(prior:Promise<void>,signal?:AbortSignal):Promise<void>{
+ if(!signal){await prior;return;}
+ signal.throwIfAborted();
+ const aborted=Promise.withResolvers<never>(),stop=()=>aborted.reject(signal.reason);
+ signal.addEventListener('abort',stop,{once:true});
+ try{await Promise.race([prior,aborted.promise]);signal.throwIfAborted();}
+ finally{signal.removeEventListener('abort',stop);}
+}
+async function waitForInventoryPoll(ms:number,signal?:AbortSignal):Promise<void>{
+ try{await inventoryDelay(ms,undefined,{signal});}
+ catch(error){signal?.throwIfAborted();throw error;}
+}
+async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false,signal?:AbortSignal):Promise<T>{
+ signal?.throwIfAborted();
+ const waitMs=inventoryLockWaitMs(options);
  const state=statePath(options);
- const prior=queues.get(state)??Promise.resolve();let done!:()=>void;const gate=new Promise<void>(resolve=>{done=resolve;});queues.set(state,gate);await prior;
+ const prior=queues.get(state)??Promise.resolve(),gate=Promise.withResolvers<void>(),queued=prior.then(()=>gate.promise);
+ queues.set(state,queued);
  const path=join(state,'inventory.lock');let handle:FileHandle|undefined,waiting:FileHandle|undefined,waitingIdentity:Stats|undefined;
  let waitingPath:string|undefined;
  const stopWaiting=async()=>{
@@ -509,12 +552,15 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   finally{await waiting.close();waiting=undefined;}
  };
  try{
+  await waitForInventoryTurn(prior,signal);
   if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
   if(!provisioning)await warmInventorySegments(state);
   const cooldown=(nextLockAttempt.get(state)??0)-performance.now();
-  if(cooldown>0&&await hasInventoryWaiters(state))await new Promise<void>(resolve=>setTimeout(resolve,cooldown));
-  const deadline=performance.now()+5_000;
+  signal?.throwIfAborted();
+  if(cooldown>0&&await hasInventoryWaiters(state))await waitForInventoryPoll(cooldown,signal);
+  const deadline=performance.now()+waitMs;
   for(;;){
+   signal?.throwIfAborted();
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
    catch(error){
     if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;
@@ -522,17 +568,19 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
     try{const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();}
     catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
     if(!provisioning&&!waiting){waitingPath=join(state,'inventory.wait-'+randomUUID());waiting=await open(waitingPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);waitingIdentity=await waiting.stat();}
-    await new Promise<void>(resolve=>setTimeout(resolve,25));
+    await waitForInventoryPoll(25,signal);
    }
   }
   const original=await handle.stat();
   try{
    await stopWaiting();
+   signal?.throwIfAborted();
    await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID()})+'\n');await handle.sync();
    if(!provisioning)await assertCivicPolicyAuthority(options);
+   signal?.throwIfAborted();
    return await work();
   }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
- }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{done();if(queues.get(state)===gate)queues.delete(state);}}
+ }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{gate.resolve();void queued.then(()=>{if(queues.get(state)===queued)queues.delete(state);});}}
 }
 function entryId(entry:Omit<Entry,'id'|'state'>):string{return digest(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));}
 function checkedRelative(root:Root,path:string,contentSha256:string,receiptSha256?:string):string{
@@ -673,6 +721,14 @@ function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:
 // machines. Known formats are inventoried only inside the supplied managed root.
 async function reconcile(root:Root,inventory:Inventory,retiring=false):Promise<boolean>{
  await verifyRoot(root);let complete=true,count=0;const paths=new Set<string>(),requests:string[]=[],receipts=new Map<string,{observationId:string;receiptSha256:string}>();
+ const watermarks:Record<string,z.infer<typeof casWatermarkSchema>>={};
+ // This authority trusts its owning uid, which also controls inventory/segments.
+ // Reconciliation catches accidental/foreign changes and debris, not malicious
+ // same-uid writes through existing MAP_SHARED mappings without timestamp updates.
+ // Ordinary source reads, content admissions and deletions still full-hash.
+ // ext-family files must show fractional precision (ext2 does not). tmpfs and
+ // unknown/coarse filesystems never reuse digests, regardless of timestamp shape.
+ const preciseFilesystem=root.kind==='artifacts'&&!retiring&&await statfs(root.path).then(stat=>[0xef53,0x58465342,0x9123683e].includes(stat.type),()=>false);
  const visit=async(folder:string):Promise<void>=>{
   for await(const child of await opendir(join(root.path,folder))){if(++count>MAX_FILES)throw new CivicPolicyStateError();const path=folder?folder+'/'+child.name:child.name,stat=await lstat(join(root.path,path));
    if(stat.isSymbolicLink()){complete=false;continue;}
@@ -750,13 +806,18 @@ async function reconcile(root:Root,inventory:Inventory,retiring=false):Promise<b
  for(const path of paths){const entries=entriesAt(inventory,root.id,path);
   if(!entries.length){complete=false;continue;}
   try{
-   const actual=await fileDigest(join(root.path,path)),current=entries.filter(entry=>entry.contentSha256===actual.sha256);
+   const casHash=!retiring&&root.kind==='artifacts'&&/^sha256\/[a-f0-9]{2}\/[a-f0-9]{64}$/.test(path)?basename(path):undefined;
+   const cached=casHash&&path===`sha256/${casHash.slice(0,2)}/${casHash}`?{watermark:root.casWatermarks?.[casHash],sha256:casHash,preciseFilesystem}:undefined;
+   const actual=await fileDigest(join(root.path,path),cached),current=entries.filter(entry=>entry.contentSha256===actual.sha256);
    if(!current.length)complete=false;
+   else if(casHash&&actual.sha256===casHash&&actual.watermark)watermarks[casHash]=actual.watermark;
    // A restored copy does not become exempt merely because its prior reference
    // was tombstoned. Keep it withdrawn and eligible for a renewed purge.
    for(const entry of current)if(entry.state==='deleted'||entry.state==='missing')setEntryState(inventory,entry,'revoked');
   }catch{complete=false;}
  }
+ // Prune missing/changed members; a watermark never creates a provenance entry.
+ if(root.kind==='artifacts'&&!retiring){if(Object.keys(watermarks).length)root.casWatermarks=watermarks;else delete root.casWatermarks;}
  return complete;
 }
 function managedRootPath(input:string,state:string):string{
@@ -1093,7 +1154,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
  const id=randomUUID(),controller=new AbortController(),signal=options.signal?AbortSignal.any([controller.signal,options.signal]):controller.signal;
  let lease!:ScratchLease,root!:Root;
  await locked(policy,async()=>{
-  const inventory=await loadInventory(state);root=await reconcileAcquisitionLane(inventory,lanePath,kind,authority);
+  signal.throwIfAborted();const inventory=await loadInventory(state);signal.throwIfAborted();root=await reconcileAcquisitionLane(inventory,lanePath,kind,authority);signal.throwIfAborted();
   // Reconciliation and the planned lease share the pre-mkdir commit. Even a
   // refused incomplete lane must retain its reconciled completeness durably.
   if(!root.complete){await saveInventory(state,inventory);throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');}
@@ -1101,7 +1162,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   inventory.scratch.push(lease);await saveInventory(state,inventory);
   await directory(join(root.path,'scratch'),true,true);await mkdir(join(root.path,lease.directory),{mode:0o700});
   const metadata=await directory(join(root.path,lease.directory),false,true);lease.identity={dev:metadata.dev,ino:metadata.ino};lease.state='active';await saveInventory(state,inventory);
- });
+ },false,signal);
  const scratchDirectory=join(root.path,lease.directory),children:Array<{child:ChildProcessWithoutNullStreams;closed:boolean;completion:Promise<void>}>=[];
  const daemonRemovers=new Set<()=>Promise<void>>();
  const stopDaemons=()=>{for(const remove of daemonRemovers)void remove().catch(()=>{});};
@@ -1405,6 +1466,7 @@ async function withdraw(state:string,inventory:Inventory,selected:Entry[],receip
    // Owner-only state/root components exclude other users from the rename race;
    // participating producers are serialized by the shared inventory lock.
    await unlinkManagedFile(root,first.relativePath,actual);receipt.deletedFiles++;receipt.deletedBytes+=actual.stat.size;
+   if(root.casWatermarks){delete root.casWatermarks[basename(first.relativePath)];if(!Object.keys(root.casWatermarks).length)delete root.casWatermarks;}
    for(const entry of entriesAt(inventory,root.id,first.relativePath)){if(selected.has(entry)&&entry.state==='active')receipt.removedReferences++;setEntryState(inventory,entry,'deleted');}
   }catch{issue('unsafe_content');}
  }

@@ -9,7 +9,9 @@ import {join} from 'node:path';
 import {sha256} from '../src/district-schema.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,recordHostOptOut,HostOptedOutError,CivicPolicyStateError,withManagedSourceScratch,assertManagedSourceBindings} from '../src/civic-opt-out.ts';
 import {buildOperatorRegistryConfigDescriptor,operatorRegistryConfigSchema,operatorRegistryConfigSourcePinSchema,operatorRegistryConfigBindingSchema,readOperatorRegistryConfig,importOperatorRegistryConfig,readOperatorRegistryConfigSourcePin,parseOperatorRegistryConfiguration,operatorRegistryInputPinSchema,readOperatorRegistryInputPin,readCrawlOperatorRegistryInputPin} from '../src/district-registry-config.ts';
-import {districtR1Cli} from '../src/district-r1.ts';
+import {districtR1Cli,formatR1Failure} from '../src/district-r1.ts';
+import type {R1FailurePhase} from '../src/district-r1.ts';
+import {DistrictExecutionHold} from '../src/district-jobs.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createOperatorRegistryFixture,operatorRegistryFixtureValue,registryDescriptor,writeOperatorRegistryInputPin} from './helpers/operator-registry-fixture.ts';
 import {knowledgePreparedSourcePinSchema} from '../src/prepare-knowledge.ts';
@@ -211,6 +213,25 @@ test('registry-descriptor CLI validates flags and confines output to the operato
  for(const args of [[],['--commit','abc'],['--commit','a','--output','x','--commit','b'],['--commit','a','--output','x','--other']])
   await assert.rejects(districtR1Cli(['registry-descriptor',...args]));
  await assert.rejects(districtR1Cli(['registry-descriptor','--commit','a'.repeat(40),'--output','/tmp/out']));
+});
+
+test('R1 CLI emits only a phase and content-free reason code, with conservative side-effect boundaries',async t=>{
+ for(const phase of ['startup','admission','execution'] as const){
+  assert.equal(formatR1Failure(new CivicPolicyStateError('CIVIC_POLICY_BUSY'),phase),`R1_FAILURE phase=${phase} code=CIVIC_POLICY_BUSY\n`);
+  assert.equal(formatR1Failure(new DistrictExecutionHold('execution_exception'),phase),`R1_FAILURE phase=${phase} code=execution_exception\n`);
+  for(const error of [Error('private source text https://private.test'),new CivicPolicyStateError('private text\nINJECTION'),null])
+   assert.equal(formatR1Failure(error,phase),`R1_FAILURE phase=${phase} code=R1_COMMAND_FAILED\n`);
+ }
+ const context:{phase:R1FailurePhase}={phase:'execution'};
+ await assert.rejects(districtR1Cli(['registry-descriptor'],context));assert.equal(context.phase,'startup');
+ t.mock.method(fsPromises,'mkdir',async()=>{throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');});syncBuiltinESMExports();
+ try{
+  const output=new URL('../cache/districts/r1-operator/synthetic-failure',import.meta.url).pathname;
+  await assert.rejects(districtR1Cli(['registry-descriptor','--commit','a'.repeat(40),'--output',output],context),{code:'CIVIC_POLICY_BUSY'});
+  assert.equal(context.phase,'admission');
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ const result=await execFileAsync(process.execPath,['--experimental-strip-types',new URL('../src/district-r1.ts',import.meta.url).pathname,'registry-descriptor']).then(()=>assert.fail('CLI must exit 2'),error=>error as {code:number;stdout:string;stderr:string});
+ assert.equal(result.code,2);assert.equal(result.stdout,'');assert.equal(result.stderr,'R1_FAILURE phase=startup code=R1_COMMAND_FAILED\n');
 });
 
 test('explicit crawl migration authenticates older codec proofs against identical current Git configuration and records both pins',async t=>{

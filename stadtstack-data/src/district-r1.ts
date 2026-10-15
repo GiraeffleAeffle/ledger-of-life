@@ -9,7 +9,7 @@ import {z} from 'zod';
 import {DistrictCas} from './district-cas.ts';
 import type {CasArtifact} from './district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,runDistrictJobsCli,migrateDistrictJobs,R1_MUNICIPALITIES,insertR1MetadataSnapshot} from './district-jobs.ts';
-import type {JobHandler,DistrictJobSpec} from './district-jobs.ts';
+import type {JobHandler,DistrictJobSpec,ExecutorResult} from './district-jobs.ts';
 import {canonicalJson,digest,semanticHash,ScopeSchema,HashSchema} from './district-adapter-contract.ts';
 import type {AdapterScope} from './district-adapter-contract.ts';
 import {districtRegistrySchema} from './district-registry.ts';
@@ -28,7 +28,7 @@ import {readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {OwnerAcquisitionReusePinSchema,readPriorGenesisOwnerAcquisition} from './genesis-owner-reuse.ts';
 import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
@@ -410,12 +410,23 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
  process.stdout.write(canonicalJson({records:run.records.length,coverage:run.coverage.length,nativeFieldHolds:structuredHoldSummary([...groups.values()].flatMap(group=>group.pages.map(page=>page.result))),registrySha256:run.registrySha256,structuredRunSha256:runArtifact.sha256,acquisitionDescriptors,artifacts:{structuredRun:{...runArtifact,path:join(cas.root,runArtifact.storageKey)},records:{...recordsArtifact,path:join(cas.root,recordsArtifact.storageKey)},coverage:{...coverageArtifact,path:join(cas.root,coverageArtifact.storageKey)}}})+'\n');
 }
 
-export async function districtR1Cli(argv=process.argv.slice(2)){
+export type R1FailurePhase='startup'|'admission'|'execution';
+export function formatR1Failure(error:unknown,phase:R1FailurePhase):string{
+ const candidate=error instanceof CivicPolicyStateError?error.code:error instanceof DistrictExecutionHold?error.reasonCode:'R1_COMMAND_FAILED';
+ const code=/^[A-Za-z][A-Za-z0-9_]{0,95}$/.test(candidate)?candidate:'R1_COMMAND_FAILED';
+ return `R1_FAILURE phase=${phase} code=${code}\n`;
+}
+export function reportR1ExecutorFailure(result:ExecutorResult|undefined):void{
+ if(result?.state==='held')process.stderr.write(formatR1Failure(new DistrictExecutionHold(result.reasonCode),'execution'));
+}
+export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1FailurePhase}={phase:'startup'}){
+ context.phase='startup';
  const [command,...rawArgs]=argv;
  if(command==='registry-descriptor'){
   if(rawArgs.length!==4||rawArgs[0]!=='--commit'||rawArgs[2]!=='--output'||!rawArgs[1]||!rawArgs[3])throw Error('registry-descriptor requires exactly --commit <oid> --output <dir>');
   const output=resolve(rawArgs[3]),root=resolve(OPERATOR_ROOT),part=relative(root,output);
   if(part===''||part==='..'||part.startsWith(`..${process.platform==='win32'?'\\\\':'/'}`)||isAbsolute(part))throw Error('Registry descriptor output must be a new directory under the R1 operator cache');
+  context.phase='admission';
   await mkdir(root,{recursive:true,mode:0o700});
   try{await lstat(output);throw Error('Registry descriptor output directory already exists');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
   const built=await buildOperatorRegistryConfigDescriptor({repository:REPO,commit:rawArgs[1],outputDirectory:output});
@@ -425,6 +436,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   if(rawArgs.length)throw Error('Migration accepts no registry or execution arguments');
   if(!process.env.DATABASE_URL)throw Error('Database configuration required');
   const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});
+  context.phase='admission';
   try{await migrateDistrictJobs(pool);}finally{await pool.end();}return;
  }
  const {registryPin,args}=parseR1RegistryArguments(rawArgs),admitted=await readOperatorRegistryInputPin(registryPin,{}),registry=admitted.registry,registrySha256=digest(admitted.bytes);
@@ -432,13 +444,16 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   if(!process.env.DATABASE_URL)throw Error('Database configuration required');
   const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});
   try{
+   context.phase='admission';
    await persistOperatorRegistry(new DistrictJobStore(pool),new DistrictCas(CAS_ROOT),admitted);
    const authorizationIndex=args.indexOf('--authorization-id'),authorizationId=z.uuid().parse(args[authorizationIndex+1]);
    if(authorizationIndex<0)throw Error('Explicit authorization required');
    const authorization=await pool.query<{has_b:boolean;only_b:boolean}>(`SELECT BOOL_OR(j.step='assessment_b') AS has_b,BOOL_AND(j.step='assessment_b') AS only_b FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys) WHERE a.id=$1`,[authorizationId]);
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
    const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024,registry,registrySha256}));
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256),admit_acquired_representation:acquiredRepresentationHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   context.phase='execution';
+   const result=await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256),admit_acquired_representation:acquiredRepresentationHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   reportR1ExecutorFailure(result);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
@@ -447,12 +462,14 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   if(digest(catalogBytes)!=='c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40')throw Error('Catalog differs from explicit initial-plan control approval');
   const proposal=registerStructuredCatalog(registry,catalogBytes),date=new Date().toISOString().slice(0,10);
   parseOperatorRegistryConfiguration(proposal.registry);
+  context.phase='admission';
   await writeOperator(`registry-proposal-${date}.json`,proposal.registry);await writeOperator(`catalog-routes-proposal-${date}.json`,proposal.routes);
   process.stdout.write(canonicalJson({state:'proposal_not_admitted',inputRegistrySha256:registrySha256,catalogSha256:proposal.catalogSha256,routes:proposal.routes.length,requires:'separate_shared_registry_config_admission'})+'\n');return;
  }
  if(!process.env.DATABASE_URL)throw Error('Database configuration required');
  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000}),store=new DistrictJobStore(pool),cas=new DistrictCas(CAS_ROOT);
  try{
+  context.phase='admission';
   await persistOperatorRegistry(store,cas,admitted);
   const input=await stdinJson();
   if(command==='import-crawl-corpus'){
@@ -595,4 +612,7 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
   throw Error('Unknown R1 command');
  }finally{await pool.end();}
 }
-if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url)districtR1Cli().catch(error=>{process.stderr.write((error instanceof DistrictExecutionHold?error.reasonCode:'R1 command failed; inspect private configuration and committed state.')+'\n');process.exitCode=2;});
+if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
+ const context:{phase:R1FailurePhase}={phase:'startup'};
+ districtR1Cli(process.argv.slice(2),context).catch(error=>{process.stderr.write(formatR1Failure(error,context.phase));process.exitCode=2;});
+}
