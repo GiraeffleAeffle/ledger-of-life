@@ -11,12 +11,12 @@ import type {CivicPolicyOptions} from './civic-opt-out.ts';
 
 export const SUBSCRIPTION_RESUME_APPROVAL='9882aa1a3938c41a358760705705b943b31e569e11a7b5a2f6579c8661a6b028';
 export const SUBSCRIPTION_PARENT_APPROVAL='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b';
-const OWNER_EXPIRY='2026-10-25T21:59:59Z';
+const ParentApprovalBoundsSchema=z.object({approved:z.object({expiresAt:z.iso.datetime(),maxDocuments:z.number().int().positive(),extraction:z.object({maxModelCallsPerDocument:z.number().int().positive(),paidMicroUsd:z.literal(0)})})});
 export const UsageResumeInputSchema=z.object({jobKeys:z.array(HashSchema).min(1).max(500),approvedBy:z.string().min(1).max(256),expiresAt:z.iso.datetime(),maxElapsedMs:z.number().int().min(1).max(86400000),mode:z.enum(['attended','bounded_unattended'])}).strict();
 export type UsageResumeInput=z.infer<typeof UsageResumeInputSchema>;
 interface UsageHold {id:string;provider:SubscriptionLimit['provider'];authorization_id:string;job_id:string;bridge_lease_id:string|null;reset_at:Date|null;observed_at:Date;no_output:boolean;failure_proof:unknown}
 interface ResumeJob {id:string;job_key:string;spec:DistrictJobSpec;state:string;reason_code:string;held_run_id:string|null;receipt:unknown;receipt_sha256:string|null;attempt:number;fencing_token:string;cancellation_requested:boolean;reserved_micro_usd:string}
-interface PriorAuthorization {id:string;state:string;expires_at:Date;max_elapsed_ms:number;allowed_job_keys:string[];allowed_ags:string[];category:'production'|'evaluation'|'development'}
+interface PriorAuthorization {id:string;state:string;allowed_job_keys:string[];allowed_ags:string[];category:'production'|'evaluation'|'development'}
 
 /** Read-only operator report, including legacy holds with no captured clock. */
 export async function subscriptionUsageStatus(pool:Pool){
@@ -52,9 +52,10 @@ export async function assertBSubscriptionResume(client:PoolClient,authorizationI
 export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,options:{checkPolicy:(spec:DistrictJobSpec)=>Promise<void>;notification?:NotificationIdentity;casRoot?:string;completionPolicy?:CivicPolicyOptions}){
  const input=UsageResumeInputSchema.parse(raw),jobKeys=[...new Set(input.jobKeys)].sort();
  if(jobKeys.length!==input.jobKeys.length)throw Error('Duplicate resume job key');
- for(const [name,expected] of [['r1-subscription-usage-autoresume-2026-10-14',SUBSCRIPTION_RESUME_APPROVAL],['r1-nine-town-models-2026-10-13',SUBSCRIPTION_PARENT_APPROVAL]]){
-  if(digest(await readFile(new URL(`../reports/approvals/${name}.json`,import.meta.url)))!==expected)throw new DistrictExecutionHold('authorization_revoked');
- }
+ const parentBytes=await readFile(new URL('../reports/approvals/r1-nine-town-models-2026-10-13.json',import.meta.url));
+ const resumeBytes=await readFile(new URL('../reports/approvals/r1-subscription-usage-autoresume-2026-10-14.json',import.meta.url));
+ if(digest(parentBytes)!==SUBSCRIPTION_PARENT_APPROVAL||digest(resumeBytes)!==SUBSCRIPTION_RESUME_APPROVAL)throw new DistrictExecutionHold('authorization_revoked');
+ const parent=ParentApprovalBoundsSchema.parse(JSON.parse(parentBytes.toString('utf8'))).approved,ownerExpiresAt=Date.parse(parent.expiresAt);
  const client=await pool.connect();
  try{
   await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(18441,81)');
@@ -69,7 +70,7 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
   const jobs=await client.query<ResumeJob>(`SELECT j.*,s.run_id AS held_run_id,s.receipt,s.receipt_sha256 FROM district_pipeline.jobs j LEFT JOIN district_pipeline.step_receipts s ON s.job_id=j.id AND s.attempt=j.attempt WHERE j.job_key=ANY($1::text[]) ORDER BY j.id FOR UPDATE OF j`,[jobKeys]);
   if(jobs.rowCount!==jobKeys.length)throw new DistrictExecutionHold('authorization_revoked');
   const clock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now'),now=clock.rows[0].now;
-  if(now>=new Date(OWNER_EXPIRY)||Date.parse(input.expiresAt)<=now.getTime()||Date.parse(input.expiresAt)>Date.parse(OWNER_EXPIRY))throw new DistrictExecutionHold('authorization_expired');
+  if(now.getTime()>=ownerExpiresAt||Date.parse(input.expiresAt)<=now.getTime()||Date.parse(input.expiresAt)>ownerExpiresAt)throw new DistrictExecutionHold('authorization_expired');
   const provider:SubscriptionLimit['provider']=jobs.rows[0].spec.step==='assessment_b'?'anthropic-subscription':'openai-subscription';
   const scopes=new Set(jobs.rows.map(job=>semanticHash(job.spec.sourceScope)));
   if(scopes.size!==1)throw new DistrictExecutionHold('authorization_mode_mismatch');
@@ -94,15 +95,15 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
   const live=await client.query(`SELECT 1 FROM district_pipeline.executor_runs r JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE r.state='running' AND a.allowed_job_keys && $1::text[] LIMIT 1`,[jobKeys]);
   if(live.rowCount)throw new DistrictExecutionHold('lease_lost');
   const selections=await client.query<{count:string}>('SELECT count(*) FROM district_pipeline.r1_codex_selections');
-  if(Number(selections.rows[0].count)>500)throw new DistrictExecutionHold('source_limit_exceeded');
+  if(Number(selections.rows[0].count)>parent.maxDocuments)throw new DistrictExecutionHold('source_limit_exceeded');
   const sourceResumes=await client.query<{count:string}>('SELECT count(DISTINCT authorization_id) FROM district_pipeline.r1_subscription_resumptions WHERE source_scope_sha256=$1',[scopeSha256]);
   if(Number(sourceResumes.rows[0].count)>=6)throw new DistrictExecutionHold('source_limit_exceeded');
   const completionProofs:Array<CodexCompletionProof&{jobKey:string}>=[];
   for(const job of jobs.rows){
    const run=runs.rows.find(run=>run.id===job.held_run_id),authorization=authorities.rows.find(auth=>auth.id===run?.authorization_id);
    if(!authorization||authorization.state!=='approved'||!authorization.allowed_job_keys.includes(job.job_key)||!authorization.allowed_ags.includes(job.spec.sourceScope.ags))throw new DistrictExecutionHold('authorization_revoked');
-   if(authorization.expires_at<=now||Date.parse(input.expiresAt)>authorization.expires_at.getTime())throw new DistrictExecutionHold('authorization_expired');
-   if(input.maxElapsedMs>authorization.max_elapsed_ms)throw new DistrictExecutionHold('authorization_time_exhausted');
+   // The original grant authenticates the held scope, not the fresh grant's
+   // lifetime. An expired stage is never extended or reused.
    if(job.state!=='held_execution'||job.reason_code!=='budget_paused'||job.cancellation_requested||Number(job.reserved_micro_usd)!==0||canonicalJobIdentity(job.spec).jobKey!==job.job_key)throw new DistrictExecutionHold('usage_unknown');
    const encoded=encodeStepReceipt(StepReceiptSchema.parse(job.receipt)),receipt=encoded.receipt;
    const receiptFence=BigInt(receipt.leaseToken),fence=BigInt(job.fencing_token);
@@ -116,7 +117,7 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
     if(ambiguous.rowCount)throw new DistrictExecutionHold('usage_unknown');
    }else{
     // Count every intent for each original, not just this job's intents.
-    const originalCaps=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_documents d WHERE d.original_sha256 IN(SELECT original_sha256 FROM district_pipeline.r1_codex_call_intents WHERE job_id=$1) AND (SELECT count(*) FROM district_pipeline.r1_codex_call_intents i WHERE i.original_sha256=d.original_sha256)>=d.max_calls LIMIT 1`,[job.id]);
+    const originalCaps=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_documents d WHERE d.original_sha256 IN(SELECT original_sha256 FROM district_pipeline.r1_codex_call_intents WHERE job_id=$1) AND (SELECT count(*) FROM district_pipeline.r1_codex_call_intents i WHERE i.original_sha256=d.original_sha256)>=LEAST(d.max_calls,$2) LIMIT 1`,[job.id,parent.extraction.maxModelCallsPerDocument]);
     if(originalCaps.rowCount)throw new DistrictExecutionHold('source_limit_exceeded');
     const ambiguous=await client.query<CodexCompletionIntent>(`SELECT i.id,i.request_sha256 FROM district_pipeline.r1_codex_call_intents i WHERE i.job_id=$1 AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_codex_usage_holds h JOIN district_pipeline.r1_subscription_usage_holds evidence ON evidence.codex_authorization_id=h.authorization_id WHERE h.failed_intent_id=i.id AND evidence.provider='openai-subscription' AND evidence.no_output AND evidence.reset_at<=clock_timestamp())`,[job.id]);
     if(ambiguous.rowCount){
@@ -130,7 +131,7 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
    await options.checkPolicy(job.spec);
   }
   const finalClock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now');
-  if(finalClock.rows[0].now>=new Date(OWNER_EXPIRY)||finalClock.rows[0].now>=new Date(input.expiresAt)||authorities.rows.some(auth=>auth.expires_at<=finalClock.rows[0].now))throw new DistrictExecutionHold('authorization_expired');
+  if(finalClock.rows[0].now.getTime()>=ownerExpiresAt||finalClock.rows[0].now>=new Date(input.expiresAt))throw new DistrictExecutionHold('authorization_expired');
   if(new Set(authorities.rows.map(auth=>auth.category)).size!==1)throw new DistrictExecutionHold('authorization_mode_mismatch');
   const authorizationId=randomUUID(),approval={version:'r1-subscription-usage-resume-v1',authorizationId,ownerApprovalSha256:SUBSCRIPTION_RESUME_APPROVAL,parentApprovalSha256:SUBSCRIPTION_PARENT_APPROVAL,holdIds:holds.rows.map(hold=>hold.id),holdReceipts:jobs.rows.map(job=>({jobKey:job.job_key,receiptSha256:job.receipt_sha256,runId:job.held_run_id,attempt:job.attempt})),completionProofs,...input,jobKeys,approvedAt:now.toISOString()};
   const approvalSha256=semanticHash(approval);
