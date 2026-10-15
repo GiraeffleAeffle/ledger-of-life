@@ -10,6 +10,8 @@ test('queue sealing selects committed jobs, never a caller-supplied run, clock, 
  const input={jobKeys:[key],reconciliationJobKeys:[final]};
  assert.deepEqual(QueueTextSealInputSchema.parse(input),{...input,terminalDocumentExceptions:[],terminalAssessmentExceptions:[]});
  assert.deepEqual(QueueTextSealInputSchema.parse({...input,reconciliationJobKeys:[]}),{jobKeys:[key],reconciliationJobKeys:[],terminalDocumentExceptions:[],terminalAssessmentExceptions:[]});
+ assert.equal(QueueTextSealInputSchema.parse({...input,attemptHistory:'committed-v1'}).attemptHistory,'committed-v1');
+ assert.throws(()=>QueueTextSealInputSchema.parse({...input,attemptHistory:'rewrite-legacy'}));
  for(const extra of [{generatedAt:'2026-10-13T00:00:00Z'},{runId:key},{model:'gpt-6.1-sol'},{records:[]},{sealSha256:key},{policyApproved:true}])assert.throws(()=>QueueTextSealInputSchema.parse({...input,...extra}));
  for(const invalid of [{jobKeys:[],reconciliationJobKeys:[]},{...input,jobKeys:[key,key]},{...input,reconciliationJobKeys:[final,final]},{...input,jobKeys:['invented-output']}])assert.throws(()=>QueueTextSealInputSchema.parse(invalid));
 });

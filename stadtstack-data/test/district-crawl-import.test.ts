@@ -780,6 +780,27 @@ test('offline frozen crawl import preserves managed originals and produces enque
      const composition=await loadR1TextCompositionInput(JSON.parse((await terminal.cas.read(sealed.compositionArtifactSha256)).toString('utf8')),pin=>terminal.cas.read(pin.sha256));assert.equal((await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],composition.contributions[0])).terminalAssessmentExceptions.length,2);
     });
    });
+   await st.test('pre-beb7047 held_quality seal bytes remain exportable while enrichment is explicit',async()=>{
+    const historical=await fixture('legacy-held-quality-seal',{body:Buffer.from('Synthetic Strausberg narrative ohne belegten Vorgang.')});
+    await withFixtureAuthorizedCorpus(historical.indexBytes,policy,async()=>{
+     const imported=await importCrawlCorpusForResidual(store,historical.cas,historical.manifest),preparedKey=await enqueueResidualPreparation(store,historical.cas,imported.jobs[0]);
+     await runDistrictJobs({store,cas:historical.cas,handlers:{residual_prepare:prepareFixture},authorizationId:await authorize(preparedKey,'historical-held-prepare'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const key=await enqueueCommittedResidualExtraction(pool!,store,historical.cas,preparedKey),qualityHold:JobHandler=async context=>({...await extractionFixture(context),outcome:'held_quality',reasonCode:'quality_failed'});qualityHold.currentPolicy=extractionFixture.currentPolicy;
+     await runDistrictJobs({store,cas:historical.cas,handlers:{residual_extract:qualityHold},authorizationId:await authorize(key,'historical-held-extract'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     const selected={jobKeys:[key],reconciliationJobKeys:[]},enriched=await buildQueueTextRun(pool!,historical.cas,{...selected,attemptHistory:'committed-v1'}),enrichedRun=JSON.parse(Buffer.from(enriched.contribution.artifacts.extractionRun.bytes).toString('utf8'));
+     assert.equal(enrichedRun.queue.attemptHistory,'committed-v1');assert.equal(enrichedRun.queue.extractionAttemptHistory.length,1);
+     // Pre-beb7047 format has the same genuine committed outputs/receipts but
+     // neither later queue history field. No extraction/receipt is invented.
+     const preBebRun=structuredClone(enrichedRun);delete preBebRun.queue.attemptHistory;delete preBebRun.queue.extractionAttemptHistory;
+     const legacyBytes=Buffer.from(canonicalJson(preBebRun)),legacySha256=digest(legacyBytes),legacyFixture={...enriched.contribution,runId:legacySha256,artifacts:{...enriched.contribution.artifacts,extractionRun:{bytes:legacyBytes,sha256:legacySha256}}};
+     assert.equal((await exportQueueTextContribution(pool!,historical.cas,[key],legacyFixture)).contribution.runId,legacySha256);
+     assert.equal((await exportResidualTextContribution(pool!,historical.cas,[key],legacyFixture)).contribution.runId,legacySha256);
+     const legacy=await sealQueueTextContribution(pool!,historical.cas,selected);assert.equal(legacy.runId,legacySha256);assert.deepEqual(await historical.cas.read(legacy.runId),legacyBytes);assert.deepEqual(await sealQueueTextContribution(pool!,historical.cas,selected),legacy);
+     const modern=await sealQueueTextContribution(pool!,historical.cas,{...selected,attemptHistory:'committed-v1'});assert.equal(modern.attemptHistory,'committed-v1');assert.notEqual(modern.runId,legacySha256);await exportQueueTextContribution(pool!,historical.cas,[key],enriched.contribution);
+     // beb7047 emitted history without a marker: preserve that envelope too.
+     const bebRun=structuredClone(enrichedRun);delete bebRun.queue.attemptHistory;const bebBytes=Buffer.from(canonicalJson(bebRun)),bebSha256=digest(bebBytes),bebFixture={...enriched.contribution,runId:bebSha256,artifacts:{...enriched.contribution.artifacts,extractionRun:{bytes:bebBytes,sha256:bebSha256}}};assert.equal((await exportQueueTextContribution(pool!,historical.cas,[key],bebFixture)).contribution.runId,bebSha256);
+    });
+   });
    st.mock.timers.enable({apis:['Date'],now:new Date(checked.currentReceipt.expiresAt)});
    try{await assert.rejects(recheckResidualPolicy(store,item.cas,original),stale);}finally{st.mock.timers.reset();}
    stricter=true;

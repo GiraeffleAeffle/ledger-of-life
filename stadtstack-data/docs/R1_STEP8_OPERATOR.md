@@ -319,7 +319,7 @@ checked; an exception is not permission to bypass a source denial.
 A document is exactly one extracted/negative group or one terminal-document
 exception, never both. `jobKeys` may be empty only with at least one authenticated
 terminal document. An output-bearing held-quality extraction stays in `jobKeys`;
-its committed attempt history is retained in the sealed queue evidence. An
+its committed attempt history is retained when enrichment is requested. An
 output-less terminal extraction must also authenticate its genuine successful
 preparation predecessor. A failed preparation contributes no prepared document,
 native extraction result, generation archive or knowledge record.
@@ -377,3 +377,28 @@ publication/replay with a retained assessment exception, and the expected
 all-terminal candidate slice hold with durable source-disposition evidence.
 No production writes, real provider calls or hosted rollout were exercised.
 
+### Historical ordinary seal compatibility
+
+Ordinary seals with no terminal exceptions retain their pre-`beb7047` bytes and
+run IDs by default, including native-output `held_quality` extractions. New
+seals can explicitly request `attemptHistory: "committed-v1"` at the seal-input
+root; this marker is retained in the sealed queue and seal result. Nonempty
+terminal exception arrays also enable history collection.
+
+Export reconstructs the serialization actually authenticated by the envelope:
+legacy seals without history retain legacy bytes; explicit marked seals retain
+their marker/history; existing `beb7047` history-bearing seals without a marker
+are also reproduced by field presence. It does not silently enrich or rewrite a
+historical immutable seal. Current receipt/source/policy authentication still
+applies in every format, and the frozen residual implementation is untouched.
+
+The held-quality regression starts from a real committed synthetic worker output,
+constructs the pre-`beb7047` queue serialization with unchanged genuine receipts,
+and checks export, byte-for-byte default resealing, explicit enrichment, and the
+already-produced unmarked `beb7047` history format.
+
+Historical-seal compatibility verification used the same complete gate command
+above. Receipt `tests-20261015T120425Z.tap`: TypeScript exit 0; 1,899 tests,
+1,851 passed, 0 failed, 0 cancelled, 48 skipped; test exit 0. This includes the
+held-quality serialization regression and all six frozen running-campaign
+contract assertions. No production seal was exported or rewritten by this test.
