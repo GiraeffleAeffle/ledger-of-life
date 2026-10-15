@@ -5,7 +5,7 @@ import {HashSchema,canonicalJson,digest,semanticHash} from './district-adapter-c
 import {DistrictJobStore,canonicalJobIdentity,type DistrictJobSpec} from './district-jobs.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import type {DistrictCas} from './district-cas.ts';
-import {loadCommittedResidualOutputs,ResidualInputSchema} from './district-residual-jobs.ts';
+import {loadCommittedResidualOutputs,loadResidualSource,ResidualInputSchema,residualJobContract,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument} from './district-prepared-document.ts';
 import {assessmentItemSchema,validateReceipt,verifyPinnedAssessment} from './district-assessment.ts';
 import {residualAssessmentItem} from './district-assessment-jobs.ts';
@@ -20,7 +20,7 @@ import {publicationPolicyReceiptInventorySchema} from './district-publication-po
 import {crawlSummarySchema} from './district-publication.ts';
 import {privatePublicationProvenanceSchema} from './district-publication-provenance.ts';
 import {readOperatorRegistryInputPin,readCrawlOperatorRegistryInputPin} from './district-registry-config.ts';
-import {corpusFixturePolicy} from './district-corpus.ts';
+import {corpusFixturePolicy,type CrawlDocument} from './district-corpus.ts';
 import {assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 import {ModelEvidenceSchema,type ModelEvidence} from './district-model-contract.ts';
@@ -29,9 +29,14 @@ import {districtRegistrySchema} from './district-registry.ts';
 import {residualOriginalIdentity,readPolicyRefreshCommit,recordedPolicyIdentity} from './district-policy-refresh.ts';
 import {loadPolicyReceipt} from './district-policy-receipt.ts';
 import {CrawlCorpusImportSchema} from './district-crawl-import.ts';
+import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException,assertTerminalSourceScope} from './district-terminal-exceptions.ts';
+import type {QuarantineCase} from './district-inference.ts';
 
-export const QueueTextSealInputSchema=z.object({jobKeys:z.array(HashSchema).min(1).max(10000),reconciliationJobKeys:z.array(HashSchema).max(10000)}).strict().superRefine((value,ctx)=>{
- for(const keys of [value.jobKeys,value.reconciliationJobKeys])if(new Set(keys).size!==keys.length)ctx.addIssue({code:'custom',message:'Queue seal requires distinct committed jobs'});
+export const QueueTextSealInputSchema=z.object({jobKeys:z.array(HashSchema).max(10000),reconciliationJobKeys:z.array(HashSchema).max(10000),terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema).max(10000).default([]),terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema).max(10000).default([])}).strict().superRefine((value,ctx)=>{
+ for(const keys of [value.jobKeys,value.reconciliationJobKeys,value.terminalDocumentExceptions.map(pin=>pin.jobKey),value.terminalAssessmentExceptions.map(pin=>pin.jobKey)])if(new Set(keys).size!==keys.length)ctx.addIssue({code:'custom',message:'Queue seal requires distinct committed jobs'});
+ if(!value.jobKeys.length&&!value.terminalDocumentExceptions.length)ctx.addIssue({code:'custom',message:'Queue seal requires an extraction or terminal document exception'});
+ if(new Set(value.terminalDocumentExceptions.map(pin=>pin.documentId)).size!==value.terminalDocumentExceptions.length)ctx.addIssue({code:'custom',message:'Duplicate terminal document exception'});
+ if(value.terminalDocumentExceptions.some(pin=>value.jobKeys.includes(pin.jobKey)))ctx.addIssue({code:'custom',message:'Terminal exception overlaps an admitted job selection'});
 });
 interface CommittedStep {spec:DistrictJobSpec;receipt:StepReceipt;sha256:string}
 const pinSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict();
@@ -43,8 +48,24 @@ const artifact=(value:unknown)=>{const bytes=Buffer.from(canonicalJson(value));r
  * Original queue receipts are the execution authority; v2 is the native output
  * envelope. Recomputing this closure is also the export authentication gate. */
 export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown){
- const input=QueueTextSealInputSchema.parse(raw),committed=await loadCommittedResidualOutputs(pool,cas,input.jobKeys);
- const first=committed.selectors[0],source=committed.sources[0],policy={...corpusFixturePolicy(),authorityId:source.receipt.authorityId,authoritySha256:source.receipt.authoritySha256};
+ const input=QueueTextSealInputSchema.parse(raw),store=new DistrictJobStore(pool);
+ const committed:Awaited<ReturnType<typeof loadCommittedResidualOutputs>>=input.jobKeys.length?await loadCommittedResidualOutputs(pool,cas,input.jobKeys):{receipts:[],results:[],sources:[],selectors:[]};
+ const terminalDocuments=await Promise.all([...input.terminalDocumentExceptions].sort((a,b)=>a.jobKey.localeCompare(b.jobKey)).map(async pin=>{
+  const entry=await loadTerminalException(pool,pin),selector=ResidualInputSchema.passthrough().parse(entry.spec.selector);
+  if(selector.documentId!==pin.documentId||entry.spec.semanticContractSha256!==semanticHash(selector.contract))throw Error('Terminal exception document or semantic contract mismatch');
+  const source=await loadResidualSource(cas,ResidualInputSchema.strip().parse(selector),{store});assertTerminalSourceScope(entry.spec,source.receipt.scope,selector.policyReceiptSha256);
+  if([source.document.sha256,selector.corpusSha256,selector.registrySha256,selector.policyReceiptSha256,selector.httpObservation.receiptSha256,selector.requestEvidenceSha256].some(hash=>!entry.spec.inputArtifactHashes.includes(hash)))throw Error('Terminal exception omits original custody inputs');
+  if(pin.step==='residual_extract'&&entry.receipt.outputHashes.length)throw Error('Output-bearing extraction must use its native contribution, not a terminal exception');
+  return {pin,entry,selector,source};
+ }));
+ const fallback=terminalDocuments[0],fallbackContract=fallback?await residualJobContract():undefined;
+ const first=committed.selectors[0]??{...fallback!.selector,contract:{...fallbackContract!,preparationSha256:z.object({preparationSha256:HashSchema}).passthrough().parse(fallback!.selector.contract).preparationSha256}},source=committed.sources[0]??fallback!.source,policy={...corpusFixturePolicy(),authorityId:source.receipt.authorityId,authoritySha256:source.receipt.authoritySha256};
+ const originals=[...committed.sources,...terminalDocuments.map(document=>document.source)],selectors=[...committed.selectors,...terminalDocuments.map(document=>document.selector)];
+ const selectedGroups=new Set(committed.sources.map(original=>canonicalJson([original.municipality.id,original.document.sha256])));
+ for(const document of terminalDocuments){const key=canonicalJson([document.source.municipality.id,document.source.document.sha256]);if(selectedGroups.has(key))throw Error('Terminal exception duplicates an extracted or terminal document group');selectedGroups.add(key);
+  if(document.selector.corpusSha256!==first.corpusSha256||document.selector.registrySha256!==first.registrySha256||canonicalJson(document.selector.registry)!==canonicalJson(first.registry)||canonicalJson(document.selector.crawlRegistry??null)!==canonicalJson(first.crawlRegistry??null)||z.object({preparationSha256:HashSchema}).passthrough().parse(document.selector.contract).preparationSha256!==first.contract.preparationSha256||document.source.receipt.authorityId!==source.receipt.authorityId||document.source.receipt.authoritySha256!==source.receipt.authoritySha256)throw Error('Terminal exception changes source/control generation');
+  if(document.source.document.sourceId!==source.document.sourceId||document.source.municipality.id!==source.municipality.id)throw Error('Terminal exception belongs to another source scope');
+ }
  const steps=new Map<string,CommittedStep>(),byId=new Map<string,CommittedStep>();
  const read=async(hash:string)=>{HashSchema.parse(hash);await assertManagedSourceReadable(pathFor(cas,hash),policy);return cas.read(hash);};
  const json=async(hash:string)=>JSON.parse((await read(hash)).toString('utf8'));
@@ -74,10 +95,12 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown){
  };
  const prepared=new Map<string,z.infer<typeof PreparedDocumentSchema>>(),archives=new Set<string>(),currentAdmissionReceipts:Record<string,string>={};
  const callRequirements:Array<{originalSha256:string;requestSha256:string;jobKey?:string;runId?:string}>=[];
+ const extractionAttemptHistory=[];
  for(let index=0;index<committed.results.length;index++){
   const result=committed.results[index],selector=committed.selectors[index],original=committed.sources[index];
   if(selector.corpusSha256!==first.corpusSha256||selector.registrySha256!==first.registrySha256||canonicalJson(selector.contract)!==canonicalJson(first.contract)||canonicalJson(selector.registry)!==canonicalJson(first.registry)||canonicalJson(selector.crawlRegistry??null)!==canonicalJson(first.crawlRegistry??null)||original.receipt.authorityId!==source.receipt.authorityId||original.receipt.authoritySha256!==source.receipt.authoritySha256)throw Error('Queue seal cannot merge different source/control generations');
   const extraction=await load(result.result.taskId,'residual_extract');await closeDependencies(extraction);
+  if(extraction.receipt.outcome==='held_quality'){const history=await loadTerminalException(pool,{documentId:result.documentId,step:'residual_extract',jobKey:extraction.receipt.jobKey,receiptId:extraction.receipt.id,receiptSha256:extraction.sha256,reasonCode:extraction.receipt.reasonCode});extractionAttemptHistory.push({documentId:result.documentId,jobKey:extraction.receipt.jobKey,attemptHistory:history.attemptHistory});}
   const predecessor=byId.get(result.preparationReceiptId);
   if(!predecessor||predecessor.spec.step!=='residual_prepare'||predecessor.receipt.jobKey!==result.preparationJobKey||predecessor.sha256!==result.preparationReceiptSha256||!predecessor.receipt.outputHashes.includes(result.preparedArtifactSha256))throw Error('Queue seal changes committed preparation lineage');
   const document=PreparedDocumentSchema.parse(await json(result.preparedArtifactSha256));
@@ -95,6 +118,20 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown){
   for(const answer of answers.values())callRequirements.push({originalSha256:result.result.sourceSha256,requestSha256:semanticHash(answer.binding)});
   archives.add(archiveHash);
   currentAdmissionReceipts[selector.policyReceiptSha256]=original.policyCheck.admissibilityReceiptSha256;
+ }
+ const terminalDocumentExceptions=[];
+ const terminalCase=(source:{document:CrawlDocument;municipality:{id:string}},reason:string):QuarantineCase=>({documentId:source.document.id,municipalityId:source.municipality.id,sourceId:source.document.sourceId,sourceSha256:source.document.sha256,chunk:null,reason});
+ for(const document of terminalDocuments){
+  remember({spec:document.entry.spec,receipt:document.entry.receipt,receipt_sha256:document.entry.sha256});await closeDependencies(steps.get(document.pin.jobKey)!);
+  currentAdmissionReceipts[document.selector.policyReceiptSha256]=document.source.policyCheck.admissibilityReceiptSha256;
+  if(document.pin.step==='residual_extract'){
+   const selector=z.object({preparationJobKey:HashSchema,preparationReceiptId:z.uuid(),preparationReceiptSha256:HashSchema,preparedArtifactSha256:HashSchema}).passthrough().parse(document.selector),predecessor=byId.get(selector.preparationReceiptId);
+   if(!predecessor||predecessor.spec.step!=='residual_prepare'||predecessor.receipt.jobKey!==selector.preparationJobKey||predecessor.sha256!==selector.preparationReceiptSha256||!predecessor.receipt.outputHashes.includes(selector.preparedArtifactSha256))throw Error('Terminal extraction changes preparation ancestry');
+   const preparedDocument=PreparedDocumentSchema.parse(await json(selector.preparedArtifactSha256));verifyPreparedDocument(preparedDocument,{...preparedDocument,municipalityId:document.source.municipality.id,sourceSha256:document.source.document.sha256,extractorSha256:first.contract.preparationSha256,references:[document.source.reference]},await read(document.source.document.sha256));
+   if(!predecessor.receipt.outputHashes.includes(preparedDocument.textSha256)||digest(await read(preparedDocument.textSha256))!==preparedDocument.textSha256)throw Error('Terminal extraction prepared text binding mismatch');
+   prepared.set(document.pin.jobKey,preparedDocument);
+  }
+  terminalDocumentExceptions.push({...document.pin,municipalityId:document.source.municipality.id,sourceId:document.source.document.sourceId,sourceSha256:document.source.document.sha256,corpusSha256:document.selector.corpusSha256,outcome:document.entry.receipt.outcome,receipt:document.entry.receipt,attemptHistory:document.entry.attemptHistory});
  }
  const candidates=new Map<string,{record:DistrictKnowledgeRecord;index:number}>();
  committed.results.forEach((result,index)=>result.result.records.forEach(record=>{if(candidates.has(record.id))throw Error('Queue seal duplicate native record ID');candidates.set(record.id,{record,index});}));
@@ -136,27 +173,51 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown){
   }
   assessments.push({jobKey:key,recordId:record.id,outcome:entry.receipt.outcome,pins:selector.CJobKey&&entry.receipt.outputHashes.length===1?pins:null});
  }
+ const terminalAssessmentExceptions=[],terminalHeldRecords=new Set<string>();
+ for(const pin of [...input.terminalAssessmentExceptions].sort((a,b)=>a.jobKey.localeCompare(b.jobKey))){
+  const entry=await loadTerminalException(pool,pin),index=committed.results.findIndex(result=>result.documentId===pin.documentId);if(index<0)throw Error('Terminal assessment lacks an extracted document');
+  const result=committed.results[index],original=committed.sources[index],extraction=steps.get(result.result.taskId)!;assertTerminalSourceScope(entry.spec,original.receipt.scope,result.policyReceiptSha256);
+  remember({spec:entry.spec,receipt:entry.receipt,receipt_sha256:entry.sha256});await closeDependencies(steps.get(pin.jobKey)!);
+  let recordIds:string[];
+  if(pin.step==='assessment_prepare'){
+   const selector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(entry.spec.selector);
+   if(selector.extraction.jobKey!==extraction.receipt.jobKey||selector.extraction.receiptId!==extraction.receipt.id||selector.extraction.receiptSha256!==extraction.sha256||!entry.receipt.dependencyReceiptIds.includes(extraction.receipt.id)||!extraction.receipt.outputHashes.includes(selector.extractionArtifactSha256)||!entry.spec.inputArtifactHashes.includes(selector.extractionArtifactSha256))throw Error('Terminal assessment preparation changes extraction ancestry');
+   recordIds=result.result.records.map(record=>record.id);
+  }else{
+   const selector=z.object({itemArtifactSha256:HashSchema}).passthrough().parse(entry.spec.selector),item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),record=result.result.records.find(record=>record.id===item.itemId);
+   if(!record||!entry.spec.inputArtifactHashes.includes(selector.itemArtifactSha256)||canonicalJson(item)!==canonicalJson(residualAssessmentItem(record,prepared.get(result.result.taskId)!,result.preparedArtifactSha256,result.policyReceiptSha256)))throw Error('Terminal assessment item differs from extracted original');
+   const emitted=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.step='assessment_prepare' AND r.outcome='succeeded' AND r.receipt->'outputHashes' ? $1 AND r.receipt->'dependencyReceiptIds' ? $2`,[selector.itemArtifactSha256,extraction.receipt.id]);
+   if(emitted.rows.length!==1)throw Error('Terminal assessment item lacks unique committed preparation ancestry');
+   const preparation=remember(emitted.rows[0]);await closeDependencies(preparation);
+   const preparationSelector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(preparation.spec.selector);
+   if(preparationSelector.extraction.jobKey!==extraction.receipt.jobKey||preparationSelector.extraction.receiptId!==extraction.receipt.id||preparationSelector.extraction.receiptSha256!==extraction.sha256||!extraction.receipt.outputHashes.includes(preparationSelector.extractionArtifactSha256))throw Error('Terminal assessment preparation pin mismatch');
+   recordIds=[record.id];
+  }
+  for(const id of recordIds)terminalHeldRecords.add(id);
+  terminalAssessmentExceptions.push({...pin,municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceSha256:original.document.sha256,corpusSha256:result.corpusSha256,outcome:entry.receipt.outcome,recordIds,receipt:entry.receipt,attemptHistory:entry.attemptHistory});
+ }
  const critical=await admitCriticalKnowledge([...admitted].map(id=>candidates.get(id)!.record),inventory,cas,{policyOptions:policy,currentAdmissionReceipts});
  for(const hold of critical.holds)admitted.delete(hold.recordId);
  const records=committed.results.flatMap(result=>result.result.records.filter(record=>admitted.has(record.id)));
  const quarantine=committed.results.flatMap((result,index)=>{
   const cases=[...result.result.quarantine];
-  for(const record of result.result.records)if(!admitted.has(record.id))cases.push({documentId:result.documentId,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:result.result.sourceSha256,chunk:null,reason:assessed.has(record.id)?'assessment_held':'assessment_missing',candidate:record});
+  for(const record of result.result.records)if(!admitted.has(record.id))cases.push({documentId:result.documentId,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:result.result.sourceSha256,chunk:null,reason:assessed.has(record.id)||terminalHeldRecords.has(record.id)?'assessment_held':'assessment_missing',candidate:record});
   // A real negative extraction still counts as an attempted group in v2 lineage.
   if(!result.result.records.length&&!cases.length)cases.push({documentId:result.documentId,municipalityId:result.result.municipalityId,sourceId:committed.sources[index].document.sourceId,sourceSha256:result.result.sourceSha256,chunk:null,reason:committed.receipts[index].outcome==='no_supported_case'?'no_supported_case':'extraction_held'});
   return cases;
  });
+ quarantine.push(...terminalDocuments.map(document=>terminalCase(document.source,'terminal_document_exception:'+document.pin.reasonCode)),...terminalAssessmentExceptions.map((entry):QuarantineCase=>({documentId:entry.documentId,municipalityId:entry.municipalityId,sourceId:entry.sourceId,sourceSha256:entry.sourceSha256,chunk:null,reason:'terminal_assessment_exception:'+entry.reasonCode})));
  const orderedSteps=[...steps.values()].sort((a,b)=>a.receipt.jobKey<b.receipt.jobKey?-1:1);
  // Authenticate every historical rebinding from its immutable refresh receipt.
- const store=new DistrictJobStore(pool),authenticatedRefreshes=new Set<string>();
+ const authenticatedRefreshes=new Set<string>();
  for(const step of orderedSteps)for(const [name,to] of Object.entries(step.receipt.versions))if(name.startsWith('policyRebinding.')){
   const parts=name.split('.');if(parts.length!==3||parts[1]!==step.receipt.policyProofSha256)throw Error('Queue seal policy continuation binding mismatch');
   const rows=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE r.receipt_sha256=$1`,[HashSchema.parse(parts[2])]);
   if(rows.rows.length!==1)throw Error('Queue seal continuation receipt unavailable');const refresh=remember(rows.rows[0]);
   if(refresh.receipt.step!=='policy_refresh'||refresh.receipt.outcome!=='succeeded'||refresh.receipt.versions.policyRefreshReceipt!==to)throw Error('Queue seal policy continuation receipt mismatch');
   for(const hash of refresh.receipt.outputHashes)await read(hash);await read(HashSchema.parse(to));
-  const originalIndex=committed.selectors.findIndex(selector=>selector.policyReceiptSha256===parts[1]);
-  if(originalIndex<0||refresh.receipt.versions.policyRefreshOriginal!==residualOriginalIdentity(ResidualInputSchema.strip().parse(committed.selectors[originalIndex])))throw Error('Queue seal continuation changes original custody');
+  const originalIndex=selectors.findIndex(selector=>selector.policyReceiptSha256===parts[1]);
+  if(originalIndex<0||refresh.receipt.versions.policyRefreshOriginal!==residualOriginalIdentity(ResidualInputSchema.strip().parse(selectors[originalIndex])))throw Error('Queue seal continuation changes original custody');
   const historical=await loadPolicyReceipt(cas,parts[1]),proof=await loadPolicyReceipt(cas,to);
   if(!authenticatedRefreshes.has(parts[2])){
    const selector=z.object({manifestSha256:HashSchema}).passthrough().parse(refresh.spec.selector);
@@ -182,38 +243,39 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown){
   JOIN district_pipeline.preauthorizations p ON p.id=a.authorization_id
   JOIN district_pipeline.jobs j ON j.id=i.job_id
   WHERE i.original_sha256=ANY($1::text[]) AND i.created_at<=$2::timestamptz ORDER BY i.id
- `,[committed.results.map(result=>result.result.sourceSha256),generatedAt]);
+ `,[originals.map(source=>source.document.sha256),generatedAt]);
  for(const required of callRequirements)if(!accounting.rows.some(row=>row.intent.original_sha256===required.originalSha256&&row.intent.request_sha256===required.requestSha256&&(!required.jobKey||row.jobKey===required.jobKey)&&(!required.runId||row.authorization.run_id===required.runId)))throw Error('Queue seal source-bearing model call lacks committed accounting');
  const crawl={bytes:await read(first.corpusSha256),sha256:first.corpusSha256},registry={bytes:await read(first.registrySha256),sha256:first.registrySha256};
  const crawlValue=crawlSummarySchema.parse(JSON.parse(crawl.bytes.toString('utf8'))),registryValue=districtRegistrySchema.parse(JSON.parse(registry.bytes.toString('utf8')));
- const group=(municipalityId:string,sourceSha256:string)=>canonicalJson([municipalityId,sourceSha256]),fetched=new Set(crawlValue.documents.map(doc=>group(doc.municipalityId,doc.sha256))),attempted=new Set(committed.results.map(result=>group(result.result.municipalityId,result.result.sourceSha256)));
- if(attempted.size!==committed.results.length)throw Error('Queue seal duplicate municipal-byte groups must be resolved before selection');
- const limit=Math.max(...registryValue.municipalities.map(city=>committed.results.filter(result=>result.result.municipalityId===city.id).length));
- const municipalities=registryValue.municipalities.map(city=>({id:city.id,availableDocumentGroups:new Set(crawlValue.documents.filter(doc=>doc.municipalityId===city.id).map(doc=>doc.sha256)).size,selectedDocumentGroups:committed.results.filter(result=>result.result.municipalityId===city.id).length,preparedDocumentGroups:committed.results.filter(result=>result.result.municipalityId===city.id).length,attemptedDocumentGroups:committed.results.filter(result=>result.result.municipalityId===city.id).length}));
+ const group=(municipalityId:string,sourceSha256:string)=>canonicalJson([municipalityId,sourceSha256]),fetched=new Set(crawlValue.documents.map(doc=>group(doc.municipalityId,doc.sha256))),attempted=new Set(originals.map(original=>group(original.municipality.id,original.document.sha256)));
+ if(attempted.size!==originals.length)throw Error('Queue seal duplicate municipal-byte groups must be resolved before selection');
+ const limit=Math.max(...registryValue.municipalities.map(city=>originals.filter(original=>original.municipality.id===city.id).length));
+ const preparedOriginals=originals.filter((_original,index)=>index<committed.results.length||terminalDocuments[index-committed.results.length].pin.step==='residual_extract');
+ const municipalities=registryValue.municipalities.map(city=>({id:city.id,availableDocumentGroups:new Set(crawlValue.documents.filter(doc=>doc.municipalityId===city.id).map(doc=>doc.sha256)).size,selectedDocumentGroups:originals.filter(original=>original.municipality.id===city.id).length,preparedDocumentGroups:preparedOriginals.filter(original=>original.municipality.id===city.id).length,attemptedDocumentGroups:originals.filter(original=>original.municipality.id===city.id).length}));
  const preparationPlan=artifact(preparationPlanSchema.parse({
   schemaVersion:'stadtstack-preparation-plan-v1',generatedAt,corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,
   extractorSha256:first.contract.preparationSha256,maxDocumentsPerMunicipality:limit,availableDocumentGroups:fetched.size,
-  selectedDocumentGroups:attempted.size,selectedRepresentations:committed.results.length,
+  selectedDocumentGroups:attempted.size,selectedRepresentations:originals.length,
   municipalities:municipalities.map(counts=>{
    const city=registryValue.municipalities.find(city=>city.id===counts.id)!;
    return {id:city.id,name:city.name,ags:city.ags,districtId:city.districtId,availableDocumentGroups:counts.availableDocumentGroups,selectedDocumentGroups:counts.selectedDocumentGroups,selectedRepresentations:counts.selectedDocumentGroups};
   }),
-  groups:committed.results.map((result,index)=>({municipality:committed.sources[index].municipality,documentIds:[result.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(result.result.taskId)),referenceWarnings:[]})),
-  quarantine:[],
+  groups:[...committed.results.map((result,index)=>({municipality:committed.sources[index].municipality,documentIds:[result.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(result.result.taskId)),referenceWarnings:[]})),...terminalDocuments.filter(document=>document.pin.step==='residual_extract').map(document=>({municipality:document.source.municipality,documentIds:[document.pin.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(document.pin.jobKey)),referenceWarnings:[]}))],
+  quarantine:terminalDocuments.filter(document=>document.pin.step==='residual_prepare').map(document=>terminalCase(document.source,'terminal_document_exception:'+document.pin.reasonCode)),
  }));
- const extractionRun=artifact({schemaVersion:'stadtstack-extraction-run-v2',generatedAt,assignmentMode:'codex-only',corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,promptContractSha256:first.contract.extraction.promptSha256,schemaSha256:first.contract.extraction.schemaSha256,scope:'bounded_per_municipality',maxDocumentsPerMunicipality:limit,availableDocumentGroups:fetched.size,attemptedDocumentGroups:attempted.size,pendingDocumentGroups:fetched.size-attempted.size,municipalities,promotedRecords:records.length,quarantinedCases:quarantine.length,queue:{reconciliationJobKeys:[...input.reconciliationJobKeys].sort(),stepReceipts:allSteps.map(step=>({spec:step.spec,receipt:step.receipt,sha256:step.sha256})),generationArchiveSha256s:[...archives].sort(),assessments,callAccounting:{basis:'committed_pre_effect_intents_not_wire_calls_or_invoices',codex:accounting.rows},criticalAdmissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}});
+ const extractionRun=artifact({schemaVersion:'stadtstack-extraction-run-v2',generatedAt,assignmentMode:'codex-only',corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,promptContractSha256:first.contract.extraction.promptSha256,schemaSha256:first.contract.extraction.schemaSha256,scope:'bounded_per_municipality',maxDocumentsPerMunicipality:limit,availableDocumentGroups:fetched.size,attemptedDocumentGroups:attempted.size,pendingDocumentGroups:fetched.size-attempted.size,municipalities,promotedRecords:records.length,quarantinedCases:quarantine.length,queue:{...(extractionAttemptHistory.length?{extractionAttemptHistory}:{}),...(terminalDocumentExceptions.length?{terminalDocumentExceptions}:{}),...(terminalAssessmentExceptions.length?{terminalAssessmentExceptions}:{}),reconciliationJobKeys:[...input.reconciliationJobKeys].sort(),stepReceipts:allSteps.map(step=>({spec:step.spec,receipt:step.receipt,sha256:step.sha256})),generationArchiveSha256s:[...archives].sort(),assessments,callAccounting:{basis:'committed_pre_effect_intents_not_wire_calls_or_invoices',codex:accounting.rows},criticalAdmissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}});
  const knowledge=KnowledgeRecordsSchema.parse({schemaVersion:'stadtstack-knowledge-v3',generatedAt,records,identityAssertions:[],identityAdmissions:[]});
  const contribution:TextRunContribution={runId:extractionRun.sha256,pins:{corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,promptContractSha256:first.contract.extraction.promptSha256,schemaSha256:first.contract.extraction.schemaSha256},sourceArtifactKind:'native_extraction_output',artifacts:{extractionRun,records:artifact(knowledge),quarantine:artifact({schemaVersion:'stadtstack-quarantine-v1',generatedAt,cases:quarantine}),preparationPlan,crawl,registry}};
  authenticateTextRunContribution(contribution);
  const policyInventory=publicationPolicyReceiptInventorySchema.parse({records:records.map(record=>{const candidate=candidates.get(record.id)!,selector=committed.selectors[candidate.index],currentReceiptSha256=currentAdmissionReceipts[selector.policyReceiptSha256];return {recordId:record.id,receipts:record.sources.map(reference=>({sourceUrl:reference.url,sourceSha256:reference.sha256,receiptSha256:selector.policyReceiptSha256,...(currentReceiptSha256?{currentReceiptSha256}:{})}))};}),currentAdmissionReceipts});
- return {contribution,knowledge,committed,steps:allSteps,policy,criticalInventory:CriticalAssessmentInventorySchema.parse({records:inventory.records.filter(entry=>admitted.has(entry.recordId))}),criticalAdmissions:CriticalAdmissionsSchema.parse({schemaVersion:CRITICAL_ADMISSIONS_VERSION,admissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}),policyInventory,heldRecords:quarantine.filter(entry=>entry.candidate!==undefined).length};
+ return {contribution,knowledge,committed,first,originals,terminalDocumentExceptions,terminalAssessmentExceptions,steps:allSteps,policy,criticalInventory:CriticalAssessmentInventorySchema.parse({records:inventory.records.filter(entry=>admitted.has(entry.recordId))}),criticalAdmissions:CriticalAdmissionsSchema.parse({schemaVersion:CRITICAL_ADMISSIONS_VERSION,admissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}),policyInventory,heldRecords:quarantine.filter(entry=>entry.candidate!==undefined).length};
 }
 
 /** Content-addressed immutable managed outputs. Existing current-policy/custody
  * writers own every byte; sealing does not authorize publication or invoke models. */
 export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:unknown){
  const built=await buildQueueTextRun(pool,cas,input),store=new DistrictJobStore(pool);
- const bindings:SourceArtifactBinding[]=built.committed.sources.map(source=>({...source.sourceBinding,independentAllowed:true}));
+ const bindings:SourceArtifactBinding[]=built.originals.map(source=>({...source.sourceBinding,independentAllowed:true}));
  const unique=[...new Map(bindings.map(binding=>[canonicalJson(binding),binding])).values()];
  await initializeManagedAcquisitionLane(cas.root,{...built.policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
  const persist=async(value:{bytes:string|Uint8Array;sha256:string},kind:'derived'|'receipt'='derived')=>{
@@ -224,7 +286,7 @@ export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:
  const pins:{path:string;sha256:string;bytes:number;bindings:SourceArtifactBinding[]}[]=[];
  const artifacts={} as Record<keyof TextRunContribution['artifacts'],{path:string;sha256:string}>;
  for(const key of ['extractionRun','records','quarantine','preparationPlan'] as const){const pin=await persist(built.contribution.artifacts[key]!);artifacts[key]={path:pin.path,sha256:pin.sha256};pins.push(pin);}
- const first=built.committed.selectors[0],admitted=await readOperatorRegistryInputPin(first.registry,built.policy),migration=first.crawlRegistry?await readCrawlOperatorRegistryInputPin(first.crawlRegistry,first.registry,built.policy):undefined;
+ const first=built.first,admitted=await readOperatorRegistryInputPin(first.registry,built.policy),migration=first.crawlRegistry?await readCrawlOperatorRegistryInputPin(first.crawlRegistry,first.registry,built.policy):undefined;
  for(const key of ['crawl','registry'] as const){const original=built.contribution.artifacts[key],bindings=key==='registry'?admitted.bindings:[...admitted.bindings,...migration?.crawl.bindings??[],...first.corpusObservations];const pin={path:pathFor(cas,original.sha256),sha256:original.sha256,bytes:original.bytes.length,bindings:bindings.map(binding=>({...binding,independentAllowed:false}))};await assertManagedSourceBindings(pin.path,pin.bindings,built.policy);pins.push(pin);artifacts[key]={path:pin.path,sha256:pin.sha256};}
  const composition=r1TextCompositionInputSchema.parse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:built.knowledge.generatedAt,approvedRunOrder:[built.contribution.runId],admissions:[{runId:built.contribution.runId,recordIds:built.knowledge.records.map(record=>record.id)}],contributions:[{runId:built.contribution.runId,pins:built.contribution.pins,sourceArtifactKind:'native_extraction_output',artifacts}]});
  const compositionPin=await persist(artifact(composition)),criticalInventory=await persist(artifact(built.criticalInventory)),criticalAdmissions=await persist(artifact(built.criticalAdmissions)),policyInventory=await persist(artifact(built.policyInventory));pins.push(compositionPin,criticalInventory,policyInventory,criticalAdmissions);
@@ -232,5 +294,19 @@ export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:
  const provenance=await persist(artifact(privatePublicationProvenanceSchema.parse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins})));
  // A final offline current-policy/queue recheck prevents a changed cohort escaping.
  const final=await buildQueueTextRun(pool,cas,input);if(final.contribution.runId!==built.contribution.runId||semanticHash(final.policyInventory)!==semanticHash(built.policyInventory))throw Error('Queue seal inputs changed during managed persistence');
- return {runId:built.contribution.runId,compositionArtifactSha256:compositionPin.sha256,path:compositionPin.path,artifacts,criticalInventory,criticalAdmissions,policyInventory,privateProvenance:provenance,records:built.knowledge.records.length,heldRecords:built.heldRecords,committedDocuments:built.committed.results.length};
+ return {runId:built.contribution.runId,compositionArtifactSha256:compositionPin.sha256,path:compositionPin.path,artifacts,criticalInventory,criticalAdmissions,policyInventory,privateProvenance:provenance,records:built.knowledge.records.length,heldRecords:built.heldRecords,committedDocuments:built.originals.length,terminalDocumentExceptions:built.terminalDocumentExceptions,terminalAssessmentExceptions:built.terminalAssessmentExceptions};
+}
+
+/** Preserve historical non-exception exports without changing their frozen job
+ * implementation. Terminal exports authenticate the new complete queue closure. */
+export async function exportQueueTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
+ const authenticated=authenticateTextRunContribution(contribution),queue=z.object({reconciliationJobKeys:z.array(HashSchema),terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema.strip()).default([]),terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema.strip()).default([])}).passthrough().parse(authenticated.extractionRun.queue);
+ if(!queue.terminalDocumentExceptions.length&&!queue.terminalAssessmentExceptions.length){const original=await exportResidualTextContribution(pool,cas,jobKeys,contribution);return {...original,terminalDocumentExceptions:[],terminalAssessmentExceptions:[]};}
+ if(authenticated.sourceArtifactKind!=='native_extraction_output'||authenticated.extractionRun.assignmentMode!=='codex-only')throw Error('Terminal exception export requires a genuine native queue contribution');
+ const expected=await buildQueueTextRun(pool,cas,{jobKeys:[...jobKeys],...queueSchemaInput(queue)});
+ for(const key of ['extractionRun','records','quarantine','crawl','registry','preparationPlan'] as const)if(contribution.artifacts[key]?.sha256!==expected.contribution.artifacts[key]?.sha256)throw Error('Queue text terminal exception seal differs from committed lineage');
+ return {contribution,stepReceipts:expected.committed.receipts,results:expected.committed.results,terminalDocumentExceptions:expected.terminalDocumentExceptions,terminalAssessmentExceptions:expected.terminalAssessmentExceptions};
+}
+function queueSchemaInput(queue:{reconciliationJobKeys:string[];terminalDocumentExceptions:z.infer<typeof TerminalDocumentExceptionSchema>[];terminalAssessmentExceptions:z.infer<typeof TerminalAssessmentExceptionSchema>[]}){
+ return {reconciliationJobKeys:queue.reconciliationJobKeys,terminalDocumentExceptions:queue.terminalDocumentExceptions,terminalAssessmentExceptions:queue.terminalAssessmentExceptions};
 }

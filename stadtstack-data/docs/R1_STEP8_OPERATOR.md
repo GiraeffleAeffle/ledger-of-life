@@ -278,3 +278,102 @@ The CLI and replay audit writer parse socket connection strings with
 documented `postgresql://OPERATOR@/DB?host=/absolute/socket-directory` works;
 the operator command rejects network hosts and relative socket directories.
 
+## Terminal document and assessment exceptions
+
+`seal-text-contribution` additionally accepts these two optional arrays (default
+empty). Both use exactly six input fields:
+
+```json
+{
+  "jobKeys": [],
+  "reconciliationJobKeys": [],
+  "terminalDocumentExceptions": [
+    {
+      "documentId": "the-frozen-document-id",
+      "step": "residual_prepare",
+      "jobKey": "ACTUAL_HELD_JOB_SHA256",
+      "receiptId": "ACTUAL_COMMITTED_RECEIPT_UUID",
+      "receiptSha256": "ACTUAL_COMMITTED_RECEIPT_SHA256",
+      "reasonCode": "isolation_unavailable"
+    }
+  ],
+  "terminalAssessmentExceptions": []
+}
+```
+
+The uppercase values above describe required operator inputs, not usable pins.
+Document-exception steps are `residual_prepare` and `residual_extract`;
+assessment-exception steps are `assessment_prepare`, `assessment_a`,
+`assessment_b`, `assessment_c`, and `assessment_reconcile`. Permitted outcomes
+are `held_origin`, `held_quality`, `held_execution`, `blocked_policy`,
+`blocked_access`, and `failed_execution`. Deferred, cancelled, superseded,
+successful and no-case jobs cannot be terminal exceptions.
+
+Each pin must identify the job's **current committed held attempt**: canonical
+receipt hash, SQL row identities, run/attempt/fencing/outcome, job identity,
+scope, policy and selected reason must agree. Resumed/leased jobs, old attempt
+pins, later successful attempts, foreign documents and conflicting selections
+fail closed. Frozen original custody and current policy are still independently
+checked; an exception is not permission to bypass a source denial.
+
+A document is exactly one extracted/negative group or one terminal-document
+exception, never both. `jobKeys` may be empty only with at least one authenticated
+terminal document. An output-bearing held-quality extraction stays in `jobKeys`;
+its committed attempt history is retained in the sealed queue evidence. An
+output-less terminal extraction must also authenticate its genuine successful
+preparation predecessor. A failed preparation contributes no prepared document,
+native extraction result, generation archive or knowledge record.
+
+Assessment exceptions require an extracted document and authenticate the exact
+committed extraction dependency or an assessment item actually emitted by its
+committed preparation. They add no document and admit no record. A selected
+genuine final assessment still controls its own admission: historical held
+side paths do not manufacture or replace its A/B/C evidence. One held
+reconciliation receipt may appear in both `reconciliationJobKeys` and
+`terminalAssessmentExceptions`; it is one closure step. Do not select two
+reconciliations for the same record in `reconciliationJobKeys`.
+
+Seal/export results and the immutable extraction queue retain enriched exception
+evidence, including real committed `attemptHistory` receipts. These are not
+invented manual-resume events; separate verified operator resume decisions remain
+the operator audit's responsibility. `export-text-contribution` recovers and
+re-authenticates the pinned exceptions from the sealed queue envelope.
+
+Step-8 `seals` accepts the same two six-field arrays and checks they equal the
+authenticated export. In the frozen campaign's `documents`, `jobKey` names the
+actual selected extraction job, or the actual held preparation/extraction job
+for a terminal document. Never insert a nonexistent extraction key. Exact
+campaign membership is checked over the disjoint union. The release-bound
+exception inventory retains full document/assessment receipt evidence and
+classification; terminal documents have no admitted record IDs.
+
+Terminal sealing/export changes deliberately live outside the frozen residual
+job implementation. A regression pins all six measured running-campaign
+contracts at `93b967d`: residual preparation/extraction, assessment queue/B,
+policy refresh and OMP runner. This cutover must not re-key running jobs.
+
+After complete source/native authentication, step 8 durably writes
+`source-dispositions.json` with `status: authenticated_not_released`, its
+generation nonce, campaign pin and complete source dispositions. This remains
+available if subsequent knowledge preparation or quality gates fail; it is not
+a release receipt. Successful publication pins this inventory from the
+release-bound `exception-inventory.json`.
+
+An all-terminal **source** is sealable and exportable. An entire candidate with
+no genuine dated/staged case must still fail the existing district slice gate.
+The fixture asserts that independent failure, retains the authenticated terminal
+document evidence, and verifies that no passed release gate is written. A
+separate positive full publication/replay fixture retains an authentic held
+assessment side path alongside its genuine selected final A/B/C admission.
+Neither test manufactures a staged fact or relaxes the release gate.
+
+Terminal-exception cutover verification: the complete gate passed with
+`umask 022; PYTHONDONTWRITEBYTECODE=1 PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH R1_VERIFY_CPUS=4-5 taskset -c 4-5 nice -n 10 ./scripts/r1-verify.sh all`.
+Receipt `tests-20261015T113436Z.tap`: TypeScript exit 0; 1,898 tests,
+1,850 passed, 0 failed, 0 cancelled, 48 skipped; test exit 0. This includes the
+six unchanged running-campaign contract assertions, real committed terminal
+preparation/extraction and assessment ancestry/history checks, exact guarded
+publication/replay with a retained assessment exception, and the expected
+all-terminal candidate slice hold with durable source-disposition evidence.
+No production writes, real provider calls or hosted rollout were exercised.
+
