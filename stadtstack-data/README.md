@@ -368,9 +368,9 @@ failures have no captured reset clock and stay held. There is no probe permissio
 `budget_paused` jobs from one exact source scope and one provider lane. Outside
 all live jobs/leases, it checks actual PostgreSQL time against every applicable
 recorded reset, pinned owner autoresume/#81 approval bytes, current source policy,
-uncancelled immutable job identities, inactive prior runs, still-approved and
-unexpired prior stage authority, unchanged stage/parent expiry and elapsed bounds,
-remaining original-wide Codex calls, the 500-document ceiling and at most six
+uncancelled immutable job identities, inactive prior runs, non-revoked original
+stage authority and its exact held job/AGS scope, remaining original-wide Codex
+calls, the byte-pinned parent's 500-document ceiling and at most six
 committed source dispositions. It atomically issues genuinely new canonical
 authority, records both owner approval hashes and the exact hold/job basis, and
 calls guarded `DistrictJobStore.resume`. Its JSON result contains the new stage
@@ -379,6 +379,16 @@ or concurrent dispositions cannot mint a second authorization for the same hold.
 No old authority clock, intent, lease, receipt or ambiguous reservation is erased;
 `reserveR1CodexCall` alone still creates the canonical Codex resumption rows when
 the newly authorized live job actually reserves its next call.
+
+An expired stage grant alone does **not** prevent resumption after an actual
+subscription reset: the parent #81 approval, not the old stage wall, bounds the
+fresh lead-issued authorization. `expiresAt` must be strictly after current DB
+time and no later than the parent expiry **2026-10-25T21:59:59Z**; its fresh
+`maxElapsedMs` is explicitly bounded by the existing input/executor maximum
+(24 hours), not inherited from the prior stage. The original grant is never
+extended, reused or rewritten, and a revoked grant remains ineligible. Parent
+expiry is rechecked before commit and all remaining cumulative caps stay
+enforced. No reset clock or ambiguous intent is bypassed.
 
 Completed earlier Codex requests in the same residual extraction (for example,
 extraction completed before a judge hit quota) are not ambiguous merely because

@@ -21,7 +21,7 @@ import {withManagedSourceWrite} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
-async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-subscription'='openai-subscription'){
+async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-subscription'='openai-subscription',stageLifetimeMs=60000){
  const base=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(base.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Usage fixture refuses remote PostgreSQL');
  const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Usage fixture refuses remote host override');
@@ -33,7 +33,7 @@ async function fixture(t:TestContext,provider:'openai-subscription'|'anthropic-s
  await migrateDistrictJobs(db);directory=await mkdtemp(join(tmpdir(),'subscription-usage-'));
  const cas=new DistrictCas(join(directory,'cas')),store=new DistrictJobStore(db),hash=digest(randomUUID());
  const spec:DistrictJobSpec={step:provider==='openai-subscription'?'residual_extract':'assessment_b',lane:'synthetic-test',semanticContractSha256:hash,inputArtifactHashes:[],sourceScope:{publisherId:'synthetic-publisher',sourceId:'synthetic-source',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-15'},selector:{transport:'vm-omp',nonce:randomUUID()},policyProofSha256:null};
- const jobKey=await store.enqueue(spec),expiresAt=new Date(Date.now()+60000).toISOString();
+ const jobKey=await store.enqueue(spec),expiresAt=new Date(Date.now()+stageLifetimeMs).toISOString();
  const authorizationId=await store.authorize({approvalSha256:digest('synthetic initial authority '+randomUUID()),approvedBy:'synthetic-test-lead',expiresAt,jobKeys:[jobKey],ags:['12064472'],maxJobs:10,maxElapsedMs:60000,category:'development'});
  const run=(handler:JobHandler,authorization=authorizationId)=>runDistrictJobs({store,cas,authorizationId:authorization,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,handlers:{[spec.step]:handler}});
  const input:UsageResumeInput={jobKeys:[jobKey],approvedBy:'synthetic-test-lead',expiresAt,maxElapsedMs:60000,mode:'attended'};
@@ -84,6 +84,32 @@ test('subscription usage autoresume against disposable PostgreSQL',{skip:!connec
   assert.equal(result.state,'completed');assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_resumptions')).rowCount,1);
   assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_call_intents')).rowCount,2);
   assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,1);
+ });
+ for(const provider of ['openai-subscription','anthropic-subscription'] as const)await t.test('parent approval admits a fresh grant after the original stage expires before reset: '+provider,async t=>{
+  const f=await fixture(t,provider,5000),resetAt=new Date(Date.parse(f.input.expiresAt)+50).toISOString();
+  const held=await f.hold(resetAt),original=(await f.db.query('SELECT * FROM district_pipeline.preauthorizations WHERE id=$1',[f.authorizationId])).rows[0];
+  const fresh={expiresAt:'2026-10-25T21:59:59Z',maxElapsedMs:120000};
+  await assert.rejects(f.resume(fresh),{message:'budget_paused'},'A longer fresh grant cannot bypass the provider reset clock');
+  await delay(Math.max(0,Date.parse(resetAt)-Date.now()+20));
+  const resumed=await f.resume(fresh),authorization=(await f.db.query('SELECT *,clock_timestamp() AS now FROM district_pipeline.preauthorizations WHERE id=$1',[resumed.authorizationId])).rows[0];
+  assert.notEqual(resumed.authorizationId,f.authorizationId);assert.notEqual(authorization.approval_sha256,original.approval_sha256);
+  assert.ok(original.expires_at<authorization.now);assert.ok(authorization.approved_at>=new Date(resetAt));assert.ok(authorization.approved_at>original.approved_at);
+  assert.equal(authorization.expires_at.toISOString(),'2026-10-25T21:59:59.000Z');assert.equal(authorization.max_elapsed_ms,120000);
+  assert.deepEqual(authorization.allowed_job_keys,[f.jobKey]);assert.deepEqual(authorization.allowed_ags,[f.spec.sourceScope.ags]);
+  assert.deepEqual((await f.db.query('SELECT * FROM district_pipeline.preauthorizations WHERE id=$1',[f.authorizationId])).rows[0],original,'The expired original grant is never extended or otherwise rewritten');
+  await assert.rejects(f.store.beginRun(f.authorizationId,1,60000),{message:'authorization_expired'},'Canonical execution must still reject reuse of the old grant');
+  await assert.rejects(f.resume(fresh),{message:'usage_unknown'},'No second grant for the already disposed hold');
+  const result=await f.run(async context=>{
+   if(provider==='openai-subscription')await reserveR1CodexCall(f.db,context.job,f.originalSha256,f.requestSha256);
+   else{
+    const client=await f.db.connect();try{assert.deepEqual(await assertBSubscriptionResume(client,resumed.authorizationId,context.job.id),[held.leaseId]);}finally{client.release();}
+    await f.bridgeIntent(context.job);
+   }
+   return {outcome:'succeeded',reasonCode:'completed'};
+  },resumed.authorizationId);
+  assert.equal(result.state,'completed');assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,1);
+  if(provider==='openai-subscription')assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_codex_resumptions')).rowCount,1);
+  else assert.equal((await f.db.query('SELECT * FROM district_pipeline.assessment_bridge_submission_intents')).rowCount,2);
  });
  await t.test('no stated reset remains held, is reported, and never probes',async t=>{
   const f=await fixture(t);await f.hold(null);await assert.rejects(f.resume(),{message:'budget_paused'});
@@ -161,13 +187,30 @@ test('subscription usage autoresume against disposable PostgreSQL',{skip:!connec
   await f.db.query('UPDATE district_pipeline.r1_codex_documents SET max_calls=2 WHERE original_sha256=$1',[f.originalSha256]);
   const intent=await f.db.query('SELECT * FROM district_pipeline.r1_codex_call_intents');
   await f.db.query(`INSERT INTO district_pipeline.r1_codex_call_intents(id,original_sha256,job_id,fencing_token,request_sha256,stage) VALUES($1,$2,$3,$4,$5,'residual_extract')`,[randomUUID(),f.originalSha256,intent.rows[0].job_id,intent.rows[0].fencing_token,digest('synthetic cap fill')]);
-  await assert.rejects(f.resume(),{message:'source_limit_exceeded'});
+  await assert.rejects(f.resume({expiresAt:'2026-10-25T21:59:59Z'}),{message:'source_limit_exceeded'});
  });
- await t.test('expiry, parent expiry, revocation and guarded reservations refuse without new authority',async t=>{
+ await t.test('the parent document ceiling is not replenished by a fresh stage grant',async t=>{
+  const f=await fixture(t);await f.hold(new Date(Date.now()-1000).toISOString());
+  const originals=Array.from({length:500},(_,index)=>digest('synthetic additional owner-cap selection '+index));
+  await f.db.query('INSERT INTO district_pipeline.r1_codex_documents(original_sha256,max_calls) SELECT original,48 FROM unnest($1::text[]) AS original',[originals]);
+  await f.db.query(`INSERT INTO district_pipeline.r1_codex_selections(municipality_id,original_sha256) SELECT 'synthetic-owner-cap',original FROM unnest($1::text[]) AS original`,[originals]);
+  assert.equal((await f.db.query('SELECT count(*) FROM district_pipeline.r1_codex_selections')).rows[0].count,'501');
+  await assert.rejects(f.resume({expiresAt:'2026-10-25T21:59:59Z'}),{message:'source_limit_exceeded'});
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.preauthorizations')).rowCount,1);
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,0);
+ });
+ await t.test('a fresh grant cannot widen the original held job and source scope',async t=>{
+  const f=await fixture(t);await f.hold(new Date(Date.now()-1000).toISOString());
+  const foreign=await f.store.enqueue({...f.spec,sourceScope:{...f.spec.sourceScope,sourceId:'synthetic-other-source'}});
+  await assert.rejects(f.resume({jobKeys:[foreign],expiresAt:'2026-10-25T21:59:59Z'}),{message:'authorization_revoked'});
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.preauthorizations')).rowCount,1);
+  assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,0);
+ });
+ await t.test('new grant expiry, parent expiry, revocation and input wall limits refuse without new authority',async t=>{
   const f=await fixture(t);await f.hold(new Date(Date.now()-1000).toISOString());
   await assert.rejects(f.resume({expiresAt:'2026-10-26T00:00:00Z'}),{message:'authorization_expired'});
   await assert.rejects(f.resume({expiresAt:'2026-10-01T00:00:00Z'}),{message:'authorization_expired'});
-  await assert.rejects(f.resume({maxElapsedMs:60001}),{message:'authorization_time_exhausted'});
+  await assert.rejects(f.resume({maxElapsedMs:86400001}));
   await f.db.query("UPDATE district_pipeline.preauthorizations SET state='revoked' WHERE id=$1",[f.authorizationId]);
   await assert.rejects(f.resume(),{message:'authorization_revoked'});
   assert.equal((await f.db.query('SELECT * FROM district_pipeline.r1_subscription_resumptions')).rowCount,0);
