@@ -12,15 +12,16 @@ import { syncBuiltinESMExports } from 'node:module';
 import { PROVIDER_CONFIGS, SUPPORTED_MODEL_ROUTES, SupportedModelRouteSchema, ModelEvidenceSchema, modelIdentitySha256, assertModelEvidenceIdentity, assertModelResponseIdentity, SubscriptionRuntimeError } from '../src/district-model-contract.ts';
 import type {ReportedUsage,RuntimeFailureDiagnostic} from '../src/district-model-contract.ts';
 import { assertClaudeSubscriptionAuth, claudeExecutionArgs, inspectClaudeEvents } from '../src/district-claude.ts';
-import { inspectCodexEvents, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput, MAX_SUBSCRIPTION_INPUT_BYTES, subscriptionInputWithinBound } from '../src/district-model.ts';
+import { inspectCodexEvents, codexFailureCategory, modelReadiness, subscriptionChat, subscriptionExecutionArgs, collectSubscriptionProcess, encodeSubscriptionInput, MAX_SUBSCRIPTION_INPUT_BYTES, subscriptionInputWithinBound, subscriptionScratchRoot, prepareSubscriptionFiles } from '../src/district-model.ts';
 import { appendUsageEntry, readUsageLedger, hourlyUsage, recordExercisedReadinessProbe, usageEntry, writeOperatorPause, pauseProvider, isProviderStopped, COST_MEANING, appendFailureDiagnostic, failureDiagnosticPath, rejectRuntimeFailure } from '../src/district-model-usage.ts';
 import { classifyRuntimeFailure, failureDiagnostic, runtimeFailureReason, runtimeToolEvidence, RuntimeFailureDiagnosticSchema } from '../src/district-model-diagnostics.ts';
-import {CivicPolicyStateError} from '../src/civic-opt-out.ts';
+import {CivicPolicyStateError,CIVIC_ACQUISITION_DECISION_ID,withManagedSourceScratch,assertManagedSourceReadable,readCivicPolicyInventory} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import { sourceFreeModelReadiness, type ReadinessExecutor } from '../src/district-model-readiness.ts';
 import { BridgeAnswerSchema } from '../src/district-assessment-bridge-contract.ts';
 import {EXTRACTION_INSTRUCTIONS,JUDGE_INSTRUCTIONS} from '../src/district-claims.ts';
 import {TOPIC_VOCABULARY} from '../src/topic-vocabulary.ts';
+import {admittedAssessmentFixture} from './district-assessment.fixture.ts';
 const digest = (text: string) => createHash('sha256').update(text).digest('hex');
 function claudeResult(extra: Record<string, unknown> = {}) {
   return JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { supported: true }, usage: { input_tokens: 2, output_tokens: 52, cache_read_input_tokens: 3, cache_creation_input_tokens: 923 }, modelUsage: { 'claude-haiku-5-5': { inputTokens: 2, outputTokens: 52, cacheReadInputTokens: 3, cacheCreationInputTokens: 923, costUSD: 0.008432 } }, total_cost_usd: 0.008432, ...extra });
@@ -335,7 +336,10 @@ test('fatal Codex fixtures preserve controlled parser causes without retaining m
   const secret = 'private-request-source-header';
   for (const [message, category, reason] of [
     ['model metadata unavailable', 'model_metadata_unavailable', 'model'],
-    ['Invalid schema for response_format', 'structured_schema_rejected', 'schema'],
+    ['Invalid schema for response_format', 'request_schema_rejected', 'schema'],
+    ['Model output does not match the schema', 'output_schema_validation_failed', 'schema'],
+    ['Failed to deserialize structured output', 'output_schema_validation_failed', 'schema'],
+    ['schema processing failed', 'schema_failure_unclassified', 'schema'],
     ['model not found', 'configured_model_unavailable', 'model'],
     ['context limit exceeded', 'context_limit', 'context'],
     ['generation failed', 'generation_error', 'generation'],
@@ -346,6 +350,13 @@ test('fatal Codex fixtures preserve controlled parser causes without retaining m
     const diagnostic = diagnosticFixture({ parserFailureCategory: parsed.failureCategory, ...classifyRuntimeFailure(null, 1, parsed.failureCategory, parsed.toolAttempted) });
     assert.doesNotMatch(JSON.stringify(diagnostic), /private-request-source-header/);
     assert.equal(diagnostic.parserFailureCategory, category);
+  }
+  assert.equal(codexFailureCategory('error: unexpected argument --flag found'),'cli_configuration');
+  for(const message of ['Invalid schema for response_format','Output schema validation failed','schema processing failed','other failure']){
+    const category=codexFailureCategory(message+' '+secret);
+    const diagnostic=diagnosticFixture({parserFailureCategory:category,...classifyRuntimeFailure(null,1,category,false)});
+    assert.doesNotMatch(JSON.stringify(diagnostic),/private-request-source-header/);
+    assert.equal(diagnostic.parserFailureCategory,category);
   }
   const truncated = '{"type":"item.started","item":{"type":"command_execution","command":"private"}}\n{"type":';
   assert.throws(() => inspectCodexEvents(truncated), SubscriptionRuntimeError);
@@ -533,4 +544,36 @@ test('omp evidence support does not enable native Anthropic execution on the VM'
     purpose: 'synthetic_readiness', ledgerPath: 'unused', pausePath: 'unused',
   }), CivicPolicyStateError);
   assert.equal(native.mock.callCount(), 0);
+});
+
+for(const mask of [0o000,0o002,0o022])test('Codex files and gated children remain private without changing caller umask '+mask.toString(8),async t=>{
+ const f=await admittedAssessmentFixture('Synthetic retained original',true);t.after(()=>rm(f.directory,{recursive:true,force:true}));
+ const root=subscriptionScratchRoot(f.context.cas.root),policy={...f.context.policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID};
+ const bindings=[{kind:'prepared_source' as const,url:f.policy.source.url,sourceSha256:f.source.originalSha256,observationId:'synthetic-model',receiptSha256:f.policyArtifact.sha256}];
+ assert.notEqual(root,f.context.cas.root);assert.equal(root.startsWith(f.context.cas.root+'/'),false);
+ await withManagedSourceScratch(root,bindings,async scope=>{
+  const previous=process.umask(mask);
+  try{
+   const files=await prepareSubscriptionFiles(scope.directory,{type:'object',properties:{ok:{type:'boolean'}},required:['ok'],additionalProperties:false});
+   for(const path of Object.values(files))assert.equal((await stat(path)).mode&0o777,0o600);
+   const child=await scope.spawn(process.execPath,['-e',`const fs=require('node:fs');fs.writeFileSync('answer.json','{"ok":true}');fs.writeFileSync('default.json','synthetic');process.stdout.write(String(process.umask()));`]);
+   const {promise,resolve,reject}=Promise.withResolvers<number|null>();child.once('error',reject);child.once('close',resolve);
+   let stdout='';child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.resume();child.stdin.end();
+   assert.equal(await promise,0);
+   assert.equal(stdout,String(0o077));assert.equal(process.umask(),mask);
+   for(const path of [...Object.values(files),join(scope.directory,'default.json')])assert.equal((await stat(path)).mode&0o777,0o600);
+   assert.deepEqual(JSON.parse(await readFile(files.outputPath,'utf8')),{ok:true});
+  }finally{process.umask(previous);}
+ },{...policy,kind:'artifacts',purpose:'classification'});
+ // A failed model's unexpected unsafe output remains quarantined only in its
+ // own lane. It cannot prevent an independent governed original CAS read.
+ await assert.rejects(withManagedSourceScratch(root,bindings,async scope=>{
+  const path=join(scope.directory,'unexpected.json');await writeFile(path,'synthetic',{mode:0o600});await chmod(path,0o664);
+ },{...policy,kind:'artifacts',purpose:'openai'}),CivicPolicyStateError);
+ await assertManagedSourceReadable(f.originalObjectPath,policy);
+ assert.equal(await readFile(f.originalObjectPath,'utf8'),'Synthetic retained original');
+ const inventory=await readCivicPolicyInventory(policy);
+ assert.equal(inventory.roots.find(item=>item.path===f.context.cas.root)!.complete,true);
+ const modelRoot=inventory.roots.find(item=>item.path===root)!;
+ assert.ok(inventory.scratch.some(lease=>lease.rootId===modelRoot.id&&lease.state==='partial'));
 });

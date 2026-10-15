@@ -15,8 +15,15 @@ import type {ModelAnswer} from './district-model-contract.ts';
 import type {ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
-import {runVmOmpAssessment,ompRunnerOutputContractSha256,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
+
+/** Closed, content-free native hold classification; never persist an error message. */
+export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
+ if(error instanceof DistrictExecutionHold)return error.reasonCode;
+ if(error instanceof OmpRunnerHold)return `omp_${error.reason}`;
+ return 'execution_exception';
+}
 
 export const ASSESSMENT_B_STEP='assessment_b';
 export const AssessmentBSelectorSchema=z.discriminatedUnion('transport',[
@@ -359,7 +366,7 @@ export class DistrictAssessmentBroker {
      const current=await this.current(client,row);if('reason' in current)throw new DistrictExecutionHold(current.reason);
     });
    }});}catch(error){
-    const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
+    const reason=assessmentBridgeHoldReason(error);
     await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],reason);});
     return {outcome:'held_execution',reasonCode:reason};
    }
@@ -389,9 +396,10 @@ export class DistrictAssessmentBroker {
    });
    return result;
   }catch(error){
-   if(leaseId)try{await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception');});}catch{}
+   const reason=assessmentBridgeHoldReason(error);
+   if(leaseId)try{await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],reason);});}catch{}
    if(error instanceof DistrictExecutionHold)throw error;
-   throw new DistrictExecutionHold('execution_exception');
+   throw new DistrictExecutionHold(reason);
   }finally{
    if(signal.aborted&&leaseId)await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],'owner_stopped');});
   }
