@@ -127,6 +127,108 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   await assert.rejects(db.query('UPDATE district_pipeline.assessment_bridge_submission_intents SET client_id=$2 WHERE lease_id=$1',[lease.leaseId,'other-client']),/Immutable/);
  });
 
+ await t.test('slow real evidence, managed writes and receipt reads do not block executor heartbeats',async slow=>{
+  // Much shorter SQL timeout than the real evidence delay, without extending
+  // either SQL timeout or executor lease to conceal blocked authority locks.
+  const heartbeatPool=new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:400});
+  const closeHeartbeatPool=poolShutdownBarrier(heartbeatPool);
+  const f=await fixture(heartbeatPool,'slow-evidence-heartbeat');directories.push(f.directory);
+  const controller=new AbortController();
+  let run:Promise<unknown>|undefined;
+  slow.after(async()=>{controller.abort();try{await run;}finally{await closeHeartbeatPool();}});
+  const renewedDuring=new Set<string>(),receiptHashes=new Set<string>();
+  const delayed=async<T>(kind:string,body:()=>Promise<T>):Promise<T>=>{
+   const before=(await db.query<{state:string;lease_expires_at:Date}>('SELECT state,lease_expires_at FROM district_pipeline.jobs WHERE job_key=$1',[f.jobKey])).rows[0];
+   await delay(1100);
+   const after=(await db.query<{state:string;lease_expires_at:Date}>('SELECT state,lease_expires_at FROM district_pipeline.jobs WHERE job_key=$1',[f.jobKey])).rows[0];
+   assert.equal(before.state,'leased');assert.equal(after.state,'leased');
+   assert.ok(after.lease_expires_at>before.lease_expires_at,kind+' must allow a real committed executor heartbeat while evidence IO exceeds statement_timeout');
+   renewedDuring.add(kind);
+   return body();
+  };
+  // Delay the actual private work; never replace authenticated evidence or CAS
+  // results with a fixture answer. No production test-only callback is added.
+  const hooks=f.broker as unknown as {checkedEvidence(...args:unknown[]):Promise<unknown>;persist(...args:unknown[]):Promise<unknown>};
+  const checked=hooks.checkedEvidence.bind(f.broker),persist=hooks.persist.bind(f.broker),read=f.cas.read.bind(f.cas);
+  slow.mock.method(hooks,'checkedEvidence',(...args:unknown[])=>delayed('checkedEvidence',()=>checked(...args)));
+  slow.mock.method(hooks,'persist',(...args:unknown[])=>delayed('managedWrite',async()=>{
+   const artifact=await persist(...args);
+   if(args[1]==='receipt')receiptHashes.add(digest(args[0] as Buffer));
+   return artifact;
+  }));
+  slow.mock.method(f.cas,'read',(hash:string)=>receiptHashes.has(hash)?delayed('receiptRead',()=>read(hash)):read(hash));
+  const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+  const execution=runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,leaseMs:1800,signal:controller.signal,ownerPresent:true});
+  run=execution;
+  await ready(db,f.jobKey);
+  const lease=BridgeLeaseSchema.parse(await f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'synthetic-slow-client',clientContractSha256}));
+  assert.equal(BridgeStatusSchema.parse(await f.broker.dispatch(submitFor(lease))).state,'submitted');
+  assert.equal((await execution).state,'completed');
+  assert.deepEqual([...renewedDuring].sort(),['checkedEvidence','managedWrite','receiptRead']);
+  const receipts=await db.query<{reason_code:string}>('SELECT reason_code FROM district_pipeline.step_receipts WHERE job_key=$1',[f.jobKey]);
+  assert.deepEqual(receipts.rows.map(row=>row.reason_code),['completed']);
+ });
+
+ for(const phase of ['prepare','claim','submit'] as const)for(const mutation of ['policy','snapshot','artifact'] as const){
+  await t.test(`${phase} fences ${mutation} changes made after unlocked authenticated IO`,async race=>{
+   const f=await fixture(db,`${phase}-${mutation}-unlocked`);directories.push(f.directory);
+   const controller=new AbortController();
+   let run:Promise<unknown>|undefined,armed=phase==='prepare',mutated=false;
+   let mutationWork:Promise<void>|undefined;
+   race.after(async()=>{controller.abort();await run;});
+   const mutate=()=>{
+    mutationWork??=(async()=>{
+    mutated=true;
+    if(mutation==='policy')await db.query("UPDATE district_pipeline.policy_decisions SET state='excluded' WHERE proof_sha256=$1",[f.proof.receiptSha256]);
+    else if(mutation==='snapshot'){
+     // Snapshots/receipt bodies are immutable: publish a genuine newer allowed
+     // receipt rather than bypassing their database immutability protections.
+     const original=f.proof.receipt;
+     const refreshed=await createPolicyReceipt({source:original.source,sourcePolicy:original.sourcePolicy,permission:original.permission,scope:original.scope,checkedAt:new Date().toISOString(),expiresAt:original.expiresAt},f.policyOptions);
+     const bytes=Buffer.from(canonicalJson(refreshed.receipt)),hash=digest(bytes);
+     const artifact=await withManagedSourceWrite(f.cas.root,[{kind:'prepared_source',relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,sourceSha256:original.source.sha256,url:original.source.url,observationId:'synthetic-policy-refresh',receiptSha256:f.proof.receiptSha256,independentAllowed:false}],()=>f.cas.put(bytes,{kind:'receipt',mimeType:'application/json'}),f.policyOptions);
+     await f.store.addArtifact(artifact);
+     await db.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) SELECT $1,source_snapshot_id,$2,source_sha256,$3,'allowed',observed_robots,owner_robots_override,$4,$5,$6,$7,'synthetic_policy_refresh' FROM district_pipeline.policy_decisions WHERE proof_sha256=$8`,[randomUUID(),hash,refreshed.receipt,refreshed.receipt.optOutSnapshotSha256,refreshed.receipt.version,refreshed.receipt.checkedAt,refreshed.receipt.expiresAt,f.proof.receiptSha256]);
+    }else await db.query("UPDATE district_pipeline.artifacts SET disposition='excluded' WHERE sha256=$1",[f.proof.receipt.source.sha256]);
+    })();
+    return mutationWork;
+   };
+   const hooks=f.broker as unknown as {checkedEvidence(...args:unknown[]):Promise<unknown>;persist(...args:unknown[]):Promise<unknown>};
+   const checked=hooks.checkedEvidence.bind(f.broker),persist=hooks.persist.bind(f.broker);
+   race.mock.method(hooks,'checkedEvidence',async(...args:unknown[])=>{
+    const value=await checked(...args);
+    if(armed&&phase!=='submit')await mutate();
+    return value;
+   });
+   let writes=0;
+   race.mock.method(hooks,'persist',async(...args:unknown[])=>{
+    const value=await persist(...args);
+    if(armed&&phase==='submit'&&++writes===4)await mutate();
+    return value;
+   });
+   const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+   const execution=runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,leaseMs:30000,signal:controller.signal,ownerPresent:true});run=execution;
+   if(phase!=='prepare'){
+    await ready(db,f.jobKey);
+    if(phase==='claim'){
+     armed=true;
+     const held=await f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'synthetic-race-client',clientContractSha256});
+     assert.equal('data' in held,false);assert.notEqual(BridgeStatusSchema.parse(held).state,'active');
+    }else{
+     const lease=BridgeLeaseSchema.parse(await f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'synthetic-race-client',clientContractSha256}));
+     armed=true;
+     assert.notEqual(BridgeStatusSchema.parse(await f.broker.dispatch(submitFor(lease))).state,'submitted');
+    }
+   }
+   const result=await execution;assert.equal(result.state,'held');assert.ok(mutated);
+   assert.equal(result.reasonCode,'policy_excluded');
+   const accepted=await db.query("SELECT s.lease_id FROM district_pipeline.assessment_bridge_submissions s JOIN district_pipeline.assessment_bridge_leases b ON b.id=s.lease_id JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND s.state='accepted'",[f.jobKey]);
+   assert.equal(accepted.rowCount,0);
+   if(phase==='prepare')assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[f.jobKey])).rowCount,0);
+   if(phase==='claim')assert.equal((await db.query('SELECT lease_id FROM district_pipeline.assessment_bridge_submission_intents WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[f.jobKey])).rowCount,0);
+  });
+ }
+
  await t.test('offline unexposed B safely pauses and only explicit resume/new approval may create a new lease',async()=>{
   const f=await start('offline-unexposed'),prior=await ready(db,f.jobKey);
   assert.equal((await db.query('SELECT * FROM district_pipeline.assessment_bridge_submission_intents WHERE lease_id=$1',[prior.id])).rows.length,0);

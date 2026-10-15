@@ -9,7 +9,7 @@ import {canonicalJson,HashSchema,semanticHash,digest,ScopeSchema,type AdapterSco
 import {DistrictCas,type CasArtifact,type ArtifactKind} from './district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,canonicalJobIdentity,type ClaimedJob,type DistrictJobSpec,type JobHandler,type JobHandlerResult} from './district-jobs.ts';
 import {assessmentItemSchema,assessmentOutputSchema,originalEvidence,assessmentProviderInput,createAssessmentReceipt,validateReceipt,PROMPTS,digest as assessmentDigest,type AssessmentItem,type AssessmentReceipt,type AssessmentEvidenceContext,type OriginalEvidence} from './district-assessment.ts';
-import {loadPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
+import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt} from './district-policy-receipt.ts';
 import {inspectClaudeEvents} from './district-claude.ts';
 import type {ModelAnswer} from './district-model-contract.ts';
 import type {ReasonCode} from './district-step-receipt.ts';
@@ -46,9 +46,12 @@ type LeaseState='ready'|'active'|'held'|'expired'|'cancelled'|'submitted';
 interface LeaseRow extends QueryResultRow {id:string;job_id:string;run_id:string;fencing_token:string;item_sha256:string;request_artifact_sha256:string;request_sha256:string;input_sha256:string;authority_id:string;authority_sha256:string;policy_snapshot_sha256:string;client_contract_sha256:string;state:LeaseState;reason_code:ReasonCode|null;created_at:Date;deadline_at:Date;client_id:string|null;claimed_at:Date|null;expires_at:Date;receipt_sha256:string|null;purge_ack_sha256:string|null}
 interface JobAuthorityRow extends QueryResultRow {id:string;job_key:string;spec:DistrictJobSpec;fencing_token:string;state:string;lease_owner:string|null;lease_expires_at:Date|null;cancellation_requested:boolean;run_state:string;run_started_at:Date;run_max_elapsed_ms:number;authorization_id:string;approval_sha256:string;approved_by:string;approved_at:Date;expires_at:Date;allowed_job_keys:string[];allowed_ags:string[];max_jobs:number;max_elapsed_ms:number;jobs_started:number;first_started_at:Date|null;category:string;execution_mode:string;authorization_state:string;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null;now:Date}
 interface SourceReference {sha256:string;url:string;policyReceiptSha256:string}
-interface CheckedEvidence {item:AssessmentItem;evidence:OriginalEvidence;data:Record<string,unknown>;sources:SourceReference[];sourceAuthority:CivicPolicyAuthorityReceipt;policySnapshotSha256:string;validUntil:number}
+interface PolicyPin {originalSha256:string;originalReceiptSha256:string;original:PolicyReceipt;currentReceiptSha256:string;current:PolicyReceipt;configured:string|undefined}
+interface CheckedEvidence {item:AssessmentItem;evidence:OriginalEvidence;data:Record<string,unknown>;sources:SourceReference[];sourceAuthority:CivicPolicyAuthorityReceipt;policySnapshotSha256:string;optOutSnapshotSha256:string;artifactHashes:string[];policyPins:PolicyPin[];validUntil:number}
+type EvidenceCheck={checked:CheckedEvidence}|{reason:ReasonCode};
 interface SubmissionRow extends QueryResultRow {submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;receipt_artifact_sha256:string|null;reconciliation_input_sha256:string;provider_request_id:string|null;provider_response_id:string|null;state:'accepted'|'rejected';reason_code:ReasonCode}
 export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:ModelAnswer;providerRequestId:string|null;providerResponseId:string|null;clocks:Pick<BridgeAnswer,'startedAt'|'finishedAt'>}
+interface StagedSubmission {response:CasArtifact;answer:CasArtifact;receipt:CasArtifact|null;reconciliation:CasArtifact;parsed:RecordedBridgeAssessment|undefined}
 
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
@@ -127,7 +130,7 @@ export class DistrictAssessmentBroker {
   if(result.rows.length!==1)throw new DistrictExecutionHold('lease_lost');
   return result.rows[0];
  }
- private async checkedEvidence(client:PoolClient,itemHash:string,spec:DistrictJobSpec):Promise<CheckedEvidence>{
+ private async checkedEvidence(itemHash:string,spec:DistrictJobSpec):Promise<CheckedEvidence>{
   const sourceAuthority=await assertCivicPolicyAuthority(this.context.policyOptions),optout=await readCivicOptOutSnapshot(this.context.policyOptions);
   const requiredMode=this.fixtureProtocol?'isolated-fixture':'codex-workstation-local';
   if(sourceAuthority.mode!==requiredMode||sourceAuthority.authorityId!==optout.authorityId||sourceAuthority.authoritySha256!==optout.authoritySha256)throw new DistrictExecutionHold('authorization_revoked');
@@ -137,9 +140,10 @@ export class DistrictAssessmentBroker {
   const anchor=item.valueContext?await loadPolicyReceipt(this.cas,item.valueContext.custodyReceiptSha256):undefined;
   const hashes=[...new Set([itemHash,...assessmentEvidenceArtifactHashes(item),...(anchor?[anchor.source.sha256]:[])])];
   if(hashes.some(hash=>!spec.inputArtifactHashes.includes(hash)))throw new DistrictExecutionHold('policy_excluded');
-  const artifacts=await client.query<{sha256:string;disposition:string}>('SELECT sha256,disposition FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
+  const artifacts=await this.pool.query<{sha256:string;disposition:string}>('SELECT sha256,disposition FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
   if(artifacts.rows.length!==new Set(hashes).size||artifacts.rows.some(row=>row.disposition!=='retained'))throw new DistrictExecutionHold('policy_excluded');
   const currentAdmissionReceipts:Record<string,string>={};
+  const artifactHashes=new Set(hashes),policyPins:PolicyPin[]=[];
   const sources:SourceReference[]=[],snapshots:{sourceId:string;originalSha256:string;scope:AdapterScope;snapshotSha256:string;currentReceiptSha256:string}[]=[];
   let validUntil=Infinity,primary=false;
   // Custody may belong to another town; only this non-evidence anchor is exempt
@@ -156,16 +160,16 @@ export class DistrictAssessmentBroker {
     if(source!==custodySource&&!cities.includes(scope.municipalityId))throw new DistrictExecutionHold('policy_excluded');
    }else if(scope.municipalityId!==spec.sourceScope.municipalityId||scope.ags!==spec.sourceScope.ags)throw new DistrictExecutionHold('policy_excluded');
    if(same(scope,spec.sourceScope)&&source.admissionReceiptSha256===spec.policyProofSha256)primary=true;
-   const originalRow=await client.query<{state:string;receipt_json:unknown}>('SELECT state,receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1 AND source_sha256=$2',[source.admissionReceiptSha256,source.originalSha256]);
+   const originalRow=await this.pool.query<{state:string;receipt_json:unknown}>('SELECT state,receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1 AND source_sha256=$2',[source.admissionReceiptSha256,source.originalSha256]);
    if(originalRow.rows.length!==1||originalRow.rows[0].state!=='allowed'||!same(originalRow.rows[0].receipt_json,original))throw new DistrictExecutionHold('policy_excluded');
    const configured=this.context.currentAdmissionReceipts?.[source.admissionReceiptSha256];
-   const currentRows=await client.query<{proof_sha256:string;receipt_json:unknown}>(`SELECT p.proof_sha256,p.receipt_json FROM district_pipeline.policy_decisions p JOIN district_pipeline.source_snapshots s ON s.id=p.source_snapshot_id JOIN district_pipeline.artifacts a ON a.sha256=p.proof_sha256 AND a.disposition='retained' WHERE p.source_sha256=$1 AND p.state='allowed' AND p.checked_at<=clock_timestamp() AND p.expires_at>clock_timestamp() AND s.publisher_id=$2 AND s.source_id=$3 AND s.municipality_id=$4 AND s.ags=$5 AND s.tenant IS NOT DISTINCT FROM $6 AND s.observation_window=$7 AND ($8::text IS NULL OR p.proof_sha256=$8) ORDER BY p.checked_at DESC,p.proof_sha256 LIMIT 1`,[source.originalSha256,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,scope.tenant,scope.observationWindow,configured??null]);
-   if(currentRows.rows.length!==1)throw new DistrictExecutionHold('policy_expired');
-   const currentRow=currentRows.rows[0],current=await loadPolicyReceipt(this.cas,currentRow.proof_sha256);
+   const currentRow=await this.currentPolicy(this.pool,source.originalSha256,scope,configured),current=await loadPolicyReceipt(this.cas,currentRow.proof_sha256);
    if(!same(current,currentRow.receipt_json))throw new DistrictExecutionHold('policy_excluded');
    const checked=await recheckPolicyReceipt(original,{...this.context.policyOptions,evaluationAt:new Date().toISOString(),currentProof:current});
    currentAdmissionReceipts[source.admissionReceiptSha256]=currentRow.proof_sha256;
    validUntil=Math.min(validUntil,Date.parse(current.expiresAt));
+   artifactHashes.add(currentRow.proof_sha256);
+   policyPins.push({originalSha256:source.originalSha256,originalReceiptSha256:source.admissionReceiptSha256,original,currentReceiptSha256:currentRow.proof_sha256,current,configured});
    sources.push({sha256:source.originalSha256,url:original.source.url,policyReceiptSha256:source.admissionReceiptSha256});
    snapshots.push({sourceId:source.sourceId,originalSha256:source.originalSha256,scope,snapshotSha256:checked.snapshotSha256,currentReceiptSha256:currentRow.proof_sha256});
    for(const hash of new Set([itemHash,source.originalSha256,source.textSha256,source.parserReceiptSha256,source.admissionReceiptSha256,currentRow.proof_sha256]))await assertManagedSourceReadable(resolve(this.cas.root,'sha256',hash.slice(0,2),hash),{...this.context.policyOptions,sourceUrl:original.source.url});
@@ -176,16 +180,42 @@ export class DistrictAssessmentBroker {
   assertAssessmentContextBound(data);
   const finalAuthority=await assertCivicPolicyAuthority(this.context.policyOptions),finalOptout=await readCivicOptOutSnapshot(this.context.policyOptions);
   if(!same(finalAuthority,sourceAuthority)||finalOptout.authorityId!==sourceAuthority.authorityId||finalOptout.authoritySha256!==sourceAuthority.authoritySha256||finalOptout.sha256!==optout.sha256)throw new DistrictExecutionHold('authorization_revoked');
-  return {item,evidence,data,sources,sourceAuthority,policySnapshotSha256:semanticHash({sourceAuthority,optOutSnapshotSha256:optout.sha256,sources:snapshots.sort((a,b)=>a.sourceId.localeCompare(b.sourceId))}),validUntil};
+  return {item,evidence,data,sources,sourceAuthority,optOutSnapshotSha256:optout.sha256,artifactHashes:[...artifactHashes],policyPins,policySnapshotSha256:semanticHash({sourceAuthority,optOutSnapshotSha256:optout.sha256,sources:snapshots.sort((a,b)=>a.sourceId.localeCompare(b.sourceId))}),validUntil};
  }
- private async persist(client:PoolClient,bytes:Buffer,kind:ArtifactKind,sources:SourceReference[],observationId:string,mimeType='application/json'):Promise<CasArtifact>{
+ private async persist(bytes:Buffer,kind:ArtifactKind,sources:SourceReference[],observationId:string,mimeType='application/json'):Promise<CasArtifact>{
   const hash=digest(bytes),storageKey=`sha256/${hash.slice(0,2)}/${hash}`;
   await initializeManagedAcquisitionLane(this.cas.root,{...this.context.policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
   const artifact=await withManagedSourceWrite(this.cas.root,sources.map(source=>({kind:'prepared_source' as const,relativePath:storageKey,contentSha256:hash,sourceSha256:source.sha256,url:source.url,observationId,receiptSha256:source.policyReceiptSha256,independentAllowed:false})),()=>this.cas.put(bytes,{kind,mimeType}),this.context.policyOptions);
-  await client.query(`INSERT INTO district_pipeline.artifacts(sha256,kind,mime_type,byte_length,storage_key) VALUES($1,$2,$3,$4,$5) ON CONFLICT(sha256) DO NOTHING`,[artifact.sha256,artifact.kind,artifact.mimeType,artifact.byteLength,artifact.storageKey]);
-  const row=await client.query<{byte_length:string;storage_key:string;disposition:string}>('SELECT byte_length,storage_key,disposition FROM district_pipeline.artifacts WHERE sha256=$1',[hash]);
-  if(Number(row.rows[0]?.byte_length)!==artifact.byteLength||row.rows[0]?.storage_key!==storageKey||row.rows[0]?.disposition!=='retained')throw new DistrictExecutionHold('policy_excluded');
   return artifact;
+ }
+ private async registerArtifacts(client:PoolClient,artifacts:CasArtifact[]):Promise<void>{
+  for(const artifact of artifacts){
+   await client.query(`INSERT INTO district_pipeline.artifacts(sha256,kind,mime_type,byte_length,storage_key) VALUES($1,$2,$3,$4,$5) ON CONFLICT(sha256) DO NOTHING`,[artifact.sha256,artifact.kind,artifact.mimeType,artifact.byteLength,artifact.storageKey]);
+   const row=await client.query<{byte_length:string;storage_key:string;disposition:string}>('SELECT byte_length,storage_key,disposition FROM district_pipeline.artifacts WHERE sha256=$1',[artifact.sha256]);
+   if(Number(row.rows[0]?.byte_length)!==artifact.byteLength||row.rows[0]?.storage_key!==artifact.storageKey||row.rows[0]?.disposition!=='retained')throw new DistrictExecutionHold('policy_excluded');
+  }
+ }
+ private async currentPolicy(reader:Pool|PoolClient,originalSha256:string,scope:AdapterScope,configured:string|undefined):Promise<{proof_sha256:string;receipt_json:unknown}>{
+  const rows=await reader.query<{proof_sha256:string;receipt_json:unknown}>(`SELECT p.proof_sha256,p.receipt_json FROM district_pipeline.policy_decisions p JOIN district_pipeline.source_snapshots s ON s.id=p.source_snapshot_id JOIN district_pipeline.artifacts a ON a.sha256=p.proof_sha256 AND a.disposition='retained' WHERE p.source_sha256=$1 AND p.state='allowed' AND p.checked_at<=clock_timestamp() AND p.expires_at>clock_timestamp() AND s.publisher_id=$2 AND s.source_id=$3 AND s.municipality_id=$4 AND s.ags=$5 AND s.tenant IS NOT DISTINCT FROM $6 AND s.observation_window=$7 AND ($8::text IS NULL OR p.proof_sha256=$8) ORDER BY p.checked_at DESC,p.proof_sha256 LIMIT 1`,[originalSha256,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,scope.tenant,scope.observationWindow,configured??null]);
+  if(rows.rows.length!==1)throw new DistrictExecutionHold('policy_expired');
+  return rows.rows[0];
+ }
+ /** No managed inventory/CAS reads here: authenticate bytes before taking locks,
+  * then fence their retained hashes and exact policy selection at admission. */
+ private async revalidateEvidence(client:PoolClient,checked:CheckedEvidence,extraHashes:string[]=[]):Promise<void>{
+  const hashes=[...new Set([...checked.artifactHashes,...extraHashes])];
+  const artifacts=await client.query<{sha256:string;disposition:string}>('SELECT sha256,disposition FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
+  if(artifacts.rows.length!==hashes.length||artifacts.rows.some(row=>row.disposition!=='retained'))throw new DistrictExecutionHold('policy_excluded');
+  for(const pin of checked.policyPins){
+   if(this.context.currentAdmissionReceipts?.[pin.originalReceiptSha256]!==pin.configured)throw new DistrictExecutionHold('policy_excluded');
+   const original=await client.query<{state:string;receipt_json:unknown}>('SELECT state,receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1 AND source_sha256=$2',[pin.originalReceiptSha256,pin.originalSha256]);
+   if(original.rows.length!==1||original.rows[0].state!=='allowed'||!same(original.rows[0].receipt_json,pin.original))throw new DistrictExecutionHold('policy_excluded');
+   const current=await this.currentPolicy(client,pin.originalSha256,pin.original.scope,pin.configured);
+   if(current.proof_sha256!==pin.currentReceiptSha256||!same(current.receipt_json,pin.current))throw new DistrictExecutionHold('policy_excluded');
+  }
+  const authority=await assertCivicPolicyAuthority(this.context.policyOptions),optout=await readCivicOptOutSnapshot(this.context.policyOptions);
+  if(!same(authority,checked.sourceAuthority)||optout.authorityId!==authority.authorityId||optout.authoritySha256!==authority.authoritySha256)throw new DistrictExecutionHold('authorization_revoked');
+  if(optout.sha256!==checked.optOutSnapshotSha256)throw new DistrictExecutionHold('policy_excluded');
  }
  private async event(client:PoolClient,row:LeaseRow,state:LeaseState,reason:ReasonCode):Promise<void>{
   await client.query('INSERT INTO district_pipeline.assessment_bridge_events(id,lease_id,state,reason_code) VALUES($1,$2,$3,$4)',[randomUUID(),row.id,state,reason]);
@@ -198,19 +228,45 @@ export class DistrictAssessmentBroker {
   }
   return status(row);
  }
- private async current(client:PoolClient,row:LeaseRow):Promise<{job:JobAuthorityRow;checked:CheckedEvidence}|{reason:ReasonCode}>{
+ /** Initial authority check is short; all authenticated evidence work is unlocked.
+  * The caller MUST use current() after reacquiring authority -> bridge locks. */
+ private async readCurrent(row:LeaseRow):Promise<EvidenceCheck>{
+  try{
+   const snapshot=await this.transaction<{spec:DistrictJobSpec}|{reason:ReasonCode}>(async client=>{
+    const job=await this.job(client,row.job_id,row.run_id),reason=disposition(job,row.run_id,row.fencing_token);
+    if(reason)return {reason};
+    if(row.deadline_at<=job.now||(row.state==='active'&&row.expires_at<=job.now))return {reason:'lease_expired' as const};
+    return {spec:job.spec};
+   });
+   if('reason' in snapshot)return {reason:snapshot.reason};
+   return {checked:await this.checkedEvidence(row.item_sha256,snapshot.spec)};
+  }catch(error){if(error instanceof CivicPolicyStateError)throw error;return {reason:error instanceof DistrictExecutionHold?error.reasonCode:'policy_excluded'};}
+ }
+ private async current(client:PoolClient,row:LeaseRow,evidence:EvidenceCheck):Promise<{job:JobAuthorityRow;checked:CheckedEvidence}|{reason:ReasonCode}>{
   try{
    const job=await this.job(client,row.job_id,row.run_id),reason=disposition(job,row.run_id,row.fencing_token);
    if(reason)return {reason};
    if(row.deadline_at<=job.now||(row.state==='active'&&row.expires_at<=job.now))return {reason:'lease_expired'};
-   const checked=await this.checkedEvidence(client,row.item_sha256,job.spec);
+   if('reason' in evidence)return evidence;
+   const checked=evidence.checked;
    if(checked.sourceAuthority.authorityId!==row.authority_id||checked.sourceAuthority.authoritySha256!==row.authority_sha256)return {reason:'authorization_revoked'};
    if(checked.policySnapshotSha256!==row.policy_snapshot_sha256||assessmentDigest(checked.data)!==row.request_sha256)return {reason:'policy_excluded'};
+   await this.revalidateEvidence(client,checked,[row.request_artifact_sha256]);
    const latest=await this.job(client,row.job_id,row.run_id),latestReason=disposition(latest,row.run_id,row.fencing_token);
    if(latestReason)return {reason:latestReason};
    if(row.deadline_at<=latest.now||(row.state==='active'&&row.expires_at<=latest.now))return {reason:'lease_expired'};
    return {job:latest,checked};
   }catch(error){if(error instanceof CivicPolicyStateError)throw error;return {reason:error instanceof DistrictExecutionHold?error.reasonCode:'policy_excluded'};}
+ }
+ private async preparationAuthority(client:PoolClient,job:ClaimedJob):Promise<LeaseRow[]>{
+  const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);
+  if(reason)throw new DistrictExecutionHold(reason);
+  const resolvedLeases=await assertBSubscriptionResume(client,current.authorization_id,job.id);
+  const intent=await client.query<{lease_id:string}>('SELECT lease_id FROM district_pipeline.assessment_bridge_submission_intents WHERE job_id=$1',[job.id]);
+  if(intent.rows.some(row=>!resolvedLeases.includes(row.lease_id)))throw new DistrictExecutionHold('execution_exception');
+  const existing=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 FOR UPDATE',[job.id]);
+  if(existing.rows.some(row=>row.fencing_token===job.fencingToken||row.claimed_at!==null&&!resolvedLeases.includes(row.id)))throw new DistrictExecutionHold('execution_exception');
+  return existing.rows;
  }
  async prepare(job:ClaimedJob,signal:AbortSignal):Promise<string>{
   signal.throwIfAborted();
@@ -218,26 +274,22 @@ export class DistrictAssessmentBroker {
   // Fixture mode exercises private protocol/storage only, never native provider execution.
   if(this.fixtureProtocol&&selector.transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
   if(job.spec.step!==ASSESSMENT_B_STEP||job.spec.lane!=='assessment'||job.spec.semanticContractSha256!==await assessmentBJobContract()||canonicalJobIdentity(job.spec).jobKey!==job.jobKey||selector.transport==='vm-omp'&&selector.runnerOutputContractSha256!==await ompRunnerOutputContractSha256())throw new DistrictExecutionHold('quality_failed');
+  await this.transaction(client=>this.preparationAuthority(client,job));
+  const checked=await this.checkedEvidence(selector.itemArtifactSha256,job.spec);
+  signal.throwIfAborted();
+  const request=await this.persist(Buffer.from(canonicalJson(checked.data)),'derived',checked.sources,job.jobKey);
+  const clientContractSha256=selector.transport==='mac-bridge'?selector.clientContractSha256:selector.runnerOutputContractSha256;
   return this.transaction(async client=>{
-   const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);
-   if(reason)throw new DistrictExecutionHold(reason);
-   const resolvedLeases=await assertBSubscriptionResume(client,current.authorization_id,job.id);
-   const intent=await client.query<{lease_id:string}>('SELECT lease_id FROM district_pipeline.assessment_bridge_submission_intents WHERE job_id=$1',[job.id]);
-   if(intent.rows.some(row=>!resolvedLeases.includes(row.lease_id)))throw new DistrictExecutionHold('execution_exception');
-   const existing=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 FOR UPDATE',[job.id]);
-   if(existing.rows.some(row=>row.fencing_token===job.fencingToken||row.claimed_at!==null&&!resolvedLeases.includes(row.id)))throw new DistrictExecutionHold('execution_exception');
-   // Only an explicitly resumed/newly authorized queue attempt may replace an
-   // unexposed lease. Preserve its historical hold; never reset or erase it.
-   for(const prior of existing.rows)if(prior.state==='ready'||prior.state==='active')await this.hold(client,prior,'lease_lost');
-   const checked=await this.checkedEvidence(client,selector.itemArtifactSha256,job.spec);
-   signal.throwIfAborted();
-   const request=await this.persist(client,Buffer.from(canonicalJson(checked.data)),'derived',checked.sources,job.jobKey);
-   const id=randomUUID(),deadline=new Date(Math.min(hardDeadline(current),checked.validUntil,current.now.getTime()+BRIDGE_LIMITS.maxLeaseMs));
-   const clientContractSha256=selector.transport==='mac-bridge'?selector.clientContractSha256:selector.runnerOutputContractSha256;
+   const existing=await this.preparationAuthority(client,job);
+   await this.revalidateEvidence(client,checked);
+   await this.registerArtifacts(client,[request]);
+   // Only a newly authorized attempt may replace an unexposed lease; retain history.
+   for(const prior of existing)if(prior.state==='ready'||prior.state==='active')await this.hold(client,prior,'lease_lost');
    const binding={jobKey:job.jobKey,authorityId:checked.sourceAuthority.authorityId,authoritySha256:checked.sourceAuthority.authoritySha256,policySnapshotSha256:checked.policySnapshotSha256,role:'B' as const,provider:'anthropic-subscription' as const,requestedModel:'claude-haiku-5-5' as const,system:PROMPTS.B,data:checked.data,outputSchema:z.toJSONSchema(assessmentOutputSchema),clientContractSha256};
    const inputSha256=bridgeInputHash(binding);
    const latest=await this.job(client,job.id,job.runId),latestReason=disposition(latest,job.runId,job.fencingToken);
    if(latestReason)throw new DistrictExecutionHold(latestReason);
+   const id=randomUUID(),deadline=new Date(Math.min(hardDeadline(latest),checked.validUntil,latest.now.getTime()+BRIDGE_LIMITS.maxLeaseMs));
    if(deadline<=latest.now)throw new DistrictExecutionHold('lease_expired');
    signal.throwIfAborted();
    await client.query(`INSERT INTO district_pipeline.assessment_bridge_leases(id,job_id,run_id,fencing_token,item_sha256,request_artifact_sha256,request_sha256,input_sha256,authority_id,authority_sha256,policy_snapshot_sha256,client_contract_sha256,role,provider,requested_model,state,deadline_at,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'B','anthropic-subscription','claude-haiku-5-5','ready',$13,$13)`,[id,job.id,job.runId,job.fencingToken,selector.itemArtifactSha256,request.sha256,assessmentDigest(checked.data),inputSha256,binding.authorityId,binding.authoritySha256,checked.policySnapshotSha256,clientContractSha256,deadline]);
@@ -254,11 +306,20 @@ export class DistrictAssessmentBroker {
  }
  async dispatch(input:unknown):Promise<BridgeLease|BridgeStatus>{
   const request=BridgeRequestSchema.parse(input);
+  const located=await this.pool.query<LeaseRow>(request.operation==='claim'?'SELECT b.* FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 ORDER BY b.created_at DESC,b.id DESC LIMIT 1':'SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[request.operation==='claim'?request.jobKey:request.leaseId]);
+  if(located.rows.length!==1)throw new DistrictExecutionHold('dependency_uncommitted');
+  const identity=located.rows[0];
+  await this.transaction(async client=>{
+   const authority=await this.job(client,identity.job_id,identity.run_id);
+   if(AssessmentBSelectorSchema.parse(authority.spec.selector).transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
+   if(request.operation==='claim'&&request.clientContractSha256!==identity.client_contract_sha256)throw new DistrictExecutionHold('isolation_unavailable');
+   if(request.operation!=='claim'&&request.inputSha256!==identity.input_sha256)throw new DistrictExecutionHold('quality_failed');
+  });
+  const evidence:EvidenceCheck=identity.state==='ready'||identity.state==='active'||request.operation==='abandon'?await this.readCurrent(identity):{reason:'lease_lost'};
+  const receivedAt=(await this.pool.query<{now:Date}>('SELECT clock_timestamp() AS now')).rows[0].now;
+  const staged=request.operation==='submit'&&identity.state==='active'&&'checked' in evidence?await this.stageSubmission(identity,request,evidence.checked,receivedAt):undefined;
   return this.transaction(async client=>{
-   // Locate without locking first, then acquire authority rows before the lease.
-   const located=await client.query<LeaseRow>(request.operation==='claim'?'SELECT b.* FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 ORDER BY b.created_at DESC,b.id DESC LIMIT 1':'SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[request.operation==='claim'?request.jobKey:request.leaseId]);
-   if(located.rows.length!==1)throw new DistrictExecutionHold('dependency_uncommitted');
-   const identity=located.rows[0];
+   // Slow evidence and managed writes above never retain authority row locks.
    const authority=await this.job(client,identity.job_id,identity.run_id),selector=AssessmentBSelectorSchema.parse(authority.spec.selector);
    if(selector.transport!=='mac-bridge')throw new DistrictExecutionHold('isolation_unavailable');
    const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[identity.id]);
@@ -267,7 +328,7 @@ export class DistrictAssessmentBroker {
    if(request.operation==='claim'){
     if(request.clientContractSha256!==row.client_contract_sha256)throw new DistrictExecutionHold('isolation_unavailable');
     if(row.state!=='ready')return status(row); // Never retransmit evidence after a recorded intent.
-    const current=await this.current(client,row);if('reason' in current)return this.hold(client,row,current.reason);
+    const current=await this.current(client,row,evidence);if('reason' in current)return this.hold(client,row,current.reason);
     const now=current.job.now,expires=new Date(Math.min(now.getTime()+BRIDGE_LIMITS.leaseMs,row.deadline_at.getTime()));
     const lease=BridgeLeaseSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,leaseId:row.id,jobKey:request.jobKey,inputSha256:row.input_sha256,authorityId:row.authority_id,authoritySha256:row.authority_sha256,policySnapshotSha256:row.policy_snapshot_sha256,expiresAt:expires.toISOString(),role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',system:PROMPTS.B,data:current.checked.data,outputSchema:z.toJSONSchema(assessmentOutputSchema),clientContractSha256:row.client_contract_sha256});
     const intentSha256=semanticHash({version:ASSESSMENT_BRIDGE_VERSION,leaseId:row.id,jobKey:request.jobKey,runId:row.run_id,fencingToken:row.fencing_token,inputSha256:row.input_sha256,clientId:request.clientId,provider:lease.provider,model:lease.requestedModel});
@@ -277,10 +338,9 @@ export class DistrictAssessmentBroker {
     return lease;
    }
    if(request.inputSha256!==row.input_sha256)throw new DistrictExecutionHold('quality_failed');
-   const clock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now'),receivedAt=clock.rows[0].now;
    if(request.operation==='abandon'){
     await this.acknowledgePurge(client,row,request.purgeAck,receivedAt);
-    const current=await this.current(client,row);
+    const current=await this.current(client,row,evidence);
     const reason='reason' in current?current.reason:request.reason==='lease_expired'?'lease_expired':request.reason==='authority_changed'?'authorization_revoked':'execution_exception';
     return this.hold(client,row,reason);
    }
@@ -291,26 +351,32 @@ export class DistrictAssessmentBroker {
    }
    if(request.operation==='submit')await this.acknowledgePurge(client,row,request.purgeAck,receivedAt);
    if(row.state!=='active')return status(row);
-   const current=await this.current(client,row);if('reason' in current)return this.hold(client,row,current.reason);
+   const current=await this.current(client,row,evidence);if('reason' in current)return this.hold(client,row,current.reason);
    if(request.operation==='check'){
     const expiry=new Date(Math.min(Date.now()+BRIDGE_LIMITS.leaseMs,row.deadline_at.getTime(),hardDeadline(current.job),current.checked.validUntil));
     await client.query('UPDATE district_pipeline.assessment_bridge_leases SET expires_at=$2,last_checked_at=clock_timestamp() WHERE id=$1',[row.id,expiry]);row.expires_at=expiry;return status(row);
    }
-   return this.submit(client,row,request,current.checked,receivedAt);
+   if(!staged)return this.hold(client,row,'quality_failed');
+   return this.submit(client,row,request,current.checked,staged);
   });
  }
- private async submit(client:PoolClient,row:LeaseRow,request:Extract<BridgeRequest,{operation:'submit'}>,checked:CheckedEvidence,receivedAt:Date):Promise<BridgeStatus>{
+ private async stageSubmission(row:LeaseRow,request:Extract<BridgeRequest,{operation:'submit'}>,checked:CheckedEvidence,receivedAt:Date):Promise<StagedSubmission>{
   const raw=BridgeAnswerSchema.parse(request.answer);
-  if(Date.parse(request.purgeAck.completedAt)<Date.parse(raw.finishedAt))return this.hold(client,row,'quality_failed');
-  const response=await this.persist(client,Buffer.from(raw.stdout),'provider_response',checked.sources,row.id,'application/x-ndjson');
+  const response=await this.persist(Buffer.from(raw.stdout),'provider_response',checked.sources,row.id,'application/x-ndjson');
   let parsed:RecordedBridgeAssessment|undefined;
   try{parsed=assessmentBridgeReceipt(checked.item,checked.evidence,checked.data,raw,{claimedAt:row.claimed_at!.toISOString(),deadlineAt:row.expires_at.toISOString(),receivedAt:receivedAt.toISOString()});}catch{/* Rejected execution is preserved, never converted into a fake assessment. */}
-  const answer=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-bridge-answer-v1',inputSha256:row.input_sha256,providerResponseArtifactSha256:response.sha256,evidence:raw.evidence,startedAt:raw.startedAt,finishedAt:raw.finishedAt,answer:parsed?.answer??null})),'derived',checked.sources,row.id);
-  const receipt=parsed?await this.persist(client,Buffer.from(canonicalJson(parsed.receipt)),'receipt',checked.sources,row.id):null;
-  const reconciliation=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-bridge-reconciliation-input-v1',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:receipt?.sha256??null,B:parsed?.receipt??null,deterministicIssues:parsed?.receipt.deterministicIssues??null,disposition:parsed?'assessment_recorded':'held_execution',providerResponseArtifactSha256:response.sha256})),'derived',checked.sources,row.id);
-  // Recheck after CAS writes: revocation/expiry during persistence cannot commit accepted effects.
-  const final=await this.current(client,row);
-  const accepted=parsed!==undefined&&!('reason' in final),reason:ReasonCode='reason' in final?final.reason:accepted?'completed':'quality_failed';
+  const answer=await this.persist(Buffer.from(canonicalJson({version:'assessment-bridge-answer-v1',inputSha256:row.input_sha256,providerResponseArtifactSha256:response.sha256,evidence:raw.evidence,startedAt:raw.startedAt,finishedAt:raw.finishedAt,answer:parsed?.answer??null})),'derived',checked.sources,row.id);
+  const receipt=parsed?await this.persist(Buffer.from(canonicalJson(parsed.receipt)),'receipt',checked.sources,row.id):null;
+  const reconciliation=await this.persist(Buffer.from(canonicalJson({version:'assessment-bridge-reconciliation-input-v1',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:receipt?.sha256??null,B:parsed?.receipt??null,deterministicIssues:parsed?.receipt.deterministicIssues??null,disposition:parsed?'assessment_recorded':'held_execution',providerResponseArtifactSha256:response.sha256})),'derived',checked.sources,row.id);
+  return {response,answer,receipt,reconciliation,parsed};
+ }
+ private async submit(client:PoolClient,row:LeaseRow,request:Extract<BridgeRequest,{operation:'submit'}>,checked:CheckedEvidence,staged:StagedSubmission):Promise<BridgeStatus>{
+  if(Date.parse(request.purgeAck.completedAt)<Date.parse(request.answer.finishedAt))return this.hold(client,row,'quality_failed');
+  const {response,answer,receipt,reconciliation,parsed}=staged;
+  const final=await this.current(client,row,{checked});
+  if('reason' in final)return this.hold(client,row,final.reason);
+  await this.registerArtifacts(client,[response,answer,...receipt?[receipt]:[],reconciliation]);
+  const accepted=parsed!==undefined,reason:ReasonCode=accepted?'completed':'quality_failed';
   await client.query(`INSERT INTO district_pipeline.assessment_bridge_submissions(lease_id,submission_sha256,provider_response_sha256,answer_artifact_sha256,receipt_artifact_sha256,reconciliation_input_sha256,provider_request_id,provider_response_id,state,reason_code) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[row.id,semanticHash(request),response.sha256,answer.sha256,accepted?receipt!.sha256:null,reconciliation.sha256,parsed?.providerRequestId??null,parsed?.providerResponseId??null,accepted?'accepted':'rejected',reason]);
   if(!accepted)return this.hold(client,row,reason);
   await client.query(`UPDATE district_pipeline.assessment_bridge_leases SET state='submitted',reason_code='completed',receipt_sha256=$2 WHERE id=$1`,[row.id,receipt!.sha256]);row.state='submitted';row.receipt_sha256=receipt!.sha256;await this.event(client,row,'submitted','completed');
@@ -323,12 +389,22 @@ export class DistrictAssessmentBroker {
    await this.prepare(job,signal);
    for(;;){
     signal.throwIfAborted();
+    const snapshot=(await this.pool.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 AND run_id=$2 AND fencing_token=$3',[job.id,job.runId,job.fencingToken])).rows[0];
+    if(!snapshot)throw new DistrictExecutionHold('lease_lost');
+    const evidence=await this.readCurrent(snapshot);
+    let completion:{saved:SubmissionRow;receipt:AssessmentReceipt}|undefined;
+    if(snapshot.state==='submitted'&&'checked' in evidence){
+     const saved=(await this.pool.query<SubmissionRow>('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[snapshot.id])).rows[0];
+     if(!saved||saved.state!=='accepted'||!saved.receipt_artifact_sha256||!snapshot.purge_ack_sha256)throw new DistrictExecutionHold('quality_failed');
+     const receipt=validateReceipt(JSON.parse((await this.cas.read(saved.receipt_artifact_sha256)).toString('utf8')),evidence.checked.item,'B');
+     completion={saved,receipt};
+    }
     const result=await this.transaction(async client=>{
      await this.job(client,job.id,job.runId);
      const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 AND run_id=$2 AND fencing_token=$3 FOR UPDATE',[job.id,job.runId,job.fencingToken]),row=found.rows[0];
      if(!row)throw new DistrictExecutionHold('lease_lost');
      if(row.run_id!==job.runId||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
-     const checked=await this.current(client,row);
+     const checked=await this.current(client,row,evidence);
      if('reason' in checked&&row.state!=='submitted')await this.hold(client,row,checked.reason);
      if(row.state==='ready'||row.state==='active')return null;
      if(row.state!=='submitted')return {outcome:'held_execution' as const,reasonCode:row.reason_code??'execution_exception'};
@@ -336,7 +412,9 @@ export class DistrictAssessmentBroker {
      const submission=await client.query<SubmissionRow>('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[row.id]),saved=submission.rows[0];
      const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
      if(!saved||saved.state!=='accepted'||!saved.receipt_artifact_sha256||selector.transport==='mac-bridge'&&!row.purge_ack_sha256)throw new DistrictExecutionHold('quality_failed');
-     const receipt=validateReceipt(JSON.parse((await this.cas.read(saved.receipt_artifact_sha256)).toString('utf8')),checked.checked.item,'B');
+     if(!completion)return null; // Submission committed while the unlocked read was in flight.
+     if(!same(saved,completion.saved))throw new DistrictExecutionHold('quality_failed');
+     const receipt=completion.receipt;
      if(receipt.requestSha256!==row.request_sha256||receipt.provider!=='anthropic-subscription'||receipt.dependencies.length)throw new DistrictExecutionHold('quality_failed');
      const hashes=[row.request_artifact_sha256,saved.provider_response_sha256,saved.answer_artifact_sha256,saved.receipt_artifact_sha256,saved.reconciliation_input_sha256];
      const artifacts=await client.query<{sha256:string;kind:ArtifactKind;mime_type:string;byte_length:string;storage_key:string;disposition:string}>('SELECT * FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
@@ -358,12 +436,15 @@ export class DistrictAssessmentBroker {
    const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
    if(selector.transport!=='vm-omp'||selector.runnerOutputContractSha256!==await ompRunnerOutputContractSha256())throw new DistrictExecutionHold('quality_failed');
    leaseId=await this.prepare(job,signal);
+   const initial=(await this.pool.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0];
+   if(!initial)throw new DistrictExecutionHold('lease_lost');
+   const initialEvidence=await this.readCurrent(initial);
    const prepared=await this.transaction(async client=>{
     const authority=await this.job(client,job.id,job.runId),reason=disposition(authority,job.runId,job.fencingToken);
     if(reason)throw new DistrictExecutionHold(reason);
     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);
     const row=found.rows[0];if(!row||row.state!=='ready'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
-    const current=await this.current(client,row);if('reason' in current)throw new DistrictExecutionHold(current.reason);
+    const current=await this.current(client,row,initialEvidence);if('reason' in current)throw new DistrictExecutionHold(current.reason);
     const clock=await client.query<{now:Date}>('SELECT clock_timestamp() AS now'),claimedAt=clock.rows[0]!.now;
     if(row.deadline_at<=claimedAt||current.checked.validUntil<=claimedAt.getTime())throw new DistrictExecutionHold('lease_expired');
     const expiresAt=new Date(Math.min(claimedAt.getTime()+BRIDGE_LIMITS.maxLeaseMs,row.deadline_at.getTime(),hardDeadline(current.job),current.checked.validUntil));
@@ -382,12 +463,13 @@ export class DistrictAssessmentBroker {
     authorityId:prepared.checked.sourceAuthority.authorityId,authoritySha256:prepared.checked.sourceAuthority.authoritySha256,
     bindings:prepared.checked.sources.map(source=>({kind:'prepared_source',url:source.url,sourceSha256:source.sha256,observationId:prepared.row.id,receiptSha256:source.policyReceiptSha256})),
    },signal,{beforeHandoff:async()=>{
+    const evidence=await this.readCurrent(prepared.row);
     await this.transaction(async client=>{
      const authority=await this.job(client,job.id,job.runId),authorityReason=disposition(authority,job.runId,job.fencingToken);
      if(authorityReason)throw new DistrictExecutionHold(authorityReason);
      const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
      if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
-     const current=await this.current(client,row);if('reason' in current)throw new DistrictExecutionHold(current.reason);
+     const current=await this.current(client,row,evidence);if('reason' in current)throw new DistrictExecutionHold(current.reason);
     });
    }});}catch(error){
     const reason=assessmentBridgeHoldReason(error);
@@ -401,21 +483,26 @@ export class DistrictAssessmentBroker {
     });
     return {outcome:'held_execution',reasonCode:reason,versions:assessmentBridgeFailureVersions(prepared.row.id,error)};
    }
+   const row=(await this.pool.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0];
+   if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
+   const checked=await this.readCurrent(row);
+   if('reason' in checked)throw new DistrictExecutionHold(checked.reason);
+   const receivedAt=(await this.pool.query<{now:Date}>('SELECT clock_timestamp() AS now')).rows[0]!.now;
+   const receipt=createAssessmentReceipt(checked.checked.item,'B',run.answer,{startedAt:run.startedAt,finishedAt:run.finishedAt},checked.checked.evidence);
+   if(receipt.requestSha256!==row.request_sha256||receipt.schemaSha256!==run.outputSchemaSha256||receipt.dependencies.length||receipt.provider!=='anthropic-subscription'||Date.parse(run.startedAt)<prepared.claimedAt.getTime()||Date.parse(run.finishedAt)>Math.min(row.expires_at.getTime(),receivedAt.getTime()))throw new DistrictExecutionHold('quality_failed');
+    const transport={selector:'anthropic/claude-haiku-5-5',transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'The source-free control prompt includes the exact frozen output schema; stock omp may append generated context, footer, date, or cwd material despite this pinned file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,outputSchemaSha256:run.outputSchemaSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256};
+   const response=await this.persist(Buffer.from(run.stdout),'provider_response',checked.checked.sources,row.id,'application/x-ndjson');
+   const answer=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v1',inputSha256:row.input_sha256,responseArtifactSha256:response.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived',checked.checked.sources,row.id);
+   const savedReceipt=await this.persist(Buffer.from(canonicalJson(receipt)),'receipt',checked.checked.sources,row.id);
+   const reconciliation=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-reconciliation-v1',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:savedReceipt.sha256,B:receipt,deterministicIssues:receipt.deterministicIssues,disposition:'assessment_recorded',providerResponseArtifactSha256:response.sha256,transport})),'derived',checked.checked.sources,row.id);
+   signal.throwIfAborted();
    const result=await this.transaction(async client=>{
+    await this.job(client,job.id,job.runId);
     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
     if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
-    const checked=await this.current(client,row);
-    if('reason' in checked){await this.hold(client,row,checked.reason);return {outcome:'held_execution' as const,reasonCode:checked.reason};}
-    const receivedAt=(await client.query<{now:Date}>('SELECT clock_timestamp() AS now')).rows[0]!.now;
-    const receipt=createAssessmentReceipt(checked.checked.item,'B',run.answer,{startedAt:run.startedAt,finishedAt:run.finishedAt},checked.checked.evidence);
-    if(receipt.requestSha256!==row.request_sha256||receipt.schemaSha256!==run.outputSchemaSha256||receipt.dependencies.length||receipt.provider!=='anthropic-subscription'||Date.parse(run.startedAt)<prepared.claimedAt.getTime()||Date.parse(run.finishedAt)>Math.min(row.expires_at.getTime(),receivedAt.getTime()))throw new DistrictExecutionHold('quality_failed');
-    const transport={selector:'anthropic/claude-haiku-5-5',transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'The source-free control prompt includes the exact frozen output schema; stock omp may append generated context, footer, date, or cwd material despite this pinned file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,outputSchemaSha256:run.outputSchemaSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256};
-    const response=await this.persist(client,Buffer.from(run.stdout),'provider_response',checked.checked.sources,row.id,'application/x-ndjson');
-    const answer=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v1',inputSha256:row.input_sha256,responseArtifactSha256:response.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived',checked.checked.sources,row.id);
-    const savedReceipt=await this.persist(client,Buffer.from(canonicalJson(receipt)),'receipt',checked.checked.sources,row.id);
-    const reconciliation=await this.persist(client,Buffer.from(canonicalJson({version:'assessment-vm-omp-reconciliation-v1',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:savedReceipt.sha256,B:receipt,deterministicIssues:receipt.deterministicIssues,disposition:'assessment_recorded',providerResponseArtifactSha256:response.sha256,transport})),'derived',checked.checked.sources,row.id);
-    const final=await this.current(client,row);
+    const final=await this.current(client,row,checked);
     if('reason' in final){await this.hold(client,row,final.reason);return {outcome:'held_execution' as const,reasonCode:final.reason};}
+    await this.registerArtifacts(client,[response,answer,savedReceipt,reconciliation]);
     await client.query(`INSERT INTO district_pipeline.assessment_bridge_submissions(lease_id,submission_sha256,provider_response_sha256,answer_artifact_sha256,receipt_artifact_sha256,reconciliation_input_sha256,provider_request_id,provider_response_id,state,reason_code) VALUES($1,$2,$3,$4,$5,$6,NULL,NULL,'accepted','completed')`,[row.id,semanticHash({leaseId:row.id,inputSha256:row.input_sha256,responseSha256:run.answer.responseSha256}),response.sha256,answer.sha256,savedReceipt.sha256,reconciliation.sha256]);
     await client.query(`UPDATE district_pipeline.assessment_bridge_leases SET state='submitted',reason_code='completed',receipt_sha256=$2 WHERE id=$1`,[row.id,savedReceipt.sha256]);
     row.state='submitted';row.receipt_sha256=savedReceipt.sha256;await this.event(client,row,'submitted','completed');

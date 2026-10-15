@@ -677,6 +677,41 @@ Static B incident analysis (lead-reported receipt `0bafd47c-7de8-4980-bd99-59604
 
 This change updates B's job/output fingerprints and the **omp-b runner review hash**; the privileged lead must reissue the review and enqueue fresh B jobs. It does not rebuild the image, replace either pinned binary, change a prompt/output schema, parser contract, residual preparation/extraction contract, A/C assessment-queue contract or policy-refresh contract. No credentials, production authority/CAS/DB, Docker daemon or model calls are used by the static analysis or synthetic tests.
 
+**B broker heartbeat safety:** authenticated evidence reads, managed-CAS writes,
+and submitted receipt reads run **outside** authority-row-lock transactions.
+Short admission transactions still acquire run → approval → job → bridge lease
+locks in that order. Before committing ready/active/accepted effects, they fence
+the current job owner/token, approval and deadlines, retained input/request/output
+hashes, exact original/current policy receipts and scoped latest-policy selection,
+and the fresh authority/opt-out snapshot against the authenticated evidence pins.
+Source bindings and managed readability are not bypassed; staged bytes remain in
+the governed CAS, and a changed fence/policy cannot admit their metadata or an
+accepted submission. Submission intent still commits before any evidence handoff.
+There is no lost-ownership retry, timeout/lease extension, history reset, provider
+fallback or change to subscription accounting/usage-limit holds.
+
+The production `bc6c6b45-7a21-426a-9b5c-c93b7d7777ae` B job had three
+`lease_lost` receipts at approximately 20 seconds and no bridge lease/intents.
+An earlier B attempt reached ready at +19.791 seconds. **[INFERENCE]** Holding
+the executor-run row across slow evidence work self-starved the first executor
+heartbeat: it starts after 10 seconds and its blocked SQL has a 10-second
+statement timeout. Historical receipts do not retain the underlying SQL error,
+so they do not directly prove SQLSTATE `57014`. The isolated real-PostgreSQL
+regression delays actual authenticated reads, managed writes and final receipt
+reads for 1.1 seconds with a 400 ms statement timeout and 1.8-second executor
+lease; real committed heartbeats must advance during those delays and the job
+must complete without `lease_lost`. Additional interleavings withdraw policy,
+publish a newer genuine policy receipt or exclude an artifact after unlocked IO,
+and require no stale ready/handoff/accepted effects.
+
+This broker-only cutover advances **assessment B's job contract**: enqueue and
+authorize fresh B jobs against it; do not reuse old semantic job keys or reset
+ambiguous submission intents. It does **not** change the omp runner security or
+output contract/review hash, container image/binaries, prompts/output schema,
+parser contract, residual preparation/extraction, A/C assessment queue or policy
+refresh contracts. Their existing review/authorization requirements remain.
+
+
 Content-free diagnosis on 2026-10-15: production receipt `26ed32c1-d2a4-4635-9dc7-3e1464378e04` records council `residual_prepare`, `held_execution` / `execution_exception`, 01:06:17.368–01:07:50.119Z (92.751 s). It contains no original exception code, so it cannot uniquely prove BUSY retrospectively. Code analysis establishes that `persistOperatorRegistry` initializes/reconciles the CAS under the shared inventory lock before authorization, and parser scratch admission reconciles its lane under that same lock. An offline copy held 201,711 logical entries, 2,093 leases, 180 roots and 752 segments (347,778,214 bytes). On CPUs 4–5/nice 10, cold segment warming outside the lock took 17.692 s; warm locked load 0.671 s, CAS reconciliation 1.398 s, and copied-state save 0.142 s. The all-root reconciliation loop used by purge/recovery took 9.694 s, hashing 1,175 files / 631,518,324 bytes (metadata decoding is additional); that loop alone exceeds the old five-second waiter deadline. These are offline component measurements, not exact historical production lock durations or proof that purge ran during the incident.
 
 The first CAS listing had 240 files / 38,337,089 bytes; a later private CAS copy had 242 admitted hash watermarks. First/new-code reconciliation took 1.413 s, repeated metadata-only passes 0.584 and 0.178 s. Inventory and live-root copies were not an atomic snapshot while other workers continued: added CAS members correctly made reconciliation incomplete against the older copied inventory. Measurements retained that failure rather than blessing the extra files. All production reads were lock-free/read-only, all saves and marker rewrites were confined to private benchmark copies, and temporary copies/instrumentation were removed. This does not claim an end-to-end production speedup, a complete root audit or new processing authorization.
