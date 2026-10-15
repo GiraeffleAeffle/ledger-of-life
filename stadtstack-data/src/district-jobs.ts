@@ -716,7 +716,7 @@ export const artifactVerificationHandler:JobHandler=async ({job,signal,cas})=>{
  * No handler name is interpreted as a shell command or import path.
  * DATABASE_URL is read only by the runner; it is never logged or passed as context.
  */
-export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<void> {
+export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<ExecutorResult|undefined> {
   const [command,...args]=argv;
   if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH]');
   const flags:Record<string,string|true>={};
@@ -737,6 +737,7 @@ export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHand
     if(mode==='attended'){process.stdin.on('end',stop);process.stdin.on('close',stop);process.stdin.resume();}
     const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})}});
     process.stdout.write(JSON.stringify(result)+'\n');if(result.state==='held')process.exitCode=2;
+    return result;
   } finally {
     process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);process.removeListener('SIGHUP',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
   }

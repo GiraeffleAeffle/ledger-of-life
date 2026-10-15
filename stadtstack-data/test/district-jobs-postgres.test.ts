@@ -8,12 +8,13 @@ import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,runDistrictJobsCli,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
 import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
 import {pipelineNotificationConfig,sendPipelineNotification} from '../src/district-notifications.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import {reportR1ExecutorFailure} from '../src/district-r1.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
 // Run: DISTRICT_TEST_DATABASE_URL=postgresql://localhost/postgres node --experimental-strip-types --test test/district-jobs-postgres.test.ts
@@ -501,6 +502,30 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       assert.equal(result.state,'held');assert.equal(result.reasonCode,'paid_not_authorized');
       const persisted=await pool.query<{outcome:string}>(`SELECT outcome FROM district_pipeline.step_receipts WHERE run_id=$1`,[result.runId]);
       assert.equal(persisted.rows[0].outcome,'held_execution');
+    }
+  });
+
+  await t.test('a normally returned held CLI result retains JSON stdout, exit 2 and R1 execution stderr',async st=>{
+    const key=await store.enqueue(jobSpec('cli-held-result')),approval=digest('cli-approved-notification-route'),destination=digest('cli-approved-destination'),provider='ntfy';
+    const authorizationId=await authorize([key],{mode:'bounded_unattended',notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:provider});
+    const previousUrl=process.env.DATABASE_URL,previousExit=process.exitCode;let stdout='',stderr='';
+    process.env.DATABASE_URL=isolated.href;
+    st.mock.method(process.stdout,'write',(chunk:string|Uint8Array)=>{stdout+=String(chunk);return true;});
+    st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+    try{
+      const result=await runDistrictJobsCli({verify_artifacts:async()=>({outcome:'held_execution',reasonCode:'execution_exception'})},['run','--authorization-id',authorizationId,'--max-jobs','1','--max-seconds','60','--mode','bounded_unattended','--cas-root',cas.root],{
+        notificationApprovalSha256:approval,destinationSha256:destination,provider,
+        notifyOwner:async notification=>({provider,messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:destination,acknowledgedAt:new Date().toISOString()}),
+      });
+      assert.ok(result);assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');
+      reportR1ExecutorFailure(result);
+      assert.equal(stdout,JSON.stringify(result)+'\n');assert.equal(process.exitCode,2);
+      assert.equal(stderr,'R1_FAILURE phase=execution code=execution_exception\n');
+      const committed=await pool.query("SELECT r.receipt->>'reasonCode' AS reason FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1",[key]);
+      assert.equal(committed.rows[0].reason,'execution_exception');
+      stderr='';reportR1ExecutorFailure({...result,state:'completed',reasonCode:'completed'});reportR1ExecutorFailure(undefined);assert.equal(stderr,'');
+    }finally{
+      st.mock.restoreAll();process.exitCode=previousExit;if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
     }
   });
 

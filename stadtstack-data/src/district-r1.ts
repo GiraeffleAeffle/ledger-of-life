@@ -9,7 +9,7 @@ import {z} from 'zod';
 import {DistrictCas} from './district-cas.ts';
 import type {CasArtifact} from './district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,runDistrictJobsCli,migrateDistrictJobs,R1_MUNICIPALITIES,insertR1MetadataSnapshot} from './district-jobs.ts';
-import type {JobHandler,DistrictJobSpec} from './district-jobs.ts';
+import type {JobHandler,DistrictJobSpec,ExecutorResult} from './district-jobs.ts';
 import {canonicalJson,digest,semanticHash,ScopeSchema,HashSchema} from './district-adapter-contract.ts';
 import type {AdapterScope} from './district-adapter-contract.ts';
 import {districtRegistrySchema} from './district-registry.ts';
@@ -416,6 +416,9 @@ export function formatR1Failure(error:unknown,phase:R1FailurePhase):string{
  const code=/^[A-Za-z][A-Za-z0-9_]{0,95}$/.test(candidate)?candidate:'R1_COMMAND_FAILED';
  return `R1_FAILURE phase=${phase} code=${code}\n`;
 }
+export function reportR1ExecutorFailure(result:ExecutorResult|undefined):void{
+ if(result?.state==='held')process.stderr.write(formatR1Failure(new DistrictExecutionHold(result.reasonCode),'execution'));
+}
 export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1FailurePhase}={phase:'startup'}){
  context.phase='startup';
  const [command,...rawArgs]=argv;
@@ -449,7 +452,8 @@ export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1
    if(authorization.rows[0]?.has_b&&!authorization.rows[0]?.only_b)throw new DistrictExecutionHold('authorization_mode_mismatch');
    const refreshStore=new DistrictJobStore(pool),refresh=policyRefreshHandler(refreshStore,(context,maxRequests)=>createR1PublicFetcher(refreshStore,context,{maxRequests,maxBytes:1024*1024,registry,registrySha256}));
    context.phase='execution';
-   await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256),admit_acquired_representation:acquiredRepresentationHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   const result=await runDistrictJobsCli({...structuredJobHandlers,...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool),policy_refresh:refresh,acquire_representation:acquisitionHandler(new DistrictJobStore(pool),registry,undefined,registrySha256),admit_acquired_representation:acquiredRepresentationHandler(new DistrictJobStore(pool),registry,undefined,registrySha256)},['run',...args,'--cas-root',CAS_ROOT],pipelineNotificationConfig);
+   reportR1ExecutorFailure(result);
   }finally{await pool.end();}return;
  }
  if(args.length)throw Error('R1 commands require only explicit registry configuration flags and bounded JSON stdin');
