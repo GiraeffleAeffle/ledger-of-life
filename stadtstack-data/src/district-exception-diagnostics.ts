@@ -146,8 +146,13 @@ export const OmpFailureKindSchema=z.enum([
  'provider_error_not_found','provider_error_server','provider_error_network','provider_error_unknown','exception_other',
 ]);
 export type OmpFailureKind=z.infer<typeof OmpFailureKindSchema>;
+export const OmpContainerExitCodeSchema=z.number().int().min(0).max(255);
 export function formatDistrictBFailure(jobKey:string,step:string,receipt:Pick<StepReceipt,'outcome'|'reasonCode'|'versions'>):string|undefined {
  if(step!=='assessment_b'||receipt.outcome!=='held_execution'||!['omp_provider_failed','budget_paused'].includes(receipt.reasonCode)||!/^[a-f0-9]{64}$/.test(jobKey))return;
  const kind=OmpFailureKindSchema.safeParse(receipt.versions.ompFailureKind);
- if(kind.success)return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind.data}\n`;
+ if(kind.success){
+  const raw=receipt.versions.ompContainerExitCode;
+  const exit=typeof raw==='string'&&String(Number(raw))===raw?OmpContainerExitCodeSchema.safeParse(Number(raw)):undefined;
+  return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind.data}${exit?.success?' exit='+exit.data:''}\n`;
+ }
 }

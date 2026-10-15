@@ -1,0 +1,6 @@
+# @oh-my-pi/pi-natives 18.9.2, extracted from the embedded assets of omp/18.9.2.
+# Source image: sha256:91c2c2c451fbc0273b97d25523bab3308b7077edca33efaaf26af923209711df
+# Source executable SHA-256: 647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992
+# baseline: 113621624 bytes; modern: 113529592 bytes.
+a5c48a5718258a55be65410ae036fafb7af8bdf4643f44c83379af5d7a6cf584  pi_natives.linux-x64-baseline.node
+fa537a8c0765dc76e5199aae9dadb99cec9d69d41b3d36a47a032452196cb078  pi_natives.linux-x64-modern.node

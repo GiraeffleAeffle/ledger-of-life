@@ -19,7 +19,7 @@ import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpR
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
-import {OmpFailureKindSchema} from './district-exception-diagnostics.ts';
+import {OmpFailureKindSchema,OmpContainerExitCodeSchema} from './district-exception-diagnostics.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
@@ -34,6 +34,8 @@ export function assessmentBridgeFailureVersions(leaseId:string,error:unknown):Re
  const versions=error.failureProof?bSubscriptionFailureVersions(leaseId,error.noOutput,error.failureProof):{};
  const kind=OmpFailureKindSchema.safeParse(error.failureKind);
  if(kind.success)versions.ompFailureKind=kind.data;
+ const exit=OmpContainerExitCodeSchema.safeParse(error.containerExitCode);
+ if(exit.success)versions.ompContainerExitCode=String(exit.data);
  return versions;
 }
 
@@ -56,7 +58,7 @@ interface StagedSubmission {response:CasArtifact;answer:CasArtifact;receipt:CasA
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
 export async function assessmentBJobContract(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{

@@ -12,7 +12,7 @@ import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
 import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
-import type {OmpFailureKind} from './district-exception-diagnostics.ts';
+import {OmpContainerExitCodeSchema,type OmpFailureKind} from './district-exception-diagnostics.ts';
 export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
@@ -30,7 +30,9 @@ export class OmpRunnerHold extends Error {
  readonly noOutput:boolean;
  readonly failureProof?:OmpLimitFailureProof;
  readonly failureKind?:OmpFailureKind;
- constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;}
+ /** Present only after an actual container completion, never a guessed code. */
+ readonly containerExitCode?:number;
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind,containerExitCode?:number){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;const exit=OmpContainerExitCodeSchema.safeParse(containerExitCode);this.containerExitCode=exit.success?exit.data:undefined;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -121,18 +123,18 @@ function ompProviderFailure(stdout:string):OmpFailureKind|undefined {
  }
  return found;
 }
-function ompProviderHold(stdout:string,fallback:OmpFailureKind):OmpRunnerHold {
- return new OmpRunnerHold('provider_failed',undefined,ompProviderFailure(stdout)??fallback);
+function ompProviderHold(stdout:string,fallback:OmpFailureKind,exitCode:number):OmpRunnerHold {
+ return new OmpRunnerHold('provider_failed',undefined,ompProviderFailure(stdout)??fallback,exitCode);
 }
 export function inspectOmpEvents(stdout:string,exitCode:number){
- if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero');
+ if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero',exitCode);
  if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes||!stdout.endsWith('\n'))throw new OmpRunnerHold('event_stream');
  const lines=stdout.split('\n');lines.pop();if(!lines.length)throw new OmpRunnerHold('event_stream');
  let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0;const assistantMessages=new Map<string,string>();
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
-  if(['length','toolUse','error','aborted','failed'].includes(reason))throw ompProviderHold(stdout,reason==='length'?'stop_length':reason==='error'?'stop_error':'stop_other');
+  if(['length','toolUse','error','aborted','failed'].includes(reason))throw ompProviderHold(stdout,reason==='length'?'stop_length':reason==='error'?'stop_error':'stop_other',exitCode);
   if(message.completedAt!==undefined&&tokenCount(message.completedAt)===undefined)throw new OmpRunnerHold('event_stream');
   const {completedAt:_completedAt,...substantive}=message;
   // The session enriches only the message_end clone with completedAt. Every
@@ -157,18 +159,18 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
   if(['message_start','message_end'].includes(event.type)&&object(event.message).role==='toolResult')throw new OmpRunnerHold('event_stream');
   if(event.type==='message_update'){
    const update=object(event.assistantMessageEvent);
-   if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error');
-   if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other');
+   if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error',exitCode);
+   if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other',exitCode);
    if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))throw new OmpRunnerHold('event_stream');
    if(!OmpTextUpdateSchema.safeParse(update).success)throw new OmpRunnerHold('event_stream');
   }
   if(event.type==='turn_end'){
    rejectAssistant(object(event.message));
-   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason');
+   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason',exitCode);
    if(Array.isArray(event.toolResults)&&event.toolResults.length)throw new OmpRunnerHold('event_stream');
   }
   if(event.type==='agent_end'){
-   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'agent_reason');
+   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'agent_reason',exitCode);
    if(Array.isArray(event.messages))for(const message of event.messages)rejectAssistant(object(message));
   }
   if(event.type==='message_end'){
@@ -196,7 +198,7 @@ export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:st
  const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
  if(!evidence)return null;
  if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
- return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined);
+ return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode);
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
@@ -206,7 +208,7 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  }catch(e){if(e instanceof OmpRunnerHold)throw e;throw new OmpRunnerHold('security_review_required');}
 }
 export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -214,7 +216,7 @@ export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<strin
  * The mixed runner remains semantic for model framing, event decoding and CLI
  * arguments. runVmOmpAssessment still validates the live security contract. */
 export async function ompRunnerOutputContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }

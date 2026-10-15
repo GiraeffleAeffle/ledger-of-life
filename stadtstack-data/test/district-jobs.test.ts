@@ -112,6 +112,8 @@ test('B failure stderr admits exactly a job prefix and one closed kind for a com
  const key=digest('synthetic B diagnostic job'),receipt={outcome:'held_execution' as const,reasonCode:'omp_provider_failed' as const,versions:{ompFailureKind:'exit_nonzero'}};
  for(const kind of OmpFailureKindSchema.options)assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{ompFailureKind:kind}}),`R1_B_FAILURE job=${key.slice(0,12)} kind=${kind}\n`);
  assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,reasonCode:'budget_paused'}),`R1_B_FAILURE job=${key.slice(0,12)} kind=exit_nonzero\n`);
+ for(let exit=0;exit<=255;exit++)assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{...receipt.versions,ompContainerExitCode:String(exit)}}),`R1_B_FAILURE job=${key.slice(0,12)} kind=exit_nonzero exit=${exit}\n`);
+ for(const exit of ['256','-1','1.5','NaN','Infinity','01','+1',' 1','1\nPRIVATE_PROVIDER_ERROR','PRIVATE_TOKEN',''])assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{...receipt.versions,ompContainerExitCode:exit}}),`R1_B_FAILURE job=${key.slice(0,12)} kind=exit_nonzero\n`);
  for(const kind of ['PRIVATE_PROVIDER_ERROR','401 auth failed','exit_nonzero\\nSECRET_TOKEN','provider_error_unauthorized',''])assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{ompFailureKind:kind}}),undefined);
  for(const step of ['assessment_a','assessment_c','assessment_reconcile','assessment_b\\nPRIVATE'])assert.equal(formatDistrictBFailure(key,step,receipt),undefined);
  assert.equal(formatDistrictBFailure('PRIVATE_JOB_KEY','assessment_b',receipt),undefined);
