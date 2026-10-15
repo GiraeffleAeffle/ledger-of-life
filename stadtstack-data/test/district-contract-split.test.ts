@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {canonicalJobIdentity,type DistrictJobSpec} from '../src/district-jobs.ts';
-import {residualJobContract} from '../src/district-residual-jobs.ts';
+import {residualJobContract,residualPreparationContract} from '../src/district-residual-jobs.ts';
 import {preparationExtractorSha256,prepareDocument,verifyPreparedDocument} from '../src/district-prepared-document.ts';
 import {jointExtractionContract} from '../src/district-inference.ts';
 import {assessmentQueueContract} from '../src/district-assessment-jobs.ts';
@@ -24,6 +24,7 @@ const change=(file:string):ContractSourceHash=>async candidate=>candidate===file
 const hostFiles=['civic-opt-out.ts','district-jobs.ts','source-policy.ts','registered-source-policy.ts','district-private-io.ts','district-codex-accounting.ts','district-policy-receipt.ts','district-policy-refresh.ts','district-model-readiness.ts','district-model-usage.ts','district-model-diagnostics.ts','district-corpus.ts','district-crawl-request.ts','district-http-observation.ts','source-observation.ts','document-origin.ts','document-origin-contract.ts','document-origin-rules.ts','civic-docker.ts','district-cas.ts','genesis-owner-credentials.ts','genesis-owner-reuse.ts','district-structured-registry-admission.ts','../sources/district-host-groups.json'];
 const contracts:Record<string,{compute:(hash:ContractSourceHash)=>Promise<unknown>;semantic:string}>={
  residual:{compute:residualJobContract,semantic:'district-residual-jobs.ts'},
+ residualPreparation:{compute:residualPreparationContract,semantic:'district-document.ts'},
  preparation:{compute:preparationExtractorSha256,semantic:'district-document.ts'},
  extraction:{compute:jointExtractionContract,semantic:'district-claims.ts'},
  assessmentQueue:{compute:assessmentQueueContract,semantic:'district-assessment-context.ts'},
@@ -49,6 +50,21 @@ for(const [name,{compute,semantic}] of Object.entries(contracts)){
   assert.notEqual(canonicalJobIdentity(spec(after)).jobKey,key,semantic);
  });
 }
+test('preparation jobs are independent of extraction prompts/model/decoding/chunking and output assembly',async()=>{
+ const preparation=await residualPreparationContract(hash),extraction=await residualJobContract(hash);
+ assert.deepEqual(Object.keys(preparation),['preparationSha256']);
+ for(const file of ['district-model.ts','district-inference.ts','district-answer-cache.ts','district-claims.ts','district-residual-jobs.ts']){
+  const nextPreparation=await residualPreparationContract(change(file)),nextExtraction=await residualJobContract(change(file));
+  assert.deepEqual(nextPreparation,preparation,file);
+  assert.equal(canonicalJobIdentity({...spec(nextPreparation),step:'residual_prepare'}).jobKey,canonicalJobIdentity({...spec(preparation),step:'residual_prepare'}).jobKey,file);
+  assert.notDeepEqual(nextExtraction,extraction,file);
+  assert.notEqual(canonicalJobIdentity({...spec(nextExtraction),step:'residual_extract'}).jobKey,canonicalJobIdentity({...spec(extraction),step:'residual_extract'}).jobKey,file);
+ }
+ for(const file of ['district-document.ts','district-prepared-document.ts','district-parser-worker.py','district-execution-profile.ts']){
+  assert.notDeepEqual(await residualPreparationContract(change(file)),preparation,file);
+  assert.notDeepEqual(await residualJobContract(change(file)),extraction,file);
+ }
+});
 test('security authorization still changes on host-only edits while parser/OMP output identity does not',async()=>{
  for(const file of ['civic-opt-out.ts','civic-docker.ts']){
   assert.notEqual(await parserIsolationContractSha256(hash),await parserIsolationContractSha256(change(file)));

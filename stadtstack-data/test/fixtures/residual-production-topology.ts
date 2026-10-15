@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {readFile,writeFile,mkdir,lstat} from 'node:fs/promises';
+import * as filesystem from 'node:fs/promises';
 import {join,relative,dirname} from 'node:path';
 import {userInfo} from 'node:os';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -16,6 +17,25 @@ import type {ModelAnswer,ModelEvidence} from '../../src/district-model-contract.
 // before loading the real queue-handler dependency graph.
 test('enrolled artifacts CAS survives real preparation/extraction and fixture A/B/C/seal/export',async t=>{
  const {digest:contractDigest,semanticHash}=await import('../../src/district-adapter-contract.ts');
+ let extractionGeneration=0,preparationGeneration=0,toolProbes=0;
+ // Module loading boundary: contract/archive readers see the same explicitly
+ // synthetic source edit; physical checkout bytes are never changed by a test.
+ const contractReadFile=(async(path:Parameters<typeof readFile>[0],options?:Parameters<typeof readFile>[1])=>{
+  const bytes=await readFile(path,options);
+  const generation=path instanceof URL?path.pathname.endsWith('/src/district-model.ts')?extractionGeneration:path.pathname.endsWith('/src/district-document.ts')?preparationGeneration:0:0;
+  if(!generation)return bytes;
+  const suffix='\n// Synthetic topology contract generation '+generation+'\n';
+  return typeof bytes==='string'?bytes+suffix:Buffer.concat([bytes,Buffer.from(suffix)]);
+ }) as typeof readFile;
+ t.mock.module('node:fs/promises',{namedExports:{...filesystem,readFile:contractReadFile}});
+ const claimsModule=await import('../../src/district-claims.ts');
+ let chunkFailure:'oversized'|'unexpected'|undefined;
+ // Deterministic chunk-boundary seam, after genuine predecessor admission:
+ // exercise the real 320,800-UTF-16 limit without altering frozen CAS artifacts.
+ t.mock.module(new URL('../../src/district-claims.ts',import.meta.url),{namedExports:{...claimsModule,documentChunks:(text:string)=>{
+  if(chunkFailure==='unexpected')throw TypeError('Synthetic unexpected chunk implementation failure');
+  return claimsModule.documentChunks(chunkFailure==='oversized'?'x'.repeat(320801):text);
+ }}});
  const sourceHashes=await import('../../src/district-contract-source.ts'),provenance=await import('../../src/district-host-provenance.ts');
  let hostGeneration=0;
  const currentHostHash:typeof sourceHashes.contractSourceHash=async file=>{
@@ -43,7 +63,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
  const parserRoots:string[]=[];
  t.mock.module(new URL('../../src/district-parser-isolation.ts',import.meta.url),{namedExports:{...parser,
   readParserReview:async()=>{await requireFixture();return {...review,runnerSha256:await parser.parserIsolationContractSha256()};},
-  collectParserToolVersions:async(tools:readonly string[])=>{await requireFixture();assert.deepEqual(tools,['node']);return {node:process.versions.node};},
+  collectParserToolVersions:async(tools:readonly string[])=>{await requireFixture();toolProbes++;assert.deepEqual(tools,['node']);return {node:process.versions.node};},
   withParserSandbox:async(artifact:Uint8Array,consume:(sandbox:ParserSandbox)=>Promise<unknown>,context:ParserSourceContext)=>{
    await requireFixture(context);assert.ok(context);parserRoots.push(context.root);
    return civic.withManagedSourceScratch(context.root,context.bindings,async scope=>{
@@ -115,7 +135,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   const bounds={maxDocuments:1 as const,maxChunks:12,maxModelCalls:48,paidMicroUsd:0 as const},manifest={index:{path:indexPath,sha256:indexHash},rawRoot,registry:registry.registryPin,observations:[{path:observationPath,sha256:binding.receiptSha256}],documents:[{documentId:document.id,scope,permission:{kind:'facts_with_attribution' as const},bounds,requestEvidence}]};
   claims=DistrictExtractionClaimsSchema.parse({title:'Strausberg',titleQuote:'Strausberg',summary:text,summaryQuote:text,caseKey:null,caseKeyType:'source_document',caseQuote:null,caseType:'unknown',topics:[],stages:[],locations:[],municipalityQuote:city.name,stage:'adopted',stageQuote:'am 13.10.2026 als Satzung beschlossen',originalStatus:'als Satzung beschlossen',stageDate:'2026-10-13',stageDateQuote:'am 13.10.2026 als Satzung beschlossen',stageDateReason:null,documentDate:'2026-10-13',documentDateQuote:'Stand: 13.10.2026',documentDateReason:null,entities:[],relations:[]});
   const complete=async()=>{const receipt=await civic.recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete',canonicalJson(receipt));const inventory=JSON.parse(await readFile(join(policy.stateDir!,'inventory.json'),'utf8'));assert.equal(inventory.roots.find((entry:{path:string})=>entry.path===cas.root).complete,true);return inventory;};
-  const authorize=(jobKey:string)=>store.authorize({approvalSha256:digest('Synthetic topology authorization '+jobKey),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
+  const authorize=(jobKey:string,phase='initial')=>store.authorize({approvalSha256:digest('Synthetic topology authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
   const run=async(jobKey:string,handlers:Parameters<typeof runDistrictJobs>[0]['handlers'])=>{const result=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(jobKey),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.state,'completed',canonicalJson(result));await complete();return result;};
   await withFixtureAuthorizedCorpus(indexBytes,policy,async()=>{
    const imported=await importCrawlCorpusForResidual(store,cas,manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,1);
@@ -123,14 +143,56 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    const semanticBefore=await residual.residualJobContract();hostGeneration++;
    assert.deepEqual(await residual.residualJobContract(),semanticBefore);
    assert.equal(await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]),preparationKey);
+   extractionGeneration++;
+   assert.notDeepEqual(await residual.residualJobContract(),semanticBefore);
+   assert.equal(await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]),preparationKey,'A queued preparation survives an extraction-only source edit before claim');
    await run(preparationKey,handlers);assert.deepEqual(parserRoots,[cas.root+'-residual-prepared']);await assert.rejects(lstat(join(cas.root,'residual-prepared')),{code:'ENOENT'});
    const inventory=await complete();assert.equal(inventory.roots.find((entry:{path:string})=>entry.path===cas.root+'-residual-prepared').kind,'prepared');
    const preparationReceipt=(await pool.query('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1',[preparationKey])).rows[0].receipt;
    assert.equal(preparationReceipt.versions['hostCode.src/civic-opt-out.ts'],await currentHostHash('civic-opt-out.ts'));
-   const extractionKey=await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparationKey);
-   hostGeneration++;assert.deepEqual(await residual.residualJobContract(),semanticBefore);
-   assert.equal(await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparationKey),extractionKey);
-   await run(extractionKey,handlers);assert.equal(modelCalls,2);assert.ok(sourceModelRoots.every(path=>path.startsWith(cas.root+'-residual-model/')&&!path.startsWith(cas.root+'/')));
+   const frozenPreparationBytes=await Promise.all(preparationReceipt.outputHashes.map((hash:string)=>cas.read(hash)));
+   const priorSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[preparationKey])).rows[0].spec;
+   // Real queue/receipt commits with the historical broad selector shape. This
+   // synthetic fixture reuses actual produced parser artifacts, not invented text
+   // or a fabricated success receipt; no production migration is performed.
+   const oldContract=await residual.residualJobContract(),historicalKey=await store.enqueue({...priorSpec,semanticContractSha256:semanticHash(oldContract),selector:{...priorSpec.selector,contract:oldContract}});
+   const historicalOutputs=(await pool.query('SELECT sha256,byte_length,kind,mime_type,storage_key FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[preparationReceipt.outputHashes])).rows;
+   const historicalPrepare:typeof handlers.residual_prepare=async()=>({outcome:'succeeded',reasonCode:'completed',outputs:historicalOutputs.map(row=>({sha256:row.sha256,byteLength:Number(row.byte_length),kind:row.kind,mimeType:row.mime_type,storageKey:row.storage_key})),versions:preparationReceipt.versions});
+   historicalPrepare.currentPolicy=handlers.residual_prepare.currentPolicy;
+   await run(historicalKey,{...handlers,residual_prepare:historicalPrepare});
+   const historicalReceipt=(await pool.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1',[historicalKey])).rows[0],frozenHistoricalReceipt=canonicalJson(historicalReceipt);
+   const earlierExtraction=await residual.enqueueCommittedResidualExtraction(pool,store,cas,historicalKey);
+   extractionGeneration++;hostGeneration++;
+   assert.notDeepEqual(await residual.residualJobContract(),oldContract);
+   assert.equal(await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]),preparationKey);
+   const extractionKey=await residual.enqueueCommittedResidualExtraction(pool,store,cas,historicalKey);
+   assert.notEqual(extractionKey,earlierExtraction,'Changed extraction semantics create a new extraction, not a new preparation');
+   const extractionSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[extractionKey])).rows[0].spec;
+   assert.equal(extractionSpec.selector.preparationJobKey,historicalKey);
+   assert.equal(extractionSpec.selector.preparationReceiptSha256,historicalReceipt.receipt_sha256);
+   assert.deepEqual(extractionSpec.selector.contract,await residual.residualJobContract());
+   assert.deepEqual(frozenPreparationBytes,await Promise.all(preparationReceipt.outputHashes.map((hash:string)=>cas.read(hash))));
+   assert.equal(canonicalJson((await pool.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1',[historicalKey])).rows[0]),frozenHistoricalReceipt);
+   preparationGeneration++;
+   const changedPreparationKey=await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]);
+   assert.notEqual(changedPreparationKey,preparationKey);
+   await assert.rejects(residual.enqueueCommittedResidualExtraction(pool,store,cas,historicalKey),/preparation semantic contract changed/);
+   preparationGeneration=0;
+   const stalePreparation=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(changedPreparationKey),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(stalePreparation.state,'held');assert.equal(stalePreparation.reasonCode,'execution_exception');assert.equal(parserRoots.length,1);
+   // Consuming frozen prepared text must not probe tools or require a new parser
+   // review. Only the current semantic parser contract is compared offline.
+   const probesBeforeExtraction=toolProbes;
+   chunkFailure='oversized';
+   const budgetRun=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(extractionKey,'chunk-budget'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(budgetRun.state,'held');assert.equal(budgetRun.reasonCode,'quality_failed');await complete();
+   const budgetReceipt=(await pool.query('SELECT receipt FROM district_pipeline.step_receipts WHERE receipt->>\'jobKey\'=$1 ORDER BY attempt DESC LIMIT 1',[extractionKey])).rows[0].receipt;
+   assert.equal(budgetReceipt.outcome,'held_quality');assert.equal(budgetReceipt.reasonCode,'quality_failed');assert.equal(modelCalls,0);
+   await store.resume(extractionKey);chunkFailure='unexpected';
+   const unexpectedChunk=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(extractionKey,'unexpected-chunk-failure'),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+   assert.equal(unexpectedChunk.state,'held');assert.equal(unexpectedChunk.reasonCode,'execution_exception');assert.equal(modelCalls,0);
+   await store.resume(extractionKey);chunkFailure=undefined;
+   await run(extractionKey,handlers);assert.equal(toolProbes,probesBeforeExtraction);assert.equal(parserRoots.length,1);assert.equal(modelCalls,2);assert.ok(sourceModelRoots.every(path=>path.startsWith(cas.root+'-residual-model/')&&!path.startsWith(cas.root+'/')));
    hostGeneration++; // Already produced prepared/extraction outputs remain admissible downstream.
    const groundedAnswer=(input:AssessmentPassInput):ModelAnswer=>{const response=answer(input),output=response.value as AssessmentOutput,data=input.data as {criticalTarget:unknown;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]},target=CriticalRecordTargetSchema.strip().parse(data.criticalTarget);output.assertions=target.claims.map(claim=>({claimId:claim.claimId,sourceId:claim.sourceId,locatorId:data.evidence.find(entry=>entry.sourceId===claim.sourceId)!.locators.find(locator=>locator.quote===claim.quote)!.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,value:null,unit:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality}));output.criticalReview={recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',rationale:'Synthetic topology fixture, not independent gold'}))};return {...response,value:output,responseSha256:digest(canonicalJson(output))};};
    const assessmentHandlers=assessments.assessmentQueueHandlers(pool,{policyOptions:policy,fixtureProtocol:true,fixtureProvider:async input=>groundedAnswer(input)}),assessmentPreparation=await assessments.enqueueResidualAssessmentItems(pool,store,cas,extractionKey);await run(assessmentPreparation,assessmentHandlers);
