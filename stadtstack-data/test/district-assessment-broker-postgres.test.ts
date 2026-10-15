@@ -166,7 +166,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal(BridgeStatusSchema.parse(await f.broker.dispatch(submitFor(lease))).state,'submitted');
   assert.equal((await execution).state,'completed');
   assert.deepEqual([...renewedDuring].sort(),['checkedEvidence','managedWrite','receiptRead']);
-  const receipts=await db.query<{reason_code:string}>('SELECT reason_code FROM district_pipeline.step_receipts WHERE job_key=$1',[f.jobKey]);
+  const receipts=await db.query<{reason_code:string}>("SELECT r.receipt->>'reasonCode' AS reason_code FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1",[f.jobKey]);
   assert.deepEqual(receipts.rows.map(row=>row.reason_code),['completed']);
  });
 
