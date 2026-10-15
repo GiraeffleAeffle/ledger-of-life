@@ -3,6 +3,7 @@ import type {Pool} from 'pg';
 import {HashSchema} from './district-adapter-contract.ts';
 import {DistrictExecutionHold,type ClaimedJob} from './district-jobs.ts';
 import {SubscriptionRuntimeError} from './district-model-contract.ts';
+import {SubscriptionLimitSchema} from './district-subscription-limit.ts';
 export async function registerR1CodexDocument(pool:Pool,municipalityId:string,originalSha256:string,maxCalls:number){
  HashSchema.parse(originalSha256);
  if(!Number.isInteger(maxCalls)||maxCalls<2||maxCalls>48)throw new DistrictExecutionHold('source_limit_exceeded');
@@ -61,6 +62,10 @@ export async function holdR1CodexFailure(pool:Pool,job:ClaimedJob,originalSha256
    await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(18441,81)');
    const held=await client.query(`INSERT INTO district_pipeline.r1_codex_usage_holds(authorization_id,run_id,failed_intent_id) SELECT a.authorization_id,a.run_id,i.id FROM district_pipeline.r1_codex_call_intents i JOIN district_pipeline.r1_codex_call_authorizations a ON a.intent_id=i.id WHERE i.job_id=$1 AND i.original_sha256=$2 AND i.fencing_token=$3 AND a.run_id=$4 ORDER BY i.created_at DESC LIMIT 1 ON CONFLICT DO NOTHING RETURNING authorization_id`,[job.id,originalSha256,job.fencingToken,job.runId]);
    if(!held.rowCount)throw new DistrictExecutionHold('usage_unknown');
+   const projected=SubscriptionLimitSchema.safeParse(error.diagnostic&&'subscriptionLimit' in error.diagnostic?error.diagnostic.subscriptionLimit:null);
+   const limit=projected.success&&projected.data.provider==='openai-subscription'?projected.data:null;
+   const noOutput=!!error.diagnostic&&'subscriptionNoOutput' in error.diagnostic&&error.diagnostic.subscriptionNoOutput===true;
+   await client.query(`INSERT INTO district_pipeline.r1_subscription_usage_holds(id,provider,authorization_id,job_id,codex_authorization_id,limit_kind,reset_at,observed_at,no_output) VALUES($1,'openai-subscription',$2,$3,$2,$4,$5,$6,$7)`,[randomUUID(),held.rows[0].authorization_id,job.id,limit?.limitKind??'usage_limit',limit?.resetAt??null,limit?.observedAt??new Date().toISOString(),noOutput]);
    await client.query('COMMIT');
   }catch(failure){await client.query('ROLLBACK');throw failure;}finally{client.release();}
   throw new DistrictExecutionHold('budget_paused');

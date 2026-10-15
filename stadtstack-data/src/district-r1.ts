@@ -53,6 +53,7 @@ import {CrawlPolicyRefreshEnqueueSchema,enqueueCrawlPolicyRefresh,policyRefreshH
 import {QueueTextSealInputSchema,sealQueueTextContribution} from './district-queue-text-run.ts';
 import {KnowledgeRecordsSchema} from './district-schema.ts';
 import {readTextLineageArtifact} from './text-run-lineage.ts';
+import {resumeSubscriptionUsage,subscriptionUsageStatus,UsageResumeInputSchema} from './district-subscription-usage.ts';
 
 const REPO=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 export const R1_FETCH_ROOT=join(REPO,'cache/districts/r1-fetch');
@@ -478,6 +479,22 @@ export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1
   context.phase='admission';
   await persistOperatorRegistry(store,cas,admitted);
   const input=await stdinJson();
+  if(command==='usage-holds'){
+   z.object({}).strict().parse(input);
+   process.stdout.write(canonicalJson(await subscriptionUsageStatus(pool))+'\n');return;
+  }
+  if(command==='usage-resume'){
+   const handlers={...residualJobHandlersFor(pool),...assessmentQueueHandlers(pool)};
+   const resumed=await resumeSubscriptionUsage(pool,UsageResumeInputSchema.parse(input),{
+    notification:pipelineNotificationConfig,
+    checkPolicy:async spec=>{
+     const handler=handlers[spec.step];
+     if(!handler?.currentPolicy)throw new DistrictExecutionHold('source_policy_stale');
+     await handler.currentPolicy(spec,cas);
+    },
+   });
+   process.stdout.write(canonicalJson(resumed)+'\n');return;
+  }
   if(command==='import-crawl-corpus'){
    const manifest=CrawlCorpusImportSchema.parse(input);
    if(canonicalJson(manifest.registry)!==canonicalJson(registryPin))throw Error('Crawl import descriptor must match admitted CLI registry pin');

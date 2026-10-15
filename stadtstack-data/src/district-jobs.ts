@@ -65,6 +65,7 @@ export async function migrateDistrictJobs(pool:Pool):Promise<void> {
     {version:4,file:new URL('../migrations/004_r1_codex_calls.sql',import.meta.url)},
     {version:5,file:new URL('../migrations/005_parallel_executors.sql',import.meta.url)},
     {version:6,file:new URL('../migrations/006_resource_slot_ownership.sql',import.meta.url)},
+    {version:7,file:new URL('../migrations/007_subscription_usage_resume.sql',import.meta.url)},
   ];
   const client=await pool.connect();
   try {

@@ -18,10 +18,12 @@ import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestS
 import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
+import {assertBSubscriptionResume,recordBSubscriptionHold} from './district-subscription-usage.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
  if(error instanceof DistrictExecutionHold)return error.reasonCode;
+ if(error instanceof OmpRunnerHold&&error.subscriptionLimit)return 'budget_paused';
  if(error instanceof OmpRunnerHold)return `omp_${error.reason}`;
  return 'execution_exception';
 }
@@ -42,7 +44,7 @@ export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:Mode
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
 export async function assessmentBJobContract(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
@@ -210,10 +212,11 @@ export class DistrictAssessmentBroker {
   return this.transaction(async client=>{
    const current=await this.job(client,job.id,job.runId),reason=disposition(current,job.runId,job.fencingToken);
    if(reason)throw new DistrictExecutionHold(reason);
-   const intent=await client.query('SELECT lease_id FROM district_pipeline.assessment_bridge_submission_intents WHERE job_id=$1',[job.id]);
-   if(intent.rowCount)throw new DistrictExecutionHold('execution_exception'); // Exposure is ambiguous forever until separately reconciled, even after queue resume.
+   const resolvedLeases=await assertBSubscriptionResume(client,current.authorization_id,job.id);
+   const intent=await client.query<{lease_id:string}>('SELECT lease_id FROM district_pipeline.assessment_bridge_submission_intents WHERE job_id=$1',[job.id]);
+   if(intent.rows.some(row=>!resolvedLeases.includes(row.lease_id)))throw new DistrictExecutionHold('execution_exception');
    const existing=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 FOR UPDATE',[job.id]);
-   if(existing.rows.some(row=>row.claimed_at!==null||row.fencing_token===job.fencingToken))throw new DistrictExecutionHold('execution_exception');
+   if(existing.rows.some(row=>row.fencing_token===job.fencingToken||row.claimed_at!==null&&!resolvedLeases.includes(row.id)))throw new DistrictExecutionHold('execution_exception');
    // Only an explicitly resumed/newly authorized queue attempt may replace an
    // unexposed lease. Preserve its historical hold; never reset or erase it.
    for(const prior of existing.rows)if(prior.state==='ready'||prior.state==='active')await this.hold(client,prior,'lease_lost');
@@ -379,7 +382,14 @@ export class DistrictAssessmentBroker {
     });
    }});}catch(error){
     const reason=assessmentBridgeHoldReason(error);
-    await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);if(found.rows[0])await this.hold(client,found.rows[0],reason);});
+    await this.transaction(async client=>{
+     const authority=await this.job(client,job.id,job.runId);
+     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]);
+     if(found.rows[0]){
+      if(error instanceof OmpRunnerHold&&error.subscriptionLimit)await recordBSubscriptionHold(client,authority.authorization_id,job.id,found.rows[0].id,error.subscriptionLimit,error.noOutput);
+      await this.hold(client,found.rows[0],reason);
+     }
+    });
     return {outcome:'held_execution',reasonCode:reason};
    }
    const result=await this.transaction(async client=>{
