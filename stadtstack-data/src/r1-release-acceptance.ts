@@ -147,9 +147,55 @@ export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
   if(expected.critical!==given.critical||expected.rights!==given.rights||expected.disagreement!==given.disagreement)append('preparation/classification',given,'unknown');
   return items;
 }
+const assessmentRoles=['item','A','B','C'] as const;
+export const AuditAssessmentManifestSchema=z.array(z.object({item:z.string().min(1),A:z.string().min(1),B:z.string().min(1),C:z.string().min(1),exceptionMinutes:z.number().finite().positive().optional()}).strict());
+export type AssessmentContentHashes=Record<typeof assessmentRoles[number],string>;
+export interface RequiredStep8Assessment {recordId:string;artifactSha256:AssessmentContentHashes;contentSha256:AssessmentContentHashes}
+async function readHandoffAssessments(pin:z.infer<typeof AcceptancePinSchema>,inventory:z.infer<typeof Step8ExceptionInventorySchema>):Promise<RequiredStep8Assessment[]>{
+  const manifest=AuditAssessmentManifestSchema.parse(await readAcceptancePin(pin));
+  const rows=z.array(z.object({recordId:z.string().min(1),item:z.string(),A:z.string(),B:z.string(),C:z.string()}).strict()).parse(inventory.assessments);
+  if(manifest.length!==rows.length)throw Error('Step8 assessment handoff omits or adds inventory triplets');
+  const selectionSchema=z.object({recordId:z.string().min(1),pins:z.object({itemArtifactSha256:HashSchema,AArtifactSha256:HashSchema,
+    BArtifactSha256:HashSchema,CArtifactSha256:HashSchema,finalArtifactSha256:HashSchema}).passthrough().nullable()}).passthrough();
+  const selected=new Map<string,AssessmentContentHashes>();
+  for(const source of inventory.sourceDispositions)for(const raw of source.assessments){
+    const row=selectionSchema.parse(raw);if(!row.pins)continue;
+    const hashes={item:row.pins.itemArtifactSha256,A:row.pins.AArtifactSha256,B:row.pins.BArtifactSha256,C:row.pins.CArtifactSha256};
+    const prior=selected.get(row.recordId);
+    if(prior&&canonicalJson(prior)!==canonicalJson(hashes))throw Error('Conflicting selected Step8 assessment triplets');
+    selected.set(row.recordId,hashes);
+  }
+  const seen=new Set<string>(),required:RequiredStep8Assessment[]=[];
+  for(const [index,row] of rows.entries()){
+    const artifactSha256=selected.get(row.recordId);if(!artifactSha256)throw Error('Step8 handoff triplet lacks selected assessment pins');
+    const contentSha256={} as AssessmentContentHashes;
+    for(const role of assessmentRoles){
+      if(row[role].split('/').at(-1)!==artifactSha256[role])throw Error('Step8 assessment inventory disagrees with selected artifact pins');
+      const artifact=await readAcceptancePin({path:manifest[index][role],sha256:artifactSha256[role]});
+      contentSha256[role]=semanticHash(artifact);
+      if(role==='item'){
+        const item=record(artifact),target=item.criticalTarget&&typeof item.criticalTarget==='object'?record(item.criticalTarget):{};
+        if(item.itemId!==row.recordId&&target.recordId!==row.recordId)throw Error('Step8 handoff item belongs to another selected record');
+      }
+    }
+    if(!seen.has(row.recordId)){required.push({recordId:row.recordId,artifactSha256,contentSha256});seen.add(row.recordId);}
+  }
+  if(seen.size!==selected.size)throw Error('Step8 assessment inventory omits selected triplets');
+  return required.sort((a,b)=>a.recordId.localeCompare(b.recordId));
+}
+export interface Step8AssessmentCoverage {
+  assessmentManifest:z.infer<typeof AcceptancePinSchema>;required:number;included:number;bindingsSha256:string;pass:boolean;
+}
+export function requireStep8AssessmentCoverage(bundle:Step8ExceptionBundle,included:AssessmentContentHashes[]):Step8AssessmentCoverage{
+  const present=new Set(included.map(semanticHash));
+  for(const required of bundle.requiredAssessments)if(!present.has(semanticHash(required.contentSha256)))throw Error('Step8 handed-off assessment triplet missing from owner packet: '+required.recordId);
+  return {assessmentManifest:bundle.assessmentManifest,required:bundle.requiredAssessments.length,included:bundle.requiredAssessments.length,
+    bindingsSha256:semanticHash(bundle.requiredAssessments),pass:true};
+}
 export interface Step8ExceptionBundle {
   version:'r1-step8-exception-bundle-v1';releaseId:string;manifestSha256:string;pins:Step8AcceptancePins;
   inventory:z.infer<typeof Step8ExceptionInventorySchema>;candidateContext:CandidateMaterialContext;items:ReleaseExceptionItem[];
+  assessmentManifest:z.infer<typeof AcceptancePinSchema>;requiredAssessments:RequiredStep8Assessment[];
 }
 export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedReleaseId?:string){
   const pins=Step8AcceptancePinsSchema.parse(pinsInput),gate=gateSchema.parse(await readAcceptancePin(pins.gate));
@@ -167,18 +213,21 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
     if(sourceInventory.schemaVersion!=='stadtstack-r1-step8-source-dispositions-v1'||sourceInventory.complete!==true||sourceInventory.generationNonce!==gate.generationNonce
       ||canonicalJson(sourceInventory.sourceDispositions)!==canonicalJson(inventory.sourceDispositions)||canonicalJson(sourceInventory.campaign)!==canonicalJson(gate.campaign))throw Error('Terminal source disposition inventory binding mismatch');
   }
+  const requiredAssessments=await readHandoffAssessments(handoff.assessmentManifest,inventory);
   const manifest=dataReleaseSchema.parse(await readAcceptancePin({path:join(gate.candidateDirectory,'release-manifest.json'),sha256:gate.manifestSha256}));
   const verified=await verifyDataRelease(gate.candidateDirectory);
   if(manifest.id!==gate.releaseId||verified.id!==gate.releaseId)throw Error('Candidate manifest differs from release gate');
   const candidateContext=await readCandidateMaterialContext(gate.candidateDirectory,manifest,gate.manifestSha256);
   const items=bindReleaseExceptionContext(inventoryExceptionItems(inventory),candidateContext,inventory.sourceDispositions);
-  const bundle:Step8ExceptionBundle={version:'r1-step8-exception-bundle-v1',releaseId:gate.releaseId,manifestSha256:gate.manifestSha256,pins,inventory,candidateContext,items};
+  const bundle:Step8ExceptionBundle={version:'r1-step8-exception-bundle-v1',releaseId:gate.releaseId,manifestSha256:gate.manifestSha256,pins,inventory,candidateContext,items,
+    assessmentManifest:handoff.assessmentManifest,requiredAssessments};
   return {bundle,gate,handoff,manifest};
 }
 const scoreGate=z.object({actual:z.number().int().nonnegative().max(60),pass:z.boolean()}).passthrough();
 const pairScore=z.number().int().min(0).max(2);
 const valueVerdictSchema=z.object({version:z.literal('pilot-value-r1-verdict-v1'),releaseId:HashSchema,reportSha256:HashSchema,packetSha256:HashSchema,
   step8:Step8AcceptancePinsSchema,manifestSha256:HashSchema,
+  step8AssessmentCoverage:z.object({assessmentManifest:AcceptancePinSchema,required:z.number().int().nonnegative(),included:z.number().int().nonnegative(),bindingsSha256:HashSchema,pass:z.boolean()}).strict(),
   frozenInputs:z.object({questionBankSha256:z.literal('2e74ab25477c83ed58a34e1a57ae76c16ed7f524fe7e6865106bfcc32bad18cc'),
     rebuildPlanSha256:z.literal('cec8d20a8f443db49744e1b8ce51be6283184526e0895aa0010abcf8b0c2bdf2'),
     statusCheckpointSha256:z.literal('643fe639b7c87cc285a2a84960aef34f7f2c36fac1606f93296c438feaa3969a'),optionBApprovalSha256:z.literal(OPTION_B_APPROVAL_SHA256)}).strict(),
@@ -222,6 +271,8 @@ export async function computeReleaseAcceptance(input:unknown){
   const pairs=value.gates.graphPairs.pairs,ids=['W03','W04','E03','B03','K03','M03','H03'];
   if(value.releaseId!==gate.releaseId)blockers.push('value_verdict_release_mismatch');
   if(canonicalJson(value.step8)!==canonicalJson(selected.step8)||value.manifestSha256!==gate.manifestSha256)blockers.push('value_verdict_step8_binding_mismatch');
+  const assessmentCoverage=requireStep8AssessmentCoverage(bundle,bundle.requiredAssessments.map(required=>required.contentSha256));
+  if(canonicalJson(value.step8AssessmentCoverage)!==canonicalJson(assessmentCoverage))blockers.push('value_verdict_step8_assessment_coverage_mismatch');
   if(value.verdict!=='pass'||value.blockingReasons.length||Object.values(value.gates).some(result=>!result.pass)
     ||value.gates.questions.actual!==30||value.gates.questions.reviewed!==30||value.gates.usefulness.actual<30||value.gates.completeAnswers.actual<8||value.gates.correctness.actual!==60||value.gates.sources.actual<46
     ||value.gates.unresolvedCriticalAndRights.actual!==0||value.gates.ownerFindings.blockingFindings.length||value.gates.ownerWorkload.plannedMinutes>120
@@ -233,6 +284,7 @@ export async function computeReleaseAcceptance(input:unknown){
   return {schemaVersion:'stadtstack-r1-release-acceptance-v1',releaseId:gate.releaseId,manifestSha256:gate.manifestSha256,
     accepted:blockers.length===0,blockers:[...new Set(blockers)].sort(),inputs:selected,replayAudit:auditPin,
     valueReportSha256:value.reportSha256,valuePacketSha256:value.packetSha256,
+    step8AssessmentCoverage:assessmentCoverage,
     exceptionRuleSet:RELEASE_ACCEPTANCE_RULES,
     exceptionItems:bundle.items.map(({evidence,...item})=>item),
     ownerPolicy:'option_B_all_gates_before_release_sample_audit_afterwards',pending_owner_audit:blockers.length===0&&value.pending_owner_audit,

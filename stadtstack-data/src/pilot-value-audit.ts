@@ -6,7 +6,7 @@ import {bankSchema,canonical,digest,validateReport,summarize,assessedValueReview
   type Report,type EvaluationRow} from './evaluate-pilot-value.ts';
 import {assessmentItemSchema,assessmentEvidenceContext,originalEvidence,reconcile,ownerAudit,recordOwnerAudit,validateReceipt,
   writeImmutable,type AssessmentEvidenceContext,type AssessmentItem,type AssessmentReceipt,type OriginalEvidence} from './district-assessment.ts';
-import {loadStep8ExceptionBundle,inventoryExceptionItems,type Step8ExceptionBundle} from './r1-release-acceptance.ts';
+import {loadStep8ExceptionBundle,inventoryExceptionItems,AuditAssessmentManifestSchema,requireStep8AssessmentCoverage,type Step8ExceptionBundle,type Step8AssessmentCoverage} from './r1-release-acceptance.ts';
 import {bindReleaseExceptionContext,RELEASE_ACCEPTANCE_RULES} from './r1-release-context.ts';
 
 // These identify the read-only acceptance contract, not a new editable rubric.
@@ -30,6 +30,7 @@ export interface AuditPacketItem {
   itemId:string;evidenceSha256:string;questionId:string|null;lane:Lane|null;risk:Risk;
   exception:'none'|'unresolved'|'rights';exceptionMinutes:number;
   assessmentItem:AssessmentItem;assessmentItemSha256:string;
+  assessmentReceiptSha256:{A:string;B:string;C:string};
   answer:EvaluationRow['review'];criticalClaims:unknown[];
   originalEvidence:unknown[];mcpSources:Record<string,unknown>;
   validationDisposition:'known_gap'|'ai_reconciled'|'blocking_exception';
@@ -41,6 +42,7 @@ export interface PilotAuditPacket {
   frozenInputs:typeof FROZEN_R1_INPUTS;seed:string;items:AuditPacketItem[];
   sample:ReturnType<typeof ownerAudit>;blockingReasons:string[];
   step8?:Step8ExceptionBundle;
+  step8AssessmentCoverage?:Step8AssessmentCoverage;
   labelPolicy:string;packetSha256:string;
 }
 function inventoryFrame(bundle?:Step8ExceptionBundle){
@@ -90,6 +92,7 @@ export async function buildPilotAuditPacket(report:Report,entries:AuditAssessmen
   assertFrozenReport(report);
   if(!seed)throw Error('Record a precommitted nonempty sample seed');
   if(step8&&step8.releaseId!==report.server.releaseId)throw Error('Exception inventory belongs to another release');
+  const step8AssessmentCoverage=step8?requireStep8AssessmentCoverage(step8,entries.map(entry=>({item:digest(entry.item),A:digest(entry.A),B:digest(entry.B),C:digest(entry.C)}))):undefined;
   const items:AuditPacketItem[]=[],seen=new Set<string>(),lanes=new Set<string>();
   for(const entry of entries){
     const item=assessmentItemSchema.parse(entry.item),lane=item.valueTarget?.lane??null;
@@ -120,6 +123,7 @@ export async function buildPilotAuditPacket(report:Report,entries:AuditAssessmen
       for(const [id,attribution] of matches)mcpSources[id]=attribution;
     }
     const base={questionId:row?.question.id??null,lane,assessmentItem:item,assessmentItemSha256:digest(item),
+      assessmentReceiptSha256:{A:digest(entry.A),B:digest(entry.B),C:digest(entry.C)},
       validationDisposition:exception!=='none'?'blocking_exception' as const:disposition.blocksAffectedAdmission?'known_gap' as const:'ai_reconciled' as const,
       ownerAuditPriority:excludedRisk||exception!=='none'?'high' as const:'normal' as const,
       answer:row?.review??null,criticalClaims:[...(item.criticalTarget?.claims??[]),...(disposition.output?.assertions??[])],
@@ -145,7 +149,7 @@ export async function buildPilotAuditPacket(report:Report,entries:AuditAssessmen
     ...(step8?.items??[]).filter(item=>item.blocking).map(item=>item.itemId+':'+item.classification),...(step8?.candidateContext.materialBlockers??[])];
   if(!sample.withinGate)blockingReasons.push('owner_packet_exceeds_80_sample_40_exception_120_total_minutes');
   const body={version:'pilot-value-owner-packet-v1' as const,releaseId:report.server.releaseId,reportSha256:auditReportHash(report),
-    frozenInputs:FROZEN_R1_INPUTS,seed,items,sample,blockingReasons,...(step8?{step8}:{}),
+    frozenInputs:FROZEN_R1_INPUTS,seed,items,sample,blockingReasons,...(step8?{step8,step8AssessmentCoverage}:{}),
     labelPolicy:'AI-assessed, not independent gold. Option B defers only the sample audit until after release; unresolved candidate-critical and applicable source-rights exceptions block release. Authenticated excluded risks remain high-priority known gaps. Individually audited items never upgrade the full set.'};
   return {...body,packetSha256:digest(body)};
 }
@@ -157,6 +161,10 @@ export function validatePilotAuditPacket(report:Report,packet:PilotAuditPacket){
   for(const {evidenceSha256,...content} of packet.items)if(evidenceSha256!==digest(content))throw Error('Audit item evidence changed');
   if(packet.step8&&(packet.step8.releaseId!==packet.releaseId||packet.step8.candidateContext.manifestSha256!==packet.step8.manifestSha256
     ||canonical(bindReleaseExceptionContext(inventoryExceptionItems(packet.step8.inventory),packet.step8.candidateContext,packet.step8.inventory.sourceDispositions))!==canonical(packet.step8.items)))throw Error('Step8 exception inventory changed');
+  if(packet.step8){
+    const coverage=requireStep8AssessmentCoverage(packet.step8,packet.items.map(item=>({item:item.assessmentItemSha256,...item.assessmentReceiptSha256})));
+    if(canonical(coverage)!==canonical(packet.step8AssessmentCoverage))throw Error('Step8 owner assessment coverage changed');
+  }else if(packet.step8AssessmentCoverage)throw Error('Unexpected Step8 assessment coverage without authenticated bundle');
   const frame=[...packet.items.map(({itemId,evidenceSha256,risk,exception,exceptionMinutes})=>({itemId,evidenceSha256,risk,exception,exceptionMinutes})),...inventoryFrame(packet.step8)];
   if(canonical(ownerAudit(frame,packet.seed))!==canonical(packet.sample))throw Error('Audit sample changed');
   const expected=[...packet.items.filter(item=>item.exception!=='none').map(item=>item.itemId+':'+item.exception),
@@ -222,7 +230,7 @@ export function computeFrozenVerdict(report:AuditReport,packet:PilotAuditPacket)
   };
   for(const [name,gate] of Object.entries(gates))if(!gate.pass)blockers.push('gate_failed:'+name);
   return {version:'pilot-value-r1-verdict-v1',releaseId:report.server.releaseId,reportSha256:packet.reportSha256,packetSha256:packet.packetSha256,
-    ...(packet.step8?{step8:packet.step8.pins,manifestSha256:packet.step8.manifestSha256}:{}),
+    ...(packet.step8?{step8:packet.step8.pins,manifestSha256:packet.step8.manifestSha256,step8AssessmentCoverage:packet.step8AssessmentCoverage}:{}),
     frozenInputs:FROZEN_R1_INPUTS,verdict:Object.values(gates).every(gate=>gate.pass)?'pass':'fail',gates,blockingReasons:[...new Set(blockers)],
     pending_owner_audit:!audit&&Object.values(gates).every(gate=>gate.pass)&&!blockers.length,ownerAuditPolicy:'option_B_post_release_sample_only',
     validationBasis:'AI-assessed with stated item-level owner audit coverage; not independent gold',
@@ -256,7 +264,6 @@ export function auditPacketMarkdown(packet:PilotAuditPacket){
   }
   return lines.join('\n')+'\n';
 }
-const manifestSchema=z.array(z.object({item:z.string(),A:z.string(),B:z.string(),C:z.string(),exceptionMinutes:z.number().finite().positive().optional()}).strict());
 export async function runPilotValueAudit(mode:string,options:Map<string,string>):Promise<void>{
   const required=(key:string)=>{const value=options.get(key);if(!value)throw Error('Required audit option missing: '+key);return value;};
   const load=async(path:string)=>JSON.parse(await readFile(path,'utf8'));
@@ -270,7 +277,7 @@ export async function runPilotValueAudit(mode:string,options:Map<string,string>)
     if(canonical(packet.step8)!==canonical(step8))throw Error('Owner packet omits or changes step8 exceptions');
     await writeImmutable(required('output'),ingestPilotOwnerAudit(report,packet,await load(required('audit'))));return;
   }
-  const manifest=manifestSchema.parse(await load(required('assessments')));
+  const manifest=AuditAssessmentManifestSchema.parse(await load(required('assessments')));
   const entries=await Promise.all(manifest.map(async entry=>({item:await load(entry.item),A:await load(entry.A),B:await load(entry.B),C:await load(entry.C),exceptionMinutes:entry.exceptionMinutes})));
   const context=assessmentEvidenceContext({casRoot:options.get('cas-root'),policyStateDir:options.get('policy-state-dir'),
     currentAdmissionReceipts:options.has('current-policy-map')?await load(required('current-policy-map')):undefined});

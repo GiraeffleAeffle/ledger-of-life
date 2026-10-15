@@ -162,7 +162,8 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
           criticalHolds:[],classification:{critical:false,rights:false,disagreement:false}},assessments:[]});
       const candidateContext:CandidateMaterialContext={manifestSha256:'1'.repeat(64),ids:[],sourceHashes:[],sourceUrls:[],sourceScopes:['synthetic\nsource1'],materialBlockers:[]};
       const step8:Step8ExceptionBundle={version:'r1-step8-exception-bundle-v1',releaseId:finalized.server.releaseId,manifestSha256:'1'.repeat(64),
-        pins:{gate:pin,exceptions:pin,handoff:pin},inventory,candidateContext,items:bindReleaseExceptionContext(inventoryExceptionItems(inventory),candidateContext,inventory.sourceDispositions)};
+        pins:{gate:pin,exceptions:pin,handoff:pin},inventory,candidateContext,assessmentManifest:pin,requiredAssessments:[],
+        items:bindReleaseExceptionContext(inventoryExceptionItems(inventory),candidateContext,inventory.sourceDispositions)};
       const withInventory=await buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,step8);
       assert.ok(withInventory.step8?.items.length);assert.ok(withInventory.sample.exceptions.every(item=>item.itemId.startsWith('step8:')));
       assert.match(auditPacketMarkdown(withInventory),/Step-8 exception inventory/);
@@ -193,6 +194,26 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
       const extendedPacket=await buildPilotAuditPacket(finalized,[...entries,{item,...await syntheticAssessmentTriplet(item,output,admitted.context)}],packet.seed,admitted.context,extendedStep8);
       assert.ok(extendedPacket.items.some(row=>row.assessmentItem.itemId===item.itemId&&row.ownerAuditPriority==='high'&&row.validationDisposition==='known_gap'));
       assert.equal(computeFrozenVerdict(finalized,extendedPacket).verdict,'pass');
+      const {valueTarget:ignoredTarget,valueContext:ignoredContext,...claimBase}=assessmentItemSchema.parse(entries[0].item);
+      const admittedItem=assessmentItemSchema.parse({...claimBase,itemId:'record:handed-off-critical',criticalKinds:['stage','finance']});
+      const {valueReview:ignoredReview,...claimOutput}=assessmentOutputSchema.parse((entries[0].A as {output:unknown}).output);
+      const admittedOutput=assessmentOutputSchema.parse({...claimOutput,itemId:admittedItem.itemId});
+      const admittedEntry={item:admittedItem,...await syntheticAssessmentTriplet(admittedItem,admittedOutput,admitted.context)};
+      const requiredStep8:Step8ExceptionBundle={...excludedStep8,inventory:{...inventory,sourceDispositions:[]},items:[],
+        candidateContext:{...excludedContext,ids:[admittedItem.itemId],sourceHashes:[source.sha256]},
+        requiredAssessments:[{recordId:admittedItem.itemId,artifactSha256:{item:pin.sha256,A:pin.sha256,B:pin.sha256,C:pin.sha256},
+          contentSha256:{item:digest(admittedEntry.item),A:digest(admittedEntry.A),B:digest(admittedEntry.B),C:digest(admittedEntry.C)}}]};
+      await assert.rejects(buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,requiredStep8),/handed-off assessment triplet missing/);
+      const requiredPacket=await buildPilotAuditPacket(finalized,[...entries,admittedEntry],packet.seed,admitted.context,requiredStep8);
+      assert.equal(requiredPacket.step8AssessmentCoverage!.required,1);assert.equal(requiredPacket.step8AssessmentCoverage!.included,1);
+      const criticalEvidence=requiredPacket.items.filter(row=>row.assessmentItem.itemId===admittedItem.itemId);
+      assert.ok(criticalEvidence.length&&criticalEvidence.every(row=>row.originalEvidence.length&&Object.keys(row.mcpSources).length));
+      assert.equal(computeFrozenVerdict(finalized,requiredPacket).verdict,'pass');
+      assert.equal(computeFrozenVerdict(finalized,requiredPacket).step8AssessmentCoverage!.included,1);
+      const truncated=structuredClone(requiredPacket);
+      truncated.items=truncated.items.filter(row=>row.assessmentItem.itemId!==admittedItem.itemId);
+      const {packetSha256:ignoredPacketHash,...truncatedBody}=truncated;truncated.packetSha256=digest(truncatedBody);
+      assert.throws(()=>validatePilotAuditPacket(finalized,truncated),/handed-off assessment triplet missing/);
     });
   }finally{await rm(admitted.directory,{recursive:true,force:true});}
 });

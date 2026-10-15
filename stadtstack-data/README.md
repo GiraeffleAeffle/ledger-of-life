@@ -910,9 +910,11 @@ parser, provider, authorization or owner-check receipts.
 3. **Export, ingest and finalize.** `knowledge:r1 value-assessment-results`
    consumes `{jobKeys:[...]}` with the 37 committed reconciliation keys and emits
    `$ASSESSMENTS`, an array of `{item,A,B,C}` paths to the actual CAS artifacts.
-   Include additional actual critical/exception triplets in `$AUDIT_ASSESSMENTS`
-   where available; those entries may carry a positive `exceptionMinutes`
-   reservation (default 10). **A/B/C manifests are not the complete exception
+   Build `$AUDIT_ASSESSMENTS` from **all 37 value entries plus every triplet** in
+   the `assessmentManifest` pinned by `step9-handoff.json`. These include the
+   admitted step-8 critical claims, not merely their inventory labels. Additional
+   actual exception triplets may carry a positive `exceptionMinutes` reservation
+   (default 10). **A/B/C manifests are not the complete exception
    inventory.** Prepare `$STEP8_PINS` as a private JSON object with `gate`,
    `exceptions` and `handoff`, each an absolute `{path,sha256}` pin to the
    corresponding `release-gate.json`, `exception-inventory.json` and
@@ -920,6 +922,12 @@ parser, provider, authorization or owner-check receipts.
    The handoff/gate must pin the identical inventory, release and candidate,
    including terminal document/assessment exceptions without A/B/C artifacts.
    Campaign membership and any source-disposition precursor pin are checked.
+   The handed-off assessment manifest is hash-verified; each item/A/B/C file is
+   verified against the selected source-assessment artifact pins and inventory.
+   Missing triplets, substitutions, extra unselected triplets in the handoff, or
+   selected triplets omitted from the inventory fail closed. Audit/verdict
+   generation rejects a 37-lane-only manifest when any handed-off claim triplet
+   is missing; it does not silently downgrade that claim to metadata-only audit.
    An unresolved value answer cannot be finalized: resolve the evidence and rerun
    the governed assessment path, rather than importing hand-written scores.
 
@@ -1032,13 +1040,22 @@ zero-call exact-replay proof. It then checks the frozen value verdict's actual
 numbers, graph pairs, unchanged denominators, all pass flags and same step-8
 pins. A stale value-only verdict without the inventory binding cannot authorize
 release.
+The value verdict and acceptance record also carry `step8AssessmentCoverage`:
+the handed-off manifest pin, required/included triplet counts and a digest of
+the exact selected artifact/content bindings. Counts alone cannot satisfy this
+binding. Older value-only verdicts without that coverage are rejected.
+
 
 The release classifier reuses `classifyStep8Exception`, also recognizing terminal
 `reasonCode`, legal/permission/contact risks and native/publication holds. It
 binds exceptions to **actual candidate membership**, not diagnostic quarantine
 counts or the mere existence of a source in the registry. Original source hashes,
 municipality/source identities, attributed source URLs and record/claim/graph
-references establish direct or derived contribution. Unknown/ambiguous evidence,
+references establish direct or derived contribution. For origin, critical and
+rights/legal issues, candidate IDs and original-document hashes are **OR** evidence:
+an excluded ID cannot mask a published sibling derived from the same original.
+Only a record-specific noncritical hold can rely solely on per-record exclusion.
+Unknown/ambiguous evidence,
 unrecognized reason codes/classes, missing current receipts and unclassified
 native observations always block; an operator label never authenticates exclusion.
 A genuine `no_supported_case` remains a negative, without value credit.

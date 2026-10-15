@@ -9,8 +9,8 @@ export const RELEASE_ACCEPTANCE_RULES={version:'r1-option-b-candidate-scope-v1',
   {class:'technical/replay/value',condition:'Any required gate fails or its pinned binding is invalid',decision:'block'},
   {class:'unknown',condition:'Unknown/ambiguous classification, incomplete inventory or unprovable exclusion',decision:'block'},
   {class:'withheld_in_candidate',condition:'Quarantined/withheld material or derived identifiers are in the candidate',decision:'block'},
-  {class:'rights/legal',condition:'Affected material is in the candidate, or a source-level question affects a source contributing candidate material',decision:'block'},
-  {class:'origin/disagreement/critical',condition:'Affected document, claim, record or derived material is in the candidate without resolution',decision:'block'},
+  {class:'rights/legal',condition:'Affected material is in the candidate by IDs OR original-source hashes, or a source-level question affects any source contributing candidate material',decision:'block'},
+  {class:'origin/disagreement/critical',condition:'Affected document, claim, record or derived material is in the candidate without resolution; IDs OR original-source hashes bind impact, and an excluded ID cannot clear a published sibling',decision:'block'},
   {class:'excluded_risk',condition:'Affected material is authenticated as excluded; for source-level rights/legal the source contributes no candidate material',decision:'known_gap; ownerAuditPriority=high'},
   {class:'quality/context/infrastructure/access',condition:'Controlled non-admission; affected material remains excluded',decision:'known_gap'},
   {class:'negative',condition:'Genuine no_supported_case',decision:'negative; no value credit'},
@@ -81,7 +81,13 @@ export function bindReleaseExceptionContext(items:ReleaseExceptionItem[],context
     const sourceId=source?.sourceId??(raw.success&&typeof raw.data.sourceId==='string'?raw.data.sourceId:null);
     const sourceSha256=source?.sourceSha256??(raw.success&&typeof raw.data.sourceSha256==='string'?raw.data.sourceSha256:null);
     const sourceContributes=municipalityId&&sourceId?scopes.has(municipalityId+'\n'+sourceId)||sourceDispositions.some(other=>other.municipalityId===municipalityId&&other.sourceId===sourceId&&hashes.has(other.sourceSha256)):null;
-    const candidateAffected=item.recordIds.length?item.recordIds.some(id=>ids.has(id)):sourceSha256?hashes.has(sourceSha256):sourceContributes===false?false:null;
+    const recordAffected=item.recordIds.length?item.recordIds.some(id=>ids.has(id)):null;
+    const documentAffected=sourceSha256?hashes.has(sourceSha256):null;
+    // An excluded candidate ID cannot narrow an origin/critical/rights question
+    // about its original document. Published siblings retain that impact.
+    const recordScoped=['known_gap','privacy_excluded'].includes(item.classification)&&recordAffected!==null;
+    const candidateAffected=recordScoped?recordAffected:recordAffected===true||documentAffected===true?true
+      :recordAffected!==null||documentAffected!==null||sourceContributes===false?false:null;
     const reasons:string[]=[];
     const visit=(node:unknown):void=>{if(Array.isArray(node)){node.forEach(visit);return;}if(node&&typeof node==='object')for(const [key,child] of Object.entries(node)){
       if(['reason','reasonCode','holdReasons'].includes(key)){if(typeof child==='string')reasons.push(child);else if(Array.isArray(child))for(const reason of child)if(typeof reason==='string')reasons.push(reason);}

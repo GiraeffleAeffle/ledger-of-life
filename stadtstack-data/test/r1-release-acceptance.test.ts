@@ -5,7 +5,7 @@ import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {computeReleaseAcceptance,classifyReleaseException,inventoryExceptionItems,loadStep8ExceptionBundle,
-  OPTION_B_APPROVAL_SHA256,Step8ExceptionInventorySchema,runReleaseAcceptance} from '../src/r1-release-acceptance.ts';
+  OPTION_B_APPROVAL_SHA256,Step8ExceptionInventorySchema,runReleaseAcceptance,requireStep8AssessmentCoverage} from '../src/r1-release-acceptance.ts';
 import {dataReleaseId} from '../src/data-release.ts';
 import {FROZEN_R1_INPUTS} from '../src/pilot-value-audit.ts';
 import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
@@ -48,17 +48,34 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
       completeAnswers:{actual:8,minimum:8,pass:true},correctness:{actual:60,required:60,denominator:60,pass:true},sources:{actual:46,minimum:46,denominator:60,pass:true},
       graphPairs:{actual:7,required:7,minimumGain:2,gain:2,correctnessLosses:0,pass:true,pairs:['W03','W04','E03','B03','K03','M03','H03'].map((id,index)=>({id,reviewed:true,usefulnessWithout:1,usefulnessWith:index<2?2:1,gain:index<2?1:0,correctnessWithout:2,correctnessWith:2}))},
       unresolvedCriticalAndRights:{actual:0,required:0,pass:true},ownerWorkload:{plannedMinutes:80,maximumMinutes:120,pass:true},ownerFindings:{blockingFindings:[] as string[],pass:true}}};
+  const selectAssessment=async(recordId:string)=>{
+    const paths={} as Record<'item'|'A'|'B'|'C',string>,pins:Record<string,string>={finalArtifactSha256:h};
+    for(const role of ['item','A','B','C'] as const){
+      const payload={itemId:recordId,role,fixture:'Synthetic artifact-binding fixture; not a real assessment receipt.'};
+      const sha256=hash(JSON.stringify(payload)+'\n'),pin=await save(`cas/sha256/${sha256.slice(0,2)}/${sha256}`,payload);
+      paths[role]=pin.path;pins[role==='item'?'itemArtifactSha256':role+'ArtifactSha256']=pin.sha256;
+    }
+    inventory.assessments.push({recordId,...paths});return {recordId,pins};
+  };
   const seal=async()=>{
-    const exceptions=await save('exception-inventory.json',inventory),assessmentManifest=await save('assessments.json',[]);
+    const auditManifest=[];
+    for(const [index,raw] of inventory.assessments.entries()){
+      const row=raw as Record<'item'|'A'|'B'|'C',string>,copy={} as Record<'item'|'A'|'B'|'C',string>;
+      for(const role of ['item','A','B','C'] as const)copy[role]=(await save(`audit/${index}-${role}.json`,JSON.parse(await readFile(row[role],'utf8')))).path;
+      auditManifest.push(copy);
+    }
+    const exceptions=await save('exception-inventory.json',inventory),assessmentManifest=await save('assessments.json',auditManifest);
     const handoff=await save('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest,policy:{}});
     const audit=await persistReplay();
     const gate=await save('release-gate.json',{schemaVersion:'stadtstack-r1-step8-gate-v1',...gateState,releaseId:manifest.id,manifestSha256:manifestPin.sha256,candidateDirectory,campaign,
       exceptionInventory:exceptions,step9Handoff:handoff,replayReceipt:receiptPin,replayAuditSha256:audit.sha256,generationNonce:'synthetic-generation'});
     const step8={gate,exceptions,handoff};
-    const valueVerdict=await save('value-verdict.json',{...value,step8});
+    const bundle=(await loadStep8ExceptionBundle(step8)).bundle;
+    const step8AssessmentCoverage=requireStep8AssessmentCoverage(bundle,bundle.requiredAssessments.map(entry=>entry.contentSha256));
+    const valueVerdict=await save('value-verdict.json',{...value,step8,step8AssessmentCoverage});
     return {step8,valueVerdict,ownerApproval:{path:new URL('../reports/approvals/r1-autonomy-and-release-2026-10-14.json',import.meta.url).pathname,sha256:OPTION_B_APPROVAL_SHA256}};
   };
-  return {root,save,seal,inventory,value,gateState,proof,manifest,manifestPin};
+  return {root,save,seal,selectAssessment,inventory,value,gateState,proof,manifest,manifestPin};
 }
 
 test('whole release acceptance is immutable-input bound and option B defers only sample audit',async t=>{
@@ -95,7 +112,7 @@ test('current selected A/B/C admission distinguishes superseded assessment jobs 
   source.classification=classifyStep8Exception(source.cases);
   source.terminalAssessmentExceptions=[{recordIds:['admitted:fixture'],reasonCode:'quality_failed',step:'assessment_reconcile'}];
   assert.equal((await computeReleaseAcceptance(await f.seal())).accepted,false);
-  source.assessments=[{recordId:'admitted:fixture',pins:{itemArtifactSha256:h,AArtifactSha256:h,BArtifactSha256:h,CArtifactSha256:h,finalArtifactSha256:h}}];
+  source.assessments=[await f.selectAssessment('admitted:fixture')];
   const items=inventoryExceptionItems(f.inventory);
   assert.ok(items.every(item=>!item.blocking));assert.ok(items.some(item=>item.classification==='superseded_assessment'));
   assert.equal((await computeReleaseAcceptance(await f.seal())).accepted,true);
@@ -219,6 +236,48 @@ test('unknown case codes remain blockers even when accompanied by a controlled q
   source.queueEvidence={stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'held_quality',reasonCode:'quality_failed'}}]};
   assert.ok((await computeReleaseAcceptance(await f.seal())).exceptionItems.some(item=>item.classification==='unknown'&&item.blocking));
   source.terminalAssessmentExceptions=[{recordIds:['admitted:fixture'],reasonCode:'invented_code'}];
-  source.assessments=[{recordId:'admitted:fixture',pins:{itemArtifactSha256:h,AArtifactSha256:h,BArtifactSha256:h,CArtifactSha256:h,finalArtifactSha256:h}}];
+  source.assessments=[await f.selectAssessment('admitted:fixture')];
   assert.ok((await computeReleaseAcceptance(await f.seal())).exceptionItems.some(item=>item.origin.includes('terminalAssessmentExceptions')&&item.classification==='unknown'&&item.blocking));
+});
+
+test('an excluded ID cannot mask document-wide origin, rights or critical impact on a published sibling',async t=>{
+  const f=await fixture('website',h);t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const source=f.inventory.sourceDispositions[0];
+  for(const reason of ['origin_unresolved','copyright_question','rights_pending','assessment_held','disagreement']){
+    source.cases=[{reason,candidate:{id:'excluded-record'}}];source.classification=classifyStep8Exception(source.cases);
+    const result=await computeReleaseAcceptance(await f.seal());
+    assert.equal(result.accepted,false,reason);
+    assert.ok(result.exceptionItems.some(item=>item.candidateAffected===true&&item.blocking),reason);
+  }
+  source.cases=[{reason:'terminal_assessment_exception:quality_failed',candidate:{id:'excluded-record'}}];
+  source.classification=classifyStep8Exception(source.cases);
+  const excludedRecordHold=await computeReleaseAcceptance(await f.seal());
+  assert.equal(excludedRecordHold.accepted,true);
+  assert.ok(excludedRecordHold.exceptionItems.some(item=>item.classification==='known_gap'&&item.candidateAffected===false));
+});
+
+test('handoff assessment manifest and every selected triplet are authenticated and bound to value coverage',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  f.inventory.sourceDispositions[0].assessments=[await f.selectAssessment('admitted:fixture')];
+  const selected=await f.seal(),{bundle}=await loadStep8ExceptionBundle(selected.step8);
+  assert.equal(bundle.requiredAssessments.length,1);assert.equal((await computeReleaseAcceptance(selected)).accepted,true);
+  const value=JSON.parse(await readFile(selected.valueVerdict.path,'utf8'));
+  value.step8AssessmentCoverage.included=0;
+  const altered=await f.save('altered-value-verdict.json',value);
+  assert.ok((await computeReleaseAcceptance({...selected,valueVerdict:altered})).blockers.includes('value_verdict_step8_assessment_coverage_mismatch'));
+  const missing={...value};delete missing.step8AssessmentCoverage;
+  await assert.rejects(computeReleaseAcceptance({...selected,valueVerdict:await f.save('missing-coverage.json',missing)}));
+  assert.throws(()=>requireStep8AssessmentCoverage(bundle,[]),/triplet missing/);
+  await f.save('assessments.json',[]);
+  await assert.rejects(loadStep8ExceptionBundle(selected.step8),/hash mismatch/);
+});
+
+test('handoff artifact substitution and omission of selected triplets fail closed',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  f.inventory.sourceDispositions[0].assessments=[await f.selectAssessment('admitted:fixture')];
+  const selected=await f.seal();
+  await f.save('audit/0-A.json',{fixture:'Substituted synthetic receipt.'});
+  await assert.rejects(loadStep8ExceptionBundle(selected.step8),/hash mismatch/);
+  f.inventory.assessments=[];
+  await assert.rejects(f.seal(),/omits selected triplets/);
 });
