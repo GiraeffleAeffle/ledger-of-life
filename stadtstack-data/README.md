@@ -782,8 +782,15 @@ parser, provider, authorization or owner-check receipts.
    selectors match both published attribution and verified parser locators;
    full native parser JSON is not sent to assessors. Stale, missing or oversized
    original/parser/public-locator closure holds without trimming or network refresh.
-   The empty-evidence custody anchor is a genuine current policy receipt, never
-   an implied source. The default ceiling is 2 total Codex calls (A+C; allowed
+   Collection and every value-item original-evidence read also require exact
+   canonical equality with the unique primary `get_signal`/`get_source` responses.
+   Question membership and completeness are re-derived from the recorded bounded
+   search/graph queries: recomputing report hashes cannot widen MCP attribution
+   or move another question's evidence into an answer.
+   The custody anchor is a genuine current policy receipt whose original remains
+   a retained governed job input, including for empty answers. It is never implied
+   answer evidence; actual answer sources still obey the question's town filter.
+   The default ceiling is 2 total Codex calls (A+C; allowed
    2–48) per answer-unit SHA(bank, release, question, lane); evidence changes do
    not reset it. B uses the separately authorized Haiku Max lane.
    The atomic enqueue produces thirty

@@ -42,7 +42,7 @@ export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:Mode
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
 export async function assessmentBJobContract(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
@@ -123,23 +123,26 @@ export class DistrictAssessmentBroker {
   const item=assessmentItemSchema.parse(JSON.parse((await this.cas.read(itemHash)).toString('utf8')));
   if(digest(canonicalJson(item))!==itemHash)throw new DistrictExecutionHold('quality_failed');
   if(item.valueTarget)assertValueAssessmentContext(item);
-  const hashes=[itemHash,...assessmentEvidenceArtifactHashes(item)];
+  const anchor=item.valueContext?await loadPolicyReceipt(this.cas,item.valueContext.custodyReceiptSha256):undefined;
+  const hashes=[...new Set([itemHash,...assessmentEvidenceArtifactHashes(item),...(anchor?[anchor.source.sha256]:[])])];
   if(hashes.some(hash=>!spec.inputArtifactHashes.includes(hash)))throw new DistrictExecutionHold('policy_excluded');
   const artifacts=await client.query<{sha256:string;disposition:string}>('SELECT sha256,disposition FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
   if(artifacts.rows.length!==new Set(hashes).size||artifacts.rows.some(row=>row.disposition!=='retained'))throw new DistrictExecutionHold('policy_excluded');
   const currentAdmissionReceipts:Record<string,string>={};
   const sources:SourceReference[]=[],snapshots:{sourceId:string;originalSha256:string;scope:AdapterScope;snapshotSha256:string;currentReceiptSha256:string}[]=[];
   let validUntil=Infinity,primary=false;
-  const anchor=item.valueContext&&!item.sources.length?await loadPolicyReceipt(this.cas,item.valueContext.custodyReceiptSha256):undefined;
-  const policySources=anchor?[{sourceId:anchor.scope.sourceId,originalSha256:anchor.source.sha256,
+  // Custody may belong to another town; only this non-evidence anchor is exempt
+  // from the question's town filter. Actual answer sources always retain it.
+  const custodySource=anchor?{sourceId:anchor.scope.sourceId,originalSha256:anchor.source.sha256,
     admissionReceiptSha256:item.valueContext!.custodyReceiptSha256,textSha256:item.valueContext!.custodyReceiptSha256,
-    parserReceiptSha256:item.valueContext!.custodyReceiptSha256}]:item.sources;
+    parserReceiptSha256:item.valueContext!.custodyReceiptSha256}:undefined;
+  const policySources=[...item.sources,...custodySource&&!item.sources.some(source=>source.admissionReceiptSha256===custodySource.admissionReceiptSha256)?[custodySource]:[]];
   for(const source of policySources){
    const original=await loadPolicyReceipt(this.cas,source.admissionReceiptSha256);
    const scope=original.scope;
    if(item.valueTarget){
     const cities=z.array(z.string()).parse(item.valueTarget.question.cityIds);
-    if(!anchor&&!cities.includes(scope.municipalityId))throw new DistrictExecutionHold('policy_excluded');
+    if(source!==custodySource&&!cities.includes(scope.municipalityId))throw new DistrictExecutionHold('policy_excluded');
    }else if(scope.municipalityId!==spec.sourceScope.municipalityId||scope.ags!==spec.sourceScope.ags)throw new DistrictExecutionHold('policy_excluded');
    if(same(scope,spec.sourceScope)&&source.admissionReceiptSha256===spec.policyProofSha256)primary=true;
    const originalRow=await client.query<{state:string;receipt_json:unknown}>('SELECT state,receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1 AND source_sha256=$2',[source.admissionReceiptSha256,source.originalSha256]);
@@ -426,7 +429,9 @@ export async function enqueueAssessmentB(broker:DistrictAssessmentBroker,input:(
  const base={version:ASSESSMENT_BRIDGE_VERSION,role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:input.itemArtifactSha256};
  const selector=AssessmentBSelectorSchema.parse(input.transport==='mac-bridge'?{...base,transport:input.transport,clientContractSha256:input.clientContractSha256}:{...base,transport:input.transport,runnerOutputContractSha256:await ompRunnerOutputContractSha256()});
  const item=assessmentItemSchema.parse(JSON.parse((await broker.cas.read(selector.itemArtifactSha256)).toString('utf8')));
- return broker.store.enqueue({step:ASSESSMENT_B_STEP,lane:'assessment',semanticContractSha256:await assessmentBJobContract(),inputArtifactHashes:[...new Set([selector.itemArtifactSha256,...assessmentEvidenceArtifactHashes(item)])].sort(),sourceScope:ScopeSchema.parse(input.sourceScope),selector,policyProofSha256:HashSchema.parse(input.policyProofSha256)});
+ const anchor=item.valueContext?await loadPolicyReceipt(broker.cas,item.valueContext.custodyReceiptSha256):undefined;
+ if(item.valueContext&&item.valueContext.custodyReceiptSha256!==input.policyProofSha256)throw new DistrictExecutionHold('policy_excluded');
+ return broker.store.enqueue({step:ASSESSMENT_B_STEP,lane:'assessment',semanticContractSha256:await assessmentBJobContract(),inputArtifactHashes:[...new Set([selector.itemArtifactSha256,...assessmentEvidenceArtifactHashes(item),...(anchor?[anchor.source.sha256]:[])])].sort(),sourceScope:ScopeSchema.parse(input.sourceScope),selector,policyProofSha256:HashSchema.parse(input.policyProofSha256)});
 }
 
 /** Only the fixed SSH-invoked command may use this private raw JSON channel.

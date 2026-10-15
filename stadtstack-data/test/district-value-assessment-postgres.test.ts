@@ -42,6 +42,7 @@ test('candidate value answers run through governed A/B/C and reconciliation with
  assert.equal(queued.jobs.length,37);assert.equal(new Set(queued.jobs.map(job=>job.answerUnitSha256)).size,37);
  const requested=await db.query("SELECT spec FROM district_pipeline.jobs WHERE step='assessment_b'");
  assert.equal(requested.rows.length,37);assert.ok(requested.rows.every(row=>row.spec.selector.transport==='vm-omp'));
+ assert.ok(requested.rows.every(row=>row.spec.inputArtifactHashes.includes(f.source.originalSha256)),'all B units retain their real custody anchor, including empty evidence');
  const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>)=>{
   const authorizationId=await store.authorize({approvalSha256:digest('synthetic owner development approval '+randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
   return runDistrictJobs({store,cas,handlers,authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
@@ -62,6 +63,7 @@ test('candidate value answers run through governed A/B/C and reconciliation with
   const pending=run(BJobKey,{assessment_b:assessmentBJobHandler(broker)}),deadline=Date.now()+10000;
   for(;;){const rows=await db.query(`SELECT b.id FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready'`,[BJobKey]);if(rows.rowCount)break;if(Date.now()>=deadline)throw Error('Synthetic B lease deadline');await delay(10);}
   const lease=BridgeLeaseSchema.parse(await broker.dispatch({operation:'claim',jobKey:BJobKey,clientId:'synthetic-client',clientContractSha256}));
+  assert.ok(lease.data&&typeof lease.data==='object'&&!Array.isArray(lease.data));assert.ok('itemId' in lease.data);
   assert.equal('assessments' in lease.data,false);assert.equal(lease.data.itemId,item.itemId);
   const input=buildAssessmentPassInput(item,await originalEvidence(item,f.context),'B');assert.equal(canonicalJson(lease.data),canonicalJson(input.data));
   const output=valueOutput(item,item.sources.length?f.quote:undefined),config=PROVIDER_CONFIGS['anthropic-subscription'];
@@ -75,9 +77,12 @@ test('candidate value answers run through governed A/B/C and reconciliation with
   const exported=await exportValueAssessmentResults(db,cas,[finalKey],policy);assert.equal(exported.length,1);
   assert.ok(exported[0].item.endsWith(selected.itemArtifactSha256));assert.ok(exported[0].C.startsWith(cas.root));
   const count=await db.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[selected.answerUnitSha256]);assert.equal(Number(count.rows[0].count),2);
-  const over=await store.enqueue({step:'assessment_a',lane:'assessment',semanticContractSha256:digest('synthetic cap check'),inputArtifactHashes:[selected.itemArtifactSha256],sourceScope:scope,selector:{fixture:'third-call-must-hold',answerUnitSha256:selected.answerUnitSha256},policyProofSha256:f.policyArtifact.sha256});
-  const denied=await run(over,{assessment_a:async context=>{await reserveR1CodexCall(db,context.job,selected.answerUnitSha256,digest('synthetic forbidden third request'),48);throw Error('Cap was bypassed');}});
+  const over=await store.enqueue({step:'assessment_a',lane:'assessment',semanticContractSha256:digest('synthetic cap check'),inputArtifactHashes:[selected.itemArtifactSha256,f.source.originalSha256],sourceScope:scope,selector:{fixture:'third-call-must-hold',answerUnitSha256:selected.answerUnitSha256},policyProofSha256:f.policyArtifact.sha256});
+  let attempted=false;
+  const denied=await run(over,{assessment_a:async context=>{attempted=true;await reserveR1CodexCall(db,context.job,selected.answerUnitSha256,digest('synthetic forbidden third request'),48);throw Error('Cap was bypassed');}});
+  assert.equal(attempted,true,'the genuine policy-authorized handler reaches accounting');
   assert.equal(denied.reasonCode,'source_limit_exceeded');
+  assert.equal(Number((await db.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[selected.answerUnitSha256])).rows[0].count),2);
  }
  assert.equal(Number((await db.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256])).rows[0].count),0,'value answer units do not spend or reset source-document call caps');
 });

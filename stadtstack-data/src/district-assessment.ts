@@ -14,6 +14,7 @@ import { PreparedDocumentSchema, verifyPreparedDocument } from './district-prepa
 import { CIVIC_ACQUISITION_DECISION_ID, ManagedSourceBindingSchema, type CivicPolicyOptions, type ManagedSourceContext } from './civic-opt-out.ts';
 import {AssessmentContextSchema,AssessmentContextHold,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
 import {ValueAssessmentContextSchema,assertValueAssessmentContext,assertValueSourceContext} from './district-value-context.ts';
+import {validateValueTargetTranscript,valueCallSchema} from './pilot-value-transcript.ts';
 export interface AssessmentEvidenceContext {
   cas: DistrictCas; policyOptions?: CivicPolicyOptions;
   currentAdmissionReceipts?: Readonly<Record<string,string>>;
@@ -127,7 +128,7 @@ export async function originalEvidence(item: AssessmentItem, context: Assessment
   if (new Set(item.sources.map(s => s.mcpSourceId ?? s.sourceId)).size !== item.sources.length) throw Error('Duplicate source identities');
   if (bytesHash(item.rubric) !== item.rubricSha256) throw Error('Rubric binding failed');
   if (!item.sources.length && (!item.valueTarget || Object.keys(item.valueTarget.sources).length)) throw Error('Missing original evidence');
-  if(item.valueContext)assertValueAssessmentContext(item);
+  if(item.valueContext){assertValueAssessmentContext(item);validateValueTargetTranscript(item.valueTarget!);}
   if (item.valueTarget && Object.keys(item.valueTarget.sources).length !== item.sources.length) throw Error('Value target original source coverage mismatch');
   let residualProjection = false;
   if (!item.valueTarget && !item.criticalTarget) {
@@ -300,7 +301,7 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
     data.valueTarget = { ...target, projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(target),
       records: Object.fromEntries(Object.entries(target.records).map(([id, record]) => [id, project(record)])),
       sources: Object.fromEntries(Object.entries(target.sources).map(([id, source]) => [id, project(source)])),
-      calls: item.valueContext?target.calls.map(call=>({id:call.id,tool:call.tool,selection:call.selection,responseSha256:call.responseSha256,
+      calls: item.valueContext?target.calls.map(call=>valueCallSchema.parse(call)).map(call=>({id:call.id,tool:call.tool,selection:call.selection,responseSha256:call.responseSha256,
         ...(['entity_search','graph_neighbors','graph_path'].includes(call.tool)?{response:project(call.response)}:{})})):target.calls.map(project) };
   }
   if (item.criticalTarget) data.criticalTarget = { ...item.criticalTarget,

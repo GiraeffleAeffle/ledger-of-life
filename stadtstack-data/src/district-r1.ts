@@ -412,6 +412,7 @@ async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:Distric
 
 export async function districtR1Cli(argv=process.argv.slice(2)){
  const [command,...rawArgs]=argv;
+ if(command==='--help'||command==='help'){process.stdout.write('Usage: district-r1.ts COMMAND --registry-config PATH --registry-descriptor PATH [bounded JSON stdin]\n');return;}
  if(command==='registry-descriptor'){
   if(rawArgs.length!==4||rawArgs[0]!=='--commit'||rawArgs[2]!=='--output'||!rawArgs[1]||!rawArgs[3])throw Error('registry-descriptor requires exactly --commit <oid> --output <dir>');
   const output=resolve(rawArgs[3]),root=resolve(OPERATOR_ROOT),part=relative(root,output);

@@ -1,13 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {rm} from 'node:fs/promises';
-import {candidateTransport,parseCandidateCollection,assessedValueReview,canonical} from '../src/evaluate-pilot-value.ts';
+import {candidateTransport,parseCandidateCollection,assessedValueReview,canonical,valueAssessmentTarget} from '../src/evaluate-pilot-value.ts';
 import {buildValueAssessmentItem,ValueAssessmentEnqueueSchema} from '../src/district-assessment-jobs.ts';
 import {assertValueAssessmentContext,valueAnswerUnit,valueWindows,boundedValueSource,assertValueSourceContext} from '../src/district-value-context.ts';
 import {assertResidualAssessmentContext,originalEvidence,buildAssessmentPassInput,deterministicChecks,assessmentOutputSchema} from '../src/district-assessment.ts';
 import {AssessmentContextHold,ASSESSMENT_CONTEXT_BYTES,ASSESSMENT_RECONCILIATION_BYTES} from '../src/district-assessment-context.ts';
 import {syntheticAssessmentTriplet,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
-import {valueAssessmentFixture,valueOutput} from './district-value-assessment.fixture.ts';
+import {valueAssessmentFixture,valueOutput,rebindValueFixtureRows} from './district-value-assessment.fixture.ts';
 import {canonicalJson,digest as bytesHash} from '../src/district-adapter-contract.ts';
 import {encodeStepReceipt,StepReceiptSchema} from '../src/district-step-receipt.ts';
 import {digest as valueDigest} from '../src/evaluate-pilot-value.ts';
@@ -75,14 +75,13 @@ test('empty original evidence yields an honest assessed abstention, never a forc
 });
 test('value byte ceilings hold rather than trimming originals or C receipts',async t=>{
  const f=await valueAssessmentFixture();t.after(()=>rm(f.directory,{recursive:true,force:true}));
- const wide={...f.source,locators:[{id:'wide',page:1,table:null,start:0,end:f.text.length}]};
  const item=await buildValueAssessmentItem(f.report,'W01','withoutGraph',[f.source],f.policyArtifact.sha256,f.context);
  const evidence=await originalEvidence(item,f.context),input=buildAssessmentPassInput(item,evidence,'A');
  const output=assessmentOutputSchema.parse({...valueOutput(item,f.quote),rationale:'x'.repeat(22000)});
  const A=syntheticAssessmentReceipt(item,'A',output,input.data),B=syntheticAssessmentReceipt(item,'B',output,input.data);
  assert.throws(()=>buildAssessmentPassInput(item,evidence,'C',{A,B}),{reasonCode:'assessment_context_exceeded'});
  const huge=structuredClone(f.report);huge.method.grading='x'.repeat(22000);
- await assert.rejects(buildValueAssessmentItem(huge,'W01','withoutGraph',[wide],f.policyArtifact.sha256,f.context),{reasonCode:'assessment_context_exceeded'});
+ await assert.rejects(buildValueAssessmentItem(huge,'W01','withoutGraph',[f.source],f.policyArtifact.sha256,f.context),{reasonCode:'assessment_context_exceeded'});
  const text='a'.repeat(300)+'😀'+'b'.repeat(300);assert.deepEqual(valueWindows(text,[{start:557,end:558}]),[{start:302,end:text.length}]);
  assert.throws(()=>valueWindows(text,[{start:301,end:302}]),AssessmentContextHold);
 });
@@ -123,4 +122,54 @@ test('value text context is clipped to the immutable MCP prepared-text interval,
  assert.throws(()=>boundedValueSource(f.source,f.text,{locator:`text-sha256:${'e'.repeat(64)};chars:0-${f.text.length}`}),AssessmentContextHold);
  const enlarged=structuredClone(source);enlarged.contextSelection!.spans[0].start--;
  assert.throws(()=>assertValueSourceContext(enlarged,f.text,attribution),AssessmentContextHold);
+});
+test('recomputed row hashes cannot widen served attribution or forge search/graph membership',async t=>{
+ const f=await valueAssessmentFixture();t.after(()=>rm(f.directory,{recursive:true,force:true}));
+ const forged=structuredClone(f.report);
+ forged.sources['source:fixture'].locator=`text-sha256:${f.source.textSha256};chars:0-${f.text.length}`;
+ rebindValueFixtureRows(forged);
+ assert.throws(()=>parseCandidateCollection(forged));
+ assert.throws(()=>valueAssessmentTarget(forged,forged.evaluations[0],'withoutGraph'));
+ await assert.rejects(buildValueAssessmentItem(forged,'W01','withoutGraph',[f.source],f.policyArtifact.sha256,f.context));
+ const item=await buildValueAssessmentItem(f.report,'W01','withoutGraph',[f.source],f.policyArtifact.sha256,f.context);
+ const changed=structuredClone(item);changed.valueTarget!.sources=forged.sources;
+ changed.valueContext!.targetSha256=valueDigest(changed.valueTarget);
+ await assert.rejects(originalEvidence(changed,f.context));
+ for(const mutate of [
+  (report:typeof f.report)=>{report.calls.push({...structuredClone(report.calls[1]),id:report.calls.length});},
+  (report:typeof f.report)=>{report.calls[0].tool='list_cities';},
+  (report:typeof f.report)=>{report.evaluations[1].recordIds=['record:fixture'];},
+  (report:typeof f.report)=>{report.evaluations.find(row=>row.question.id==='W03')!.graph.recordIds=['record:fixture'];},
+  (report:typeof f.report)=>{report.evaluations[0].callIds.pop();},
+ ]){
+  const report=structuredClone(f.report);mutate(report);rebindValueFixtureRows(report);
+  assert.throws(()=>parseCandidateCollection(report));
+ }
+});
+test('served graph witnesses establish only the graph lane and require exact neighbor/path calls',async t=>{
+ const f=await valueAssessmentFixture();t.after(()=>rm(f.directory,{recursive:true,force:true}));
+ const report=structuredClone(f.report),row=report.evaluations.find(value=>value.question.id==='W03')!;
+ const entity=report.calls[row.graph.callIds[0]];entity.response={items:[{id:'entity:1'},{id:'entity:2'}],nextCursor:null,complete:true};
+ entity.responseSha256=valueDigest(entity.response);
+ const append=(tool:string,selection:Record<string,unknown>,response:unknown)=>{
+  const id=report.calls.length;report.calls.push({id,tool,selection,response,responseSha256:valueDigest(response)});row.graph.callIds.push(id);
+ };
+ for(const id of ['entity:1','entity:2'])append('graph_neighbors',{id,direction:'both',limit:50},
+  {items:[{recordId:'record:fixture',municipalityId:row.question.cityIds[0]}],nextCursor:null,complete:true});
+ append('graph_path',{fromId:'entity:1',toId:'entity:2',maxHops:5,limit:20},{paths:[],complete:true});
+ row.graph.recordIds=['record:fixture'];rebindValueFixtureRows(report);parseCandidateCollection(report);
+ assert.deepEqual(Object.keys(valueAssessmentTarget(report,row,'withoutGraph').records),[]);
+ assert.deepEqual(Object.keys(valueAssessmentTarget(report,row,'withGraph').records),['record:fixture']);
+ const changed=structuredClone(report);changed.calls.at(-1)!.selection.maxHops=4;
+ assert.throws(()=>parseCandidateCollection(changed));
+});
+test('persisted opaque pagination re-derives completeness and rejects a missing continuation',async t=>{
+ const f=await valueAssessmentFixture();t.after(()=>rm(f.directory,{recursive:true,force:true}));
+ const report=structuredClone(f.report),row=report.evaluations[1],first=report.calls[row.callIds[0]],cursor='[opaque pagination cursor omitted]';
+ first.response={items:[],nextCursor:cursor,complete:false};first.responseSha256=valueDigest(first.response);
+ const response={items:[],nextCursor:null,complete:true},id=report.calls.length;
+ report.calls.push({id,tool:first.tool,selection:{...first.selection,cursor},response,responseSha256:valueDigest(response)});row.callIds.push(id);
+ rebindValueFixtureRows(report);parseCandidateCollection(report);
+ row.retrievalComplete=false;rebindValueFixtureRows(report);assert.throws(()=>parseCandidateCollection(report));
+ row.retrievalComplete=true;row.callIds.pop();rebindValueFixtureRows(report);assert.throws(()=>parseCandidateCollection(report));
 });

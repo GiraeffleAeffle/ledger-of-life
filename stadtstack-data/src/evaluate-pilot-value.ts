@@ -9,13 +9,12 @@ import {z} from 'zod';
 import {pilotReviewSchema,assessmentItemSchema,reconcile,writeImmutable,auditFrameSchema,recordOwnerAudit,
   assessmentEvidenceContext,originalEvidence,buildAssessmentPassInput,type AssessmentEvidenceContext} from './district-assessment.ts';
 import {assertValueAssessmentContext,boundedValueSource,valueAnswerUnit} from './district-value-context.ts';
-import {runPilotValueAudit} from './pilot-value-audit.ts';
+import {VALUE_AREAS as areas,valueQuestionSchema as questionSchema,valueSearches,projectMcpResponse as safeResponse,
+  validateCandidateTranscript,validateValueTargetTranscript} from './pilot-value-transcript.ts';
 
 // Retrieval crosses MCP to the separately selected immutable release. Assessment
 // ingestion additionally verifies private originals; it never queries private candidate data.
 const sha=z.string().regex(/^[a-f0-9]{64}$/);
-const areas=['waerme','solar_wind','wohnen_planung','schule_kita','mobilitaet','haushalt_investitionen'] as const;
-const questionSchema=z.object({id:z.string(),area:z.enum(areas),cityIds:z.array(z.string()).min(1),query:z.string(),question:z.string(),requires:z.array(z.string()).min(1),graphDependent:z.boolean().optional(),graphQueries:z.array(z.string()).optional()}).strict();
 export const bankSchema=z.object({schemaVersion:z.literal('pilot-questions-v1'),frozenBeforeBaselineRetrieval:z.literal(true),scope:z.string(),municipalities:z.array(z.string()).length(9),questions:z.array(questionSchema).length(30)}).strict().superRefine((bank,ctx)=>{
   if(new Set(bank.questions.map(q=>q.id)).size!==30)ctx.addIssue({code:'custom',message:'Duplicate question ID'});
   if(new Set(bank.municipalities).size!==9)ctx.addIssue({code:'custom',message:'Duplicate municipality'});
@@ -25,7 +24,6 @@ export const bankSchema=z.object({schemaVersion:z.literal('pilot-questions-v1'),
 type Question=z.infer<typeof questionSchema>;
 type JsonObject=Record<string,unknown>;
 const objectSchema=z.record(z.string(),z.unknown());
-const topics:Record<Question['area'],string[]>={waerme:['waermeplanung'],solar_wind:['solarpark','windenergie'],wohnen_planung:['wohnbau'],schule_kita:['schule','kita'],mobilitaet:['mobilitaet'],haushalt_investitionen:['haushalt']};
 export const reviewSchema=pilotReviewSchema;
 export type Review=z.infer<typeof reviewSchema>;
 export interface AssessmentReviewProvenance {
@@ -91,6 +89,7 @@ function rowHash(row:EvaluationRow,report:Report){
 }
 export function validateReport(report:Report){
   if(report.schemaVersion!=='pilot-value-evaluation-v1'||report.evaluations.length!==30)throw Error('Expected thirty evaluations');
+  if(report.server.mode==='vm_candidate')validateCandidateTranscript(report);
   for(const call of report.calls)if(call.responseSha256!==digest(call.response))throw Error('MCP evidence response changed');
   for(const row of report.evaluations){
     if(row.evidenceSha256!==rowHash(row,report))throw Error('Reviewed evidence binding changed');
@@ -125,10 +124,12 @@ export function valueAssessmentTarget(report:Report,row:EvaluationRow,lane:'with
       return lane==='withGraph'||!row.graph.callIds.includes(call.id);
     });
   for(const call of calls)if(call.responseSha256!==digest(call.response))throw Error('Assessment MCP call binding changed');
-  return {questionBankSha256:report.questionBankSha256,releaseId:report.server.releaseId,evidenceSha256:row.evidenceSha256,
+  const target={questionBankSha256:report.questionBankSha256,releaseId:report.server.releaseId,evidenceSha256:row.evidenceSha256,
     lane,question:row.question,records:Object.fromEntries(recordIds.map(id=>[id,report.records[id]])),
     sources:Object.fromEntries(sourceIds.map(id=>[id,report.sources[id]])),calls,
     retrievalComplete:row.retrievalComplete,graphBounded:lane==='withGraph'&&row.graph.bounded};
+  if(report.server.mode==='vm_candidate')validateValueTargetTranscript(target);
+  return target;
 }
 export function prepareValueAssessment(report:Report,itemInput:unknown,lane:'withoutGraph'|'withGraph'){
   const item=assessmentItemSchema.parse(itemInput),row=report.evaluations.find(r=>r.question.id===item.itemId);
@@ -224,11 +225,6 @@ async function sourceIdentity(root:string){
   if(!/^[a-f0-9]{40}$/.test(gitCommit))throw Error('Cannot identify server source revision');
   return {gitCommit,sourceSha256:digest(files),sourceFiles:files};
 }
-function safeResponse(value:unknown):unknown {
-  if(Array.isArray(value))return value.map(safeResponse);
-  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).filter(([key])=>! /^(?:authorization|headers?|request|rawResponse|rawEvents|accessToken|refreshToken|apiKey|accountId|email)$/i.test(key)).map(([key,item])=>[key,(key==='nextCursor'||key==='cursor')&&typeof item==='string'?'[opaque pagination cursor omitted]':safeResponse(item)]));
-  return value;
-}
 export function decodeTool(result:unknown):JsonObject {
   const value=objectSchema.parse(result);if(value.isError)throw Error('MCP tool returned an error; no missing-data inference permitted');
   if(value.structuredContent)return objectSchema.parse(value.structuredContent);
@@ -252,6 +248,7 @@ export function parseCandidateCollection(input:unknown):Report{
   if(objectSchema.parse(report.releaseStatus.dataManifest).id!==report.server.releaseId
     ||objectSchema.parse(report.releaseStatus.release).mode!=='vm_candidate')throw Error('Candidate release identity changed');
   for(const [id,call] of report.calls.entries())if(call.id!==id||call.responseSha256!==digest(call.response))throw Error('Candidate MCP transcript changed');
+  validateCandidateTranscript(report);
   for(const row of report.evaluations)if(row.evidenceSha256!==rowHash(row,report))throw Error('Candidate evidence changed');
   return report;
 }
@@ -305,16 +302,12 @@ export async function collect(options:{serverRoot:string;releaseId:string;toolCo
     for(const question of bank.questions){
       const row:EvaluationRow={question,recordIds:[],callIds:[],retrievalComplete:true,graph:{available:graphAvailable,callIds:[],recordIds:[],bounded:false},evidenceSha256:'',review:null};
       const found=new Set<string>();
-      const selections:[string,JsonObject][]=[['search_topics',{query:question.query,cityIds:question.cityIds,excludePlaces:true,excludeOSM:true}]];
-      for(const topic of topics[question.area]){
-        selections.push(['search_topics',{topic,cityIds:question.cityIds,excludePlaces:true,excludeOSM:true}]);
-        for(const municipalityId of question.cityIds)selections.push(['get_regional_topics',{topic,municipalityId,excludePlaces:true,excludeOSM:true}]);
-      }
+      const selections=valueSearches(question);
       for(const [tool,selection] of selections){const result=await pages(tool,selection);row.callIds.push(...result.callIds);row.retrievalComplete&&=result.complete;for(const item of result.items)found.add(z.string().parse(item.id));}
       row.recordIds=[...found].sort();
       for(const id of row.recordIds){
-        if(!report.records[id]){const result=await call('get_signal',{id});report.records[id]=result.data;row.callIds.push(result.id);}
-        for(const sourceId of z.array(z.string()).parse(report.records[id].sourceIds))if(!report.sources[sourceId]){const result=await call('get_source',{sourceId});report.sources[sourceId]=result.data;row.callIds.push(result.id);}
+        if(!report.records[id]){const result=await call('get_signal',{id});report.records[id]=objectSchema.parse(safeResponse(result.data));row.callIds.push(result.id);}
+        for(const sourceId of z.array(z.string()).parse(report.records[id].sourceIds))if(!report.sources[sourceId]){const result=await call('get_source',{sourceId});report.sources[sourceId]=objectSchema.parse(safeResponse(result.data));row.callIds.push(result.id);}
       }
       if(question.graphDependent&&graphAvailable){
         const entities=new Set<string>();
@@ -338,8 +331,8 @@ export async function collect(options:{serverRoot:string;releaseId:string;toolCo
         for(const id of row.graph.callIds)findEvidence(report.calls[id].response);
         row.graph.recordIds=[...graphRecords].sort();
         for(const id of row.graph.recordIds){
-          if(!report.records[id]){const result=await call('get_signal',{id});report.records[id]=result.data;row.callIds.push(result.id);}
-          for(const sourceId of z.array(z.string()).parse(report.records[id].sourceIds))if(!report.sources[sourceId]){const result=await call('get_source',{sourceId});report.sources[sourceId]=result.data;row.callIds.push(result.id);}
+          if(!report.records[id]){const result=await call('get_signal',{id});report.records[id]=objectSchema.parse(safeResponse(result.data));row.callIds.push(result.id);}
+          for(const sourceId of z.array(z.string()).parse(report.records[id].sourceIds))if(!report.sources[sourceId]){const result=await call('get_source',{sourceId});report.sources[sourceId]=objectSchema.parse(safeResponse(result.data));row.callIds.push(result.id);}
         }
       }
       row.evidenceSha256=rowHash(row,report);report.evaluations.push(row);
@@ -398,6 +391,7 @@ export function markdown(report:EvaluationMarkdownInput,evidencePath:string):str
 async function save(path:string,value:string){await mkdir(dirname(path),{recursive:true});await writeFile(path,value);}
 async function main(){
   const [mode,...args]=process.argv.slice(2),options=new Map<string,string>();
+  if(mode==='--help'||mode==='help'){console.log('Usage: evaluate-pilot-value.ts collect|prepare-assessment|ingest-assessments|finalize|audit-packet|ingest-owner-audit|verdict [--option value]');return;}
   for(let i=0;i<args.length;i+=2){if(!args[i]?.startsWith('--')||!args[i+1]||args[i+1].startsWith('--'))throw Error('Expected named option and value');options.set(args[i].slice(2),args[i+1]);}
   const required=(name:string)=>{const value=options.get(name);if(!value)throw Error('Required evaluation option missing');return value;};
   const load=async(path:string)=>JSON.parse(await readFile(path,'utf8')) as Report;
@@ -434,7 +428,8 @@ async function main(){
     if(options.has('baseline'))report.comparison=compareReports(await load(required('baseline')),report);
     await save(path,JSON.stringify(report,null,2)+'\n');await save(required('markdown'),markdown(report,path));console.log(JSON.stringify(report.summary));
   }else if(mode==='audit-packet'||mode==='ingest-owner-audit'||mode==='verdict'){
-    await runPilotValueAudit(mode,options);
+    // Audit initialization consumes these evaluator schemas; defer it until this module is initialized.
+    await (await import('./pilot-value-audit.ts')).runPilotValueAudit(mode,options);
   }else throw Error('Use collect, prepare-assessment, ingest-assessments, finalize, audit-packet, ingest-owner-audit or verdict');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(()=>{console.error('Pilot evaluation failed; no credentials, server stderr or raw protocol objects emitted. Check pinned release, tool contract and review evidence.');process.exitCode=1;});
