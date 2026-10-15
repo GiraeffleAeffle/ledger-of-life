@@ -1,0 +1,30 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval and not a human review",
+ "issuedAt": "2026-10-15T09:58:00Z",
+ "installedReview": {
+  "path": "/etc/stadtstack/omp-b-review.json",
+  "owner": "root:root 0644",
+  "sha256": "ab1854d1f9e8245af22dbd440e62fe9fdffe98a16f8018d8582b6386749ace59",
+  "codeCommit": "8f345f038054d8266cba6cacf7f84e942771f68f",
+  "imageId": "sha256:91c2c2c451fbc0273b97d25523bab3308b7077edca33efaaf26af923209711df",
+  "containerOmp": "omp/18.9.2, ompBinarySha256 647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992 (embedded in the unchanged image)",
+  "hostResolver": "/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4 (root:root 0555, installed 2026-10-15T09:16Z as a copy of the then-current host omp), hostResolverBinarySha256 ff59fc1b484c1308a7247ad208305005627b3fac62b440737c2b1835ac32074e, hostResolverVersion omp/18.10.4",
+  "runnerContractSha256": "9bb83760aabf131bac67f911bfac9c0c8fa95f9c89315881676f6f114aa312f7",
+  "validation": "Parsed with OmpReviewSchema of 8f345f0 and compared with ompRunnerContractSha256() of the checkout: schema valid, contract match, reviewedAt not in the future."
+ },
+ "reviewsCovered": [
+  "r1-omp-b-image-review-2026-10-13 (image, settings, entrypoint)",
+  "B lane, typed holds and Codex scratch reviews merged at dd675e2",
+  "lock-wait db526d8..b572d5f (LockWaitReview), step-9 value lanes 1c84ed3..af46461 (Step9Review), lock-holder f3a270f (LockWaitReview), pg-resilience e135e1e/97f183e (DispositionReview), usage-autoresume 72d90f9/7920958 and merge c1aca12 (UsageReview), host-resolver pin 7c35b32 (OmpPinReview): AI static reviews by reviewer agents, no P0-P3 findings remaining"
+ ],
+ "disclosedLimits": [
+  "The host resolver runs as uid max with HOME=/home/max; it is not isolated from a hostile process running as the same user (OmpPinReview).",
+  "Account stability is a comparison of displayed account labels, not an immutable account identity."
+ ],
+ "incidents": [
+  "The review installed at 2026-10-15T05:04:39Z had a securityReviewId of 205 characters, above the schema maximum of 200, so it never validated. Separately, the host omp at /home/max/.local/bin/omp had auto-updated to omp/18.10.4 at 2026-10-14T16:01Z, which no longer matched the pinned binary hash. Either fault holds B jobs with omp_security_review_required. One B job (ruedersdorf-bei-berlin-participation, job d28fc28e-dd20-4208-911e-443254296c78, claimed lease and submission intent at 07:49:54Z, no container start) is held permanently; the B contract change at 8f345f0 gives its item a new canonical job.",
+  "Countermeasure: every installed review is now validated against the current schema and contract before the campaign uses it."
+ ]
+}
