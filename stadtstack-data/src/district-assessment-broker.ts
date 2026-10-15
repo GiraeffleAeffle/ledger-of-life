@@ -49,7 +49,7 @@ interface SourceReference {sha256:string;url:string;policyReceiptSha256:string}
 interface PolicyPin {originalSha256:string;originalReceiptSha256:string;original:PolicyReceipt;currentReceiptSha256:string;current:PolicyReceipt;configured:string|undefined}
 interface CheckedEvidence {item:AssessmentItem;evidence:OriginalEvidence;data:Record<string,unknown>;sources:SourceReference[];sourceAuthority:CivicPolicyAuthorityReceipt;policySnapshotSha256:string;optOutSnapshotSha256:string;artifactHashes:string[];policyPins:PolicyPin[];validUntil:number}
 type EvidenceCheck={checked:CheckedEvidence}|{reason:ReasonCode};
-interface SubmissionRow extends QueryResultRow {submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;receipt_artifact_sha256:string|null;reconciliation_input_sha256:string;provider_request_id:string|null;provider_response_id:string|null;state:'accepted'|'rejected';reason_code:ReasonCode}
+interface SubmissionRow extends QueryResultRow {lease_id:string;submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;receipt_artifact_sha256:string|null;reconciliation_input_sha256:string;provider_request_id:string|null;provider_response_id:string|null;state:'accepted'|'rejected';reason_code:ReasonCode;committed_at:Date}
 export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:ModelAnswer;providerRequestId:string|null;providerResponseId:string|null;clocks:Pick<BridgeAnswer,'startedAt'|'finishedAt'>}
 interface StagedSubmission {response:CasArtifact;answer:CasArtifact;receipt:CasArtifact|null;reconciliation:CasArtifact;parsed:RecordedBridgeAssessment|undefined}
 
@@ -413,8 +413,11 @@ export class DistrictAssessmentBroker {
      const selector=AssessmentBSelectorSchema.parse(job.spec.selector);
      if(!saved||saved.state!=='accepted'||!saved.receipt_artifact_sha256||selector.transport==='mac-bridge'&&!row.purge_ack_sha256)throw new DistrictExecutionHold('quality_failed');
      if(!completion)return null; // Submission committed while the unlocked read was in flight.
-     if(!same(saved,completion.saved))throw new DistrictExecutionHold('quality_failed');
-     const receipt=completion.receipt;
+     const {saved:previous,receipt}=completion;
+     // pg returns audit timestamps as Date, not canonical-JSON values. Fence
+     // every immutable submission field without serializing driver objects.
+     const fields=['lease_id','submission_sha256','provider_response_sha256','answer_artifact_sha256','receipt_artifact_sha256','reconciliation_input_sha256','provider_request_id','provider_response_id','state','reason_code'] as const;
+     if(saved.committed_at.getTime()!==previous.committed_at.getTime()||fields.some(field=>saved[field]!==previous[field]))throw new DistrictExecutionHold('quality_failed');
      if(receipt.requestSha256!==row.request_sha256||receipt.provider!=='anthropic-subscription'||receipt.dependencies.length)throw new DistrictExecutionHold('quality_failed');
      const hashes=[row.request_artifact_sha256,saved.provider_response_sha256,saved.answer_artifact_sha256,saved.receipt_artifact_sha256,saved.reconciliation_input_sha256];
      const artifacts=await client.query<{sha256:string;kind:ArtifactKind;mime_type:string;byte_length:string;storage_key:string;disposition:string}>('SELECT * FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);

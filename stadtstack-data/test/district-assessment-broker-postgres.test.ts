@@ -118,7 +118,8 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const run=await f.run;assert.equal(run.state,'completed');
   assert.deepEqual(await f.broker.dispatch(request),ack,'exact ACK replay has no model/resubmission effect');
   await assert.rejects(f.broker.dispatch({...request,answer:{...request.answer,stdout:request.answer.stdout+'\n'}}));
-  const submission=await db.query<{provider_response_sha256:string;receipt_artifact_sha256:string;answer_artifact_sha256:string;reconciliation_input_sha256:string}>('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[lease.leaseId]);
+  const submission=await db.query<{provider_response_sha256:string;receipt_artifact_sha256:string;answer_artifact_sha256:string;reconciliation_input_sha256:string;committed_at:Date}>('SELECT * FROM district_pipeline.assessment_bridge_submissions WHERE lease_id=$1',[lease.leaseId]);
+  assert.ok(submission.rows[0].committed_at instanceof Date,'the unlocked/fenced receipt path must support real pg audit timestamps');
   assert.equal((await f.cas.read(submission.rows[0].provider_response_sha256)).toString('utf8'),request.answer.stdout);
   const receipt=JSON.parse((await f.cas.read(submission.rows[0].receipt_artifact_sha256)).toString('utf8'));assert.equal(receipt.startedAt,request.answer.startedAt);assert.equal(receipt.finishedAt,request.answer.finishedAt);assert.equal(receipt.estimatedApiUsd,0.003);
   const reconciliation=JSON.parse((await f.cas.read(submission.rows[0].reconciliation_input_sha256)).toString('utf8'));assert.equal(reconciliation.itemArtifactSha256,f.itemArtifact.sha256);assert.equal(reconciliation.B.receiptSha256,receipt.receiptSha256);
