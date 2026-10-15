@@ -4,7 +4,7 @@ import {randomUUID} from 'node:crypto';
 import {codexSubscriptionLimit,codexSubscriptionNoOutput,ompSubscriptionLimit} from '../src/district-subscription-limit.ts';
 import {runtimeToolEvidence,failureDiagnostic,RuntimeFailureDiagnosticSchema} from '../src/district-model-diagnostics.ts';
 import {OmpRunnerHold,inspectOmpLimitFailure,inspectOmpEvents} from '../src/district-omp-b-runner.ts';
-import {assessmentBridgeHoldReason} from '../src/district-assessment-broker.ts';
+import {assessmentBridgeHoldReason,assessmentBridgeFailureVersions} from '../src/district-assessment-broker.ts';
 const observedAt='2026-10-15T08:00:00.000Z',resetAt='2026-10-15T09:00:00.000Z';
 const events=(values:unknown[])=>values.map(value=>JSON.stringify(value)).join('\n')+'\n';
 test('Codex projects only actual absolute clocks and preserves them across the unchanged runtime framing',()=>{
@@ -55,6 +55,11 @@ test('omp accepts only typed empty limit failures with normal exit and complete 
  assert.equal(JSON.stringify(proof).includes('PRIVATE_PROVIDER_ERROR'),false);
  assert.throws(()=>inspectOmpEvents(stream(),0),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold('provider_failed'))?.noOutput,true);
+ const classified=new OmpRunnerHold('provider_failed',undefined,'provider_error_rate_limit'),limited=inspectOmpLimitFailure(stream(),'',observedAt,0,classified);
+ assert.ok(limited);assert.equal(limited.failureKind,'provider_error_rate_limit');assert.equal(limited.noOutput,true);assert.equal(assessmentBridgeHoldReason(limited),'budget_paused');
+ const versions=assessmentBridgeFailureVersions(randomUUID(),limited);
+ assert.equal(versions.ompFailureKind,'provider_error_rate_limit');assert.equal(versions.subscriptionLimitNoOutput,'true');assert.equal(versions.subscriptionLimitTerminalFrame,'assistant_turn_agent_error');
+ assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_PROVIDER_ERROR|rate_limit_error|reset_at/);
  for(const reason of ['event_stream','resource_limit','model_identity_mismatch'] as const)assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold(reason))?.noOutput,false,'An unrelated successful-decoder rejection cannot certify a quota retry');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,137,new OmpRunnerHold('provider_failed'))?.noOutput,false);
  for(const exitCode of [1,137])assert.equal(ompSubscriptionLimit(stream(),'',observedAt,exitCode)?.noOutput,false,'Abnormal process termination cannot certify empty output');

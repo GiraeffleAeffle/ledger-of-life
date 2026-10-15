@@ -16,6 +16,8 @@ import {NotificationAmbiguousError,NotificationTransientError} from '../src/dist
 import {pipelineNotificationConfig,sendPipelineNotification} from '../src/district-notifications.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import {reportR1ExecutorFailure} from '../src/district-r1.ts';
+import {OmpRunnerHold} from '../src/district-omp-b-runner.ts';
+import {assessmentBridgeFailureVersions} from '../src/district-assessment-broker.ts';
 
 // Real Postgres only. The connection must be local and its role must have CREATEDB.
 // Run: DISTRICT_TEST_DATABASE_URL=postgresql://localhost/postgres node --experimental-strip-types --test test/district-jobs-postgres.test.ts
@@ -322,6 +324,39 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const cleaned=await run(await authorize([cleanup]),1,{residual_extract:async()=>{throw new TypeError(secret);}});
       assert.equal(cleaned.reasonCode,'execution_exception');
       assert.equal(stderr,`R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=other at=none\n`);
+    }finally{st.mock.restoreAll();}
+  });
+
+  await t.test('B provider failure emits exactly once through the shared diagnostic path after its hold commits',async st=>{
+    let stderr='',committed=false;
+    const finish=store.finish.bind(store);
+    st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{assert.equal(committed,true,'No B diagnostic before the job hold commits');stderr+=String(chunk);return true;});
+    st.mock.method(store,'finish',async(...args:Parameters<DistrictJobStore['finish']>)=>{
+      assert.equal(stderr,'');await finish(...args);
+      const saved=await pool.query<{state:string}>('SELECT state FROM district_pipeline.jobs WHERE id=$1',[args[1].id]);
+      assert.equal(saved.rows[0].state,'held_execution');committed=true;
+    });
+    try{
+      const error=new OmpRunnerHold('provider_failed',undefined,'provider_error_auth');error.message='PRIVATE_PROVIDER_ERROR sk-ant-oat-synthetic';
+      const key=await store.enqueue(jobSpec('B-provider-diagnostic','assessment_b'));
+      const result=await run(await authorize([key]),1,{assessment_b:async()=>({outcome:'held_execution',reasonCode:'omp_provider_failed',versions:assessmentBridgeFailureVersions(randomUUID(),error)})});
+      assert.equal(result.reasonCode,'omp_provider_failed');
+      assert.equal(stderr,`R1_B_FAILURE job=${key.slice(0,12)} kind=provider_error_auth\n`);
+      const saved=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
+      assert.equal(saved.rows[0].receipt.versions.ompFailureKind,'provider_error_auth');
+      assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/PRIVATE_PROVIDER_ERROR|sk-ant-oat|R1_B_FAILURE/);
+    }finally{st.mock.restoreAll();}
+  });
+
+  await t.test('a rejected B finish does not diagnose an uncommitted provider failure',async st=>{
+    let stderr='';st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+    st.mock.method(store,'finish',async()=>{throw new DistrictExecutionHold('lease_lost');});
+    try{
+      const key=await store.enqueue(jobSpec('B-uncommitted-diagnostic','assessment_b'));
+      const result=await run(await authorize([key]),1,{assessment_b:async()=>({outcome:'held_execution',reasonCode:'omp_provider_failed',versions:{ompFailureKind:'exit_nonzero'}})});
+      assert.equal(result.reasonCode,'lease_lost');assert.equal(stderr,'');
+      const saved=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
+      assert.equal(saved.rows[0].receipt.reasonCode,'lease_lost');assert.equal(saved.rows[0].receipt.versions.ompFailureKind,undefined);
     }finally{st.mock.restoreAll();}
   });
 

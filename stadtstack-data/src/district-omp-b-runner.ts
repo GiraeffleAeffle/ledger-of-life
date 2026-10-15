@@ -12,6 +12,7 @@ import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
 import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
+import type {OmpFailureKind} from './district-exception-diagnostics.ts';
 export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
@@ -28,7 +29,8 @@ export class OmpRunnerHold extends Error {
  readonly subscriptionLimit?:SubscriptionLimit;
  readonly noOutput:boolean;
  readonly failureProof?:OmpLimitFailureProof;
- constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;}
+ readonly failureKind?:OmpFailureKind;
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -55,15 +57,82 @@ export function ompAssessmentControl():OmpAssessmentControl{
  const schema=canonicalJson(z.toJSONSchema(assessmentOutputSchema)),prompt=PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n'+schema+'\n';
  return {prompt,systemPromptSha256:sha(prompt),outputSchemaSha256:sha(schema)};
 }
+/** The reviewed stock CLI drops update/error payloads but retains errorStatus
+ * and errorId on final assistant copies. Inspect those typed fields only. */
+function typedOmpProviderFailure(value:Record<string,unknown>):OmpFailureKind|undefined {
+ const error=object(value.error),status=value.errorStatus??error.status??error.statusCode??value.status??value.statusCode;
+ if(typeof status==='number'&&Number.isInteger(status)&&status>=400&&status<=599){
+  if(status===401||status===403)return 'provider_error_auth';
+  if(status===429)return 'provider_error_rate_limit';
+  if(status===529)return 'provider_error_overloaded';
+  if(status===404)return 'provider_error_not_found';
+  if(status===408)return 'provider_error_network';
+  return status>=500?'provider_error_server':'provider_error_invalid_request';
+ }
+ const type=value.errorType??error.type??value.type;
+ switch(type){
+  case 'authentication_error':case 'permission_error':return 'provider_error_auth';
+  case 'rate_limit_error':return 'provider_error_rate_limit';
+  case 'overloaded_error':return 'provider_error_overloaded';
+  case 'invalid_request_error':return 'provider_error_invalid_request';
+  case 'not_found_error':return 'provider_error_not_found';
+  case 'api_error':case 'internal_server_error':return 'provider_error_server';
+  case 'connection_error':case 'network_error':case 'timeout_error':return 'provider_error_network';
+ }
+ const code=error.code??value.code;
+ if(typeof code==='string'&&['ENOTFOUND','EAI_AGAIN','ECONNRESET','ECONNREFUSED','EPIPE','ETIMEDOUT'].includes(code))return 'provider_error_network';
+ // v18.9.2 AIError.Flag values: AuthFailed/OAuthExpiry, UsageLimit, Timeout.
+ // A generic Transient flag alone does not establish a network failure.
+ const id=value.errorId;
+ if(typeof id==='number'&&Number.isSafeInteger(id)&&id>0&&id<=0xffffffff){
+  if(id&(0x01000000|0x40000000))return 'provider_error_auth';
+  if(id&0x00080000)return 'provider_error_rate_limit';
+  if(id&0x00040000)return 'provider_error_network';
+  return 'provider_error_unknown';
+ }
+ if(typeof type==='string')return 'provider_error_unknown';
+}
+function typedOmpAssistantFailure(value:unknown):OmpFailureKind|undefined {
+ const message=object(value);
+ if(message.role==='assistant'&&['error','aborted','failed'].includes(String(message.stopReason)))return typedOmpProviderFailure(message);
+}
+function ompProviderFailure(stdout:string):OmpFailureKind|undefined {
+ if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes||!stdout.endsWith('\n'))return;
+ let found:OmpFailureKind|undefined,index=0;
+ // This diagnostic-only scan runs on an already-rejected provider path. It
+ // cannot admit output, grant a retry, change accounting or loosen framing.
+ for(const line of stdout.slice(0,-1).split('\n')){
+  let event:Record<string,unknown>;try{event=object(JSON.parse(line));}catch{return;}
+  if(typeof event.type!=='string'||index++===0&&event.type!=='session')return;
+  if(found&&found!=='provider_error_unknown')continue;
+  let candidate:OmpFailureKind|undefined;
+  if(['message_end','turn_end'].includes(event.type))candidate=typedOmpAssistantFailure(event.message);
+  else if(event.type==='agent_end'&&Array.isArray(event.messages)){
+   for(const message of event.messages){
+    const kind=typedOmpAssistantFailure(message);
+    if(kind)candidate=kind;
+    if(candidate&&candidate!=='provider_error_unknown')break;
+   }
+  }else if(event.type==='message_update'){
+   const update=object(event.assistantMessageEvent);
+   if(update.type==='error')candidate=typedOmpProviderFailure(object(update.error));
+  }else if(event.type==='error')candidate=typedOmpProviderFailure(event);
+  if(candidate)found=candidate;
+ }
+ return found;
+}
+function ompProviderHold(stdout:string,fallback:OmpFailureKind):OmpRunnerHold {
+ return new OmpRunnerHold('provider_failed',undefined,ompProviderFailure(stdout)??fallback);
+}
 export function inspectOmpEvents(stdout:string,exitCode:number){
- if(exitCode!==0)throw new OmpRunnerHold('provider_failed');
+ if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero');
  if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes||!stdout.endsWith('\n'))throw new OmpRunnerHold('event_stream');
  const lines=stdout.split('\n');lines.pop();if(!lines.length)throw new OmpRunnerHold('event_stream');
  let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0;const assistantMessages=new Map<string,string>();
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
-  if(['length','toolUse','error','aborted','failed'].includes(reason))throw new OmpRunnerHold('provider_failed');
+  if(['length','toolUse','error','aborted','failed'].includes(reason))throw ompProviderHold(stdout,reason==='length'?'stop_length':reason==='error'?'stop_error':'stop_other');
   if(message.completedAt!==undefined&&tokenCount(message.completedAt)===undefined)throw new OmpRunnerHold('event_stream');
   const {completedAt:_completedAt,...substantive}=message;
   // The session enriches only the message_end clone with completedAt. Every
@@ -88,17 +157,18 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
   if(['message_start','message_end'].includes(event.type)&&object(event.message).role==='toolResult')throw new OmpRunnerHold('event_stream');
   if(event.type==='message_update'){
    const update=object(event.assistantMessageEvent);
-   if(update.type==='error'||update.type==='done'&&update.reason!=='stop')throw new OmpRunnerHold('provider_failed');
+   if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error');
+   if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other');
    if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))throw new OmpRunnerHold('event_stream');
    if(!OmpTextUpdateSchema.safeParse(update).success)throw new OmpRunnerHold('event_stream');
   }
   if(event.type==='turn_end'){
    rejectAssistant(object(event.message));
-   if(event.reason&&event.reason!=='stop')throw new OmpRunnerHold('provider_failed');
+   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason');
    if(Array.isArray(event.toolResults)&&event.toolResults.length)throw new OmpRunnerHold('event_stream');
   }
   if(event.type==='agent_end'){
-   if(event.reason&&event.reason!=='stop')throw new OmpRunnerHold('provider_failed');
+   if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'agent_reason');
    if(Array.isArray(event.messages))for(const message of event.messages)rejectAssistant(object(message));
   }
   if(event.type==='message_end'){
@@ -126,7 +196,7 @@ export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:st
  const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
  if(!evidence)return null;
  if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
- return new OmpRunnerHold('provider_failed',evidence);
+ return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined);
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
