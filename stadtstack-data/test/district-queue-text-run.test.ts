@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type {Pool} from 'pg';
+import {EventEmitter} from 'node:events';
 import type {DistrictCas} from '../src/district-cas.ts';
 import {QueueTextSealInputSchema,buildQueueTextRun} from '../src/district-queue-text-run.ts';
 const key='a'.repeat(64),final='b'.repeat(64);
@@ -13,6 +14,6 @@ test('queue sealing selects committed jobs, never a caller-supplied run, clock, 
  for(const invalid of [{jobKeys:[],reconciliationJobKeys:[]},{...input,jobKeys:[key,key]},{...input,reconciliationJobKeys:[final,final]},{...input,jobKeys:['invented-output']}])assert.throws(()=>QueueTextSealInputSchema.parse(invalid));
 });
 test('an uncommitted extraction cannot become a native extraction run',async()=>{
- const pool={query:async()=>({rows:[]})} as unknown as Pool;
+ const pool=Object.assign(new EventEmitter(),{query:async()=>({rows:[]})}) as unknown as Pool;
  await assert.rejects(buildQueueTextRun(pool,{} as DistrictCas,{jobKeys:[key],reconciliationJobKeys:[]}),/not committed/);
 });
