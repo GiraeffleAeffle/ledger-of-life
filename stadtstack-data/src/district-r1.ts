@@ -28,7 +28,7 @@ import {readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {OwnerAcquisitionReusePinSchema,readPriorGenesisOwnerAcquisition} from './genesis-owner-reuse.ts';
 import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './registered-source-policy.ts';
 import {pipelineNotificationConfig} from './district-notifications.ts';
-import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from './civic-opt-out.ts';
+import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,withCivicPolicyShutdown} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
 import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding,authenticateHttpSourceBindings} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
@@ -425,6 +425,9 @@ export function reportR1ExecutorFailure(result:ExecutorResult|undefined):void{
  if(result?.state==='held')process.stderr.write(formatR1Failure(new DistrictExecutionHold(result.reasonCode),'execution'));
 }
 export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1FailurePhase}={phase:'startup'}){
+ return withCivicPolicyShutdown(()=>districtR1Command(argv,context));
+}
+async function districtR1Command(argv:string[],context:{phase:R1FailurePhase}){
  context.phase='startup';
  const [command,...rawArgs]=argv;
  if(command==='--help'||command==='help'){process.stdout.write('Usage: district-r1.ts COMMAND --registry-config PATH --registry-descriptor PATH [bounded JSON stdin]\n');return;}

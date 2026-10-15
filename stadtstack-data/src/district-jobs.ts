@@ -8,7 +8,7 @@ import {z} from 'zod';
 import {canonicalJson, digest, HashSchema, ScopeSchema, type AdapterScope} from './district-adapter-contract.ts';
 import {DistrictCas, type CasArtifact} from './district-cas.ts';
 import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encodeStepReceipt, unknownReceiptCounts, type JobOutcome, type ReasonCode, type StepReceipt} from './district-step-receipt.ts';
-import {CivicPolicyStateError} from './civic-opt-out.ts';
+import {CivicPolicyStateError,withCivicPolicyShutdown} from './civic-opt-out.ts';
 import {hostCodeVersions} from './district-host-provenance.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
@@ -604,6 +604,7 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
       const renew=()=>{timer=setTimeout(()=>{renewal=options.store.renew(run!,job,leaseMs).then(expiresAt=>{if(!controller.signal.aborted){armLease(expiresAt);renew();}},error=>controller.abort(error instanceof DistrictExecutionHold?error:new DistrictExecutionHold('lease_lost')));},Math.max(10,Math.floor(leaseMs/3)));};
       renew();let receipt:StepReceipt|undefined;
       let rejectAbort:((reason:unknown)=>void)|undefined;
+      let invocation:Promise<JobHandlerResult>|undefined;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -622,7 +623,8 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         };
         // An aborted but still-unwinding handler keeps its slot until it settles
         // (or the fenced job lease expires); it cannot release a newer holder.
-        const result=await Promise.race([invoke(),aborted]);
+        invocation=invoke();
+        const result=await Promise.race([invocation,aborted]);
         if(controller.signal.aborted)throw controller.signal.reason;
         if(result.provider){
           const provider=result.provider;
@@ -641,6 +643,10 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
         stopped=reason;break;
       } finally {
         clearTimeout(deadline);clearTimeout(timer);clearTimeout(leaseTimer);controller.signal.removeEventListener('abort',onAbort);controller.abort(new DistrictExecutionHold('owner_stopped'));stopController.signal.removeEventListener('abort',abortRun);await renewal;
+        // The abort race fences results, not cleanup. Do not print a run result,
+        // close pools or remove signal protection while scratch/daemon teardown
+        // can still acquire an inventory lock or hold live process handles.
+        await invocation?.catch(()=>{});
       }
     }
     const reasonCode:ReasonCode=stopped??'max_jobs_reached';
@@ -724,6 +730,9 @@ export const artifactVerificationHandler:JobHandler=async ({job,signal,cas})=>{
  * DATABASE_URL is read only by the runner; it is never logged or passed as context.
  */
 export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<ExecutorResult|undefined> {
+  return withCivicPolicyShutdown(signal=>runDistrictJobsCommand(handlers,argv,notificationConfig,signal));
+}
+async function runDistrictJobsCommand(handlers:Readonly<Record<string,JobHandler>>,argv:string[],notificationConfig:NotificationConfig|undefined,shutdown:AbortSignal):Promise<ExecutorResult|undefined> {
   const [command,...args]=argv;
   if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH]');
   const flags:Record<string,string|true>={};
@@ -736,17 +745,17 @@ export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHand
   if(command==='run'&&mode==='bounded_unattended'&&(!notificationConfig||flags['--owner-present']))throw new DistrictExecutionHold('notification_unavailable');
   const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-bounded'});
   const abort=new AbortController();const stop=()=>abort.abort(new DistrictExecutionHold('owner_stopped'));
+  shutdown.addEventListener('abort',stop,{once:true});if(shutdown.aborted)stop();
   try {
     if(command==='migrate'){await migrateDistrictJobs(pool);process.stdout.write('District job migration applied.\n');return;}
     const id=flags['--authorization-id'];const jobs=Number(flags['--max-jobs']),seconds=Number(flags['--max-seconds']);
     if(typeof id!=='string'||!Number.isInteger(jobs)||!Number.isInteger(seconds)||seconds<1)throw Error('Explicit authorization and positive job/time bounds required');
-    process.on('SIGINT',stop);process.on('SIGTERM',stop);process.on('SIGHUP',stop);
     if(mode==='attended'){process.stdin.on('end',stop);process.stdin.on('close',stop);process.stdin.resume();}
     const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})}});
     process.stdout.write(JSON.stringify(result)+'\n');if(result.state==='held')process.exitCode=2;
     return result;
   } finally {
-    process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);process.removeListener('SIGHUP',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
+    shutdown.removeEventListener('abort',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
   }
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url){
