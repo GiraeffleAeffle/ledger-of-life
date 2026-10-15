@@ -332,7 +332,9 @@ Provider capacity is shared in PostgreSQL, not an in-process semaphore: `residua
 
 Migration **006** records the acquired resource obligation on the fenced job separately from the expiring slot row. Renewal and admission/reclamation take the same per-resource advisory lock. An acquired slot that expired or disappeared is `lease_lost`, rolling back job renewal and aborting the handler; a waiting job legitimately has no acquired slot. This avoids treating a reclaimed holder as a waiter and silently exceeding the limit.
 
-Outbox delivery atomically claims each notification with a fenced 70-second lease. Startup still requires a durable valid delivered ACK **before claims**. Retryable HTTP 429/5xx refusals are classified **transient**; transport failures and timeouts (including a missing response/ACK after possible server acceptance) are separately classified **ambiguous**. Both retry with bounded exponential backoff, at most eight attempts, at most 60 seconds and within remaining invocation budget. Each post increments the durable attempt count before sending and uses the **same notificationId and immutable payload**. Owner notifications are informational: duplicates following ambiguous acceptance are explicitly allowed and identifiable. The successfully bound ACK is the delivered one; invalid/replayed ACKs and other non-retryable failures remain strict holds. Persistent failure still holds the run. External delivery is **at least once**, not exactly once; receivers should deduplicate by `notificationId`, and no ntfy exactly-once guarantee is claimed. The per-original count/insert additionally locks its document row; cumulative 48-call and 500-selection gates and failed-intent accounting are unchanged.
+Outbox delivery atomically claims each notification with a fenced 70-second lease. Startup still requires a durable valid delivered ACK **before claims**. Retryable HTTP 429/5xx refusals are classified **transient**; transport failures and timeouts (including a missing response/ACK after possible server acceptance) are separately classified **ambiguous**. Both retry with bounded exponential backoff, at most eight attempts and at most 60 seconds within the phase's delivery budget. Each post increments the durable attempt count before sending and uses the **same notificationId and immutable payload**. Owner notifications are informational: duplicates following ambiguous acceptance are explicitly allowed and identifiable. The successfully bound ACK is the delivered one; invalid/replayed ACKs and other non-retryable failures remain strict delivery failures. Persistent startup failure holds the run before work. External delivery is **at least once**, not exactly once; receivers should deduplicate by `notificationId`, and no ntfy exactly-once guarantee is claimed. The per-original count/insert additionally locks its document row; cumulative 48-call and 500-selection gates and failed-intent accounting are unchanged.
+
+`maxElapsedMs` / `--max-seconds` remains the **workload** bound: no job effects or claims are authorized past it. After workload finalization, disposition delivery receives a separate bounded **60-second** window from `r1-vm-run.sh`'s existing **120-second OS cleanup reserve**, even when the workload consumed its entire allowance. This notification-only window does not extend any job lease or authorization; direct API/CLI callers must also provide equivalent OS cleanup headroom. It delivers only that run's pending outbox, so unrelated backlog cannot consume its reserve. A failed disposition remains durable in the outbox and is reported separately as `notificationReasonCode`; it never changes committed job receipts or rewrites a finalized `completed`/`held` run or its original reason. Startup delivery still uses the remaining workload budget and requires its valid delivered ACK before claims.
 
 ACK-body timeouts/resets remain ambiguous even if cancellation of the errored stream also rejects. Cleanup errors never overwrite the delivery classification or weaken oversized/malformed ACK rejection.
 
@@ -553,7 +555,21 @@ Only this module reads `inventory.json` in `src/`; callers continue using the ex
 
 Sealed entries/leases are not silently filtered when their owning root is missing: they remain in logical validation and make the load fail closed unless an explicit retirement cutoff already excludes them. Content-free observation/request replacements transition old sealed bindings to `missing` through the same copy-on-write state path as purge, without editing sealed records or poisoning root completeness. Closed/purged leases are immutable history; stale finalization/resource callbacks refuse them rather than reactivating or mutating archived objects.
 
-The existing exclusive lock, five-second acquisition deadline, write-temp/fsync/atomic-rename manifest publication and directory fsync remain. Contending processes create private, identity-checked, empty `inventory.wait-<UUID>` advisory markers and remove their own marker on acquisition/error/timeout. If a marker is present, a just-released holder cannot compete again until 50 ms after release, giving existing 25 ms polling waiters an opportunity rather than a tight re-acquire loop. Uncontended work incurs no cooldown. Markers never grant a lock or permission to steal one; a marker left by a crashed waiter can only impose the bounded cooldown. This is cooperative scheduling, not strict cross-process FIFO. New bulk entries/finished leases publish additional immutable segments **before** their manifest; interrupted publication cannot discard the previous committed inventory. Unreferenced segments/temporaries do not become authoritative. No segment garbage collector or automatic backup deletion is introduced.
+The exclusive lock now waits **120 seconds** by default before `CIVIC_POLICY_BUSY`, instead of five seconds. Set `CIVIC_POLICY_LOCK_WAIT_MS` (integer 1..600000 ms), or pass `CivicPolicyOptions.lockWaitMs` to override it for an isolated caller; invalid settings fail with `INVALID_LOCK_WAIT`. The budget covers external lock acquisition, not cold segment warming, an earlier in-process transaction or the work performed after acquisition. No dead/live lock is stolen or automatically removed. Write-temp/fsync/atomic-rename manifest publication and directory fsync remain. Contending processes create private, identity-checked, empty `inventory.wait-<UUID>` advisory markers and remove their own marker on acquisition/error/timeout. If a marker is present, a just-released holder cannot compete again until 50 ms after release, giving existing 25 ms polling waiters an opportunity rather than a tight re-acquire loop. Uncontended work incurs no cooldown. Markers never grant a lock or permission to steal one; a marker left by a crashed waiter can only impose the bounded cooldown. This is cooperative scheduling, not strict cross-process FIFO. New bulk entries/finished leases publish additional immutable segments **before** their manifest; interrupted publication cannot discard the previous committed inventory. Unreferenced segments/temporaries do not become authoritative. No segment garbage collector or automatic backup deletion is introduced.
+
+Sharded `artifacts` CAS roots retain optional inventory-owned `casWatermarks`, keyed by the actual CAS hash and binding both an inode stamp and watermark-creation clock. Reconciliation still enumerates every directory/file, checks its exact registered provenance and safe parent components, opens files `O_NOFOLLOW`, and compares device/inode/owner/mode/link-count/size/mtimeNs/**ctimeNs** on the descriptor and published path before returning. A Git-style **racily clean** guard also requires both file timestamps to be strictly more than two seconds older than the recorded watermark clock, with no future watermark after clock rollback. Reuse is enabled only on known nanosecond-capable Linux ext-family/XFS/Btrfs filesystems and files whose mtime **and** ctime actually expose sub-millisecond precision; tmpfs, coarse/unknown filesystems and coarse timestamps always hash, never gain trusted watermarks. Fresh/racy members are rehashed until old enough. Missing members are pruned, and purge immediately removes a deleted member's watermark in its own commit. New/changed members are hashed; unregistered files, unsafe symlinks, hardlinks, permission changes, same-size edits and unchanged coarse timestamp ticks remain fail-closed within the owner-trust boundary below. Non-CAS formats keep their full content/codec reconciliation. Ordinary source-read, binding, content-admission, write, purge-deletion and retirement checks do **not** use these watermarks as authorization or skip their content checks. Existing inventories without watermarks are hashed on their first reconciliation; no production migration or cache trust is implicit.
+
+**Trust boundary:** the authority trusts its owning uid, which can also modify the inventory and sealed segments. Cached reconciliation completeness detects accidental/foreign changes, unregistered files and debris; it is not an integrity boundary against a malicious same-uid process. In particular, writes through an existing writable `MAP_SHARED` mapping can change bytes without another mtime/ctime update, especially on tmpfs/shmem. tmpfs is therefore excluded from watermark reuse. The inode stamp and racy-clean guard are not claimed to detect every same-uid mapped write on the remaining filesystems. Ordinary source reads, content admissions and deletions always perform full content hashing; reconciliation watermarks never replace those exact-byte gates.
+
+Scratch admission's inventory wait observes its actual executor/job AbortSignal, including the in-process queue, cooperative cooldown and external polling. Cancellation removes only its own waiter, preserves an existing lock, and refuses before the delayed callback can create a lane/lease. Queue chaining preserves the predecessor barrier even when an intervening waiter cancels. Cleanup of an already-owned lease remains non-cancellable so cancellation cannot abandon its durable custody obligations.
+
+Watermarked authority inventories are R1-only even if their storage is still monolithic; older strict root codecs correctly reject them. Empty/non-CAS roots omit the optional field. Actual tag-0.3.2 wire-policy codecs remain regression-tested, but recovery and purge of a watermarked realm use the canonical R1 authority tools under the approved cutover. The legacy-reader rejection probe preserves the exact inventory bytes.
+
+`district-r1.ts` failures exit 2 and print exactly `R1_FAILURE phase=<startup|admission|execution> code=<reason>` to stderr, never arbitrary exception text. Civic policy errors retain their content-free reason (including `CIVIC_POLICY_BUSY`); execution holds retain their controlled reason; other errors use `R1_COMMAND_FAILED`. A normally returned held executor result also emits the execution failure line, while retaining its original JSON stdout and exit 2; completed results do not emit a failure. `startup` is restricted to the proven read-only prefix. The phase becomes `admission` **before** the first potentially mutating call (including registry CAS/lane initialization, descriptor/catalog writes and migration), and `execution` before executor dispatch. Thus an admission failure may have no effects, but is not proof of that; do not automatically replay an import merely because its code is BUSY. No retry or authority extension is introduced.
+
+Content-free diagnosis on 2026-10-15: production receipt `26ed32c1-d2a4-4635-9dc7-3e1464378e04` records council `residual_prepare`, `held_execution` / `execution_exception`, 01:06:17.368–01:07:50.119Z (92.751 s). It contains no original exception code, so it cannot uniquely prove BUSY retrospectively. Code analysis establishes that `persistOperatorRegistry` initializes/reconciles the CAS under the shared inventory lock before authorization, and parser scratch admission reconciles its lane under that same lock. An offline copy held 201,711 logical entries, 2,093 leases, 180 roots and 752 segments (347,778,214 bytes). On CPUs 4–5/nice 10, cold segment warming outside the lock took 17.692 s; warm locked load 0.671 s, CAS reconciliation 1.398 s, and copied-state save 0.142 s. The all-root reconciliation loop used by purge/recovery took 9.694 s, hashing 1,175 files / 631,518,324 bytes (metadata decoding is additional); that loop alone exceeds the old five-second waiter deadline. These are offline component measurements, not exact historical production lock durations or proof that purge ran during the incident.
+
+The first CAS listing had 240 files / 38,337,089 bytes; a later private CAS copy had 242 admitted hash watermarks. First/new-code reconciliation took 1.413 s, repeated metadata-only passes 0.584 and 0.178 s. Inventory and live-root copies were not an atomic snapshot while other workers continued: added CAS members correctly made reconciliation incomplete against the older copied inventory. Measurements retained that failure rather than blessing the extra files. All production reads were lock-free/read-only, all saves and marker rewrites were confined to private benchmark copies, and temporary copies/instrumentation were removed. This does not claim an end-to-end production speedup, a complete root audit or new processing authorization.
 
 Use a reviewed R1 checkout and the actual independently pinned authority digest; pause workers if desired to avoid migration's one-time long lock hold. Active/planned/closing/partial leases are allowed **only because their complete logical records are preserved exactly**; migration neither kills workers nor steals locks.
 
@@ -731,6 +747,158 @@ Protected hosting defaults to60 authenticated HTTP/RPC requests per minute and4 
 ## Practitioner proof of value
 
 The fixed 30-question bank is `evaluation/pilot-questions.json`. The [baseline](reports/PILOT_VALUE_BASELINE.md) used the immutable 16-tool release: no complete answers, four partially useful answers and 26 correct abstentions. The [enhanced evaluation](reports/PILOT_VALUE_ENHANCED.md) has one complete, ten partially useful answers and 19 correct abstentions, with explicit AI-assisted source reviews rather than claimed human approval. Correct abstention is not useful substantive success. All seven graph/no-graph pairs show zero usefulness gain; dataset growth is not attributed to the graph. Frozen reports retain their actual collection/source provenance. The owner's next sequence is reproducibility first, then the planned triage/span/batch/incremental runner rebuild, concentric expansion and graph communities, then Braid import.
+
+### Frozen R1 step-9 runbook: value verdict and post-release owner sample
+
+The read-only contract is [R1_STATUS.md §4 step 9](docs/R1_STATUS.md) and
+[CIVIC_PIPELINE_REBUILD.md §4.1/§6](docs/CIVIC_PIPELINE_REBUILD.md). Do not edit
+the question bank, rubric, denominators or acceptance thresholds. The value gate
+requires **without-graph usefulness ≥30/60**, **≥8 complete substantive answers**,
+**correctness 60/60**, **sources ≥46/60**, and **≥2 total same-release graph
+usefulness points across W03/W04/E03/B03/K03/M03/H03**, with no question-level
+graph correctness loss. All thirty answers and all seven pairs remain required.
+Correct abstention is safety, not useful substantive success.
+
+The [owner's option-B decision](reports/approvals/r1-autonomy-and-release-2026-10-14.json)
+defers **only the sampled owner audit until after release**. Rights questions,
+unresolved disagreements and unsupported finalization/payment/identity findings
+still block release; owner absence never grants a waiver. A step-9 pass is not a
+source/security/runtime/seal/replay pass and does not itself authorize deployment.
+These audit commands make no provider calls, network requests or production writes.
+The separately authorized queue assessment stages below do make provider calls.
+
+Run from `stadtstack-data` with `umask 022`. Keep the report, triplet manifest,
+packet and owner checks in a private local operator directory, not tracked public
+reports or hosted release members; audit files contain original source excerpts.
+Use actual pinned paths/IDs in the shell variables below. Never invent policy,
+parser, provider, authorization or owner-check receipts.
+
+1. **Collect through the real candidate MCP.** Record actual MCP calls and
+   pagination, including graph calls. No direct private-record import may replace
+   retrieval. Store its awaiting-review report as `$COLLECTED`.
+
+   ```sh
+   npm run evaluate:pilot -- collect --server-root "$SERVER_ROOT" \
+     --release "$RELEASE_ID" --tools 20 --mode vm_candidate \
+     --candidate-directory "$CANDIDATE_DIRECTORY" \
+     --policy-state-dir "$POLICY_STATE_DIR" --output "$COLLECTED"
+   ```
+
+   Use `sealed` mode instead only for a genuinely sealed reader. Source/security/
+   runtime checks, exact replay and step-8 `release-gate.json` are independent
+   prerequisites; this value verdict does not replace them or enumerate private
+   step-8 holds. Append the step-8 critical/rights exception inventory below before
+   claiming whole-release acceptance.
+2. **Queue the value lane.** `knowledge:r1 enqueue-value-assessments`, with the
+   standard pinned `--registry-config`/`--registry-descriptor` arguments, consumes
+   stdin `{reportPath,sourceBindings,custodyReceiptSha256,maxModelCalls}`.
+   `reportPath` is the absolute collector-report path. `sourceBindings` must cover
+   every MCP source with its `mcpSourceId`, original/prepared-text/parser/admission
+   hashes and authentic text/native locators. Text attribution must expose
+   `text-sha256:<prepared-sha>;chars:<start>-<end>`; fixed ±256 context windows
+   are clipped to that immutable MCP interval, never operator-expanded. Native
+   selectors match both published attribution and verified parser locators;
+   full native parser JSON is not sent to assessors. Stale, missing or oversized
+   original/parser/public-locator closure holds without trimming or network refresh.
+   Collection and every value-item original-evidence read also require exact
+   canonical equality with the unique primary `get_signal`/`get_source` responses.
+   Question membership and completeness are re-derived from the recorded bounded
+   search/graph queries: recomputing report hashes cannot widen MCP attribution
+   or move another question's evidence into an answer.
+   The custody anchor is a genuine current policy receipt whose original remains
+   a retained governed job input, including for empty answers. It is never implied
+   answer evidence; actual answer sources still obey the question's town filter.
+   The default ceiling is 2 total Codex calls (A+C; allowed
+   2–48) per answer-unit SHA(bank, release, question, lane); evidence changes do
+   not reset it. B uses the separately authorized Haiku Max lane.
+   The atomic enqueue produces thirty
+   without-graph units plus seven graph units and their A/B job keys.
+   Execute separately authorized bounded A (Codex) and blind B (VM-OMP Haiku)
+   stages using the existing preauthorize/run workflow. Enqueue C with
+   `enqueue-assessment-c` stdin `{jobs:[{AJobKey,BJobKey}]}`, run genuine C,
+   then enqueue/run `enqueue-assessment-reconciliation` with
+   `{jobs:[{AJobKey,BJobKey,CJobKey}]}`. Never substitute a missing role or trim
+   oversized evidence to obtain a score. A/B requests are capped at 22,000
+   canonical UTF-8 bytes; C at 36,000.
+3. **Export, ingest and finalize.** `knowledge:r1 value-assessment-results`
+   consumes `{jobKeys:[...]}` with the 37 committed reconciliation keys and emits
+   `$ASSESSMENTS`, an array of `{item,A,B,C}` paths to the actual CAS artifacts.
+   Include **all relevant critical/exception triplets**, not just passing value
+   answers, in the audit inventory `$AUDIT_ASSESSMENTS`. Additional entries may
+   carry a positive `exceptionMinutes` reservation (default 10). It is an error
+   to omit a known rights/disagreement/critical exception. An unresolved value
+   answer cannot be finalized: resolve the evidence and rerun the governed
+   assessment path, rather than importing hand-written scores.
+
+   ```sh
+   npm run evaluate:pilot -- ingest-assessments --input "$COLLECTED" \
+     --assessments "$ASSESSMENTS" --cas-root "$CAS_ROOT" \
+     --policy-state-dir "$POLICY_STATE_DIR" --current-policy-map "$POLICY_MAP" \
+     --output "$FINALIZED"
+   npm run evaluate:pilot -- finalize --input "$FINALIZED" \
+     --baseline reports/pilot-value-enhanced.json --markdown "$VALUE_MARKDOWN"
+   ```
+
+4. **Compute the frozen machine verdict, then emit the matching owner packet.**
+   Precommit and retain `$AUDIT_SEED` before inspecting the sample; do not choose
+   a seed to get easier cases. Both commands reauthenticate original evidence and
+   recompute A/B/C reconciliation; they do not call a model. A failed verdict
+   writes the per-gate numbers/reasons and exits nonzero. Prepare the packet even
+   on failure, but do not deploy. Output paths are immutable/exclusive; choose
+   new paths for new evidence. A replay with the same finalized report, manifest
+   and seed yields the same packet hash.
+
+   ```sh
+   npm run evaluate:pilot -- verdict --input "$FINALIZED" \
+     --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$VALUE_VERDICT"
+   npm run evaluate:pilot -- audit-packet --input "$FINALIZED" \
+     --assessments "$AUDIT_ASSESSMENTS" --seed "$AUDIT_SEED" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$AUDIT_PACKET" \
+     --markdown "$AUDIT_MARKDOWN"
+   ```
+
+   The JSON inventory contains every answer/lane, original excerpts and their
+   UTF-8 hashes (or native cells/locator hashes), complete MCP attribution,
+   original/parser/policy bindings and A/B/C outcomes plus deterministic
+   discrepancies. The Markdown contains the **selected samples plus every
+   exception**, not an instruction to read all thirty-seven units. Sampling uses
+   the existing `sha256-stratified-rank-v1` frame hash, recorded seed and inclusion
+   probabilities: a genuine routine draw and oversampling stage/finance/identity/
+   OCR strata. The workload gate reserves up to **8 × 10 = 80 sample minutes**
+   plus **40 exception minutes**, **120 total**. Over-budget packets block
+   acceptance and require explicit scope/time authorization; exceptions are
+   never silently dropped. `pending_owner_audit` is permitted only for the
+   post-release sample under option B, never for critical or rights exceptions.
+
+5. **Record what the owner actually checked after release.** `$OWNER_CHECKS`
+   has version `pilot-value-owner-checks-v1`, the exact `releaseId` and
+   `packetSha256`, and `checks` containing each actually checked
+   `{itemId,evidenceSha256,minutes,findings,reviewer,verdict,blockers}`.
+   `verdict` is `pass`, `fail` or `unresolved`; `blockers` is an explicit array
+   of findings. Do not prefill checks with fabricated passes. Checks bind to
+   exact packet item hashes, not just question titles.
+
+   ```sh
+   npm run evaluate:pilot -- ingest-owner-audit --input "$FINALIZED" \
+     --packet "$AUDIT_PACKET" --audit "$OWNER_CHECKS" --output "$AUDITED_REPORT"
+   npm run evaluate:pilot -- verdict --input "$AUDITED_REPORT" \
+     --packet "$AUDIT_PACKET" --assessments "$AUDIT_ASSESSMENTS" \
+     --cas-root "$CAS_ROOT" --policy-state-dir "$POLICY_STATE_DIR" \
+     --current-policy-map "$POLICY_MAP" --output "$AUDITED_VERDICT"
+   ```
+
+   Ingest delegates checked IDs/evidence/time/completeness to `recordOwnerAudit`
+   and additionally binds verdicts/blockers to the packet, release and unchanged
+   finalized report hash. It never overwrites an existing audit. Failed checks,
+   incomplete required checks or actual time over 120 minutes block acceptance.
+   A resolved rights/critical issue needs an actual new policy/evidence/assessment
+   disposition and new report/packet; a check mark does not waive the old blocker.
+   Only individually checked evidence is owner-audited. Other evidence remains
+   AI-assessed; neither consensus nor a passing sample makes the full set
+   independently validated gold.
 
 ## Consumers
 

@@ -26,7 +26,7 @@ const CONTINUATION_STEPS=new Set(['residual_prepare','residual_extract','assessm
 export function policyContinuationVersions(continuation:JobPolicyContinuation):Record<string,string>{
  return {[`policyRebinding.${continuation.fromReceiptSha256}.${continuation.refreshStepReceiptSha256}`]:continuation.toReceiptSha256};
 }
-export interface ExecutorResult {runId:string;state:'completed'|'held';reasonCode:ReasonCode;jobsStarted:number;receiptIds:string[]}
+export interface ExecutorResult {runId:string;state:'completed'|'held';reasonCode:ReasonCode;jobsStarted:number;receiptIds:string[];notificationReasonCode?:ReasonCode}
 export type ExecutionMode='attended'|'bounded_unattended';
 export interface OwnerNotification {id:string;phase:'startup'|'disposition';runId:string;authorizationId:string;state:'running'|'completed'|'held';reasonCode:ReasonCode|null;jobsStarted:number;receiptIds:string[];notificationApprovalSha256:string;destinationSha256:string;provider:string}
 export interface NotificationIdentity {notificationApprovalSha256:string;destinationSha256:string;provider:string}
@@ -424,8 +424,8 @@ export class DistrictJobStore {
     }
   }
   async endRun(runId:string,state:'completed'|'held',reasonCode:ReasonCode):Promise<void> {await this.transaction(client=>this.endRunTransaction(client,runId,state,reasonCode));}
-  async pendingNotifications():Promise<OwnerNotification[]> {
-    const result=await this.pool.query<{payload:OwnerNotification;payload_sha256:string}>(`SELECT payload,payload_sha256 FROM district_pipeline.owner_notifications WHERE state<>'delivered' ORDER BY created_at,id`);
+  async pendingNotifications(runId?:string):Promise<OwnerNotification[]> {
+    const result=await this.pool.query<{payload:OwnerNotification;payload_sha256:string}>(`SELECT payload,payload_sha256 FROM district_pipeline.owner_notifications WHERE state<>'delivered' AND ($1::uuid IS NULL OR run_id=$1) ORDER BY created_at,id`,[runId??null]);
     for(const row of result.rows)if(digest(canonicalJson(row.payload))!==row.payload_sha256)throw Error('Owner notification byte binding mismatch');
     return result.rows.map(row=>row.payload);
   }
@@ -445,13 +445,12 @@ export class DistrictJobStore {
   async recordNotificationDelivery(id:string,claimToken:string,acknowledgement:NotificationAcknowledgement|null):Promise<void> {
     const ack=acknowledgement===null?null:NotificationAcknowledgementSchema.parse(acknowledgement);
     await this.transaction(async client=>{
-      const notification=await client.query<{run_id:string}>('SELECT run_id FROM district_pipeline.owner_notifications WHERE id=$1',[id]);
+      const notification=await client.query<{run_id:string;phase:OwnerNotification['phase']}>('SELECT run_id,phase FROM district_pipeline.owner_notifications WHERE id=$1',[id]);
       if(!notification.rowCount||!await this.lockRunAuthority(client,notification.rows[0].run_id))throw new DistrictExecutionHold('lease_lost');
       const result=await client.query<{run_id:string}>(`UPDATE district_pipeline.owner_notifications SET state=$2,claim_token=NULL,claim_expires_at=NULL,delivered_at=CASE WHEN $2='delivered' THEN clock_timestamp() ELSE NULL END,provider=$3,provider_message_id=$4,acknowledged_at=$5 WHERE id=$1 AND state<>'delivered' AND claim_token=$9 AND claim_expires_at>clock_timestamp() AND ($2='failed' OR (expected_provider=$3 AND destination_sha256=$6 AND payload_sha256=$7 AND id=$8::uuid)) RETURNING run_id`,[id,ack?'delivered':'failed',ack?.provider??null,ack?.messageId??null,ack?.acknowledgedAt??null,ack?.destinationSha256??null,ack?.payloadSha256??null,ack?.notificationId??null,claimToken]);
-      if(!ack&&result.rowCount){
-        await this.endLockedRun(client,result.rows[0].run_id,'held','notification_failed');
-        await client.query(`UPDATE district_pipeline.executor_runs SET state='held',reason_code='notification_failed',finished_at=clock_timestamp() WHERE id=$1`,[result.rows[0].run_id]);
-      }
+      // Startup readiness gates job authority. A disposition reports an already
+      // finalized run; delivery failure must never rewrite its committed result.
+      if(!ack&&result.rowCount&&notification.rows[0].phase==='startup')await this.endLockedRun(client,result.rows[0].run_id,'held','notification_failed');
       if(ack&&!result.rowCount)throw new DistrictExecutionHold('notification_failed');
     });
   }
@@ -540,6 +539,14 @@ async function waitForSlot(signal:AbortSignal):Promise<void> {
   await promise;
 }
 export interface ExecutorOptions {store:DistrictJobStore;cas:DistrictCas;handlers:Readonly<Record<string,JobHandler>>;authorizationId:string;mode?:ExecutionMode;ownerPresent?:true;maxJobs:number;maxElapsedMs:number;leaseMs?:number;signal?:AbortSignal;notifyOwner?:NotificationConfig['notifyOwner'];notificationApprovalSha256?:string;notificationDestinationSha256?:string;notificationProvider?:string;resourceLimits?:Partial<Record<ExecutionResource,number>>}
+/** Notification-only cleanup uses 60s of r1-vm-run.sh's 120s OS reserve.
+ * It never extends the workload/authorization deadline or permits another claim.
+ */
+async function deliverDisposition(store:DistrictJobStore,config:NotificationConfig|undefined,runId:string):Promise<ReasonCode|undefined> {
+  if(!config)return undefined;
+  try{await deliverDistrictOwnerNotifications(store,config,60000,runId);return undefined;}
+  catch(error){return error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';}
+}
 /** No polling daemon, subprocess, arbitrary module loading, or automatic retries.
  * Inject trusted, signal-aware handlers; the only accepted effects are fenced receipts.
  * Late asynchronous results are discarded. JavaScript cannot preempt synchronous
@@ -639,14 +646,14 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
     const reasonCode:ReasonCode=stopped??'max_jobs_reached';
     const state=reasonCode==='no_ready_jobs'||reasonCode==='max_jobs_reached'?'completed':'held';
     await options.store.endRun(run.runId,state,reasonCode);
-    if(notificationConfig)await deliverDistrictOwnerNotifications(options.store,notificationConfig,Math.max(1,options.maxElapsedMs-(performance.now()-invocationStart)));
-    return {runId:run.runId,state,reasonCode,jobsStarted,receiptIds};
+    const notificationReasonCode=await deliverDisposition(options.store,notificationConfig,run.runId);
+    return {runId:run.runId,state,reasonCode,jobsStarted,receiptIds,...(notificationReasonCode?{notificationReasonCode}:{})};
   } catch(error) {
     const reason=error instanceof DistrictExecutionHold?error.reasonCode:'execution_exception';
     if(run){
       await options.store.endRun(run.runId,'held',reason);
-      if(notificationConfig&&reason!=='notification_failed')await deliverDistrictOwnerNotifications(options.store,notificationConfig,Math.max(1,options.maxElapsedMs-(performance.now()-invocationStart)));
-      return {runId:run.runId,state:'held',reasonCode:reason,jobsStarted,receiptIds};
+      const notificationReasonCode=reason==='notification_failed'?undefined:await deliverDisposition(options.store,notificationConfig,run.runId);
+      return {runId:run.runId,state:'held',reasonCode:reason,jobsStarted,receiptIds,...(notificationReasonCode?{notificationReasonCode}:{})};
     }
     throw error;
   } finally {
@@ -659,12 +666,12 @@ export async function runDistrictJobs(options:ExecutorOptions):Promise<ExecutorR
  * at least once: callbacks should deduplicate by notification.id. Failures pause,
  * never spin or fall back to an unapproved destination.
  */
-export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,config:NotificationConfig,maxElapsedMs=60000):Promise<void> {
+export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,config:NotificationConfig,maxElapsedMs=60000,runId?:string):Promise<void> {
   HashSchema.parse(config.notificationApprovalSha256);
   HashSchema.parse(config.destinationSha256);token.parse(config.provider);
   if(!Number.isFinite(maxElapsedMs)||maxElapsedMs<=0)throw Error('Notification time bound required');
   const started=performance.now(),budget=Math.min(60000,maxElapsedMs);
-  for(const pending of await store.pendingNotifications()){
+  for(const pending of await store.pendingNotifications(runId)){
     if(pending.notificationApprovalSha256!==config.notificationApprovalSha256||pending.destinationSha256!==config.destinationSha256||pending.provider!==config.provider)throw new DistrictExecutionHold('notification_unavailable');
     const claimToken=randomUUID(),notification=await store.claimNotification(pending.id,claimToken);
     if(!notification){
@@ -672,7 +679,7 @@ export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,c
       const remaining=budget-(performance.now()-started);
       if(remaining<=0)throw new DistrictExecutionHold('notification_failed');
       await delay(Math.min(100,remaining));
-      return deliverDistrictOwnerNotifications(store,config,budget-(performance.now()-started));
+      return deliverDistrictOwnerNotifications(store,config,budget-(performance.now()-started),runId);
     }
     let attempt=0;
     for(;;){
@@ -716,7 +723,7 @@ export const artifactVerificationHandler:JobHandler=async ({job,signal,cas})=>{
  * No handler name is interpreted as a shell command or import path.
  * DATABASE_URL is read only by the runner; it is never logged or passed as context.
  */
-export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<void> {
+export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHandler>>,argv=process.argv.slice(2),notificationConfig?:NotificationConfig):Promise<ExecutorResult|undefined> {
   const [command,...args]=argv;
   if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH]');
   const flags:Record<string,string|true>={};
@@ -737,6 +744,7 @@ export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHand
     if(mode==='attended'){process.stdin.on('end',stop);process.stdin.on('close',stop);process.stdin.resume();}
     const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})}});
     process.stdout.write(JSON.stringify(result)+'\n');if(result.state==='held')process.exitCode=2;
+    return result;
   } finally {
     process.removeListener('SIGINT',stop);process.removeListener('SIGTERM',stop);process.removeListener('SIGHUP',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
   }

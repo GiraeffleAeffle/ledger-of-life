@@ -220,16 +220,20 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
  await assert.rejects(interrupted.fetcher.fetch(endpoint,{method:'POST',body,publicOperation:'genesis_guest'}),PoliteFetchError);
  writeMock.mock.restore();syncBuiltinESMExports();
  assert.equal((await recoverManagedSourceScratch(interrupted.options.ownerPolicyLane)).status,'complete');
- // Exercise the ACTUAL immutable tag reader against this disposable realm.
- // This test intentionally loads modules materialized from the immutable tag
- // into the disposable snapshot; these files do not exist at typecheck time.
+ // Exercise the ACTUAL immutable tag policy codec, but never ask an old
+ // authority tool to recover/purge the R1-only watermarked inventory. These
+ // materialized modules do not exist at typecheck time.
  const legacy=await import(new URL('../../legacy-src/civic-opt-out.ts',import.meta.url).href);
  const legacySchema=await import(new URL('../../legacy-src/district-schema.ts',import.meta.url).href);
  assert.equal(legacySchema.ContentFreeSourcePolicySchema.safeParse(successes[0].source.policy).success,false);
  for(const item of fetchers){
   assert.equal((await recoverManagedSourceScratch(item.options.ownerPolicyLane)).status,'complete');
-  assert.equal((await legacy.recoverManagedSourceScratch(item.options.ownerPolicyLane)).status,'complete');
  }
+ const authorityState=successes[0].options.ownerPolicyLane!.stateDir!,inventoryPath=join(authorityState,'inventory.json'),beforeLegacyProbe=await readFile(inventoryPath);
+ const watermarked=JSON.parse(beforeLegacyProbe.toString('utf8'));
+ assert.ok(watermarked.roots.some((root:{casWatermarks?:Record<string,string>})=>Object.keys(root.casWatermarks??{}).length>0));
+ await assert.rejects(legacy.recoverManagedSourceScratch(successes[0].options.ownerPolicyLane),{code:'CIVIC_POLICY_INVENTORY_UNAVAILABLE'});
+ assert.deepEqual(await readFile(inventoryPath),beforeLegacyProbe);
  // Real canonical policy receipts and, when the coordinated gate supplies PG,
  // real representation persistence through the existing R1 CAS/PG writer.
  const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
@@ -261,13 +265,13 @@ test('checked-in reviewed owner entry exercises headers, holds, persisted receip
   if(pool){const tables=await pool.query<{table_name:string}>("SELECT table_name FROM information_schema.tables WHERE table_schema='district_pipeline' AND table_type='BASE TABLE'");for(const {table_name} of tables.rows){assert.match(table_name,/^[a-z][a-z0-9_]*$/);noSecrets(JSON.stringify((await pool.query('SELECT * FROM district_pipeline."'+table_name+'"')).rows));}}
   await scanArtifacts(root);for(const {stateDir} of fetchers)await scanArtifacts(stateDir);
   for(const {source,options,cache} of successes){
-   const outcome=await legacy.recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-account-purge'},options.ownerPolicyLane);
+   const outcome=await recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-account-purge'},options.ownerPolicyLane);
    assert.equal(outcome.purge.status,'purged');assert.ok(outcome.purge.deletedFiles>=2);
    await assert.rejects(readFile(source.localPath),{code:'ENOENT'});await assert.rejects(readFile(source.observationPath),{code:'ENOENT'});
    assert.equal((await readdir(join(genesisOwnerAccountRoot(cache),'observations'))).length,0);
    assert.equal((await recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-account-purge'},options.ownerPolicyLane)).purge.status,'purged');
   }
-  const denialPurge=await legacy.recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-denial-purge'},errorLane.options.ownerPolicyLane);
+  const denialPurge=await recordHostOptOut({host:'www.regionalstatistik.de',reason:'rights_holder_objection',reference:'fixture-genesis-denial-purge'},errorLane.options.ownerPolicyLane);
   assert.equal(denialPurge.purge.status,'purged');await assert.rejects(readFile(denialPath),{code:'ENOENT'});
  }finally{try{await closePool?.();if(admin&&database)await admin.query('DROP DATABASE "'+database+'"');}finally{await closeAdmin?.();}}
  noSecrets(JSON.stringify(seen));noSecrets(JSON.stringify(process.argv));noSecrets(JSON.stringify(process.env));
