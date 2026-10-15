@@ -17,9 +17,10 @@ import {assessmentOutputSchema,PROMPTS,digest as assessmentDigest} from '../src/
 import {z} from 'zod';
 import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,assertManagedSourceReadable,readCivicPolicyInventory,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
-import {assessmentBridgeHoldReason} from '../src/district-assessment-broker.ts';
+import {assessmentBridgeHoldReason,assessmentBridgeFailureVersions} from '../src/district-assessment-broker.ts';
 import {DistrictExecutionHold} from '../src/district-jobs.ts';
 import {ReasonCodeSchema} from '../src/district-step-receipt.ts';
+import {OmpFailureKindSchema} from '../src/district-exception-diagnostics.ts';
 
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
 function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
@@ -50,6 +51,81 @@ test('omp event inspection rejects tool use, terminal failures, wrong route, ext
  ];
  for(const stdout of invalid)assert.throws(()=>inspectOmpEvents(stdout,0));
  assert.throws(()=>inspectOmpEvents(eventStream(),1));
+});
+
+test('native B failures distinguish exit, assistant stop, stream, turn and agent paths',()=>{
+ const cases=[
+  [eventStream(),1,'exit_nonzero'],
+  [eventStream([{type:'message_end',message:message({stopReason:'length'})}]),0,'stop_length'],
+  [eventStream([{type:'message_end',message:message({stopReason:'error'})}]),0,'stop_error'],
+  [eventStream([{type:'message_end',message:message({stopReason:'aborted'})}]),0,'stop_other'],
+  [eventStream([{type:'message_end',message:message({stopReason:'toolUse'})}]),0,'stop_other'],
+  [eventStream([{type:'message_update',assistantMessageEvent:{type:'error',reason:'error'}}]),0,'stream_update_error'],
+  [eventStream([{type:'message_update',assistantMessageEvent:{type:'done',reason:'length'}}]),0,'stop_length'],
+  [eventStream([{type:'turn_end',reason:'error'}]),0,'turn_reason'],
+  [eventStream([{type:'agent_end',reason:'aborted'}]),0,'agent_reason'],
+ ] as const;
+ for(const [stdout,exit,kind] of cases)assert.throws(()=>inspectOmpEvents(stdout,exit),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed'&&error.failureKind===kind,kind);
+ assert.equal(new OmpRunnerHold('provider_failed').failureKind,'exception_other');
+ assert.equal(new OmpRunnerHold('resource_limit').failureKind,undefined);
+});
+
+test('typed provider HTTP status survives stripped update errors and abnormal CLI exits',()=>{
+ const cases=[[400,'invalid_request'],[401,'auth'],[403,'auth'],[404,'not_found'],[408,'network'],[413,'invalid_request'],[422,'invalid_request'],[429,'rate_limit'],[500,'server'],[503,'server'],[529,'overloaded']] as const;
+ for(const [status,category] of cases)for(const exitCode of [0,1]){
+  const failed=message({stopReason:'error',content:[],errorStatus:status,errorMessage:'PRIVATE_PROVIDER_MESSAGE sk-ant-oat-synthetic'});
+  // Exact stock printableEvent shape: update/error strips its error object;
+  // message_end and the later logical copies retain errorStatus/errorId.
+  const stdout=eventStream([{type:'message_update',assistantMessageEvent:{type:'error',reason:'error'}},{type:'message_end',message:failed},{type:'turn_end',message:failed,toolResults:[]},{type:'agent_end',messages:[failed]}]);
+  assert.throws(()=>inspectOmpEvents(stdout,exitCode),(error:unknown)=>{
+   assert.ok(error instanceof OmpRunnerHold);assert.equal(error.reason,'provider_failed');assert.equal(error.failureKind,'provider_error_'+category);
+   assert.equal(error.subscriptionLimit,undefined,'A diagnostic 429 never grants a usage hold or retry');
+   assert.doesNotMatch(JSON.stringify(error),/PRIVATE_PROVIDER_MESSAGE|sk-ant-oat/);return true;
+  });
+ }
+});
+
+test('typed provider fields and pinned flag IDs produce only the closed diagnostic vocabulary',()=>{
+ const cases=[
+  [{errorType:'authentication_error'},'auth'],[{error:{type:'permission_error'}},'auth'],
+  [{error:{type:'rate_limit_error'}},'rate_limit'],[{error:{type:'overloaded_error'}},'overloaded'],
+  [{error:{type:'invalid_request_error'}},'invalid_request'],[{error:{type:'not_found_error'}},'not_found'],
+  [{error:{type:'api_error'}},'server'],[{error:{type:'network_error'}},'network'],
+  [{error:{code:'ECONNRESET'}},'network'],[{errorId:0x01001000},'auth'],[{errorId:0x40001000},'auth'],
+  [{errorId:0x00081000},'rate_limit'],[{errorId:0x00041000},'network'],
+  [{errorId:0x00021000},'unknown'],[{errorType:'PRIVATE_UNKNOWN_TYPE'},'unknown'],
+ ] as const;
+ for(const [fields,category] of cases){
+  const stdout=eventStream([{type:'message_end',message:message({stopReason:'error',content:[],...fields})}]);
+  assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>error instanceof OmpRunnerHold&&error.failureKind==='provider_error_'+category);
+ }
+ const late=message({stopReason:'error',content:[],errorStatus:401});
+ assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_update',assistantMessageEvent:{type:'error',error:{errorId:0x1000}}},{type:'agent_end',messages:[late]}]),0),(error:unknown)=>error instanceof OmpRunnerHold&&error.failureKind==='provider_error_auth','Later typed status refines an unknown typed update');
+});
+
+test('provider diagnostics never scrape prose, source text, malformed frames or an unbounded stream',()=>{
+ for(const privateText of ['401 authentication_error','429 rate_limit_error','529 overloaded_error','ECONNRESET network_error']){
+  const stdout=eventStream([{type:'message_end',message:message({stopReason:'error',errorMessage:privateText,content:[{type:'text',text:JSON.stringify({errorStatus:401,errorType:'authentication_error'})}]})}]);
+  assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>error instanceof OmpRunnerHold&&error.failureKind==='stop_error');
+ }
+ const typed=eventStream([{type:'message_end',message:message({stopReason:'error',errorStatus:401})}]);
+ for(const stdout of [typed.slice(0,-1),typed+'{broken}\n',typed+'x'.repeat(2*1024*1024)+'\n',typed.replace('\"session\"','\"not_session\"')]){
+  assert.throws(()=>inspectOmpEvents(stdout,1),(error:unknown)=>error instanceof OmpRunnerHold&&error.failureKind==='exit_nonzero');
+ }
+ assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({errorStatus:401})}]),1),(error:unknown)=>error instanceof OmpRunnerHold&&error.failureKind==='exit_nonzero','Successful assistant content cannot smuggle a provider failure label');
+});
+
+test('B failure projection preserves all closed kinds without retaining messages or forged labels',()=>{
+ for(const kind of OmpFailureKindSchema.options){
+  const error=new OmpRunnerHold('provider_failed',undefined,kind);
+  error.message='PRIVATE_PROVIDER_MESSAGE sk-ant-oat-synthetic';
+  assert.equal(assessmentBridgeHoldReason(error),'omp_provider_failed');
+  assert.deepEqual(assessmentBridgeFailureVersions('synthetic-lease',error),{ompFailureKind:kind});
+ }
+ const forged=new OmpRunnerHold('provider_failed');
+ Object.assign(forged,{failureKind:'PRIVATE_KIND\\nR1_B_FAILURE job=private'});
+ assert.deepEqual(assessmentBridgeFailureVersions('synthetic-lease',forged),{});
+ assert.deepEqual(assessmentBridgeFailureVersions('synthetic-lease',Error('PRIVATE_ERROR')),{});
 });
 
 test('omp argv and environment remain fixed and source-free',()=>{

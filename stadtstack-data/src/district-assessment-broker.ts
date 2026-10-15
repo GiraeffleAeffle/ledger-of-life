@@ -19,6 +19,7 @@ import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpR
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
+import {OmpFailureKindSchema} from './district-exception-diagnostics.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
@@ -26,6 +27,14 @@ export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
  if(error instanceof OmpRunnerHold&&error.subscriptionLimit)return 'budget_paused';
  if(error instanceof OmpRunnerHold)return `omp_${error.reason}`;
  return 'execution_exception';
+}
+/** Preserve only the governed limit proof and a closed host diagnostic label. */
+export function assessmentBridgeFailureVersions(leaseId:string,error:unknown):Record<string,string>{
+ if(!(error instanceof OmpRunnerHold))return {};
+ const versions=error.failureProof?bSubscriptionFailureVersions(leaseId,error.noOutput,error.failureProof):{};
+ const kind=OmpFailureKindSchema.safeParse(error.failureKind);
+ if(kind.success)versions.ompFailureKind=kind.data;
+ return versions;
 }
 
 export const ASSESSMENT_B_STEP='assessment_b';
@@ -390,7 +399,7 @@ export class DistrictAssessmentBroker {
       await this.hold(client,found.rows[0],reason);
      }
     });
-    return {outcome:'held_execution',reasonCode:reason,...(error instanceof OmpRunnerHold&&error.failureProof?{versions:bSubscriptionFailureVersions(prepared.row.id,error.noOutput,error.failureProof)}:{})};
+    return {outcome:'held_execution',reasonCode:reason,versions:assessmentBridgeFailureVersions(prepared.row.id,error)};
    }
    const result=await this.transaction(async client=>{
     const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];

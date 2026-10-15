@@ -6,7 +6,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {DatabaseError} from 'pg';
 import {z} from 'zod';
 import {CivicPolicyStateError,HostOptedOutError} from '../src/civic-opt-out.ts';
-import {formatDistrictJobException} from '../src/district-exception-diagnostics.ts';
+import {formatDistrictJobException,formatDistrictBFailure,OmpFailureKindSchema} from '../src/district-exception-diagnostics.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import {canonicalJobIdentity,canonicalResourceIdentity,runDistrictJobsCli,R1_MUNICIPALITIES,type DistrictJobSpec} from '../src/district-jobs.ts';
 
@@ -106,4 +106,16 @@ test('exception diagnostics identify real built-in, library and project construc
   }
   class PrivateDocumentName extends Error {}
   assert.equal(await formatDistrictJobException(key,'residual_prepare',new PrivateDocumentName('secret')),prefix+'class=other code=other at=none\n');
+});
+
+test('B failure stderr admits exactly a job prefix and one closed kind for a committed B execution hold',()=>{
+ const key=digest('synthetic B diagnostic job'),receipt={outcome:'held_execution' as const,reasonCode:'omp_provider_failed' as const,versions:{ompFailureKind:'exit_nonzero'}};
+ for(const kind of OmpFailureKindSchema.options)assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{ompFailureKind:kind}}),`R1_B_FAILURE job=${key.slice(0,12)} kind=${kind}\n`);
+ assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,reasonCode:'budget_paused'}),`R1_B_FAILURE job=${key.slice(0,12)} kind=exit_nonzero\n`);
+ for(const kind of ['PRIVATE_PROVIDER_ERROR','401 auth failed','exit_nonzero\\nSECRET_TOKEN','provider_error_unauthorized',''])assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,versions:{ompFailureKind:kind}}),undefined);
+ for(const step of ['assessment_a','assessment_c','assessment_reconcile','assessment_b\\nPRIVATE'])assert.equal(formatDistrictBFailure(key,step,receipt),undefined);
+ assert.equal(formatDistrictBFailure('PRIVATE_JOB_KEY','assessment_b',receipt),undefined);
+ assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,reasonCode:'lease_lost'}),undefined);
+ assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,outcome:'succeeded',reasonCode:'completed'}),undefined);
+ assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,outcome:'held_quality',reasonCode:'quality_failed'}),undefined);
 });

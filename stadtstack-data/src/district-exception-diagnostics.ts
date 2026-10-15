@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout as delay} from 'node:timers/promises';
 import {DatabaseError} from 'pg';
 import {z} from 'zod';
-import {ReasonCodeSchema} from './district-step-receipt.ts';
+import {ReasonCodeSchema,type StepReceipt} from './district-step-receipt.ts';
 
 const sourceRoot=fileURLToPath(new URL('.',import.meta.url));
 /** Snapshot only real source files at module startup. No thrown string can add
@@ -136,4 +136,18 @@ export async function formatDistrictJobException(jobKey:string,step:string,error
   try{at=firstSourceFrame(value);}catch{}
  }
  return `R1_EXCEPTION job=${jobKey.slice(0,12)} step=${step} class=${errorClass} code=${code} at=${at}\n`;
+}
+
+/** Fixed native-B vocabulary. Provider labels come only from typed event fields,
+ * never source content, error prose, stderr, account identity or credential data. */
+export const OmpFailureKindSchema=z.enum([
+ 'exit_nonzero','stop_length','stop_error','stop_other','stream_update_error','turn_reason','agent_reason',
+ 'provider_error_auth','provider_error_rate_limit','provider_error_overloaded','provider_error_invalid_request',
+ 'provider_error_not_found','provider_error_server','provider_error_network','provider_error_unknown','exception_other',
+]);
+export type OmpFailureKind=z.infer<typeof OmpFailureKindSchema>;
+export function formatDistrictBFailure(jobKey:string,step:string,receipt:Pick<StepReceipt,'outcome'|'reasonCode'|'versions'>):string|undefined {
+ if(step!=='assessment_b'||receipt.outcome!=='held_execution'||!['omp_provider_failed','budget_paused'].includes(receipt.reasonCode)||!/^[a-f0-9]{64}$/.test(jobKey))return;
+ const kind=OmpFailureKindSchema.safeParse(receipt.versions.ompFailureKind);
+ if(kind.success)return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind.data}\n`;
 }

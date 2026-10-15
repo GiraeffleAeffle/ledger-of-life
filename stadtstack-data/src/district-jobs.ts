@@ -11,7 +11,7 @@ import {CANONICALIZATION_VERSION, STEP_RECEIPT_VERSION, ReasonCodeSchema, encode
 import {CivicPolicyStateError,withCivicPolicyShutdown} from './civic-opt-out.ts';
 import {hostCodeVersions} from './district-host-provenance.ts';
 import {DistrictDatabaseConnectionLost,DistrictDatabaseScope,guardDistrictPool,isDistrictDatabaseConnectionError,withDistrictDatabaseScope} from './district-database.ts';
-import {formatDistrictJobException} from './district-exception-diagnostics.ts';
+import {formatDistrictJobException,formatDistrictBFailure} from './district-exception-diagnostics.ts';
 
 // This is the authorized R1 ring, not a district-prefix or whole-Amt admission rule.
 export const R1_MUNICIPALITIES:Readonly<Record<string,string>>={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
@@ -648,6 +648,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
       let rejectAbort:((reason:unknown)=>void)|undefined;
       let invocation:Promise<JobHandlerResult>|undefined;
       let handlerThrew=false;
+      let diagnostic:string|undefined;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -680,6 +681,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         receipt=await makeReceipt(job,result,performance.now()-start,process.cpuUsage(cpu));
         database.throwIfLost();
         await options.store.finish(run,job,receipt,currentPolicy);receiptIds.push(receipt.id);
+        diagnostic=formatDistrictBFailure(job.jobKey,job.spec.step,receipt);
         activeJob=undefined;
         if(result.outcome!=='succeeded'&&result.outcome!=='no_supported_case'){stopped=result.reasonCode;break;}
       } catch(error) {
@@ -692,7 +694,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
         if(await options.store.hold(job,reason,receipt)){
           receiptIds.push(receipt.id);
-          if(reason==='execution_exception'&&handlerThrew)process.stderr.write(await formatDistrictJobException(job.jobKey,job.spec.step,error));
+          if(reason==='execution_exception'&&handlerThrew)diagnostic=await formatDistrictJobException(job.jobKey,job.spec.step,error);
         }
         activeJob=undefined;
         stopped=reason;break;
@@ -702,6 +704,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         // close pools or remove signal protection while scratch/daemon teardown
         // can still acquire an inventory lock or hold live process handles.
         await invocation?.catch(()=>{});
+        if(diagnostic)process.stderr.write(diagnostic);
       }
     }
     const reasonCode:ReasonCode=stopped??'max_jobs_reached';
