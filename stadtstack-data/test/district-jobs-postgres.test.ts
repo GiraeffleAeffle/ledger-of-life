@@ -299,7 +299,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const error=Object.assign(new TypeError(secret),{code:'ERR_SYNTHETIC'});
       const result=await run(await authorize([key]),1,{diagnostic_throw:async()=>{throw error;}});
       assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');
-      assert.equal(stderr,`R1_EXCEPTION job=${key.slice(0,12)} step=diagnostic_throw class=TypeError code=ERR_SYNTHETIC at=none\n`);
+      assert.equal(stderr,`R1_EXCEPTION job=${key.slice(0,12)} step=diagnostic_throw class=TypeError code=other at=none\n`);
       const saved=await pool.query<{state:string;receipt:StepReceipt}>('SELECT j.state,r.receipt FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1',[key]);
       assert.equal(saved.rowCount,1);assert.equal(saved.rows[0].state,'held_execution');assert.equal(saved.rows[0].receipt.reasonCode,'execution_exception');
       assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/synthetic-secret-message|ERR_SYNTHETIC|R1_EXCEPTION/);
@@ -309,6 +309,11 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const controlled=await store.enqueue(jobSpec('controlled-exception-hold','diagnostic_controlled'));
       assert.equal((await run(await authorize([controlled]),1,{diagnostic_controlled:async()=>{throw new DistrictExecutionHold('quality_failed');}})).reasonCode,'quality_failed');
       assert.equal(stderr,'');
+      const hostile=await store.enqueue(jobSpec('hostile-exception-diagnostic','diagnostic_hostile'));
+      const forged={constructor:{name:'PrivateDocumentName'},code:'SECRET_TOKEN_VALUE',stack:`Error: secret\n    at forged (${new URL('../src/SECRET_TOKEN.ts',import.meta.url).href}:42:9)`};
+      assert.equal((await run(await authorize([hostile]),1,{diagnostic_hostile:async()=>{throw forged;}})).reasonCode,'execution_exception');
+      assert.equal(stderr,`R1_EXCEPTION job=${hostile.slice(0,12)} step=diagnostic_hostile class=other code=other at=none\n`);
+      stderr='';
       // Cleanup can replace a handler's exception. Diagnose the actual error
       // that caused the committed exception hold, still exactly once.
       const release=store.releaseResourceSlot.bind(store);
@@ -316,7 +321,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const cleanup=await store.enqueue(jobSpec('exception-cleanup-diagnostic','residual_extract'));
       const cleaned=await run(await authorize([cleanup]),1,{residual_extract:async()=>{throw new TypeError(secret);}});
       assert.equal(cleaned.reasonCode,'execution_exception');
-      assert.equal(stderr,`R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=ERR_CLEANUP at=none\n`);
+      assert.equal(stderr,`R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=other at=none\n`);
     }finally{st.mock.restoreAll();}
   });
 

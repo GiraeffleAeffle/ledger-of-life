@@ -58,8 +58,10 @@ test('database supervision remains host-only for the five queued R1 semantic con
  }
 });
 test('exception stderr diagnostics do not enter queued semantics or the OMP runner contract',async()=>{
- for(const name of ['residualPreparation','residual','assessmentQueue','assessmentB','policyRefresh'])assert.deepEqual(await contracts[name].compute(change('district-jobs.ts')),await contracts[name].compute(hash),name);
- assert.equal(await ompRunnerContractSha256(change('district-jobs.ts')),await ompRunnerContractSha256(hash));
+ for(const file of ['district-jobs.ts','district-exception-diagnostics.ts']){
+  for(const name of ['residualPreparation','residual','assessmentQueue','assessmentB','policyRefresh'])assert.deepEqual(await contracts[name].compute(change(file)),await contracts[name].compute(hash),name+': '+file);
+  assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
+ }
 });
 
 test('host resolver cutover changes only B contracts among the scoped queued job contracts',async()=>{
