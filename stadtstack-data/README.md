@@ -1013,9 +1013,16 @@ Before any governed deployment, compute **one immutable release acceptance
 record**, not a conjunction assembled by reading selected human summaries:
 
 ```sh
-npm run evaluate:pilot -- release-acceptance \
+node --experimental-strip-types src/r1-release-acceptance.ts \
   --input "$RELEASE_ACCEPTANCE_INPUT" --output "$RELEASE_ACCEPTANCE_RECORD"
 ```
+
+The release acceptance CLI is deliberately separate from the frozen evaluator:
+`evaluate-pilot-value.ts` is an input to the running assessment queue's semantic
+contract and must remain byte-identical to the `93b967d` campaign cutover.
+Adding acceptance dispatch there would re-key already-enqueued assessments.
+The standalone entry retains the same pinned inputs, immutable outputs and
+nonzero failure semantics; existing evaluator/audit modes remain unchanged.
 
 `$RELEASE_ACCEPTANCE_INPUT` is a private JSON object with:
 

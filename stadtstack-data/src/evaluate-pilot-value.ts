@@ -11,7 +11,6 @@ import {pilotReviewSchema,assessmentItemSchema,reconcile,writeImmutable,auditFra
 import {assertValueAssessmentContext,boundedValueSource,valueAnswerUnit} from './district-value-context.ts';
 import {VALUE_AREAS as areas,valueQuestionSchema as questionSchema,valueSearches,projectMcpResponse as safeResponse,
   validateCandidateTranscript,validateValueTargetTranscript} from './pilot-value-transcript.ts';
-import {runReleaseAcceptance} from './r1-release-acceptance.ts';
 
 // Retrieval crosses MCP to the separately selected immutable release. Assessment
 // ingestion additionally verifies private originals; it never queries private candidate data.
@@ -392,7 +391,7 @@ export function markdown(report:EvaluationMarkdownInput,evidencePath:string):str
 async function save(path:string,value:string){await mkdir(dirname(path),{recursive:true});await writeFile(path,value);}
 async function main(){
   const [mode,...args]=process.argv.slice(2),options=new Map<string,string>();
-  if(mode==='--help'||mode==='help'){console.log('Usage: evaluate-pilot-value.ts collect|prepare-assessment|ingest-assessments|finalize|audit-packet|ingest-owner-audit|verdict|release-acceptance [--option value]');return;}
+  if(mode==='--help'||mode==='help'){console.log('Usage: evaluate-pilot-value.ts collect|prepare-assessment|ingest-assessments|finalize|audit-packet|ingest-owner-audit|verdict [--option value]');return;}
   for(let i=0;i<args.length;i+=2){if(!args[i]?.startsWith('--')||!args[i+1]||args[i+1].startsWith('--'))throw Error('Expected named option and value');options.set(args[i].slice(2),args[i+1]);}
   const required=(name:string)=>{const value=options.get(name);if(!value)throw Error('Required evaluation option missing');return value;};
   const load=async(path:string)=>JSON.parse(await readFile(path,'utf8')) as Report;
@@ -428,11 +427,9 @@ async function main(){
     const path=required('input'),report=await load(path);validateReport(report);report.status='reviewed';report.summary=summarize(report.evaluations);
     if(options.has('baseline'))report.comparison=compareReports(await load(required('baseline')),report);
     await save(path,JSON.stringify(report,null,2)+'\n');await save(required('markdown'),markdown(report,path));console.log(JSON.stringify(report.summary));
-  }else if(mode==='release-acceptance'){
-    await runReleaseAcceptance(options);
   }else if(mode==='audit-packet'||mode==='ingest-owner-audit'||mode==='verdict'){
     // Audit initialization consumes these evaluator schemas; defer it until this module is initialized.
     await (await import('./pilot-value-audit.ts')).runPilotValueAudit(mode,options);
-  }else throw Error('Use collect, prepare-assessment, ingest-assessments, finalize, audit-packet, ingest-owner-audit, verdict or release-acceptance');
+  }else throw Error('Use collect, prepare-assessment, ingest-assessments, finalize, audit-packet, ingest-owner-audit or verdict');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(()=>{console.error('Pilot evaluation failed; no credentials, server stderr or raw protocol objects emitted. Check pinned release, tool contract and review evidence.');process.exitCode=1;});

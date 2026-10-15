@@ -1,6 +1,7 @@
 import {createHash} from 'node:crypto';
 import {readFile,lstat} from 'node:fs/promises';
-import {isAbsolute,join} from 'node:path';
+import {isAbsolute,join,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
 import {HashSchema,canonicalJson} from './district-adapter-contract.ts';
 import {classifyStep8Exception,Step8CampaignSchema} from './r1-step8-governance.ts';
@@ -295,3 +296,15 @@ export async function runReleaseAcceptance(options:Map<string,string>){
   const result=await computeReleaseAcceptance(JSON.parse(await readFile(input,'utf8')));
   await writeImmutable(output,result);console.log(JSON.stringify(result));if(!result.accepted)process.exitCode=1;
 }
+export async function r1ReleaseAcceptanceMain(args:string[]=process.argv.slice(2)){
+  if(args[0]==='--help'||args[0]==='help'){console.log('Usage: r1-release-acceptance.ts --input FILE --output FILE');return;}
+  const options=new Map<string,string>();
+  for(let index=0;index<args.length;index+=2){
+    if(!args[index]?.startsWith('--')||!args[index+1]||args[index+1].startsWith('--'))throw Error('Expected named option and value');
+    options.set(args[index].slice(2),args[index+1]);
+  }
+  await runReleaseAcceptance(options);
+}
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))r1ReleaseAcceptanceMain().catch(()=>{
+  console.error('Release acceptance failed; inspect pinned inputs and immutable output paths. No deployment was performed.');process.exitCode=1;
+});
