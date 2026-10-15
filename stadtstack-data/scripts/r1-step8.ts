@@ -1,5 +1,6 @@
 import {readFile} from 'node:fs/promises';
 import {Pool} from 'pg';
+import {step8SocketConnection} from '../src/r1-step8-governance.ts';
 import {Step8InputSchema,step8ReadPlan,discoverStep8Plan,runStep8} from '../src/r1-step8.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 
@@ -15,9 +16,8 @@ if(mode==='discover'){
  if(mode==='plan')console.log(JSON.stringify(step8ReadPlan(input),null,2));
  else{
   if(!process.env.DATABASE_URL)throw Error('Explicit same-host canonical database required');
-  const dsn=new URL(process.env.DATABASE_URL),host=dsn.searchParams.get('host');
-  if(!host?.startsWith('/'))throw Error('Offline step8 requires a PostgreSQL Unix-domain socket');
-  const pool=new Pool({connectionString:dsn.href,max:2,application_name:'r1-step8'});
+  const dsn=step8SocketConnection(process.env.DATABASE_URL);
+  const pool=new Pool({connectionString:dsn,max:2,application_name:'r1-step8'});
   try{console.log(JSON.stringify(await runStep8(input,pool),null,2));}finally{await pool.end();}
  }
 }

@@ -1,6 +1,7 @@
 import {readFile,mkdir,lstat,realpath,readdir,open} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {Pool} from 'pg';
+import {parse as parseConnectionString} from 'pg-connection-string';
 import {dirname,join,resolve,relative,isAbsolute} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {isDeepStrictEqual} from 'node:util';
@@ -134,9 +135,8 @@ async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
 const replayArtifactAuditSchema=z.object({schemaVersion:z.literal('district-replay-artifact-audit-v1'),path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative(),mimeType:z.string().min(1),kind:z.literal('derived'),storageKey:z.string().regex(/^sha256\/[a-f0-9]{2}\/[a-f0-9]{64}$/),inputBindingSha256:hashSchema}).strict();
 async function persistReplayArtifacts(context:ReplaySourceContext,receiptSha256:string,proof:{comparison:{releaseId:string;manifestSha256:string;files:DataRelease['files']};executedAt:string;completedAt:string;asOf:string;publicationInputsSha256:string}){
  const dsn=process.env.DATABASE_URL;if(!dsn)throw Error('Replay requires the private same-host canonical audit database');
- const connection=new URL(dsn);
- const host=connection.searchParams.get('host')??connection.hostname;
- if(!['postgres:','postgresql:'].includes(connection.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(host)&&!isAbsolute(host))throw Error('Replay audit database must be same-host, not an external network dependency');
+ const host=parseConnectionString(dsn).host??'';
+ if(!/^postgres(?:ql)?:/.test(dsn)||!['localhost','127.0.0.1','::1','[::1]',''].includes(host)&&!isAbsolute(host))throw Error('Replay audit database must be same-host, not an external network dependency');
  const pool=new Pool({connectionString:dsn,max:1,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-replay'});
  const artifacts:z.infer<typeof replayArtifactAuditSchema>[]=[];
  const put=async(bytes:Buffer,mimeType='application/json')=>{

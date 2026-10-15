@@ -148,7 +148,7 @@ export async function prepareKnowledge(options:PrepareKnowledgeOptions){
  return {...prepared.summary,outputPins};
 }
 /** The consumer runs inside a real nested canonical lease; no caller scope/boolean is accepted. */
-export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,consume:(prepared:{summary:PreparedKnowledgeSummary;stagingDir:string;scope:ManagedSourceScratch;outputPins:Array<{path:string;sha256:string;bytes:number}>;publication:AuthenticatedPreparedPublication})=>Promise<T>,publicationInputs?:PreparedPublicationInputs):Promise<T>{
+export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,consume:(prepared:{summary:PreparedKnowledgeSummary;publicationQuarantine:{schemaVersion:string;records:unknown[]};stagingDir:string;scope:ManagedSourceScratch;outputPins:Array<{path:string;sha256:string;bytes:number}>;publication:AuthenticatedPreparedPublication})=>Promise<T>,publicationInputs?:PreparedPublicationInputs):Promise<T>{
  const provenance=await preparationInputs(options),policy=preparationPolicy(options),outputRoot=resolve(options.outputRoot??join(cacheDir,'districts','r1-knowledge-preparation'));
  return withManagedSourceScratch(outputRoot,provenance.bindings.map(({independentAllowed:_flag,...binding})=>binding),async scope=>{
   const assertActive=scope.assertActive.bind(scope),leaseDirectory=scope.directory;
@@ -184,7 +184,7 @@ export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,c
    await assertActive();if(!active)throw Error('Prepared publication lease has ended');return bytes;
   }});
   preparedPublications.add(publication);
-  try{return await consume({summary:prepared.summary,stagingDir,scope,outputPins,publication});}
+  try{return await consume({summary:prepared.summary,publicationQuarantine:prepared.publicationQuarantine,stagingDir,scope,outputPins,publication});}
   finally{active=false;preparedPublications.delete(publication);}
  },{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts',purpose:'artifact'});
 }

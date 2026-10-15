@@ -228,17 +228,53 @@ PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
 R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all
 ```
 
-Observed final gate (`tests-20261015T024453Z.tap` under the operator's
-`r1-verify` state directory): TypeScript passed; 1,781 tests, 1,724 passed,
-7 failed, 2 cancelled, 48 skipped. The full guarded text/native
-publication/replay/candidate-loader fixture passed, as did all three step-8
-regressions. The full gate is **not green**: the existing
-`governed A/B/C queue and original-wide Codex ceilings` parent exceeded its
-120,000-ms timeout, cancelling a child and preventing its later tests from
-starting. That separate test file was not changed; no failure was suppressed
-or reclassified, and no hosted release is authorized by these results.
+Observed final gate (`tests-20261015T033555Z.tap` under the operator's
+`r1-verify` state directory), after merging `d4dc169`: TypeScript passed;
+1,827 tests, 1,779 passed, **0 failed, 0 cancelled**, 48 skipped; exit 0.
+The full guarded text/native publication/replay/candidate-loader fixture passed,
+including exact campaign authentication, retained preparation quarantine and
+step-9 assessment handoff. Focused regression execution also passed:
+`tests-20261015T033306Z.tap`, 139 passed, no failures/cancellations; exit 0.
+The final full gate includes the added explicit critical-kind regression.
+These are synthetic isolated-authority/disposable-PG results, not a production
+candidate receipt or hosted-release authorization.
 
-The real production candidate remains blocked until its complete 27-source,
-208-document seal set and admitted full staging/control provenance exist. This
-command does not waive any processing, replay, quality, identity, policy or value
-acceptance gate and never performs hosted rollout.
+No production candidate was executed here. Producing it requires the complete
+27-source, 208-document seal set and authenticated full staging/control
+provenance. This command does not waive any processing, replay, quality,
+identity, policy or value acceptance gate and never performs hosted rollout.
+
+## Review cutover: mandatory campaign, custody and exception handoff
+
+The control manifest now also requires `campaign: {path, sha256}`, itself present
+in the authenticated private provenance. Its `stadtstack-r1-step8-campaign-v1`
+document has `sources: [{municipalityId, sourceId, corpus: {path, sha256},
+documents: [{documentId, sha256, jobKey}]}]`. Outside an isolated fixture realm,
+its corpus hashes must equal the entire frozen
+`R1_NINE_TOWN_2026_10_13_CORPUS_SHA256` set. Each original frozen document group
+must have exactly one selected extraction job. Exported document IDs, hashes,
+job keys, corpus and source identities must match exactly. Splitting one source
+into multiple authentic seals cannot replace another source. Held and negative
+documents remain explicit dispositions.
+
+A generation is reserved by atomic directory creation before exports, with an
+exclusive sibling `.claim` control file and nonce. Every candidate/derived writer
+checks ownership; an existing or competing claimant cannot reuse the lane.
+Native primary and supporting HTTP contributors are authenticated from the
+committed job's source bindings and immutable original HTTP proofs. All their
+bindings join the text/staging bindings before any derived native/candidate write.
+
+`exception-inventory.json` persists authenticated source dispositions, original
+queue evidence, available A/B/C pins, native coverage/field holds and the exact
+preparation publication quarantine/critical holds before scratch cleanup. Its
+hash and release ID are bound by `release-gate.json` and `step9-handoff.json`.
+The handoff also pins `audit/assessments.json`, whose entries use the step-9
+`{item,A,B,C}` manifest contract and point to retained, hash-checked artifacts.
+Missing assessments stay explicit in the inventory; no triplet is invented and
+this command does not perform or waive the owner exception audit.
+
+The CLI and replay audit writer parse socket connection strings with
+`pg-connection-string`, preserving the original DSN passed to `Pool`. Thus the
+documented `postgresql://OPERATOR@/DB?host=/absolute/socket-directory` works;
+the operator command rejects network hosts and relative socket directories.
+

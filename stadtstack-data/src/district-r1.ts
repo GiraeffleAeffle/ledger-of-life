@@ -30,12 +30,13 @@ import {admittedRegisteredRobotsScopes,type RegisteredRobotsAudit} from './regis
 import {pipelineNotificationConfig} from './district-notifications.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,assertManagedSourceReadable,assertManagedRawSourceBinding,assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from './civic-opt-out.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from './civic-opt-out.ts';
-import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding} from './district-http-observation.ts';
+import {HttpObservationSchema,HttpObservationProofSchema,HttpSourceBindingSchema,authenticatedHttpBinding,authenticateHttpSourceBindings} from './district-http-observation.ts';
 import type {HttpObservationProof} from './district-http-observation.ts';
 import {ownerRobotsOverrideFor,ownerGenesisAccessFor,sourcePolicyExpiresAt,registeredSourcePolicyApplies,PUBLIC_SOURCE_POLICY_VALIDITY_MS} from './source-policy.ts';
 import {structuredRunSchema,structuredCoverageReceiptSchema,structuredCoverageStateForNoOutput,verifyStructuredRunReceipts} from './district-structured-run.ts';
 import type {StructuredJobResult} from './district-structured-jobs.ts';
 import type {StructuredCoverageReceipt} from './district-structured-run.ts';
+import {assertNativeContributorCoverage} from './r1-step8-governance.ts';
 import type {StepReceipt,ReasonCode} from './district-step-receipt.ts';
 import type {StructuredSupportingSource} from './district-structured-record.ts';
 import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
@@ -348,11 +349,13 @@ export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:
  if(!rows.rowCount)throw Error('No committed structured outputs in selected runs');
  const groups=new Map<string,{result:StructuredJobResult;pages:{result:StructuredJobResult;receipt:StepReceipt;hash:string}[]}>();
  const technical:StructuredCoverageReceipt[]=[];
+ const nativeBindings:z.infer<typeof HttpSourceBindingSchema>[]=[];
  for(const row of rows.rows){
   const receipt=StepReceiptSchema.parse(row.receipt);
   if(!receipt.outputHashes.length){
    const selector=z.object({worker:StructuredWorkerRequestSchema}).passthrough().parse(row.spec.selector),worker=selector.worker;
    if(receipt.outcome==='succeeded'||semanticHash(worker.scope)!==semanticHash(row.spec.sourceScope)||receipt.policyProofSha256!==worker.snapshot.policyReceiptSha256)throw Error('Technical receipt job binding mismatch');
+   if(readOnly){const selector=z.object({sourceBindings:z.array(HttpSourceBindingSchema),supportingSources:z.array(z.object({url:z.string(),sha256:HashSchema}).passthrough())}).passthrough().parse(row.spec.selector),sources=[{url:worker.snapshot.url,sha256:worker.snapshot.sourceSha256},...selector.supportingSources];assertNativeContributorCoverage(selector.sourceBindings,sources);if(selector.sourceBindings.some(binding=>!row.spec.inputArtifactHashes.includes(binding.receiptSha256)))throw Error('Native HTTP proof omitted from committed job identity');nativeBindings.push(...await authenticateHttpSourceBindings(cas,selector.sourceBindings,sources,readOnly.policy));}
    if(!readOnly){const source=await sourceHttpReference(store,cas,{url:worker.snapshot.url,sha256:worker.snapshot.sourceSha256,policyReceiptSha256:worker.snapshot.policyReceiptSha256});
    await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});}
    const state=structuredCoverageStateForNoOutput(receipt.outcome);
@@ -363,6 +366,7 @@ export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:
   const {result}=await committedResult(store,cas,row.receipt_sha256,receipt.outputHashes[0]);
   const proof=PolicyReceiptSchema.parse(JSON.parse((await cas.read(result.policyReceiptSha256)).toString('utf8')));
   await recheckPolicyReceipt(proof,{...readOnly?.policy,evaluationAt:new Date().toISOString()});
+  if(readOnly){const selector=z.object({sourceBindings:z.array(HttpSourceBindingSchema)}).passthrough().parse(row.spec.selector),sources=[{url:proof.source.url,sha256:result.sourceSha256},...result.supportingSources];assertNativeContributorCoverage(selector.sourceBindings,sources);if(selector.sourceBindings.some(binding=>!row.spec.inputArtifactHashes.includes(binding.receiptSha256)))throw Error('Native HTTP proof omitted from committed job identity');nativeBindings.push(...await authenticateHttpSourceBindings(cas,selector.sourceBindings,sources,readOnly.policy));}
   if(!readOnly){const source=await sourceHttpReference(store,cas,{url:proof.source.url,sha256:result.sourceSha256,policyReceiptSha256:result.policyReceiptSha256});
   await exportStepReceipt(store,cas,row.receipt_sha256,{url:source.url,sha256:source.sha256,policyReceiptSha256:source.policyReceiptSha256,binding:httpObservationBinding(source)});}
   const key=semanticHash({adapter:result.adapterId,version:result.adapterVersion,scope:result.scope,source:result.sourceSha256,policy:result.policyReceiptSha256,operation:receipt.step});
@@ -393,7 +397,7 @@ export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:
  }
  const checked=districtRegistrySchema.parse(updated),registryBytes=Buffer.from(canonicalJson(checked)+'\n');
  const run=structuredRunSchema.parse({schemaVersion:'district-structured-run-v1',generatedAt:readOnly?.generatedAt??new Date().toISOString(),registrySha256:digest(registryBytes),questionDispositionSha256:digest(await readFile(join(REPO,'reports/pilot-question-source-disposition.json'))),adapterContractSha256:semanticHash([...contracts].sort()),records:[...records.values()].sort((a,b)=>a.id.localeCompare(b.id)),coverage});
- if(readOnly)return {run,registry:checked,registryBytes,receipts:rows.rows.map(row=>({sha256:row.receipt_sha256,receipt:StepReceiptSchema.parse(row.receipt)}))};
+ if(readOnly)return {run,registry:checked,registryBytes,fieldHolds:structuredHoldSummary([...groups.values()].flatMap(group=>group.pages.map(page=>page.result))),bindings:[...new Map(nativeBindings.map(binding=>[canonicalJson(binding),binding])).values()],receipts:rows.rows.map(row=>({sha256:row.receipt_sha256,receipt:StepReceiptSchema.parse(row.receipt)}))};
  await verifyStructuredRunReceipts(run,cas,{evaluationAt:new Date().toISOString()});
  const references=new Map<string,HttpSourceAuditReference>();
  for(const row of run.coverage)if(row.sourceSha256&&row.policyReceiptSha256){
