@@ -1,6 +1,7 @@
 import {readFile,mkdir,lstat,realpath,readdir,open} from 'node:fs/promises';
 import {constants} from 'node:fs';
 import {Pool} from 'pg';
+import {guardDistrictPool} from './district-database.ts';
 import {parse as parseConnectionString} from 'pg-connection-string';
 import {dirname,join,resolve,relative,isAbsolute} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -137,7 +138,7 @@ async function persistReplayArtifacts(context:ReplaySourceContext,receiptSha256:
  const dsn=process.env.DATABASE_URL;if(!dsn)throw Error('Replay requires the private same-host canonical audit database');
  const host=parseConnectionString(dsn).host??'';
  if(!/^postgres(?:ql)?:/.test(dsn)||!['localhost','127.0.0.1','::1','[::1]',''].includes(host)&&!isAbsolute(host))throw Error('Replay audit database must be same-host, not an external network dependency');
- const pool=new Pool({connectionString:dsn,max:1,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-replay'});
+ const pool=guardDistrictPool(new Pool({connectionString:dsn,max:1,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-replay'}));
  const artifacts:z.infer<typeof replayArtifactAuditSchema>[]=[];
  const put=async(bytes:Buffer,mimeType='application/json')=>{
   const sha256=hash(bytes),storageKey=`sha256/${sha256.slice(0,2)}/${sha256}`;

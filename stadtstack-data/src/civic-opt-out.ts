@@ -510,15 +510,17 @@ export async function readCivicOptOutSnapshot(options:CivicPolicyOptions={}):Pro
 // TERM is a stop-admission barrier, not an interrupt inside a transaction.
 // Keep handlers installed until all already-started inventory operations drain.
 let inventoryLifetime:{controller:AbortController;operations:Set<Promise<void>>;scopes:number}|undefined;
-export async function withCivicPolicyShutdown<T>(work:(signal:AbortSignal)=>Promise<T>):Promise<T>{
+export async function withCivicPolicyShutdown<T>(work:(signal:AbortSignal)=>Promise<T>,externalStop?:AbortSignal):Promise<T>{
  const lifetime=inventoryLifetime??={controller:new AbortController(),operations:new Set(),scopes:0};
  lifetime.scopes++;
  const stop=()=>lifetime.controller.abort(new CivicPolicyStateError('CIVIC_POLICY_SHUTDOWN'));
  process.on('SIGTERM',stop);process.on('SIGINT',stop);process.on('SIGHUP',stop);
+ externalStop?.addEventListener('abort',stop,{once:true});if(externalStop?.aborted)stop();
  try{return await work(lifetime.controller.signal);}
  finally{
   while(lifetime.operations.size)await Promise.allSettled([...lifetime.operations]);
   process.removeListener('SIGTERM',stop);process.removeListener('SIGINT',stop);process.removeListener('SIGHUP',stop);
+  externalStop?.removeEventListener('abort',stop);
   // Retain an aborted barrier even after the CLI returns: a late callback must
   // never acquire a fresh lock after termination was requested.
   if(!--lifetime.scopes&&!lifetime.controller.signal.aborted)inventoryLifetime=undefined;

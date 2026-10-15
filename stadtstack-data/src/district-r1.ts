@@ -10,6 +10,7 @@ import {DistrictCas} from './district-cas.ts';
 import type {CasArtifact} from './district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,runDistrictJobsCli,migrateDistrictJobs,R1_MUNICIPALITIES,insertR1MetadataSnapshot} from './district-jobs.ts';
 import type {JobHandler,DistrictJobSpec,ExecutorResult} from './district-jobs.ts';
+import {DistrictDatabaseConnectionLost,guardDistrictPool,isDistrictDatabaseConnectionError,withDistrictDatabaseScope} from './district-database.ts';
 import {canonicalJson,digest,semanticHash,ScopeSchema,HashSchema} from './district-adapter-contract.ts';
 import type {AdapterScope} from './district-adapter-contract.ts';
 import {districtRegistrySchema} from './district-registry.ts';
@@ -341,7 +342,14 @@ export async function loadDescriptor(store:DistrictJobStore,cas:DistrictCas,hash
  if(semanticHash(proof)!==descriptor.receiptSha256||semanticHash(proof.scope)!==semanticHash(descriptor.scope)||proof.source.sha256!==descriptor.snapshot.sourceSha256||proof.source.url!==descriptor.snapshot.url)throw Error('Descriptor policy mismatch');
  await recheckPolicyReceipt(proof,{...policy,evaluationAt:new Date().toISOString()});await cas.verify(descriptor.snapshot.sourceSha256);return descriptor;
 }
-async function stdinJson(){let bytes=0;const chunks:Buffer[]=[];for await(const chunk of process.stdin){const value=Buffer.from(chunk);bytes+=value.length;if(bytes>4*1024*1024)throw Error('Operator manifest too large');chunks.push(value);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+async function stdinJson(signal:AbortSignal){
+ signal.throwIfAborted();
+ const abort=()=>process.stdin.destroy(new DistrictDatabaseConnectionLost());
+ signal.addEventListener('abort',abort,{once:true});
+ let bytes=0;const chunks:Buffer[]=[];
+ try{for await(const chunk of process.stdin){const value=Buffer.from(chunk);bytes+=value.length;if(bytes>4*1024*1024)throw Error('Operator manifest too large');chunks.push(value);}return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
+ finally{signal.removeEventListener('abort',abort);}
+}
 
 export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:DistrictRegistry,input:unknown,readOnly?:{generatedAt:string;policy:CivicPolicyOptions}){
  const selection=z.object({runIds:z.array(z.uuid()).min(1).max(1000)}).strict().parse(input);
@@ -417,7 +425,7 @@ export async function exportRun(store:DistrictJobStore,cas:DistrictCas,registry:
 
 export type R1FailurePhase='startup'|'admission'|'execution';
 export function formatR1Failure(error:unknown,phase:R1FailurePhase):string{
- const candidate=error instanceof CivicPolicyStateError?error.code:error instanceof DistrictExecutionHold?error.reasonCode:'R1_COMMAND_FAILED';
+ const candidate=isDistrictDatabaseConnectionError(error)?'DATABASE_CONNECTION_LOST':error instanceof CivicPolicyStateError?error.code:error instanceof DistrictExecutionHold?error.reasonCode:'R1_COMMAND_FAILED';
  const code=/^[A-Za-z][A-Za-z0-9_]{0,95}$/.test(candidate)?candidate:'R1_COMMAND_FAILED';
  return `R1_FAILURE phase=${phase} code=${code}\n`;
 }
@@ -425,9 +433,9 @@ export function reportR1ExecutorFailure(result:ExecutorResult|undefined):void{
  if(result?.state==='held')process.stderr.write(formatR1Failure(new DistrictExecutionHold(result.reasonCode),'execution'));
 }
 export async function districtR1Cli(argv=process.argv.slice(2),context:{phase:R1FailurePhase}={phase:'startup'}){
- return withCivicPolicyShutdown(()=>districtR1Command(argv,context));
+ return withDistrictDatabaseScope(database=>withCivicPolicyShutdown(()=>districtR1Command(argv,context,database.signal),database.signal));
 }
-async function districtR1Command(argv:string[],context:{phase:R1FailurePhase}){
+async function districtR1Command(argv:string[],context:{phase:R1FailurePhase},databaseSignal:AbortSignal){
  context.phase='startup';
  const [command,...rawArgs]=argv;
  if(command==='--help'||command==='help'){process.stdout.write('Usage: district-r1.ts COMMAND --registry-config PATH --registry-descriptor PATH [bounded JSON stdin]\n');return;}
@@ -444,14 +452,14 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase}){
  if(command==='migrate'){
   if(rawArgs.length)throw Error('Migration accepts no registry or execution arguments');
   if(!process.env.DATABASE_URL)throw Error('Database configuration required');
-  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});
+  const pool=guardDistrictPool(new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000}));
   context.phase='admission';
   try{await migrateDistrictJobs(pool);}finally{await pool.end();}return;
  }
  const {registryPin,args}=parseR1RegistryArguments(rawArgs),admitted=await readOperatorRegistryInputPin(registryPin,{}),registry=admitted.registry,registrySha256=digest(admitted.bytes);
  if(command==='run'){
   if(!process.env.DATABASE_URL)throw Error('Database configuration required');
-  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000});
+  const pool=guardDistrictPool(new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000}));
   try{
    context.phase='admission';
    await persistOperatorRegistry(new DistrictJobStore(pool),new DistrictCas(CAS_ROOT),admitted);
@@ -476,11 +484,11 @@ async function districtR1Command(argv:string[],context:{phase:R1FailurePhase}){
   process.stdout.write(canonicalJson({state:'proposal_not_admitted',inputRegistrySha256:registrySha256,catalogSha256:proposal.catalogSha256,routes:proposal.routes.length,requires:'separate_shared_registry_config_admission'})+'\n');return;
  }
  if(!process.env.DATABASE_URL)throw Error('Database configuration required');
- const pool=new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000}),store=new DistrictJobStore(pool),cas=new DistrictCas(CAS_ROOT);
+ const pool=guardDistrictPool(new Pool({connectionString:process.env.DATABASE_URL,max:4,connectionTimeoutMillis:5000,statement_timeout:10000})),store=new DistrictJobStore(pool),cas=new DistrictCas(CAS_ROOT);
  try{
   context.phase='admission';
   await persistOperatorRegistry(store,cas,admitted);
-  const input=await stdinJson();
+  const input=await stdinJson(databaseSignal);
   if(command==='import-crawl-corpus'){
    const manifest=CrawlCorpusImportSchema.parse(input);
    if(canonicalJson(manifest.registry)!==canonicalJson(registryPin))throw Error('Crawl import descriptor must match admitted CLI registry pin');

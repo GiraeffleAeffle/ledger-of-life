@@ -3,7 +3,9 @@ import type {Pool} from 'pg';
 import {HashSchema} from './district-adapter-contract.ts';
 import {DistrictExecutionHold,type ClaimedJob} from './district-jobs.ts';
 import {SubscriptionRuntimeError} from './district-model-contract.ts';
+import {guardDistrictPool} from './district-database.ts';
 export async function registerR1CodexDocument(pool:Pool,municipalityId:string,originalSha256:string,maxCalls:number){
+ guardDistrictPool(pool);
  HashSchema.parse(originalSha256);
  if(!Number.isInteger(maxCalls)||maxCalls<2||maxCalls>48)throw new DistrictExecutionHold('source_limit_exceeded');
  const client=await pool.connect();
@@ -22,6 +24,7 @@ export async function registerR1CodexDocument(pool:Pool,municipalityId:string,or
 
 /** Committed before a source-bearing effect; never refunded or silently replayed. */
 export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256:string,requestSha256:string,maxCalls=48){
+ guardDistrictPool(pool);
  HashSchema.parse(originalSha256);HashSchema.parse(requestSha256);
  if(!Number.isInteger(maxCalls)||maxCalls<2||maxCalls>48||!['residual_extract','assessment_a','assessment_c'].includes(job.spec.step))throw new DistrictExecutionHold('authorization_revoked');
  const client=await pool.connect();
@@ -56,6 +59,7 @@ export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256
 }
 export async function holdR1CodexFailure(pool:Pool,job:ClaimedJob,originalSha256:string,error:unknown):Promise<never>{
  if(error instanceof SubscriptionRuntimeError&&error.failureCategory==='rate_limit'){
+  guardDistrictPool(pool);
   const client=await pool.connect();
   try{
    await client.query('BEGIN');await client.query('SELECT pg_advisory_xact_lock(18441,81)');
