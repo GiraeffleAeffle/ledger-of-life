@@ -4,6 +4,9 @@
 # (--max-seconds) ends cleanup_seconds earlier so an aborted job can close its managed
 # source scope (each shared-inventory load/save takes seconds) before TERM/KILL; a KILL
 # mid-save would leave inventory.lock and uncertain leases behind.
+# Final disposition notification has its own bounded 60s window in this 120s
+# reserve, independent of an exhausted job budget. It cannot renew authorization
+# or start another job; failed delivery does not undo committed job/run results.
 # Each invocation needs its own authorization. Provider concurrency defaults to 1;
 # pass --codex-concurrency / --omp-b-concurrency or set R1_CODEX_CONCURRENCY /
 # R1_OMP_B_CONCURRENCY identically for the concurrent cohort (range 1..64).

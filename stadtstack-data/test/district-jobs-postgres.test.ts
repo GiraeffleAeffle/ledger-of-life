@@ -623,4 +623,60 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     }});
     assert.equal(persistent.reasonCode,'notification_failed');assert.equal(persistent.jobsStarted,0);assert.equal(persistentAttempts,2);
   });
+
+  await t.test('exhausted workload keeps a separate disposition window and notification failure cannot undo completion',async()=>{
+    const approval=digest('approved-notification-route'),destination=digest('synthetic-approved-destination'),provider='ntfy';
+    const identity={notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:provider};
+    const acknowledge=async (notification:OwnerNotification):Promise<NotificationAcknowledgement>=>({provider,messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:destination,acknowledgedAt:new Date().toISOString()});
+    const config={notificationApprovalSha256:approval,destinationSha256:destination,provider,notifyOwner:acknowledge};
+    await deliverDistrictOwnerNotifications(store,config);
+
+    const timedKey=await store.enqueue(jobSpec('disposition-after-deadline','await_disposition_deadline'));
+    const timedAuthorization=await authorize([timedKey],{mode:'bounded_unattended',...identity});
+    let handlerCalls=0,dispositionCalls=0;
+    const timed=await runDistrictJobs({store,cas,authorizationId:timedAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:300,...identity,handlers:{await_disposition_deadline:async({job,signal})=>{
+      handlerCalls++;
+      const startup=await pool.query<{state:string}>(`SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[job.runId]);
+      assert.equal(startup.rows[0].state,'delivered');
+      signal.throwIfAborted();
+      const aborted=Promise.withResolvers<never>();signal.addEventListener('abort',()=>aborted.reject(signal.reason),{once:true});return await aborted.promise;
+    }},notifyOwner:async notification=>{
+      if(notification.phase==='disposition'){dispositionCalls++;await pool.query('SELECT pg_sleep(0.05)');}
+      return acknowledge(notification);
+    }});
+    assert.equal(handlerCalls,1);assert.equal(dispositionCalls,1);
+    assert.equal(timed.state,'held');assert.equal(timed.reasonCode,'max_time_reached');assert.equal(timed.notificationReasonCode,undefined);
+    const timedOutbox=await pool.query<{state:string;attempts:number}>(`SELECT state,attempts FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='disposition'`,[timed.runId]);
+    assert.deepEqual(timedOutbox.rows,[{state:'delivered',attempts:1}]);
+    const timedRun=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.executor_runs WHERE id=$1',[timed.runId]);
+    assert.deepEqual(timedRun.rows,[{state:'held',reason_code:'max_time_reached'}]);
+
+    const completeKey=await store.enqueue(jobSpec('completed-despite-disposition-failure'));
+    const completeAuthorization=await authorize([completeKey],{mode:'bounded_unattended',...identity});
+    const completed=await runDistrictJobs({store,cas,handlers,authorizationId:completeAuthorization,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async notification=>{
+      if(notification.phase==='disposition')throw Error('synthetic non-retryable disposition failure');
+      return acknowledge(notification);
+    }});
+    assert.equal(completed.state,'completed');assert.equal(completed.reasonCode,'max_jobs_reached');assert.equal(completed.jobsStarted,1);
+    assert.equal(completed.receiptIds.length,1);assert.equal(completed.notificationReasonCode,'notification_failed');
+    const completeJob=await pool.query<{state:string}>('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[completeKey]);
+    assert.deepEqual(completeJob.rows,[{state:'succeeded'}]);
+    const failedOutbox=await pool.query<{state:string;attempts:number}>(`SELECT state,attempts FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='disposition'`,[completed.runId]);
+    assert.deepEqual(failedOutbox.rows,[{state:'failed',attempts:1}]);
+    // Retrying the durable outbox directly must also preserve the finalized run.
+    await assert.rejects(deliverDistrictOwnerNotifications(store,{...config,notifyOwner:async()=>{throw Error('synthetic persistent disposition failure');}},1000,completed.runId),error=>error instanceof DistrictExecutionHold&&error.reasonCode==='notification_failed');
+    const completedRun=await pool.query<{state:string;reason_code:string}>('SELECT state,reason_code FROM district_pipeline.executor_runs WHERE id=$1',[completed.runId]);
+    assert.deepEqual(completedRun.rows,[{state:'completed',reason_code:'max_jobs_reached'}]);
+    assert.deepEqual(await store.pendingNotifications(timed.runId),[]);
+    assert.equal((await store.pendingNotifications(completed.runId)).length,1);
+
+    // A disposition-only flush cannot spend its reserve on another run.
+    const otherKey=await store.enqueue(jobSpec('unrelated-pending-startup'));
+    const otherAuthorization=await authorize([otherKey],{mode:'bounded_unattended',...identity});
+    const otherRun=await store.beginRun(otherAuthorization,1,60000,'bounded_unattended',config);
+    await deliverDistrictOwnerNotifications(store,{...config,notifyOwner:async notification=>{assert.equal(notification.runId,completed.runId);return acknowledge(notification);}},1000,completed.runId);
+    const unrelated=await pool.query<{state:string;attempts:number}>(`SELECT state,attempts FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[otherRun.runId]);
+    assert.deepEqual(unrelated.rows,[{state:'pending',attempts:0}]);
+    await store.endRun(otherRun.runId,'held','owner_stopped');await deliverDistrictOwnerNotifications(store,config);
+  });
 });
