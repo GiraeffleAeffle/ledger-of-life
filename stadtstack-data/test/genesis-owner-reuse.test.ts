@@ -102,6 +102,8 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
   const lateScenario=['late-bound','late-unbound','bound-with-earlier-abort','legacy-other-request-abort'].some(value=>value===scenario);
   const earlyEntered=deferred(),releaseEarly=deferred(),earlySettled=deferred();
   let stagingEarlier:'late'|'settled'|undefined,earlyReleased=false;
+  let historicalFetch:Promise<unknown>|undefined;
+  child.after(async()=>{releaseEarly.release();await historicalFetch?.catch(()=>{});});
   const fetch=child.mock.method(ownerFixturePrototype,'fetchInternal',async function(this:PoliteFetcher,_url:string,options:FetchOptions){
    // Exercise the real public-fetcher -> R1 owner-account child construction,
    // but the isolated authority fixture never reads credentials or sends HTTP.
@@ -149,6 +151,19 @@ test('offline owner-account salvage uses genuine own-attempt evidence without an
    const earlierHandler=acquisitionHandler(store,registry,{fetchRoot,policy:fixture.policy},registrySha256),stop=new AbortController();
    stagingEarlier=lateScenario?'late':'settled';
    const earlierRunPromise=run(earlierKey,async context=>{
+    if(lateScenario){
+     // Model historical dd675e2 orphaned I/O explicitly. The fixed executor
+     // drains the promise returned by a trusted handler; production handlers
+     // must await their work. This adversarial legacy fixture instead retains
+     // its earlier fetch separately, so a genuinely held/committed attempt can
+     // still publish late evidence during the later attempt as before.
+     historicalFetch=earlierHandler(context).finally(()=>earlySettled.release());
+     void historicalFetch.catch(()=>{});
+     const aborted=Promise.withResolvers<never>(),onAbort=()=>aborted.reject(context.signal.reason);
+     context.signal.addEventListener('abort',onAbort,{once:true});
+     try{context.signal.throwIfAborted();return await aborted.promise;}
+     finally{context.signal.removeEventListener('abort',onAbort);}
+    }
     try{if(scenario==='legacy-unknown-hold')throw new DistrictExecutionHold('budget_paused');return await earlierHandler(context);}
     finally{earlySettled.release();}
    },'acquire_representation',stop.signal);

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {fork} from 'node:child_process';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,open,readFile,lstat,readdir} from 'node:fs/promises';
+import {watch} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
@@ -527,6 +528,35 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     }finally{
       st.mock.restoreAll();process.exitCode=previousExit;if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
     }
+  });
+
+  for(const mode of ['max-time','term'] as const)await t.test('actual CLI drains aborted scratch and exits promptly: '+mode,{timeout:15000},async st=>{
+    const key=await store.enqueue(jobSpec('cli-abort-'+mode)),approval=digest('cli-abort-notification-route'),destination=digest('cli-abort-destination');
+    const authorizationId=await authorize([key],{mode:'bounded_unattended',notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:'ntfy'});
+    const workspace=join(directory,'cli-abort-'+mode),entered=Promise.withResolvers<string>(),closed=Promise.withResolvers<number|null>();
+    const child=fork(new URL('./helpers/aborted-cli-executor.ts',import.meta.url),[isolated.href,authorizationId,cas.root,workspace,approval,destination,mode],{execArgv:['--experimental-strip-types'],stdio:['ignore','pipe','pipe','ipc']});
+    let stdout='',stderr='';child.stdout!.on('data',chunk=>{stdout+=chunk;});child.stderr!.on('data',chunk=>{stderr+=chunk;});
+    child.on('message',(message:{entered?:boolean;stateDir:string})=>{if(message.entered)entered.resolve(message.stateDir);});
+    child.once('error',error=>{entered.reject(error);closed.reject(error);});child.once('close',code=>{entered.reject(Error('CLI closed before admission'));closed.resolve(code);});
+    st.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+    const stateDir=await entered.promise,lock=join(stateDir,'inventory.lock');
+    if(mode==='max-time'){
+      const waiting=Promise.withResolvers<void>(),watcher=watch(stateDir,(_event,name)=>{if(String(name).startsWith('inventory.wait-'))waiting.resolve();});
+      const holder=await open(lock,'wx',0o600);await holder.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID()}));
+      try{
+        await waiting.promise;
+        // An independent CLI/Postgres disposition and kernel lock waiter use
+        // real clocks. Leave cleanup blocked across an OS scheduling window:
+        // the old abort race printed its result here and abandoned the handler.
+        await new Promise<void>(resolve=>setTimeout(resolve,150));
+        assert.equal(stdout,'','A result must not precede owned scratch cleanup');
+      }finally{watcher.close();await holder.close();await rm(lock);}
+    }else child.kill('SIGTERM');
+    assert.equal(await closed.promise,2,stderr);const result=JSON.parse(stdout);
+    assert.equal(result.reasonCode,mode==='max-time'?'max_time_reached':'owner_stopped');assert.equal(result.state,'held');
+    assert.equal(await readFile(join(workspace,'cleanup-finished'),'utf8'),'closed');await assert.rejects(lstat(lock),{code:'ENOENT'});
+    assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')),false);
+    const receipts=await pool.query("SELECT receipt->>'reasonCode' AS reason FROM district_pipeline.step_receipts WHERE run_id=$1",[result.runId]);assert.equal(receipts.rows[0].reason,result.reasonCode);
   });
 
   await t.test('bounded unattended mode proves approved channel readiness before work and stores real acknowledgement identities',async()=>{
