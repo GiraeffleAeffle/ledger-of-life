@@ -722,9 +722,13 @@ function accountObservationCopy(root:Root,inventory:Inventory,path:string,bytes:
 async function reconcile(root:Root,inventory:Inventory,retiring=false):Promise<boolean>{
  await verifyRoot(root);let complete=true,count=0;const paths=new Set<string>(),requests:string[]=[],receipts=new Map<string,{observationId:string;receiptSha256:string}>();
  const watermarks:Record<string,z.infer<typeof casWatermarkSchema>>={};
- // ext-family files must additionally show fractional precision (ext2 does
- // not); unknown/coarse filesystems always take the ordinary full-hash path.
- const preciseFilesystem=root.kind==='artifacts'&&!retiring&&await statfs(root.path).then(stat=>[0xef53,0x58465342,0x9123683e,0x01021994].includes(stat.type),()=>false);
+ // This authority trusts its owning uid, which also controls inventory/segments.
+ // Reconciliation catches accidental/foreign changes and debris, not malicious
+ // same-uid writes through existing MAP_SHARED mappings without timestamp updates.
+ // Ordinary source reads, content admissions and deletions still full-hash.
+ // ext-family files must show fractional precision (ext2 does not). tmpfs and
+ // unknown/coarse filesystems never reuse digests, regardless of timestamp shape.
+ const preciseFilesystem=root.kind==='artifacts'&&!retiring&&await statfs(root.path).then(stat=>[0xef53,0x58465342,0x9123683e].includes(stat.type),()=>false);
  const visit=async(folder:string):Promise<void>=>{
   for await(const child of await opendir(join(root.path,folder))){if(++count>MAX_FILES)throw new CivicPolicyStateError();const path=folder?folder+'/'+child.name:child.name,stat=await lstat(join(root.path,path));
    if(stat.isSymbolicLink()){complete=false;continue;}

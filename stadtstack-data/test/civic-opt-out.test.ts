@@ -1260,7 +1260,7 @@ for(const mutation of ['unregistered','symlink','directory-symlink','tamper-rest
  if(mutation==='open-replacement')assert.equal(intercepted,true);
 });
 
-for(const mode of ['racy','coarse','unknown-filesystem','clock-rollback'] as const)test('CAS equality never hides same-metadata tampering: '+mode,async t=>{
+for(const mode of ['racy','coarse','unknown-filesystem','tmpfs','clock-rollback'] as const)test('CAS equality never hides same-metadata tampering: '+mode,async t=>{
  const {root,policy,path,bytes}=await shardedCasFixture(t),metadata=await lstat(path,{bigint:true}),originalOpen=fsPromises.open,originalLstat=fsPromises.lstat,originalStatfs=fsPromises.statfs;
  let reads=0;
  const mtimeNs=mode==='coarse'?metadata.mtimeNs/1_000_000_000n*1_000_000_000n:metadata.mtimeNs,ctimeNs=mode==='coarse'?metadata.ctimeNs/1_000_000_000n*1_000_000_000n:metadata.ctimeNs;
@@ -1276,7 +1276,7 @@ for(const mode of ['racy','coarse','unknown-filesystem','clock-rollback'] as con
   return handle;
  });
  t.mock.method(fsPromises,'lstat',async(...args:Parameters<typeof fsPromises.lstat>)=>{const stat=await originalLstat(...args);return String(args[0])===path?mask(stat):stat;});
- if(mode==='unknown-filesystem')t.mock.method(fsPromises,'statfs',async(...args:Parameters<typeof fsPromises.statfs>)=>Object.assign(await originalStatfs(...args),{type:0}));
+ if(mode==='unknown-filesystem'||mode==='tmpfs')t.mock.method(fsPromises,'statfs',async(...args:Parameters<typeof fsPromises.statfs>)=>Object.assign(await originalStatfs(...args),{type:mode==='tmpfs'?0x01021994:0}));
  syncBuiltinESMExports();
  try{
   await initializeManagedAcquisitionLane(root,{...policy,kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID});
