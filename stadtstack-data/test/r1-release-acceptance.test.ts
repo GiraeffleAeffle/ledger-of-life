@@ -4,6 +4,7 @@ import {mkdtemp,mkdir,writeFile,readFile,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {computeReleaseAcceptance,classifyReleaseException,inventoryExceptionItems,loadStep8ExceptionBundle,
   OPTION_B_APPROVAL_SHA256,Step8ExceptionInventorySchema,runReleaseAcceptance,requireStep8AssessmentCoverage} from '../src/r1-release-acceptance.ts';
 import {dataReleaseId} from '../src/data-release.ts';
@@ -183,6 +184,29 @@ test('release acceptance handler writes exclusively and cannot overwrite an acce
   await runReleaseAcceptance(options);
   assert.equal(JSON.parse(await readFile(output,'utf8')).accepted,true);
   await assert.rejects(runReleaseAcceptance(options),error=>error instanceof Error&&'code' in error&&error.code==='EEXIST');
+});
+
+test('acceptance wiring preserves the evaluator bytes frozen at the running campaign cutover',async()=>{
+  assert.equal(hash(await readFile(new URL('../src/evaluate-pilot-value.ts',import.meta.url))),
+    '8848f12d89bef12d34c0116394e4976fbd8650a0e9e4cd97b09af30de2885d70');
+});
+
+test('standalone release CLI preserves help, pinned acceptance, exclusive output and nonzero failure semantics',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const run=(args:string[])=>spawnSync(process.execPath,['--experimental-strip-types',new URL('../src/r1-release-acceptance.ts',import.meta.url).pathname,...args],
+    {encoding:'utf8',env:{...process.env,NODE_NO_WARNINGS:'1'}});
+  const help=run(['--help']);assert.equal(help.status,0,help.stderr);assert.match(help.stdout,/Usage: r1-release-acceptance.ts --input FILE --output FILE/);
+  const input=await f.save('cli-input.json',await f.seal()),output=join(f.root,'cli-acceptance.json'),args=['--input',input.path,'--output',output];
+  const accepted=run(args);assert.equal(accepted.status,0,accepted.stderr);
+  assert.equal(JSON.parse(accepted.stdout).accepted,true);const original=await readFile(output,'utf8');
+  assert.equal(JSON.parse(original).accepted,true);
+  const duplicate=run(args);assert.equal(duplicate.status,1);assert.match(duplicate.stderr,/No deployment was performed/);
+  assert.equal(await readFile(output,'utf8'),original);
+  f.value.verdict='fail';
+  const failedInput=await f.save('cli-failed-input.json',await f.seal()),failedOutput=join(f.root,'cli-failed-acceptance.json');
+  const failed=run(['--input',failedInput.path,'--output',failedOutput]);assert.equal(failed.status,1);
+  assert.equal(JSON.parse(failed.stdout).accepted,false);assert.equal(JSON.parse(await readFile(failedOutput,'utf8')).accepted,false);
+  const malformed=run(['--input']);assert.equal(malformed.status,1);assert.equal(malformed.stdout,'');
 });
 
 test('release exception classifier never treats unknown classes or operator-cleared labels as a waiver',()=>{
