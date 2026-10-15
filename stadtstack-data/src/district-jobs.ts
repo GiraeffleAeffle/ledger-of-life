@@ -667,7 +667,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
       renew();let receipt:StepReceipt|undefined;
       let rejectAbort:((reason:unknown)=>void)|undefined;
       let invocation:Promise<JobHandlerResult>|undefined;
-      let handlerThrew=false,handlerError:unknown;
+      let handlerThrew=false;
       const onAbort=()=>rejectAbort?.(controller.signal.reason);
       controller.signal.addEventListener('abort',onAbort,{once:true});
       try {
@@ -682,7 +682,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
           try {
             controller.signal.throwIfAborted();
             try{return await handler({job,signal:controller.signal,cas:options.cas,acquireHostLane:laneKey=>options.store.acquireHostLane(run!,job,laneKey)});}
-            catch(error){handlerThrew=true;handlerError=error;throw error;}
+            catch(error){handlerThrew=true;throw error;}
           } finally {if(resource)await options.store.releaseResourceSlot(job,resource);}
         };
         // An aborted but still-unwinding handler keeps its slot until it settles
@@ -712,7 +712,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         receipt=await makeReceipt(job,{outcome:'held_execution',reasonCode:reason},performance.now()-start,process.cpuUsage(cpu));
         if(await options.store.hold(job,reason,receipt)){
           receiptIds.push(receipt.id);
-          if(reason==='execution_exception'&&handlerThrew&&Object.is(error,handlerError))process.stderr.write(formatDistrictJobException(job.jobKey,job.spec.step,error));
+          if(reason==='execution_exception'&&handlerThrew)process.stderr.write(formatDistrictJobException(job.jobKey,job.spec.step,error));
         }
         activeJob=undefined;
         stopped=reason;break;
