@@ -94,12 +94,12 @@ Actual implemented classification (paths are relative to `src/`, unless prefixed
 | Residual preparation job | Only the preparation contract above, plus immutable original/scope/registry/policy/bounds input pins | Extraction prompts, chunking, model/decoding, cache and residual extraction/output assembly are **not preparation identity**, even though they remain semantic for extraction |
 | Joint extraction / generation archive | `district-claims.ts`, `district-stage-evidence.ts`, `district-public-fields.ts`, `district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-prepared-document.ts`, `district-schema.ts`, `district-graph-claims.ts`, `topic-vocabulary.ts`, `../regional/taxonomy.mjs` | `district-model-readiness.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-private-io.ts`, `source-policy.ts`, `document-origin.ts`, `document-origin-rules.ts`, `document-origin-contract.ts`, `civic-opt-out.ts` |
 | Assessment queue | `district-assessment-jobs.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment.ts`, `district-critical-assessment.ts`, `district-critical-assessment-public.ts`, `district-residual-jobs.ts`, `district-inference.ts`, `district-model.ts`, `district-model-contract.ts` | `district-codex-accounting.ts`, `district-jobs.ts`, `district-model-usage.ts`, `district-model-diagnostics.ts`, `district-policy-receipt.ts`, `district-policy-refresh.ts`, `civic-opt-out.ts` |
-| Assessment B | `district-assessment-broker.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment-bridge-contract.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-omp-b-runner.ts`, `../docker/omp-b/Dockerfile`, `../docker/omp-b/settings.yml`, `../docker/omp-b/entry.sh`, `../scripts/build-omp-b-image.sh` | `district-policy-receipt.ts`, `district-jobs.ts`, `district-cas.ts`, `civic-opt-out.ts`, `source-policy.ts`, `document-origin.ts`; OMP **authorization hash** in selectors/leases |
+| Assessment B | `district-assessment-broker.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, `district-assessment-bridge-contract.ts`, `district-claude.ts`, `district-model-contract.ts`, `district-omp-b-runner.ts`, `district-subscription-limit.ts`, `../docker/omp-b/Dockerfile`, `../docker/omp-b/settings.yml`, `../docker/omp-b/entry.sh`, `../scripts/build-omp-b-image.sh` | `district-policy-receipt.ts`, `district-jobs.ts`, `district-cas.ts`, `civic-opt-out.ts`, `source-policy.ts`, `document-origin.ts`; OMP **authorization hash** in selectors/leases |
 | Acquisition | `district-r1.ts`, `district-r1-state.ts`, `polite-fetch.ts`, `district-native-request.ts`, `genesis-owner-acquisition.ts` | `district-crawl-request.ts`, `district-policy-receipt.ts`, `source-policy.ts`, `registered-source-policy.ts`, `civic-opt-out.ts`, `genesis-owner-credentials.ts`, `genesis-owner-reuse.ts`, `district-http-observation.ts`, `../sources/district-host-groups.json` (still validated live) |
 | Policy refresh | `district-adapter-contract.ts`, `district-schema.ts`, actual JSON receipt schema and refresh version | `district-policy-refresh.ts`, `district-crawl-import.ts`, `district-residual-jobs.ts`, `district-registry-config.ts`, `district-r1.ts`, `district-jobs.ts`, `district-step-receipt.ts`, `polite-fetch.ts`, `district-policy-receipt.ts`, `source-policy.ts`, `registered-source-policy.ts`, `civic-opt-out.ts`, `../sources/district-host-groups.json`; jobs evaluate **current**, not frozen, policy |
 | Structured mapping | `district-structured-jobs.ts`, `district-structured-record.ts`, `district-public-fields.ts`, `district-entity-resolution.ts`, `district-case-linking.ts`, `district-schema.ts`, `district-graph-claims.ts`, `planning-stages.ts`, `case-supersession.ts`; selected `../sources/<adapter>-contract.json`, worker version and parser-output contract below | `district-structured-registry-admission.ts`, `district-registry-config.ts`, `district-policy-receipt.ts`, `district-http-observation.ts`, `source-observation.ts`, `source-policy.ts`, `document-origin-contract.ts`, `document-origin.ts`, `civic-opt-out.ts`, `civic-docker.ts`, `district-cas.ts`, `district-step-receipt.ts`, `district-jobs.ts`; parser **authorization hash** |
 | Parser output | `district-parser-isolation.ts` (mixed launcher environment/protocol/limits), `district-parser-worker.py`, `district-document.ts`, `district-document-parser-worker.ts`, `district-structured-parser-worker.ts`, `district-adapter-contract.ts`, `district-contract-source.ts`, `district-policy-inspection-worker.ts`, `pdf-tdm-policy-worker.ts`, `district-regional-statement-worker.ts`, `../regional/statements.mjs`, `../Dockerfile.parser`, `../Dockerfile.parser.dockerignore`, `../package.json`, `../package-lock.json`, `council-oparl.ts`, `dedupe.ts`, `common.ts`, every `adapters/*.ts` | Host authority/security closure: `civic-opt-out.ts`, `civic-docker.ts`, `district-policy-inspection.ts`, `pdf-tdm-policy.ts`, `document-origin.ts`, `document-origin-contract.ts`, `document-origin-rules.ts`, `source-policy.ts`, `registered-source-policy.ts`, `public-address.ts` |
-| OMP output | `district-omp-b-runner.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, the four OMP image/settings/entry/build files above; control prompt and output schema | `civic-docker.ts`, `civic-opt-out.ts`; root-owned review contract remains independent |
+| OMP output | `district-omp-b-runner.ts`, `district-subscription-limit.ts`, `district-assessment.ts`, `district-assessment-context.ts`, `district-claims.ts`, the four OMP image/settings/entry/build files above; control prompt and output schema | `civic-docker.ts`, `civic-opt-out.ts`; root-owned review contract remains independent |
 | Operator registry descriptor | `district-registry-config.ts`, `district-registry.ts`, `district-schema.ts`, `district-git-snapshot-import.ts`, `district-retained-import.ts`, `text-run-lineage.ts`, `public-address.ts` | `district-private-io.ts`, `source-policy.ts`, `registered-source-policy.ts`, `document-origin-contract.ts`, `polite-fetch.ts`, `civic-opt-out.ts` |
 | Shared execution profile (additional a input to parser output, OMP output and assessment B) | `district-execution-profile.ts`: actual parser locale/environment/entrypoint and user/cwd; OMP model/CLI flags, decoding mode, environment, user/cwd and execution limit, extracted verbatim from custody | Remaining `civic-docker.ts` socket/lifecycle/labels/resource custody remains b, and still belongs to both security reviews |
 
@@ -347,6 +347,79 @@ Database supervision changes host-code provenance and current custody/security c
 Apply migrations **005** and **006** in the operator's explicit migration step before launching a concurrent cohort; database-loss supervision adds no migration. Stored job/receipt pins are never rewritten. Host-only changes preserve the five scoped queued-job semantic contracts above, while acquisition and current custody/security admission pins still require explicit review against the deployed immutable checkout.
 
 Migration 004 counts cumulative selected `(municipality, original SHA)` identities (maximum 500) and durable pre-effect source-bearing Codex intents **per original SHA** across extraction, A and C. The hard ceiling is `min(48, selected maxModelCalls)`; failed/ambiguous intents are never refunded, and ambiguous effects cannot silently replay. Cache hits do not reserve a new call. All intents have `paid_micro_usd=0`; API-equivalent estimates are not invoices. The same migration creates authorization/run-scoped usage-limit holds and their immutable resumption audit directly: that authorization cannot continue Codex effects, with no waiting, automatic retry or fallback. Continuation requires a genuinely later explicit lead-issued stage authorization narrowing and citing #81; the accounting records its actual approval SHA, approver, approval time, run and the hold it supersedes. Only an explicitly recorded usage-limit failure may be attempted under that new authorization, consuming another cumulative intent. Native pause files are run-scoped. Allocate headroom for A/C before extraction; a 48-call extraction leaves none.
+
+**Owner-approved subscription reset disposition (migration 007).** The lead may use
+`district-r1.ts usage-holds --registry-config PATH --registry-descriptor PATH`
+with JSON stdin `{}` for a content-free report of unresolved holds. `reset_status`
+is `no_reset_stated`, `before_reset`, `output_may_exist` or `reset_recorded`;
+the last means only that an actual provider clock has passed, not that all
+authorization/policy/cap checks have succeeded. Legacy holds and stderr-only Codex
+failures have no captured reset clock and stay held. There is no probe permission.
+
+`district-r1.ts usage-resume` accepts the same registry flags and JSON stdin
+`{jobKeys:[...],approvedBy:"lead identity",expiresAt:"ISO UTC",maxElapsedMs:60000,mode:"attended"}`
+(or the existing `bounded_unattended` notification mode). Select held
+`budget_paused` jobs from one exact source scope and one provider lane. Outside
+all live jobs/leases, it checks actual PostgreSQL time against every applicable
+recorded reset, pinned owner autoresume/#81 approval bytes, current source policy,
+uncancelled immutable job identities, inactive prior runs, still-approved and
+unexpired prior stage authority, unchanged stage/parent expiry and elapsed bounds,
+remaining original-wide Codex calls, the 500-document ceiling and at most six
+committed source dispositions. It atomically issues genuinely new canonical
+authority, records both owner approval hashes and the exact hold/job basis, and
+calls guarded `DistrictJobStore.resume`. Its JSON result contains the new stage
+approval and authorization ID for the normal bounded VM run. Interrupted/repeated
+or concurrent dispositions cannot mint a second authorization for the same hold.
+No old authority clock, intent, lease, receipt or ambiguous reservation is erased;
+`reserveR1CodexCall` alone still creates the canonical Codex resumption rows when
+the newly authorized live job actually reserves its next call.
+
+Completed earlier Codex requests in the same residual extraction (for example,
+extraction completed before a judge hit quota) are not ambiguous merely because
+they have no failed-intent hold. Resume reconciles their request hashes with the
+exact job's persisted answer-cache bindings, the existing envelope integrity
+codec and live managed custody of stable file bytes. The new approval records
+content-free completion-proof hashes. The normal inference path reuses those
+answers; it does not resubmit them. Missing, corrupted, unregistered or changed
+cache evidence remains held. No cache writer/generation contract changes.
+
+Codex captures content-free `{provider,limitKind,resetAt,observedAt}` through the
+existing stdout diagnostic projection, without changing extraction/A/C framing.
+The installed CLI inspected offline was **0.160.0**: its exported rate-window
+schema has `resetsAt`, and its embedded raw protocol has `token_count`,
+`rate_limits`, `primary`/`secondary`, `used_percent` and absolute `resets_at`.
+An exhausted snapshot contributes only its provider-stated absolute clock and
+only alongside a real usage-limit error; all exhausted windows must have clocks,
+and the latest is used. A snapshot fallback is allowed only when the error's
+reset clock is absent, never when provider clocks conflict or are unusable.
+Percent alone, relative/local-time prose, overloads,
+truncated/unknown streams and invented delays never establish a reset. No
+provider inference/account request was used to inspect the installed schema.
+
+The omp-b runner projects typed provider error fields before purging transient
+buffers. B retry certification requires normal container exit **0**, the
+successful decoder's provider-failure rejection and one fully closed
+assistant-error / turn-end / agent-end frame, with consistent typed provider
+failure messages and **no model content/tool output** anywhere. A killed process
+(including exit 137), an incomplete terminal frame or an unrelated decoder
+failure remains ambiguous even if a typed quota error and reset were captured.
+A new fenced attempt retains its old claimed lease and intent. Broker admission
+and the database retry trigger independently bind the recorded normal-exit and
+terminal-frame hashes to the exact immutable canonical held receipt, original
+claimed lease and intent, and absence of any recorded submission. A bare
+`no_output` certification or reset disposition cannot bypass that proof.
+Unknown failures, partial output, generic HTTP 429s and missing reset clocks stay
+held. Migration 007 replaces job-wide B intent uniqueness with per-fence
+uniqueness plus that guard; it never deletes historical intents. **Its constraint
+replacement takes ACCESS EXCLUSIVE: apply it only with the campaign stopped.**
+
+The B job/output and root-owned omp runner review hashes change and require
+review reissue and fresh B enqueues. Preparation, residual extraction, A/C
+assessment queue and policy-refresh contracts remain unchanged. This core command
+does not implement a polling scheduler, sleep in a live job, send a model probe,
+change transport/model, use overage/API billing, or grant publication permission.
+Lead orchestration must retain its disposition result, wait outside jobs and use
+the existing acknowledged hold/resume notifications and normal bounded-run path.
 
 `assessment-results` accepts `{jobKeys:[...]}` and emits only actual committed step/receipt/item/output pins and content-free dispositions. Source-bearing items, requests, records, responses and final artifacts remain in managed private CAS. This handoff does not seal a native extraction run, renew stale policy, create a critical-publication inventory automatically, or grant publication permission.
 

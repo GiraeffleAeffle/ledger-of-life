@@ -59,6 +59,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     expected.push('assessment_bridge_leases','assessment_bridge_submission_intents','assessment_bridge_purge_acknowledgements','assessment_bridge_submissions','assessment_bridge_events');
     expected.push('r1_codex_documents','r1_codex_selections','r1_codex_call_intents','r1_codex_call_authorizations','r1_codex_usage_holds','r1_codex_resumptions');
     expected.push('resource_slots');
+    expected.push('r1_subscription_usage_holds','r1_subscription_resumptions');
     const tables=await pool.query<{table_name:string}>(`SELECT table_name FROM information_schema.tables WHERE table_schema='district_pipeline'`);
     for(const name of expected)assert.ok(tables.rows.some(row=>row.table_name===name),name);
     const original=await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1');
@@ -66,7 +67,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
     const migrations=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations ORDER BY version');
-    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5,6]);
+    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5,6,7]);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[digest('wrong-002')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     assert.equal((await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1')).rows[0].sha256,original.rows[0].sha256);

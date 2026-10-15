@@ -11,6 +11,8 @@ import {withManagedSourceScratch,type ManagedSourceContext,type ManagedDockerCon
 import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
+import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
+export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
 export const OMP_BINARY='/home/max/.local/bin/omp';
@@ -22,7 +24,10 @@ export const OmpReviewSchema=z.object({version:z.literal(OMP_RUNNER_VERSION),ima
 export type OmpReview=z.infer<typeof OmpReviewSchema>;
 export class OmpRunnerHold extends Error {
  readonly reason:'security_review_required'|'unavailable'|'credential_unavailable'|'request_rejected'|'resource_limit'|'provider_failed'|'event_stream'|'model_identity_mismatch';
- constructor(reason:OmpRunnerHold['reason']){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;}
+ readonly subscriptionLimit?:SubscriptionLimit;
+ readonly noOutput:boolean;
+ readonly failureProof?:OmpLimitFailureProof;
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;binary?:string;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -114,6 +119,14 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
  const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
  return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage};
 }
+/** Preserve limit metadata on failure, but certify retry only for the normal,
+ * completely framed provider-failure path rejected by the successful decoder. */
+export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:string,exitCode:number,error:unknown):OmpRunnerHold|null{
+ const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
+ if(!evidence)return null;
+ if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
+ return new OmpRunnerHold('provider_failed',evidence);
+}
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
  try{for(const p of ['/','/etc','/etc/stadtstack',path]){const s=await lstat(p);if(s.isSymbolicLink()||s.uid!==0||(s.mode&0o022)!==0||(p===path?!s.isFile()||s.size>4096:!s.isDirectory()))throw new OmpRunnerHold('security_review_required');}
@@ -122,7 +135,7 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  }catch(e){if(e instanceof OmpRunnerHold)throw e;throw new OmpRunnerHold('security_review_required');}
 }
 export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -130,7 +143,7 @@ export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<strin
  * The mixed runner remains semantic for model framing, event decoding and CLI
  * arguments. runVmOmpAssessment still validates the live security contract. */
 export async function ompRunnerOutputContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -238,7 +251,14 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     const result=await Promise.race([session.completion,aborted.promise,streamFailure.promise]);
     await scope.assertActive();
     const finishedAt=new Date().toISOString(),bytes=Buffer.concat(output,outputBytes),stdout=bytes.toString('utf8');bytes.fill(0);
-    const parsed=inspectOmpEvents(stdout,result.exitCode);
+    let parsed:OmpParsedEvents;
+    try{parsed=inspectOmpEvents(stdout,result.exitCode);}catch(error){
+     const stderrBytes=Buffer.concat(errors,errorBytes);
+     let failure:OmpRunnerHold|null;
+     try{failure=inspectOmpLimitFailure(stdout,stderrBytes.toString('utf8'),finishedAt,result.exitCode,error);}finally{stderrBytes.fill(0);}
+     if(failure)throw failure;
+     throw error;
+    }
     const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:auth.version+' sha256:'+auth.binarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const answer:ModelAnswer={...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
