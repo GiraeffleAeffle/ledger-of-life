@@ -40,9 +40,9 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
 });
 // The four non-B scoped contracts remain at the running campaign's 93b967d
 // cutover. B advances for native diagnostics and unlocked evidence staging;
-// the runner review advances independently for verified read-only authority snapshots.
+// the runner review advances independently for verified physical-only inventory repacking.
 test('terminal sealing preserves campaign contracts with the explicit B broker cutover',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'298efd4a953711a2bf177571444921203deb6c18c07b17f21a1bb198eba4cc9e');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'ac73ba575bc9ee02ee0c82f8d70851d8d8b8d5ebdc8f70e7c5e4dc5316b89b13');
+ assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'298efd4a953711a2bf177571444921203deb6c18c07b17f21a1bb198eba4cc9e');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'98ed77a8fe5fdace6e8de342c20e2a73f83901b55a7584d726a73281c3e70ef9');
 });

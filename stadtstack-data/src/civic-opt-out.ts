@@ -681,12 +681,13 @@ async function waitForInventoryPoll(ms:number,signal?:AbortSignal):Promise<void>
  try{await inventoryDelay(ms,undefined,{signal});}
  catch(error){signal?.throwIfAborted();throw error;}
 }
-async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false,signal?:AbortSignal):Promise<T>{
+async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisioning=false,signal?:AbortSignal,quiescent=false):Promise<T>{
  const lifetime=inventoryLifetime;
  signal=signal&&lifetime?AbortSignal.any([signal,lifetime.controller.signal]):signal??lifetime?.controller.signal;
  signal?.throwIfAborted();
  const waitMs=inventoryLockWaitMs(options);
  const state=statePath(options);
+ if(quiescent&&queues.has(state))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
  const prior=queues.get(state)??Promise.resolve(),gate=Promise.withResolvers<void>(),queued=prior.then(()=>gate.promise);
  queues.set(state,queued);
  const finished=Promise.withResolvers<void>();lifetime?.operations.add(finished.promise);
@@ -700,18 +701,19 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
  try{
   await waitForInventoryTurn(prior,signal);
   if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
-  if(!provisioning)await warmInventorySegments(state);
+  if(!provisioning&&!quiescent)await warmInventorySegments(state);
   // Resolve the immutable identity before acquiring the inventory lock.
   const identity=await(lockProcessIdentity??=Promise.all([linuxBootId(),linuxProcessStarttime(process.pid)]).then(([boot_id,starttime])=>({boot_id,starttime})));
   const cooldown=(nextLockAttempt.get(state)??0)-performance.now();
   signal?.throwIfAborted();
-  if(cooldown>0&&await hasInventoryWaiters(state))await waitForInventoryPoll(cooldown,signal);
+  if(!quiescent&&cooldown>0&&await hasInventoryWaiters(state))await waitForInventoryPoll(cooldown,signal);
   const deadline=performance.now()+waitMs;
   for(;;){
    signal?.throwIfAborted();
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
    catch(error){
     if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;
+    if(quiescent)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
     if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
     try{
      const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
@@ -764,10 +766,10 @@ function rememberReadInventory(state:string,sha256:string,value:Inventory,physic
  }
  return value;
 }
-async function loadInventory(state:string,readOnly=false):Promise<Inventory>{
+async function loadInventory(state:string,readOnly=false,manifestName='inventory.json'):Promise<Inventory>{
  let value:Inventory,bytes:Buffer,sha256:string,validated:boolean,physical:unknown,hot:HotInventory|undefined;
  try{
-  bytes=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes;sha256=digest(bytes);
+  bytes=(await fileBytes(join(state,manifestName),MAX_STATE,true)).bytes;sha256=digest(bytes);
   validated=validatedInventoryBytes.get(state)===sha256;
   const cached=readOnly?readInventorySnapshots.get(state):undefined;
   if(cached?.sha256===sha256){
@@ -1734,6 +1736,19 @@ export interface InventoryCompactionReceipt {
  before:{bytes:number;sha256:string};after:{bytes:number;sha256:string};segments:SegmentPin[];
  backupPath:string|null;logicalSha256:string;logicalEquality:true;preservedWorkingLeases:string[];
 }
+async function backupInventoryManifest(state:string,original:Buffer,requested?:string):Promise<string>{
+ const backupPath=requested===undefined?join(state,'inventory.json.backup-'+digest(original)):resolve(requested);
+ if(backupPath===join(state,'inventory.json')||contained(join(state,'inventory-segments'),backupPath))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+ await directory(dirname(backupPath),false,true);
+ const temporary=join(dirname(backupPath),'.'+randomUUID()+'.tmp');
+ const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
+ try{await handle.writeFile(original);await handle.sync();}finally{await handle.close();}
+ try{
+  try{await link(temporary,backupPath);}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await fileBytes(backupPath,MAX_STATE,true);if(!existing.bytes.equals(original))throw new CivicPolicyStateError('CIVIC_POLICY_BACKUP_MISMATCH');}
+  const parent=await open(dirname(backupPath),constants.O_RDONLY|constants.O_NOFOLLOW);try{await parent.sync();}finally{await parent.close();}
+ }finally{await unlink(temporary);}
+ return backupPath;
+}
 /** One-shot owner cutover. Active/planned/partial leases stay fully hot and exact.
  * No worker is killed, lock stolen, root scanned, or authority marker replaced.
  */
@@ -1754,17 +1769,7 @@ export async function compactCivicPolicyInventory(options:CivicPolicyOptions&{dr
   if(logicalInventorySha256(reconstructed)!==logicalSha256)throw new CivicPolicyStateError('CIVIC_POLICY_COMPACTION_MISMATCH');
   let backupPath:string|null=null;
   if(!options.dryRun){
-   backupPath=options.backupPath===undefined?join(state,'inventory.json.backup-'+before.sha256):resolve(options.backupPath);
-   if(backupPath===join(state,'inventory.json')||contained(join(state,'inventory-segments'),backupPath))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
-   await directory(dirname(backupPath),false,true);
-   // Backup preserves ORIGINAL bytes (including whitespace/default omissions).
-   const temporary=join(dirname(backupPath),'.'+randomUUID()+'.tmp');
-   const handle=await open(temporary,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);
-   try{await handle.writeFile(original);await handle.sync();}finally{await handle.close();}
-   try{
-    try{await link(temporary,backupPath);}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await fileBytes(backupPath,MAX_STATE,true);if(!existing.bytes.equals(original))throw new CivicPolicyStateError('CIVIC_POLICY_BACKUP_MISMATCH');}
-    const parent=await open(dirname(backupPath),constants.O_RDONLY|constants.O_NOFOLLOW);try{await parent.sync();}finally{await parent.close();}
-   }finally{await unlink(temporary);}
+   backupPath=await backupInventoryManifest(state,original,options.backupPath);
    for(const segment of plan.added)await publishSegment(state,segment);
    await atomicJson(join(state,'inventory.json'),physical,false,true,serialized);
    validatedInventoryBytes.delete(state);
@@ -1773,6 +1778,125 @@ export async function compactCivicPolicyInventory(options:CivicPolicyOptions&{dr
   }
   return {schemaVersion:'civic-inventory-compaction-v1',status:options.dryRun?'dry_run':'compacted',authoritySha256:authority.authoritySha256,before,after,segments:plan.pins,backupPath,logicalSha256,logicalEquality:true,preservedWorkingLeases};
  });
+}
+
+const scratchRecoveryEvidenceSchema=z.object({
+ schemaVersion:z.literal('civic-scratch-recovery-v1'),scope:z.literal('registered_source_scratch'),authorityId:z.string(),authoritySha256:hex,attemptedAt:timestamp,
+ status:z.enum(['complete','partial']),recoveredLeases:z.array(z.string().uuid()),pendingLeases:z.array(z.string().uuid()),
+ deletedFiles:counter,deletedBytes:counter,missingFiles:counter,issues:z.array(issueSchema),
+}).strict();
+interface PendingScratchPin {id:string;sha256:string}
+export interface InventoryRepackOptions extends CivicPolicyOptions {dryRun?:boolean;backupPath?:string;pendingScratch?:string[]}
+interface RepackLayout {bytes:number;sha256:string;segments:SegmentPin[];segmentBytes:number;logicalSha256:string}
+export interface InventoryRepackReceipt {
+ schemaVersion:'civic-inventory-repack-v1';status:'dry_run'|'already_packed'|'repacked';authoritySha256:string;inventoryId:string;
+ before:RepackLayout;after:RepackLayout;logicalEquality:true;authoritativeCandidateReread:boolean;
+ authorityMarkerSha256:string;rootsSha256:string;optOutSnapshotSha256:string;objectionFilesSha256:string;
+ backup:{manifestPath:string;segmentsDirectory:string}|null;preservedPendingScratch:PendingScratchPin[];
+ timings:{loadMs:number;planMs:number;verifyMs:number;publishMs:number;totalMs:number};
+}
+async function daemonOnlyPendingEvidence(state:string,lease:ScratchLease,authority:CivicPolicyAuthorityReceipt):Promise<boolean>{
+ let latest:z.infer<typeof scratchRecoveryEvidenceSchema>|undefined;
+ let count=0;
+ for await(const entry of await opendir(join(state,'attempts'))){
+  if(++count>MAX_FILES)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
+  if(!/^scratch-[a-f0-9-]{36}\.json$/.test(entry.name))continue;
+  const receipt=scratchRecoveryEvidenceSchema.parse(JSON.parse((await fileBytes(join(state,'attempts',entry.name),MAX_STATE,true)).bytes.toString('utf8')));
+  if(!receipt.pendingLeases.includes(lease.id)&&!receipt.recoveredLeases.includes(lease.id))continue;
+  if(receipt.authorityId!==authority.authorityId||receipt.authoritySha256!==authority.authoritySha256||Date.parse(receipt.attemptedAt)<Date.parse(lease.createdAt)||Date.parse(receipt.attemptedAt)>Date.now())return false;
+  if(!latest||receipt.attemptedAt>latest.attemptedAt)latest=receipt;
+  else if(receipt.attemptedAt===latest.attemptedAt&&canonical(receipt)!==canonical(latest))return false;
+ }
+ const issues=latest?.issues.filter(issue=>issue.rootId===undefined||issue.rootId===lease.rootId);
+ return !!latest&&latest.status==='partial'&&latest.pendingLeases.includes(lease.id)&&!latest.recoveredLeases.includes(lease.id)&&!!issues?.length&&issues.every(issue=>issue.code==='daemon_resource_pending');
+}
+async function assertRepackQuiescence(state:string,inventory:Inventory,pins:PendingScratchPin[],authority:CivicPolicyAuthorityReceipt):Promise<void>{
+ const pending=new Map(pins.map(pin=>[pin.id,pin.sha256]));
+ if(pending.size!==pins.length)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+ for(const lease of inventory.scratch){
+  if(archivedLease(lease)){if(pending.has(lease.id))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');continue;}
+  const expected=pending.get(lease.id),root=inventory.roots.find(root=>root.id===lease.rootId);
+  if(lease.state!=='partial'||expected!==digest(JSON.stringify(lease))||processExists(lease.ownerPid)||lease.groups.some(group=>processExists(group.pid,true))||!root?.complete)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
+  await inspectScratchTree(root,lease);
+  const unresolved=lease.resources.filter(resource=>resource.state!=='removed');
+  if(unresolved.length&&(unresolved.some(resource=>resource.state!=='uncertain')||!await daemonOnlyPendingEvidence(state,lease,authority)))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
+  pending.delete(lease.id);
+ }
+ if(pending.size)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
+}
+async function repackObjectionState(state:string,options:CivicPolicyOptions):Promise<{snapshotSha256:string;filesSha256:string}>{
+ const before=await snapshotHostDirectory(state),snapshot=await readCivicOptOutSnapshot(options),after=await snapshotHostDirectory(state);
+ if(canonical(before)!==canonical(after))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_STATE_CHANGED');
+ return {snapshotSha256:snapshot.sha256,filesSha256:digest(canonical(after))};
+}
+/** Physical-only, quiescent maintenance. Candidate bytes and every candidate pin
+ * are reread and proved BEFORE the single live-manifest rename. Old manifests
+ * and ALL old segments remain available; abandoned publication is resumable.
+ */
+export async function repackCivicPolicyInventory(options:InventoryRepackOptions={}):Promise<InventoryRepackReceipt>{
+ if(!options.authoritySha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_UNPINNED');
+ const pins=(options.pendingScratch??[]).map(value=>{
+  const match=/^([a-f0-9-]{36}):([a-f0-9]{64})$/.exec(value);
+  if(!match||!z.string().uuid().safeParse(match[1]).success)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
+  return {id:match[1],sha256:match[2]};
+ });
+ const started=performance.now(),authority=await assertCivicPolicyAuthority(options),state=statePath(options);
+ return locked(options,async()=>{
+  const path=join(state,'inventory.json'),original=(await fileBytes(path,MAX_STATE,true)).bytes,authorityBytes=(await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes;
+  const inventory=await loadInventory(state),sealed=sealedInventories.get(inventory);
+  if(!sealed)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_SEALED_REQUIRED');
+  await assertRepackQuiescence(state,inventory,pins,authority);
+  const objections=await repackObjectionState(state,options),logicalSha256=logicalInventorySha256(inventory),rootsSha256=digest(canonical(inventory.roots)),loaded=performance.now();
+  const plan=planInventorySegments(inventory.inventoryId,[],inventory.entries.filter(bulkEntry),inventory.scratch.filter(archivedLease));
+  const physical=hotInventorySchema.parse({...inventory,entries:inventory.entries.filter(entry=>!bulkEntry(entry)),scratch:inventory.scratch.filter(lease=>!archivedLease(lease)),storage:{format:'sealed-segments-v1',segments:plan.pins,entryStates:{},retiredRoots:{}}}),serialized=JSON.stringify(physical);
+  const afterBytes=Buffer.from(serialized+'\n');
+  if(afterBytes.length>MAX_STATE)throw new CivicPolicyStateError();
+  const before:RepackLayout={bytes:original.length,sha256:digest(original),segments:sealed.storage.segments,segmentBytes:sealed.storage.segments.reduce((sum,pin)=>sum+pin.bytes,0),logicalSha256};
+  const after:RepackLayout={bytes:afterBytes.length,sha256:digest(afterBytes),segments:plan.pins,segmentBytes:plan.pins.reduce((sum,pin)=>sum+pin.bytes,0),logicalSha256};
+  if(options.dryRun||before.sha256===after.sha256){
+   const reconstructed:Inventory={schemaVersion:1,inventoryId:physical.inventoryId,roots:physical.roots,entries:[...physical.entries],scratch:[...physical.scratch]};
+   for(const segment of plan.added){const parsed=segmentSchema.parse(JSON.parse(segment.serialized));reconstructed.entries.push(...parsed.entries);reconstructed.scratch.push(...parsed.scratch);}
+   if(logicalInventorySha256(reconstructed)!==logicalSha256)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_MISMATCH');
+  }
+  const planned=performance.now();
+  const assertOriginal=async(backupPath?:string)=>{
+   // A retained backup must still have every original pin, not just its manifest.
+   for(const pin of before.segments)await readSegment(state,pin,inventory.inventoryId);
+   if(backupPath&&!(await fileBytes(backupPath,MAX_STATE,true)).bytes.equals(original))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_STATE_CHANGED');
+   await assertCivicPolicyAuthority(options);
+   const currentObjections=await repackObjectionState(state,options);
+   if(!(await fileBytes(path,MAX_STATE,true)).bytes.equals(original)||!(await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.equals(authorityBytes)||canonical(currentObjections)!==canonical(objections))throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_STATE_CHANGED');
+   await assertRepackQuiescence(state,inventory,pins,authority);
+  };
+  const result=(status:InventoryRepackReceipt['status'],verified:number,published:number,backup:InventoryRepackReceipt['backup']=null,authoritativeCandidateReread=false):InventoryRepackReceipt=>({
+   schemaVersion:'civic-inventory-repack-v1',status,authoritySha256:authority.authoritySha256,inventoryId:inventory.inventoryId,before,after,logicalEquality:true,authoritativeCandidateReread,
+   authorityMarkerSha256:digest(authorityBytes),rootsSha256,optOutSnapshotSha256:objections.snapshotSha256,objectionFilesSha256:objections.filesSha256,backup,preservedPendingScratch:pins,
+   timings:{loadMs:loaded-started,planMs:planned-loaded,verifyMs:verified-planned,publishMs:published-verified,totalMs:published-started},
+  });
+  if(options.dryRun||before.sha256===after.sha256){await assertOriginal();const ended=performance.now();return result(options.dryRun?'dry_run':'already_packed',ended,ended);}
+  const manifestPath=await backupInventoryManifest(state,original,options.backupPath);
+  for(const segment of plan.added)await publishSegment(state,segment);
+  // A failed/crashed publication leaves a reusable, content-addressed candidate.
+  const candidateName='inventory.repack-'+after.sha256+'.json',candidatePath=join(state,candidateName);
+  try{await atomicJson(candidatePath,physical,true,true,serialized);}catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;}
+  const candidateIdentity=await lstat(candidatePath,{bigint:true}),candidateStamp=snapshotStamp(candidateIdentity);
+  if(!candidateIdentity.isFile()||candidateIdentity.nlink!==1n||(candidateIdentity.mode&0o777n)!==0o600n)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_MISMATCH');
+  validatedInventoryBytes.delete(state);readInventorySnapshots.delete(state);
+  const reread=await loadInventory(state,false,candidateName);
+  if(!(await fileBytes(candidatePath,MAX_STATE,true)).bytes.equals(afterBytes)||reread.inventoryId!==inventory.inventoryId||digest(canonical(reread.roots))!==rootsSha256||logicalInventorySha256(reread)!==logicalSha256)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_MISMATCH');
+  await assertOriginal(manifestPath);
+  if(snapshotStamp(await lstat(candidatePath,{bigint:true}))!==candidateStamp)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_MISMATCH');
+  const verified=performance.now();
+  // Only immutable, authoritatively reread bytes can reach this rename. Failure
+  // after rename/fsync is uncertain publication, never a claimed rollback.
+  try{
+   await rename(candidatePath,path);
+   const parent=await open(state,constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_DIRECTORY);try{await parent.sync();}finally{await parent.close();}
+  }
+  catch{throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_PUBLICATION_UNCERTAIN');}
+  validatedInventoryBytes.delete(state);readInventorySnapshots.delete(state);
+  return result('repacked',verified,performance.now(),{manifestPath,segmentsDirectory:join(state,'inventory-segments')},true);
+ },false,undefined,true);
 }
 /** Read-only, owner-local audit reconstruction, including full archived records.
  * This is not an authorization snapshot. Call ordinary live read boundaries.
@@ -1806,16 +1930,21 @@ export async function benchmarkCivicInventoryCopy(path:string,iterations=5):Prom
  * Exit 2 means partial/error; a deadline is never evidence of completed purge.
  */
 export async function civicOptOutMain(args:string[]=process.argv.slice(2)):Promise<void>{
- const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},root:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'},'dry-run':{type:'boolean'},backup:{type:'string'}},strict:true});
+ const command=args[0],{values}=parseArgs({args:args.slice(1),options:{host:{type:'string'},root:{type:'string'},reason:{type:'string'},reference:{type:'string'},'received-at':{type:'string'},'state-dir':{type:'string'},'authority-id':{type:'string'},'authority-sha256':{type:'string'},'dry-run':{type:'boolean'},backup:{type:'string'},'pending-scratch':{type:'string',multiple:true}},strict:true});
  const options={stateDir:values['state-dir'],authorityId:values['authority-id'],authoritySha256:values['authority-sha256']};
  if(options.authorityId!==undefined&&options.authorityId!==CIVIC_POLICY_AUTHORITY_ID||statePath(options)!==CIVIC_POLICY_STATE_DIR)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
  if(command==='provision'){console.log(JSON.stringify(await provisionCivicPolicyAuthority(options)));return;}
  if(command==='recover-lock'){const receipt=await recoverCivicPolicyLock(options);console.log(JSON.stringify(receipt));if(receipt.status==='refused')process.exitCode=2;return;}
  if(command==='compact-inventory'){console.log(JSON.stringify(await compactCivicPolicyInventory({...options,dryRun:values['dry-run'],backupPath:values.backup})));return;}
+ if(command==='repack-inventory'){console.log(JSON.stringify(await repackCivicPolicyInventory({...options,dryRun:values['dry-run'],backupPath:values.backup,pendingScratch:values['pending-scratch']})));return;}
  if(command==='recover-scratch'){const receipt=await recoverManagedSourceScratch(options);console.log(JSON.stringify(receipt));if(receipt.status!=='complete')process.exitCode=2;return;}
  if(command==='retire-root'){if(!values.root||!values.reason)throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');const receipt=await retireManagedRoot(values.root,{reason:values.reason},options);console.log(JSON.stringify(receipt));if(receipt.status!=='retired')process.exitCode=2;return;}
  if(!values.host||!['register','purge'].includes(command))throw new CivicPolicyStateError('INVALID_OPERATOR_ARGUMENTS');
  const receipt=command==='register'?await recordHostOptOut({host:values.host,reason:reasonSchema.parse(values.reason),reference:values.reference,receivedAt:values['received-at']},options):await purgeOptedOutHost(values.host,options);
  console.log(JSON.stringify(receipt));const purge='purge' in receipt?receipt.purge:receipt;if(purge.status!=='purged')process.exitCode=2;
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)withCivicPolicyShutdown(()=>civicOptOutMain()).catch(()=>{console.error('Civic opt-out operation failed; acquisition remains fail-closed. Operator review required.');process.exitCode=2;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)withCivicPolicyShutdown(()=>civicOptOutMain()).catch(error=>{
+ if(process.argv[2]==='repack-inventory')console.error(JSON.stringify({schemaVersion:'civic-inventory-repack-error-v1',code:error instanceof CivicPolicyStateError&&/^[A-Z][A-Z0-9_]{0,79}$/.test(error.code)?error.code:'CIVIC_POLICY_REPACK_FAILED'}));
+ else console.error('Civic opt-out operation failed; acquisition remains fail-closed. Operator review required.');
+ process.exitCode=2;
+});
