@@ -1519,6 +1519,72 @@ test('compaction proves every logical record, preserves original backup bytes, i
  await assert.rejects(compactCivicPolicyInventory({...policy,authoritySha256:undefined}),{code:'CIVIC_POLICY_AUTHORITY_UNPINNED'});
 });
 
+for(const mode of ['missing','identity'] as const)test('speculative warming tolerates concurrent retirement/save across four processes: '+mode,{timeout:30_000},async t=>{
+ const {root,stateDir,policy}=await compactionFixture(t),writerRoot=join(dirname(root),'writer-fetch'),writerBytes='Synthetic concurrent saver',entry=rawEntry(writerBytes);
+ await initializeManagedAcquisitionLane(writerRoot,{...policy,kind:'fetch',decisionId:CIVIC_ACQUISITION_DECISION_ID});await publish(writerRoot,entry,writerBytes,stateDir);
+ const compacted=await compactCivicPolicyInventory(policy),pinPath=join(stateDir,'inventory-segments',compacted.segments[0]!.sha256+'.json'),lock=join(stateDir,'inventory.lock');
+ const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href,configuration=JSON.stringify({root,writerRoot,policy,entry,pinPath,mode});
+ const start=(body:string)=>{
+  const child=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {readCivicPolicyInventory,retireManagedRoot,withManagedSourceWrite} from ${JSON.stringify(moduleUrl)};const {root,writerRoot,policy,entry,pinPath,mode}=JSON.parse(process.argv[1]);${body}`,configuration],{stdio:['pipe','pipe','pipe']});
+  const closed=Promise.withResolvers<number|null>();let stdout='',stderr='';
+  child.stdout.on('data',chunk=>{stdout+=chunk;});child.stderr.on('data',chunk=>{stderr+=chunk;});child.once('error',closed.reject);child.once('close',closed.resolve);
+  void closed.promise.catch(()=>{});
+  t.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+  const stage=(name:string):Promise<void>=>{
+   if(stdout.split('\n').includes(name))return Promise.resolve();
+   const ready=Promise.withResolvers<void>(),receive=()=>{if(stdout.split('\n').includes(name)){child.stdout.removeListener('data',receive);ready.resolve();}};
+   if(child.exitCode!==null||child.signalCode!==null)return Promise.reject(Error('Fixture exited before '+name+': '+stderr));
+   child.stdout.on('data',receive);child.once('close',()=>ready.reject(Error('Fixture exited before '+name+': '+stderr)));return ready.promise;
+  };
+  return {child,closed:closed.promise,stage,stdout:()=>stdout,stderr:()=>stderr};
+ };
+ // IPC gates, not sleeps: all four independent readers have the old manifest
+ // before a real retire/save transaction changes the segment under its lock.
+ const readers=Array.from({length:4},()=>start(`
+  const original=fs.open;let first=true,waiting=false;
+  fs.open=async(...args)=>{
+   if(String(args[0])===pinPath&&first){
+    first=false;const handle=mode==='identity'?await original(...args):undefined,gate=Promise.withResolvers();
+    process.stdin.once('data',gate.resolve);process.stdout.write('warming\\n');await gate.promise;return handle??original(...args);
+   }
+   try{return await original(...args);}catch(error){if(String(args[0])===join(policy.stateDir,'inventory.lock')&&error.code==='EEXIST'&&!waiting){waiting=true;process.stdout.write('waiting\\n');}throw error;}
+  };syncBuiltinESMExports();
+  const inventory=await readCivicPolicyInventory(policy);process.stdout.write(JSON.stringify({roots:inventory.roots.map(root=>root.path),hashes:inventory.entries.map(entry=>entry.contentSha256),scratch:inventory.scratch.length})+'\\n');
+ `));
+ await Promise.all(readers.map(reader=>reader.stage('warming')));
+ const saver=start(`
+  assert.equal((await retireManagedRoot(root,{reason:'Synthetic concurrent segment retirement'},policy)).status,'retired');
+  await withManagedSourceWrite(writerRoot,[entry],async()=>{
+   // Fixture-only segment turnover inside an actual saver transaction. Missing
+   // pins are restored before release; identity replacement keeps exact bytes.
+   // No production segment garbage collection or relaxed pin codec is added.
+   if(mode==='missing')await fs.rename(pinPath,pinPath+'.retired');
+   else{await fs.writeFile(pinPath+'.replacement',await fs.readFile(pinPath),{mode:0o600});await fs.rename(pinPath+'.replacement',pinPath);}
+   const gate=Promise.withResolvers();process.stdin.once('data',gate.resolve);process.stdout.write('saving\\n');await gate.promise;
+   if(mode==='missing')await fs.rename(pinPath+'.retired',pinPath);
+  },policy);
+ `);
+ await saver.stage('saving');const holder=await lstat(lock);
+ for(const reader of readers)reader.child.stdin.end('resume-warming');
+ await Promise.all(readers.map(reader=>reader.stage('waiting')));
+ assert.equal((await lstat(lock)).ino,holder.ino,'Warm failure must proceed to waiting, not bypass the saver lock');
+ saver.child.stdin.end('finish-save');assert.equal(await saver.closed,0,saver.stderr());
+ for(const reader of readers){assert.equal(await reader.closed,0,reader.stderr());assert.deepEqual(JSON.parse(reader.stdout().trim().split('\n').at(-1)!),{roots:[writerRoot],hashes:[entry.contentSha256],scratch:0});}
+ await assert.rejects(lstat(lock),{code:'ENOENT'});
+});
+
+test('locked load rejects a changed pin after successful speculative warming',async t=>{
+ const {stateDir,policy}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy),path=join(stateDir,'inventory-segments',migration.segments[0]!.sha256+'.json'),lock=join(stateDir,'inventory.lock');
+ await readCivicPolicyInventory(policy);const originalOpen=fsPromises.open;let changed=false;
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  const handle=await originalOpen(...args);
+  if(String(args[0])===lock&&!changed){changed=true;const bytes=await readFile(path);bytes[10]^=1;await writeFile(path,bytes,{mode:0o600});}
+  return handle;
+ });syncBuiltinESMExports();
+ try{await assert.rejects(readCivicPolicyInventory(policy),{code:'CIVIC_POLICY_INVENTORY_UNAVAILABLE'});assert.equal(changed,true);await assert.rejects(lstat(lock),{code:'ENOENT'});}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
 for(const family of ['entries','scratch'])for(const mutation of ['tamper','missing','symlink','hardlink','mode'])test('sealed '+family+' '+mutation+' fails closed even after cache warming',async t=>{
  const {root,stateDir,policy}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy);
  await readCivicPolicyInventory(policy);

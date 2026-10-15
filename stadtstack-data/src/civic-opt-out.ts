@@ -150,8 +150,8 @@ async function readSegment(state:string,pin:SegmentPin,inventoryId:string):Promi
  }finally{await handle.close();}
 }
 async function warmInventorySegments(state:string):Promise<void>{
- try{await directory(join(state,'inventory-segments'),false,true);}catch(error){if(missing(error))return;throw error;}
  try{
+  await directory(join(state,'inventory-segments'),false,true);
   const physical:unknown=JSON.parse((await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes.toString('utf8'));
   if(!physical||typeof physical!=='object'||!('storage' in physical))return;
   const parsed=hotInventorySchema.parse(physical);
@@ -161,7 +161,11 @@ async function warmInventorySegments(state:string):Promise<void>{
   // exclusive lock. The locked load re-opens every pin and the current manifest,
   // so this speculative warming never authorizes a stale inventory.
   if(cold)await loadInventory(state);
- }catch{throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
+ }catch{
+  // Best-effort only: another saver may replace the manifest or a segment
+  // while we are outside the lock. Do not authorize or reject from that view.
+  // The authoritative locked load still re-opens and verifies every live pin.
+ }
 }
 async function hydrateInventory(state:string,physical:z.infer<typeof hotInventorySchema>):Promise<Inventory>{
  const entries=new Map<string,Entry>(),scratch=new Map<string,ScratchLease>(),roots=new Set(physical.roots.map(root=>root.id));

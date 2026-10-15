@@ -40,9 +40,9 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
 });
 // The four non-B scoped contracts remain at the running campaign's 93b967d
 // cutover. B advances for native diagnostics and unlocked evidence staging;
-// the runner review remains at the native diagnostics cutover.
+// the runner review advances independently for best-effort authority warming.
 test('terminal sealing preserves campaign contracts with the explicit B broker cutover',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'298efd4a953711a2bf177571444921203deb6c18c07b17f21a1bb198eba4cc9e');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'ffc418db22c3db48ac520956eb09b1f62659ba1d55bd7adaeca16b030bce8b8e');
+ assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'298efd4a953711a2bf177571444921203deb6c18c07b17f21a1bb198eba4cc9e');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'93068bfe7c3603e022146928dec6b56016abc1697785803f92bad468feaeccbd');
 });
