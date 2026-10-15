@@ -128,6 +128,23 @@ test('B failure projection preserves all closed kinds without retaining messages
  assert.deepEqual(assessmentBridgeFailureVersions('synthetic-lease',Error('PRIVATE_ERROR')),{});
 });
 
+test('actual completion exit codes survive decoder holds and the closed broker projection',()=>{
+ for(const exit of [0,1,126,127,137,255]){
+  const stdout=exit===0?eventStream([{type:'message_end',message:message({stopReason:'error',content:[],errorStatus:401})}]):'';
+  assert.throws(()=>inspectOmpEvents(stdout,exit),(error:unknown)=>{
+   assert.ok(error instanceof OmpRunnerHold);assert.equal(error.containerExitCode,exit);
+   assert.equal(assessmentBridgeFailureVersions('synthetic-lease',error).ompContainerExitCode,String(exit));return true;
+  });
+ }
+ assert.equal(new OmpRunnerHold('provider_failed').containerExitCode,undefined,'No fabricated exit code without completion');
+ for(const exit of [-1,256,1.5,NaN,Infinity]){
+  const error=new OmpRunnerHold('provider_failed',undefined,'exit_nonzero',exit);
+  assert.equal(error.containerExitCode,undefined);
+  Object.assign(error,{containerExitCode:exit});
+  assert.equal(assessmentBridgeFailureVersions('synthetic-lease',error).ompContainerExitCode,undefined);
+ }
+});
+
 test('omp argv and environment remain fixed and source-free',()=>{
  const args=OMP_EXECUTION_ARGS,env=OMP_CONTAINER_ENVIRONMENT;
  assert.equal(args.includes('--api-key'),false);assert.equal(args.some(value=>/source text|database_url|proxy|broker|api[_-]?key/i.test(value)),false);
@@ -198,7 +215,7 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
- const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  const expected=semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL('../src/'+file,import.meta.url)))})))});
  assert.equal(await ompRunnerContractSha256(),expected);
@@ -402,9 +419,34 @@ test('review requires explicit current host resolver fields and keeps the contai
  assert.equal(OMP_HOST_BINARY,'/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4');assert.equal(OMP_HOST_VERSION,'omp/18.10.4');assert.equal(OMP_VERSION,'omp/18.9.2');
 });
 
-test('image builder requires the reviewed old image source and isolates its version probe from host credentials',async()=>{
+test('image builder derives pinned native addons from the reviewed image without host credentials',async()=>{
  const script=await readFile(new URL('../scripts/build-omp-b-image.sh',import.meta.url),'utf8');
- assert.match(script,/OMP_IMAGE_BINARY:\?/);assert.match(script,/647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
- assert.match(script,/env -i HOME="\$TMP" PATH=\/usr\/bin:\/bin "\$TMP\/omp" --version/);
- assert.doesNotMatch(script,/\/home\/max\/\.local\/bin\/omp|omp-host-18\.10\.4/);
+ assert.match(script,/SOURCE_IMAGE=sha256:91c2c2c451fbc0273b97d25523bab3308b7077edca33efaaf26af923209711df/);
+ assert.match(script,/EXPECTED=647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
+ assert.match(script,/docker_local cp "\$SOURCE_NAME:\/usr\/local\/bin\/omp" "\$TMP\/omp"/);
+ assert.match(script,/--config "\$TMP\/docker-config" --host unix:\/\/\/run\/docker.sock/);
+ assert.match(script,/-i HOME=\/extract-home PATH=\/usr\/local\/bin:\/usr\/bin:\/bin/);
+ assert.match(script,/--name "\$EXTRACT_NAME" --network none --read-only/);
+ assert.match(script,/sha256sum --strict --check natives.sha256/);
+ assert.doesNotMatch(script,/OMP_IMAGE_BINARY|\/home\/max\/\.local\/bin\/omp|omp-host-18\.10\.4/);
+ const argv=script.match(/^set -- (.+)$/m)?.[1];assert.ok(argv);
+ assert.deepEqual(argv.split(' '),OMP_EXECUTION_ARGS);
+ const readiness=script.slice(script.indexOf('docker_local run --pull=never --name "$READY_NAME"'));
+ for(const flags of ['--interactive --network bridge --ipc none --read-only','--cap-drop ALL --security-opt no-new-privileges:true --user 65534:65534 --workdir /work --stop-timeout 1','--memory 536870912 --memory-swap 536870912 --cpus 1 --pids-limit 32','--ulimit nofile=64:64 --ulimit nproc=32:32 --ulimit fsize=33554432:33554432 --ulimit core=0:0 --log-driver none'])assert.ok(readiness.includes(flags),flags);
+ for(const path of ['/home/omp','/tmp','/work'])assert.ok(readiness.includes('--tmpfs '+path+':rw,noexec,nosuid,nodev,size=67108864,uid=65534,gid=65534,mode=0700'));
+ assert.ok(readiness.includes('"$IMAGE_ID" "$@" --help'));
+ assert.doesNotMatch(readiness,/--version|rw,exec/);
+});
+
+test('native image addons have explicit binary-derived hashes and immutable checked installation',async()=>{
+ const manifest=await readFile(new URL('../docker/omp-b/natives.sha256',import.meta.url),'utf8');
+ assert.match(manifest,/Source image: sha256:91c2c2c451fbc0273b97d25523bab3308b7077edca33efaaf26af923209711df/);
+ assert.match(manifest,/Source executable SHA-256: 647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
+ assert.deepEqual(manifest.split('\n').filter(line=>line&&!line.startsWith('#')),[
+  'a5c48a5718258a55be65410ae036fafb7af8bdf4643f44c83379af5d7a6cf584  pi_natives.linux-x64-baseline.node',
+  'fa537a8c0765dc76e5199aae9dadb99cec9d69d41b3d36a47a032452196cb078  pi_natives.linux-x64-modern.node',
+ ]);
+ const dockerfile=await readFile(new URL('../docker/omp-b/Dockerfile',import.meta.url),'utf8');
+ assert.match(dockerfile,/COPY --chmod=0444 pi_natives.linux-x64-baseline.node pi_natives.linux-x64-modern.node \/usr\/local\/bin\//);
+ assert.match(dockerfile,/sha256sum --strict --check \/opt\/stadtstack\/omp-b-natives.sha256/);
 });

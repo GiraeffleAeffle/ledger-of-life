@@ -4,6 +4,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /opt/stadtstack /home/omp/.omp/agent /home/omp/.config /home/omp/.local/share /home/omp/.local/state /home/omp/.cache /control /work /tmp
 COPY --chmod=0555 omp /usr/local/bin/omp
+# Immutable executable-directory fallbacks avoid extracting/loading native code
+# in the bounded noexec HOME tmpfs. Assets come from this exact omp binary.
+COPY --chmod=0444 pi_natives.linux-x64-baseline.node pi_natives.linux-x64-modern.node /usr/local/bin/
+COPY --chmod=0444 natives.sha256 /opt/stadtstack/omp-b-natives.sha256
+RUN cd /usr/local/bin && sha256sum --strict --check /opt/stadtstack/omp-b-natives.sha256
 COPY --chmod=0444 settings.yml /opt/stadtstack/omp-b-settings.yml
 COPY --chmod=0555 entry.sh /opt/stadtstack/entry.sh
 # Copy the pinned runtime filesystem without inheriting its NODE_VERSION,

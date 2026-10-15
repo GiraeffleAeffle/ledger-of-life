@@ -59,6 +59,7 @@ test('omp accepts only typed empty limit failures with normal exit and complete 
  assert.ok(limited);assert.equal(limited.failureKind,'provider_error_rate_limit');assert.equal(limited.noOutput,true);assert.equal(assessmentBridgeHoldReason(limited),'budget_paused');
  const versions=assessmentBridgeFailureVersions(randomUUID(),limited);
  assert.equal(versions.ompFailureKind,'provider_error_rate_limit');assert.equal(versions.subscriptionLimitNoOutput,'true');assert.equal(versions.subscriptionLimitTerminalFrame,'assistant_turn_agent_error');
+ assert.equal(versions.ompContainerExitCode,'0','Quota-proof wrapping preserves the actual normal completion code');
  assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_PROVIDER_ERROR|rate_limit_error|reset_at/);
  for(const reason of ['event_stream','resource_limit','model_identity_mismatch'] as const)assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold(reason))?.noOutput,false,'An unrelated successful-decoder rejection cannot certify a quota retry');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,137,new OmpRunnerHold('provider_failed'))?.noOutput,false);

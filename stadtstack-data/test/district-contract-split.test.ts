@@ -64,12 +64,14 @@ test('exception stderr diagnostics do not enter queued semantics or the OMP runn
  }
 });
 
-test('host resolver cutover changes only B contracts among the scoped queued job contracts',async()=>{
- for(const file of ['district-omp-b-runner.ts','../scripts/build-omp-b-image.sh']){
+test('host resolver and native image cutovers change only B contracts among the scoped queued job contracts',async()=>{
+ for(const file of ['district-omp-b-runner.ts','../scripts/build-omp-b-image.sh','../docker/omp-b/Dockerfile','../docker/omp-b/natives.sha256']){
   for(const name of ['residualPreparation','residual','assessmentQueue','policyRefresh'])
    assert.deepEqual(await contracts[name].compute(change(file)),await contracts[name].compute(hash),name+': '+file);
   assert.notDeepEqual(await assessmentBJobContract(change(file)),await assessmentBJobContract(hash));
   assert.notEqual(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash));
+  assert.notEqual(await ompRunnerOutputContractSha256(change(file)),await ompRunnerOutputContractSha256(hash));
+  assert.equal(await parserOutputContractSha256(change(file)),await parserOutputContractSha256(hash));
  }
 });
 test('preparation jobs are independent of extraction prompts/model/decoding/chunking and output assembly',async()=>{

@@ -337,13 +337,14 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       assert.equal(saved.rows[0].state,'held_execution');committed=true;
     });
     try{
-      const error=new OmpRunnerHold('provider_failed',undefined,'provider_error_auth');error.message='PRIVATE_PROVIDER_ERROR sk-ant-oat-synthetic';
+      const error=new OmpRunnerHold('provider_failed',undefined,'provider_error_auth',1);error.message='PRIVATE_PROVIDER_ERROR sk-ant-oat-synthetic';
       const key=await store.enqueue(jobSpec('B-provider-diagnostic','assessment_b'));
       const result=await run(await authorize([key]),1,{assessment_b:async()=>({outcome:'held_execution',reasonCode:'omp_provider_failed',versions:assessmentBridgeFailureVersions(randomUUID(),error)})});
       assert.equal(result.reasonCode,'omp_provider_failed');
-      assert.equal(stderr,`R1_B_FAILURE job=${key.slice(0,12)} kind=provider_error_auth\n`);
+      assert.equal(stderr,`R1_B_FAILURE job=${key.slice(0,12)} kind=provider_error_auth exit=1\n`);
       const saved=await pool.query<{receipt:StepReceipt}>('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId]);
       assert.equal(saved.rows[0].receipt.versions.ompFailureKind,'provider_error_auth');
+      assert.equal(saved.rows[0].receipt.versions.ompContainerExitCode,'1');
       assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/PRIVATE_PROVIDER_ERROR|sk-ant-oat|R1_B_FAILURE/);
     }finally{st.mock.restoreAll();}
   });
