@@ -109,13 +109,16 @@ const checkpointMetadataSchema=z.object({
 type Root=z.infer<typeof rootSchema>;
 type Entry=z.infer<typeof entrySchema>;
 type Inventory=z.infer<typeof inventorySchema>;
-// Only exact canonical inventory bytes are memoized, never mutable inventories.
-// Legacy bytes requiring codec defaults stay on the full-validation path until
-// a save emits the fully parsed value. Authority and safe-file reads stay live.
+// Canonical byte validation never permits skipping live authority or pin reads.
+// Read-only callers may reuse a frozen logical snapshot and its lookup index;
+// mutable transactions always hydrate their own roots, hot entries and leases.
 const validatedInventoryBytes=new Map<string,string>();
 type SegmentPin=z.infer<typeof segmentPinSchema>;
 interface SealedInventory {storage:z.infer<typeof storageSchema>;entries:Map<string,Entry>;scratch:Map<string,ScratchLease>;roots:Set<string>}
 const sealedInventories=new WeakMap<Inventory,SealedInventory>();
+type HotInventory=z.infer<typeof hotInventorySchema>;
+interface ReadInventorySnapshot {sha256:string;physical:HotInventory;value:Inventory}
+const readInventorySnapshots=new Map<string,ReadInventorySnapshot>();
 // Cached segment objects are frozen. Every load still opens O_NOFOLLOW and checks
 // nanosecond inode metadata; changed metadata forces a fresh digest/codec check.
 const segmentCache=new Map<string,{stamp:string;value:z.infer<typeof segmentSchema>}>();
@@ -155,12 +158,13 @@ async function warmInventorySegments(state:string):Promise<void>{
   const physical:unknown=JSON.parse((await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes.toString('utf8'));
   if(!physical||typeof physical!=='object'||!('storage' in physical))return;
   const parsed=hotInventorySchema.parse(physical);
-  const cold=parsed.storage.segments.some(pin=>!segmentCache.has(join(state,'inventory-segments',pin.sha256+'.json')));
-  for(const pin of parsed.storage.segments)await readSegment(state,pin,parsed.inventoryId);
+  const cold=parsed.storage.segments.filter(pin=>!segmentCache.has(join(state,'inventory-segments',pin.sha256+'.json')));
+  if(!cold.length)return;
+  for(const pin of cold)await readSegment(state,pin,parsed.inventoryId);
   // Cold immutable decoding/semantic validation is deliberately outside the
   // exclusive lock. The locked load re-opens every pin and the current manifest,
   // so this speculative warming never authorizes a stale inventory.
-  if(cold)await loadInventory(state);
+  await loadInventory(state,true);
  }catch{
   // Best-effort only: another saver may replace the manifest or a segment
   // while we are outside the lock. Do not authorize or reject from that view.
@@ -753,18 +757,35 @@ function makeEntry(root:Root,input:ManagedSourceContent):Entry{
  const value={rootId:root.id,relativePath:checkedRelative(root,input.relativePath,contentSha256,receiptSha256),contentSha256,...provenance,host:hostFromUrl(input.url),urlSha256:urlHash(input.url),independentAllowed:z.boolean().parse(input.independentAllowed)};
  return entrySchema.parse({...value,id:entryId(value),state:'active'});
 }
-async function loadInventory(state:string):Promise<Inventory>{
- let value:Inventory,bytes:Buffer,sha256:string,validated:boolean,physical:unknown;
+function rememberReadInventory(state:string,sha256:string,value:Inventory,physical:HotInventory|undefined,readOnly:boolean):Inventory{
+ if(readOnly&&physical&&validatedInventoryBytes.get(state)===sha256){
+  freezeRecord(value);freezeRecord(physical);
+  readInventorySnapshots.set(state,{sha256,value,physical});
+ }
+ return value;
+}
+async function loadInventory(state:string,readOnly=false):Promise<Inventory>{
+ let value:Inventory,bytes:Buffer,sha256:string,validated:boolean,physical:unknown,hot:HotInventory|undefined;
  try{
   bytes=(await fileBytes(join(state,'inventory.json'),MAX_STATE,true)).bytes;sha256=digest(bytes);
   validated=validatedInventoryBytes.get(state)===sha256;
-  physical=JSON.parse(bytes.toString('utf8'));
-  if(physical&&typeof physical==='object'&&'storage' in physical){
-   const parsed=hotInventorySchema.parse(physical);physical=parsed;value=await hydrateInventory(state,parsed);
-  }else{value=validated?physical as Inventory:inventorySchema.parse(physical);physical=value;}
+  const cached=readOnly?readInventorySnapshots.get(state):undefined;
+  if(cached?.sha256===sha256){
+   // Reuse computation, never a previous authorization: reopen every CURRENT
+   // pin and verify its live identity/hash/codec/chain before using the snapshot.
+   hot=cached.physical;physical=hot;
+   for(const pin of hot.storage.segments)await readSegment(state,pin,hot.inventoryId);
+   value=cached.value;
+  }else{
+   if(readOnly)readInventorySnapshots.delete(state);
+   physical=JSON.parse(bytes.toString('utf8'));
+   if(physical&&typeof physical==='object'&&'storage' in physical){
+    hot=hotInventorySchema.parse(physical);physical=hot;value=await hydrateInventory(state,hot);
+   }else{value=validated?physical as Inventory:inventorySchema.parse(physical);physical=value;}
+  }
   const authority=authoritySchema.parse(JSON.parse((await fileBytes(join(state,AUTHORITY_MARKER),8192,true)).bytes.toString('utf8')));if(value.inventoryId!==authority.inventoryId)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
- }catch{validatedInventoryBytes.delete(state);throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
- if(validated)return value;
+ }catch{validatedInventoryBytes.delete(state);readInventorySnapshots.delete(state);throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');}
+ if(validated)return rememberReadInventory(state,sha256,value,hot,readOnly);
  const roots=new Map(value.roots.map(root=>[root.id,root]));
  if(roots.size!==value.roots.length||inventoryIndex(value).byId.size!==value.entries.length)throw new CivicPolicyStateError();
  for(const root of value.roots)if(root.id!==digest(root.path)||root.path!==resolve(root.path))throw new CivicPolicyStateError();
@@ -784,7 +805,7 @@ async function loadInventory(state:string):Promise<Inventory>{
   if(Object.isFrozen(lease))validatedSegmentLeases.add(lease);
  }
  if(bytes.equals(Buffer.from(JSON.stringify(physical)+'\n')))validatedInventoryBytes.set(state,sha256);
- return value;
+ return rememberReadInventory(state,sha256,value,hot,readOnly);
 }
 async function saveInventory(state:string,value:Inventory){
  const sealed=sealedInventories.get(value);
@@ -1056,7 +1077,7 @@ async function readContentFreeFrontier(path:string,policy:CivicPolicyOptions):Pr
 export async function assertManagedSourceReadable(input:string,options:ManagedSourceReadOptions={}):Promise<void>{
  const authority=await assertCivicPolicyAuthority(options),state=statePath(options),path=resolve(input),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  await locked(policy,async()=>{
-  const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));
+  const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>contained(item.path,path));
   if(!root||!root.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const relativePath=relative(root.path,path).split(sep).join('/'),all=entriesAt(inventory,root.id,relativePath);
@@ -1095,7 +1116,7 @@ export async function assertManagedSourceReadable(input:string,options:ManagedSo
 export async function assertManagedObservationReadable(input:string,options:CivicPolicyOptions={}):Promise<void>{
  const authority=await assertCivicPolicyAuthority(options),state=statePath(options),path=resolve(input),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  const sourceBound=await locked(policy,async()=>{
-  const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));
+  const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>contained(item.path,path));
   if(!root?.complete||root.kind!=='fetch')throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const relativePath=relative(root.path,path).split(sep).join('/');
@@ -1130,7 +1151,7 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
  const key=(value:{kind:string;urlSha256:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.kind,value.urlSha256,value.sourceSha256,value.observationId??null,value.receiptSha256??null,value.publication??null,value.snapshot??null,value.purpose??null,value.configurationSha256??null,value.schemaContractSha256??null,value.code??null,value.approval??null]);
  const registryDescriptorKey=(value:{kind:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.configurationSha256,value.schemaContractSha256,value.code,value.approval]);
  await locked(policy,async()=>{
-  const inventory=await loadInventory(state),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
+  const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const actual=await fileDigest(path),relativePath=relative(root.path,path).split(sep).join('/');
   const selected=independentHttpMember?key({...sourceProvenance(bindings[0]),urlSha256:urlHash(bindings[0].url)}):null;
@@ -1184,7 +1205,7 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
  const proof=sourceProvenance(binding),authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  await assertHostNotOptedOut(binding.url,policy);
  await locked(policy,async()=>{
-  const inventory=await loadInventory(state),root=inventory.roots.find(item=>item.kind==='fetch'&&contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
+  const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>item.kind==='fetch'&&contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const relativePath=relative(root.path,path).split(sep).join('/'),entry=entriesAt(inventory,root.id,relativePath).find(item=>item.kind==='http_observation'&&item.state==='active'&&item.independentAllowed&&item.urlSha256===urlHash(binding.url)&&item.sourceSha256===proof.sourceSha256&&item.contentSha256===proof.sourceSha256&&item.observationId===binding.observationId&&item.receiptSha256===binding.receiptSha256);
   if(!entry||!/^sha256\/[a-f0-9]{64}$/.test(relativePath)||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json$/.test(binding.observationId))throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
@@ -1757,7 +1778,7 @@ export async function compactCivicPolicyInventory(options:CivicPolicyOptions&{dr
  * This is not an authorization snapshot. Call ordinary live read boundaries.
  */
 export async function readCivicPolicyInventory(options:CivicPolicyOptions={}):Promise<Inventory>{
- return locked(options,async()=>structuredClone(await loadInventory(statePath(options))));
+ return locked(options,async()=>structuredClone(await loadInventory(statePath(options),true)));
 }
 /** Offline sizing/codec benchmark, deliberately not an authority operation.
  * Caller supplies a private COPY; this routine never writes or acquires a lock.

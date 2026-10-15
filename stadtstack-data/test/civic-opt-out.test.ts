@@ -1519,6 +1519,52 @@ test('compaction proves every logical record, preserves original backup bytes, i
  await assert.rejects(compactCivicPolicyInventory({...policy,authoritySha256:undefined}),{code:'CIVIC_POLICY_AUTHORITY_UNPINNED'});
 });
 
+test('sealed read snapshots reuse hydration/index but reopen every current pin on every read',async t=>{
+ const {root,stateDir,policy,binding}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy),path=join(root,'facts.json');
+ await assertManagedSourceBindings(path,[binding],policy);
+ const detached=await readCivicPolicyInventory(policy),entryId=detached.entries[0].id;
+ detached.entries[0].state='revoked';detached.roots[0].complete=false;detached.scratch[0].sources.length=0;
+ const originalSet=Map.prototype.set,originalOpen=fsPromises.open;let rebuiltEntries=0,pinOpens=0;
+ t.mock.method(Map.prototype,'set',function(this:Map<unknown,unknown>,key:unknown,value:unknown){
+  if(key===entryId&&value&&typeof value==='object'&&'id' in value&&value.id===entryId)rebuiltEntries++;
+  return originalSet.call(this,key,value);
+ });
+ t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
+  if(String(args[0]).startsWith(join(stateDir,'inventory-segments')+'/'))pinOpens++;
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{
+  for(let i=0;i<5;i++)await assertManagedSourceReadable(path,policy);
+  assert.equal(rebuiltEntries,0,'unchanged read-only snapshots must not rebuild full entry maps');
+  assert.equal(pinOpens,5*migration.segments.length,'every locked read must reopen every pin; warm caches need no speculative reread');
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ const current=await readCivicPolicyInventory(policy);
+ assert.equal(current.entries[0].state,'active');assert.equal(current.roots[0].complete,true);assert.equal(current.scratch[0].sources.length,1);
+});
+
+test('sealed read snapshot invalidates on manifest state changes and isolates failed mutable transactions',async t=>{
+ const {root,stateDir,policy,binding,bytes}=await compactionFixture(t);await compactCivicPolicyInventory(policy);
+ const path=join(root,'facts.json'),inventoryPath=join(stateDir,'inventory.json');
+ await assertManagedSourceBindings(path,[binding],policy);const before=await readFile(inventoryPath),originalRename=fsPromises.rename;
+ t.mock.method(fsPromises,'rename',async(...args:Parameters<typeof fsPromises.rename>)=>{
+  if(String(args[1])===inventoryPath)throw Object.assign(new Error('Synthetic pre-commit failure'),{code:'EIO'});
+  return originalRename(...args);
+ });syncBuiltinESMExports();
+ try{await assert.rejects(recordManagedSourceContent(root,{...binding,url:'https://uncommitted.test/source',relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},policy),{code:'EIO'});}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ assert.deepEqual(await readFile(inventoryPath),before);
+ await assertManagedSourceBindings(path,[binding],policy);
+ const current=await readCivicPolicyInventory(policy),physical=JSON.parse(before.toString('utf8'));
+ physical.storage.entryStates[current.entries[0].id]='revoked';
+ await writeFile(inventoryPath,JSON.stringify(physical)+'\n',{mode:0o600});
+ await assert.rejects(assertManagedSourceReadable(path,policy),{code:'CONTENT_REFERENCE_REVOKED'});
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'revoked');
+ await writeFile(inventoryPath,before,{mode:0o600});await assertManagedSourceBindings(path,[binding],policy);
+ await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
+ await assert.rejects(assertManagedSourceReadable(path,policy),HostOptedOutError);
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].state,'deleted');
+});
+
 for(const mode of ['missing','identity'] as const)test('speculative warming tolerates concurrent retirement/save across four processes: '+mode,{timeout:30_000},async t=>{
  const {root,stateDir,policy}=await compactionFixture(t),writerRoot=join(dirname(root),'writer-fetch'),writerBytes='Synthetic concurrent saver',entry=rawEntry(writerBytes);
  await initializeManagedAcquisitionLane(writerRoot,{...policy,kind:'fetch',decisionId:CIVIC_ACQUISITION_DECISION_ID});await publish(writerRoot,entry,writerBytes,stateDir);
