@@ -1,0 +1,33 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-lock-recovery-2026-10-15",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-nine-town-models-2026-10-13 (#81) and r1-autonomy-and-release-2026-10-14; not a new owner approval",
+ "issuedAt": "2026-10-15T05:06:00Z",
+ "parentApprovals": [
+  {"id": "r1-nine-town-models-2026-10-13", "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"},
+  {"id": "r1-autonomy-and-release-2026-10-14", "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5", "clause": "approved.autonomy"}
+ ],
+ "authority": {"id": "owner-2026-10-11-codex-workstation", "sha256": "e35c90d1b705a52d739f438ae80b0ab1217db86386826fd9feac2f32329e926f", "stateDir": "/home/max/.local/state/stadtstack-data/civic-policy"},
+ "action": "Removed a stale shared-inventory lock left by a dead holder, plus three advisory waiter markers left by killed test processes; then ran canonical scratch recovery.",
+ "evidence": {
+  "lockFile": "inventory.lock",
+  "lockContentSha256": "921efe7ae71b817d7124d395bb904934030c4484ec61a9360f4029faea497d87",
+  "lockHolderPid": 1335545,
+  "lockMtime": "2026-10-15T02:00:56Z",
+  "holderIdentification": "Pilot v7 extraction executor (code dd675e2, scripts/r1-vm-run.sh 1800 s, started 01:30:55Z). It wrote its run result at 01:59:37Z (run fdd109c2-ef95-484b-b32e-0ed7b740db20 held; second job max_time_reached) but did not exit; the OS deadline TERM at about 02:00:55Z ended it after it had taken the lock at 02:00:56Z.",
+  "preconditionsChecked": [
+   "holder pid absent from /proc at 05:02Z; no reboot since 2026-10-12T11:30:53 (boot_id f2263eab-cf6d-4b23-a7bc-145b4934cca9)",
+   "no process had any file of the state directory open (scan of /proc/*/fd)",
+   "no R1 CLI, executor, crawler or test process running"
+  ],
+  "removedAt": "2026-10-15T05:02:50Z",
+  "removedWaiterMarkers": ["inventory.wait-3f919941-f077-4040-ae88-0f21caf7b346", "inventory.wait-9138db1f-3c03-4c45-8210-e4d43dc070d1", "inventory.wait-fec74bcb-8dd9-4d1c-9288-7cfe22cd74ae"],
+  "evidenceCopy": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/lock-recovery-2026-10-15/ (lock copy, stat before removal, removal time)"
+ },
+ "afterRecovery": {
+  "recoverScratch": "status partial at 2026-10-15T05:03:13Z: recoveredLeases [], pendingLeases [10f567ce-3086-47da-9c62-3f693450dbd1] (known daemon_resource_pending, fail-closed since 2026-10-14), deletedFiles 0",
+  "inventory": "182 roots, 0 incomplete"
+ },
+ "impact": "From 02:00:56Z to 05:02:50Z every locked authority operation failed CIVIC_POLICY_BUSY: campaign commands for ratzeburg-participation, ruedersdorf-bei-berlin-website and ruedersdorf-bei-berlin-council at 02:01-02:02Z, and the parser sentinel runs at 03:25Z and 04:25Z.",
+ "followUp": "Core fix in progress on branch r1-lock-holder: executor waits for aborted handlers before returning, refuses new locked sections after TERM, and recovers dead-holder locks only with boot/start-time proof; legacy locks only through an explicit recover-lock command."
+}
