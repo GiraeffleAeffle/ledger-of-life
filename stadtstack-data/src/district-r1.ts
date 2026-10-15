@@ -44,7 +44,7 @@ import {ResidualInputSchema,residualJobHandlersFor,enqueueResidualPreparation,en
 import {CrawlCorpusImportSchema,importCrawlCorpusForResidual} from './district-crawl-import.ts';
 import {DistrictAssessmentBroker,enqueueAssessmentB,assessmentEvidenceArtifactHashes} from './district-assessment-broker.ts';
 import {assessmentItemSchema} from './district-assessment.ts';
-import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,exportAssessmentResults} from './district-assessment-jobs.ts';
+import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,exportAssessmentResults,enqueueValueAssessments,exportValueAssessmentResults} from './district-assessment-jobs.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
 import {structuredFieldPublicationHold} from './district-public-fields.ts';
 import type {StructuredFieldHold} from './district-public-fields.ts';
@@ -507,6 +507,13 @@ export async function districtR1Cli(argv=process.argv.slice(2)){
    const manifest=z.object({preparationJobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input),jobKeys:string[]=[];
    for(const preparationJobKey of manifest.preparationJobKeys)jobKeys.push(await enqueueCommittedResidualExtraction(pool,store,cas,preparationJobKey));
    process.stdout.write(canonicalJson({jobKeys})+'\n');return;
+  }
+  if(command==='enqueue-value-assessments'){
+   process.stdout.write(canonicalJson(await enqueueValueAssessments(pool,store,cas,input))+'\n');return;
+  }
+  if(command==='value-assessment-results'){
+   const manifest=z.object({jobKeys:z.array(HashSchema).length(37)}).strict().parse(input);
+   process.stdout.write(canonicalJson(await exportValueAssessmentResults(pool,cas,manifest.jobKeys))+'\n');return;
   }
   if(command==='assessment-results'){
    const manifest=z.object({jobKeys:z.array(HashSchema).min(1).max(10000)}).strict().parse(input);

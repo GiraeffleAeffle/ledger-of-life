@@ -17,6 +17,7 @@ import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceRe
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
 import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
+import {assertValueAssessmentContext} from './district-value-context.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
@@ -41,7 +42,7 @@ export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:Mode
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
 export async function assessmentBJobContract(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
+ const files=['district-assessment-broker.ts','district-assessment.ts','district-assessment-context.ts','district-value-context.ts','district-claims.ts','district-assessment-bridge-contract.ts','district-claude.ts','district-model-contract.ts','district-omp-b-runner.ts','district-execution-profile.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../scripts/build-omp-b-image.sh'];
  return semanticHash({version:ASSESSMENT_BRIDGE_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
 function hardDeadline(row:JobAuthorityRow):number{
@@ -61,7 +62,7 @@ function disposition(row:JobAuthorityRow,runId:string,fence:string):ReasonCode|n
 function status(row:LeaseRow):BridgeStatus{
  return BridgeStatusSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,state:row.state==='ready'?'held':row.state,leaseId:row.id,inputSha256:row.input_sha256,expiresAt:row.expires_at.toISOString(),authoritySha256:row.authority_sha256,policySnapshotSha256:row.policy_snapshot_sha256,receiptSha256:row.receipt_sha256,purgeAckSha256:row.purge_ack_sha256});
 }
-export function assessmentEvidenceArtifactHashes(item:AssessmentItem):string[]{return [...new Set(item.sources.flatMap(source=>[source.originalSha256,source.textSha256,source.parserReceiptSha256,source.admissionReceiptSha256]))].sort();}
+export function assessmentEvidenceArtifactHashes(item:AssessmentItem):string[]{return [...new Set([...item.sources.flatMap(source=>[source.originalSha256,source.textSha256,source.parserReceiptSha256,source.admissionReceiptSha256]),...(item.valueContext?[item.valueContext.custodyReceiptSha256]:[])])].sort();}
 function same(a:unknown,b:unknown):boolean{return canonicalJson(a)===canonicalJson(b);}
 
 /** Independently parse the actual provider stream on the VM. A client-created
@@ -121,6 +122,7 @@ export class DistrictAssessmentBroker {
   if(sourceAuthority.mode!==requiredMode||sourceAuthority.authorityId!==optout.authorityId||sourceAuthority.authoritySha256!==optout.authoritySha256)throw new DistrictExecutionHold('authorization_revoked');
   const item=assessmentItemSchema.parse(JSON.parse((await this.cas.read(itemHash)).toString('utf8')));
   if(digest(canonicalJson(item))!==itemHash)throw new DistrictExecutionHold('quality_failed');
+  if(item.valueTarget)assertValueAssessmentContext(item);
   const hashes=[itemHash,...assessmentEvidenceArtifactHashes(item)];
   if(hashes.some(hash=>!spec.inputArtifactHashes.includes(hash)))throw new DistrictExecutionHold('policy_excluded');
   const artifacts=await client.query<{sha256:string;disposition:string}>('SELECT sha256,disposition FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[])',[hashes]);
@@ -128,10 +130,17 @@ export class DistrictAssessmentBroker {
   const currentAdmissionReceipts:Record<string,string>={};
   const sources:SourceReference[]=[],snapshots:{sourceId:string;originalSha256:string;scope:AdapterScope;snapshotSha256:string;currentReceiptSha256:string}[]=[];
   let validUntil=Infinity,primary=false;
-  for(const source of item.sources){
+  const anchor=item.valueContext&&!item.sources.length?await loadPolicyReceipt(this.cas,item.valueContext.custodyReceiptSha256):undefined;
+  const policySources=anchor?[{sourceId:anchor.scope.sourceId,originalSha256:anchor.source.sha256,
+    admissionReceiptSha256:item.valueContext!.custodyReceiptSha256,textSha256:item.valueContext!.custodyReceiptSha256,
+    parserReceiptSha256:item.valueContext!.custodyReceiptSha256}]:item.sources;
+  for(const source of policySources){
    const original=await loadPolicyReceipt(this.cas,source.admissionReceiptSha256);
    const scope=original.scope;
-   if(scope.municipalityId!==spec.sourceScope.municipalityId||scope.ags!==spec.sourceScope.ags)throw new DistrictExecutionHold('policy_excluded');
+   if(item.valueTarget){
+    const cities=z.array(z.string()).parse(item.valueTarget.question.cityIds);
+    if(!anchor&&!cities.includes(scope.municipalityId))throw new DistrictExecutionHold('policy_excluded');
+   }else if(scope.municipalityId!==spec.sourceScope.municipalityId||scope.ags!==spec.sourceScope.ags)throw new DistrictExecutionHold('policy_excluded');
    if(same(scope,spec.sourceScope)&&source.admissionReceiptSha256===spec.policyProofSha256)primary=true;
    const originalRow=await client.query<{state:string;receipt_json:unknown}>('SELECT state,receipt_json FROM district_pipeline.policy_decisions WHERE proof_sha256=$1 AND source_sha256=$2',[source.admissionReceiptSha256,source.originalSha256]);
    if(originalRow.rows.length!==1||originalRow.rows[0].state!=='allowed'||!same(originalRow.rows[0].receipt_json,original))throw new DistrictExecutionHold('policy_excluded');

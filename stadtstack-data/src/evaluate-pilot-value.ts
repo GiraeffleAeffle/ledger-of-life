@@ -7,7 +7,9 @@ import {Client} from '@modelcontextprotocol/sdk/client/index.js';
 import {StdioClientTransport} from '@modelcontextprotocol/sdk/client/stdio.js';
 import {z} from 'zod';
 import {pilotReviewSchema,assessmentItemSchema,reconcile,writeImmutable,auditFrameSchema,recordOwnerAudit,
-  assessmentEvidenceContext,type AssessmentEvidenceContext} from './district-assessment.ts';
+  assessmentEvidenceContext,originalEvidence,buildAssessmentPassInput,type AssessmentEvidenceContext} from './district-assessment.ts';
+import {assertValueAssessmentContext,boundedValueSource,valueAnswerUnit} from './district-value-context.ts';
+import {runPilotValueAudit} from './pilot-value-audit.ts';
 
 // Retrieval crosses MCP to the separately selected immutable release. Assessment
 // ingestion additionally verifies private originals; it never queries private candidate data.
@@ -35,13 +37,14 @@ export interface AssessmentReviewProvenance {
 export interface EvaluationRow {question:Question;recordIds:string[];callIds:number[];retrievalComplete:boolean;graph:{available:boolean;callIds:number[];recordIds:string[];bounded:boolean};evidenceSha256:string;review:null|{reviewer:string;withoutGraph:Review;withGraph:Review|null;assessment?:AssessmentReviewProvenance}}
 export interface EvaluationSummary {questions:number;reviewed:number;substantive:number;partial:number;abstentions:number;correctAbstentions:number;usefulSubstantive:number;dataMissing:number;correctnessPoints:number;sourcingPoints:number;usefulnessPoints:number;maximumPoints:number;graphUnavailable:number;graphReviewed:number}
 export interface EvaluationComparison {baselineRelease:string;currentRelease:string;interpretation:string;questions:{id:string;withoutGraphUsefulnessDelta:number;withinReleaseGraphUsefulnessDelta:number|null;graphRationale:string}[]}
-export interface EvaluationMarkdownInput {generatedAt:string;server:Pick<Report['server'],'root'|'releaseId'|'toolCount'>;evaluations:EvaluationRow[];comparison?:EvaluationComparison}
+export interface EvaluationMarkdownInput {generatedAt:string;server:Pick<Report['server'],'root'|'releaseId'|'toolCount'|'mode'|'candidateDirectory'|'policyStateDir'>;evaluations:EvaluationRow[];comparison?:EvaluationComparison}
 export interface Report {
   schemaVersion:'pilot-value-evaluation-v1';status:'awaiting_review'|'reviewed';generatedAt:string;
-  questionBankSha256:string;evaluatorSha256:string;server:{root:string;gitCommit:string;sourceSha256:string;sourceFiles:{path:string;sha256:string}[];releaseId:string;toolCount:number;tools:string[];transport:'stdio';protocol:string};
+  questionBankSha256:string;evaluatorSha256:string;server:{root:string;gitCommit:string;sourceSha256:string;sourceFiles:{path:string;sha256:string}[];releaseId:string;toolCount:number;tools:string[];transport:'stdio';protocol:string;mode?:'sealed'|'vm_candidate';candidateDirectory?:string;policyStateDir?:string};
   method:JsonObject;releaseStatus:JsonObject;coverage:unknown;records:Record<string,JsonObject>;sources:Record<string,JsonObject>;
   calls:{id:number;tool:string;selection:JsonObject;response:unknown;responseSha256:string}[];evaluations:EvaluationRow[];
   summary?:EvaluationSummary;comparison?:EvaluationComparison;
+  ownerAudit?:unknown;
 }
 export function canonical(value:unknown):string {
   if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';
@@ -113,7 +116,9 @@ export function valueAssessmentTarget(report:Report,row:EvaluationRow,lane:'with
   if(lane==='withGraph'&&(!row.graph.available||!row.question.graphDependent))throw Error('No established graph pair for this question');
   const recordIds=[...new Set(lane==='withGraph'?[...row.recordIds,...row.graph.recordIds]:row.recordIds)].sort();
   const sourceIds=[...new Set(recordIds.flatMap(id=>z.array(z.string()).parse(report.records[id].sourceIds)))].sort();
-  const calls=[...new Set(lane==='withGraph'?[...row.callIds,...row.graph.callIds]:row.callIds)].sort((a,b)=>a-b)
+  const cachedCalls=report.calls.filter(call=>(call.tool==='get_signal'&&recordIds.includes(String(call.selection.id)))
+    ||(call.tool==='get_source'&&sourceIds.includes(String(call.selection.sourceId)))).map(call=>call.id);
+  const calls=[...new Set([...(lane==='withGraph'?[...row.callIds,...row.graph.callIds]:row.callIds),...cachedCalls])].sort((a,b)=>a-b)
     .map(id=>report.calls[id]).filter(call=>{
       if(call.tool==='get_signal')return recordIds.includes(String(call.selection.id));
       if(call.tool==='get_source')return sourceIds.includes(String(call.selection.sourceId));
@@ -140,9 +145,22 @@ export function prepareValueAssessment(report:Report,itemInput:unknown,lane:'wit
   if(sources.length!==Object.keys(valueTarget.sources).length)throw Error('Missing original MCP source');
   return assessmentItemSchema.parse({...item,sources,valueTarget});
 }
+export async function bindCandidateValueContext(itemInput:unknown,context:AssessmentEvidenceContext,custodyReceiptSha256?:string){
+  const item=assessmentItemSchema.parse(itemInput);if(!item.valueTarget)throw Error('Candidate value target missing');
+  const target=item.valueTarget;
+  const sources=await Promise.all(item.sources.map(async source=>boundedValueSource(source,(await context.cas.read(source.textSha256)).toString('utf8'),
+    target.sources[source.mcpSourceId??source.sourceId])));
+  const bounded=assessmentItemSchema.parse({...item,sources,valueContext:{version:'assessment-value-context-v1',
+    targetSha256:digest(item.valueTarget),answerUnitSha256:valueAnswerUnit(item.valueTarget),
+    custodyReceiptSha256:sources[0]?.admissionReceiptSha256??sha.parse(custodyReceiptSha256)}});
+  assertValueAssessmentContext(bounded);
+  buildAssessmentPassInput(bounded,await originalEvidence(bounded,context),'A');
+  return bounded;
+}
 export async function assessedValueReview(report:Report,itemInput:unknown,receipts:{A:unknown;B:unknown;C:unknown},context?:AssessmentEvidenceContext){
   const item=assessmentItemSchema.parse(itemInput),row=report.evaluations.find(r=>r.question.id===item.itemId);
   if(!row||!item.valueTarget||item.question!==row.question.question||item.rubric!==report.method.grading)throw Error('Missing frozen value assessment target');
+  if(report.server.mode==='vm_candidate')assertValueAssessmentContext(item);
   const target=valueAssessmentTarget(report,row,item.valueTarget.lane);
   if(canonical(target)!==canonical(item.valueTarget))throw Error('Value assessment release/records/sources/calls changed');
   for(const [sourceId,source] of Object.entries(target.sources)){
@@ -218,13 +236,42 @@ export function decodeTool(result:unknown):JsonObject {
   const text=content.find(item=>item.type==='text')?.text;if(!text)throw Error('MCP response has no structured evidence');
   return objectSchema.parse(JSON.parse(text));
 }
-export async function collect(options:{serverRoot:string;releaseId:string;toolCount:16|19|20;bankPath:string}):Promise<Report>{
+export function parseCandidateCollection(input:unknown):Report{
+  const report=z.object({schemaVersion:z.literal('pilot-value-evaluation-v1'),status:z.literal('awaiting_review'),
+    generatedAt:z.string(),questionBankSha256:sha,evaluatorSha256:sha,
+    server:z.object({root:z.string(),gitCommit:z.string().regex(/^[a-f0-9]{40}$/),sourceSha256:sha,
+      sourceFiles:z.array(z.object({path:z.string(),sha256:sha})),releaseId:sha,toolCount:z.literal(20),
+      tools:z.array(z.string()).length(20),transport:z.literal('stdio'),protocol:z.string(),mode:z.literal('vm_candidate'),
+      candidateDirectory:z.string(),policyStateDir:z.string()}).strict(),
+    method:objectSchema,releaseStatus:objectSchema,coverage:z.unknown(),records:z.record(z.string(),objectSchema),sources:z.record(z.string(),objectSchema),
+    calls:z.array(z.object({id:z.number().int().nonnegative(),tool:z.string(),selection:objectSchema,response:z.unknown(),responseSha256:sha}).strict()),
+    evaluations:z.array(z.object({question:questionSchema,recordIds:z.array(z.string()),callIds:z.array(z.number().int().nonnegative()),
+      retrievalComplete:z.boolean(),graph:z.object({available:z.literal(true),callIds:z.array(z.number().int().nonnegative()),
+        recordIds:z.array(z.string()),bounded:z.boolean()}).strict(),evidenceSha256:sha,review:z.null()}).strict()).length(30)}).strict().parse(input);
+  if(new Set(report.server.tools).size!==20||!['entity_search','graph_neighbors','graph_path'].every(name=>report.server.tools.includes(name)))throw Error('Candidate graph inventory changed');
+  if(objectSchema.parse(report.releaseStatus.dataManifest).id!==report.server.releaseId
+    ||objectSchema.parse(report.releaseStatus.release).mode!=='vm_candidate')throw Error('Candidate release identity changed');
+  for(const [id,call] of report.calls.entries())if(call.id!==id||call.responseSha256!==digest(call.response))throw Error('Candidate MCP transcript changed');
+  for(const row of report.evaluations)if(row.evidenceSha256!==rowHash(row,report))throw Error('Candidate evidence changed');
+  return report;
+}
+export function candidateTransport(root:string,candidate:{directory:string;releaseId:string;policyStateDir:string}){
+  sha.parse(candidate.releaseId);
+  return {command:process.execPath,args:['--experimental-strip-types',join(root,'src/mcp-candidate.ts')],cwd:root,stderr:'ignore' as const,
+    env:{PATH:process.env.PATH??'',NODE_NO_WARNINGS:'1',STADTSTACK_CANDIDATE_DIRECTORY:resolve(candidate.directory),
+      STADTSTACK_CANDIDATE_RELEASE_ID:candidate.releaseId,STADTSTACK_CANDIDATE_POLICY_STATE_DIR:resolve(candidate.policyStateDir)}};
+}
+export async function collect(options:{serverRoot:string;releaseId:string;toolCount:16|19|20;bankPath:string;candidate?:{directory:string;policyStateDir:string}}):Promise<Report>{
   sha.parse(options.releaseId);
   const root=await realpath(options.serverRoot),bankBytes=await readFile(options.bankPath),bank=bankSchema.parse(JSON.parse(bankBytes.toString('utf8')));
   const identity=await sourceIdentity(root);
-  const transport=new StdioClientTransport({command:process.execPath,args:['--experimental-strip-types',join(root,'src/mcp.ts')],cwd:root,stderr:'ignore',env:{PATH:process.env.PATH??'',NODE_NO_WARNINGS:'1'}});
+  if(options.candidate&&options.toolCount!==20)throw Error('Candidate requires the current 20-tool inventory');
+  const transport=new StdioClientTransport(options.candidate?candidateTransport(root,{...options.candidate,releaseId:options.releaseId}):
+    {command:process.execPath,args:['--experimental-strip-types',join(root,'src/mcp.ts')],cwd:root,stderr:'ignore',env:{PATH:process.env.PATH??'',NODE_NO_WARNINGS:'1'}});
   const client=new Client({name:'pilot-value-evaluator',version:'1.0.0'});
   const report:Report={schemaVersion:'pilot-value-evaluation-v1',status:'awaiting_review',generatedAt:new Date().toISOString(),questionBankSha256:byteHash(bankBytes),evaluatorSha256:byteHash(await readFile(fileURLToPath(import.meta.url))),server:{root,...identity,releaseId:options.releaseId,toolCount:options.toolCount,tools:[],transport:'stdio',protocol:'MCP SDK initialize + tools/list + tools/call'},method:{scope:bank.scope,questionOrder:'Frozen before evidence retrieval; no favourable-answer selection',retrieval:'Per question: text search, then all area topics through search_topics and get_regional_topics (including withheld district candidates). Full records and attribution fetched via get_signal/get_source. No new URLs fetched.',pagination:'50 rows/page; maximum 100 pages/query. Truncation explicit, not absence.',grading:'AI-assisted claim-by-claim source-to-answer review, not human approval or row-count scoring. 0/1/2: correctness unsupported/qualified/supported; sourcing absent/partial/claim-bound; usefulness none/partial/actionable full answer. Correct abstention scores correctness separately, usefulness zero.',independence:'Coding assistant review of released MCP evidence; no independent primary-document re-reading or external factual audit. Auto-verified is not independent corroboration.',dateAuthority:'Document/publication/retrieval dates are not automatically decision dates; agenda/proposal is not adopted policy; budget is not expenditure; completed is not effective.',graph:'Unavailable is distinct from no path. Graph results are bounded discovery, preserve modality and identity caveats. Compare paired no-graph/graph reviews within the same release; release-to-release difference is confounded by added evidence.'},releaseStatus:{},coverage:null,records:{},sources:{},calls:[],evaluations:[]};
+  report.server.mode=options.candidate?'vm_candidate':'sealed';
+  if(options.candidate){report.server.candidateDirectory=await realpath(options.candidate.directory);report.server.policyStateDir=await realpath(options.candidate.policyStateDir);}
   async function call(tool:string,selection:JsonObject){
     const response=decodeTool(await client.callTool({name:tool,arguments:selection}));
     const data=typeof response.data==='object'&&response.data!==null&&'source' in response?objectSchema.parse(response.data):response;
@@ -252,6 +299,7 @@ export async function collect(options:{serverRoot:string;releaseId:string;toolCo
     if(graphAvailable!==(options.toolCount>=19))throw Error('Graph inventory does not match selected release');
     report.releaseStatus=(await call('get_release_status',{})).data;
     if(objectSchema.parse(report.releaseStatus.dataManifest).id!==options.releaseId)throw Error('Wrong immutable release');
+    if(options.candidate&&objectSchema.parse(report.releaseStatus.release).mode!=='vm_candidate')throw Error('Expected VM candidate MCP');
     report.coverage=(await call('list_cities',{})).data;
     await call('list_topics',{cityIds:bank.municipalities});
     for(const question of bank.questions){
@@ -339,8 +387,11 @@ export function markdown(report:EvaluationMarkdownInput,evidencePath:string):str
       '| Frage | Nutzendifferenz ohne Graph zur Baseline | Nutzendifferenz mit Graph im selben Release |','| --- | --- | --- |');
     for(const row of report.comparison.questions)lines.push(`| ${row.id} | ${row.withoutGraphUsefulnessDelta} | ${row.withinReleaseGraphUsefulnessDelta??'nicht bewertet'} |`);
   }
+  const quote=(value:string)=>"'"+value.replaceAll("'","'\\''")+"'";
+  const candidate=report.server.mode==='vm_candidate'
+    ?` --mode vm_candidate --candidate-directory ${quote(z.string().parse(report.server.candidateDirectory))} --policy-state-dir ${quote(z.string().parse(report.server.policyStateDir))}`:'';
   lines.push('','## Reproduzieren und vergleichen','','Im Verzeichnis `stadtstack-data`:','','```sh',
-    `node --experimental-strip-types src/evaluate-pilot-value.ts collect --server-root ${report.server.root} --release ${report.server.releaseId} --tools ${report.server.toolCount} --output reports/pilot-value-replay.json --reuse-review ${evidencePath}`,
+    `node --experimental-strip-types src/evaluate-pilot-value.ts collect --server-root ${quote(report.server.root)} --release ${report.server.releaseId} --tools ${report.server.toolCount}${candidate} --output reports/pilot-value-replay.json --reuse-review ${quote(evidencePath)}`,
     '```','','Review-Wiederverwendung nur bei identischer Fragebank, Release-ID und fragebezogenem Evidenzhash. Neue Evidenz erfordert neue Einzelbewertungen. `finalize --input DATEI --markdown BERICHT --baseline reports/pilot-value-baseline.json` prüft Bindungen und unveränderte Fragen vor dem Vergleich. Graphfragen benötigen zusätzlich `withGraph` für denselben Release.','');
   return lines.join('\n');
 }
@@ -352,13 +403,19 @@ async function main(){
   const load=async(path:string)=>JSON.parse(await readFile(path,'utf8')) as Report;
   if(mode==='collect'){
     const toolCount=Number(required('tools'));if(toolCount!==16&&toolCount!==19&&toolCount!==20)throw Error('Expected 16, 19 or 20 tools');
-    const report=await collect({serverRoot:required('server-root'),releaseId:required('release'),toolCount,bankPath:options.get('bank')??new URL('../evaluation/pilot-questions.json',import.meta.url).pathname});
+    const mode=z.enum(['sealed','vm_candidate']).parse(options.get('mode')??'sealed');
+    const report=await collect({serverRoot:required('server-root'),releaseId:required('release'),toolCount,bankPath:options.get('bank')??new URL('../evaluation/pilot-questions.json',import.meta.url).pathname,
+      ...(mode==='vm_candidate'?{candidate:{directory:required('candidate-directory'),policyStateDir:required('policy-state-dir')}}:{})});
     const reuse=options.get('reuse-review');if(reuse){const prior=await load(reuse);validateReport(prior);if(prior.questionBankSha256!==report.questionBankSha256||prior.server.releaseId!==report.server.releaseId)throw Error('Review identity mismatch');for(const row of report.evaluations){const old=prior.evaluations.find(item=>item.question.id===row.question.id);if(!old||old.evidenceSha256!==row.evidenceSha256)throw Error('Cannot reuse review after evidence change');row.review=old.review;}validateReport(report);report.status='reviewed';report.summary=summarize(report.evaluations);}
     await save(required('output'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify({status:report.status,questions:report.evaluations.length,tools:toolCount,releaseId:report.server.releaseId}));
   }else if(mode==='prepare-assessment'){
     const report=await load(required('input')),item=JSON.parse(await readFile(required('item'),'utf8'));
     const lane=z.enum(['withoutGraph','withGraph']).parse(required('lane'));
-    await writeImmutable(required('output'),prepareValueAssessment(report,item,lane));
+    const prepared=prepareValueAssessment(report,item,lane);
+    const context=assessmentEvidenceContext({casRoot:options.get('cas-root'),policyStateDir:options.get('policy-state-dir'),
+      currentAdmissionReceipts:options.has('current-policy-map')?JSON.parse(await readFile(required('current-policy-map'),'utf8')):undefined});
+    await writeImmutable(required('output'),report.server.mode==='vm_candidate'
+      ?await bindCandidateValueContext(prepared,context,options.get('custody-policy')):prepared);
   }else if(mode==='ingest-assessments'){
     const report=await load(required('input'));
     const manifest=z.array(z.object({item:z.string(),A:z.string(),B:z.string(),C:z.string()}).strict()).parse(JSON.parse(await readFile(required('assessments'),'utf8')));
@@ -376,6 +433,8 @@ async function main(){
     const path=required('input'),report=await load(path);validateReport(report);report.status='reviewed';report.summary=summarize(report.evaluations);
     if(options.has('baseline'))report.comparison=compareReports(await load(required('baseline')),report);
     await save(path,JSON.stringify(report,null,2)+'\n');await save(required('markdown'),markdown(report,path));console.log(JSON.stringify(report.summary));
-  }else throw Error('Use collect, prepare-assessment, ingest-assessments or finalize');
+  }else if(mode==='audit-packet'||mode==='ingest-owner-audit'||mode==='verdict'){
+    await runPilotValueAudit(mode,options);
+  }else throw Error('Use collect, prepare-assessment, ingest-assessments, finalize, audit-packet, ingest-owner-audit or verdict');
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))main().catch(()=>{console.error('Pilot evaluation failed; no credentials, server stderr or raw protocol objects emitted. Check pinned release, tool contract and review evidence.');process.exitCode=1;});
