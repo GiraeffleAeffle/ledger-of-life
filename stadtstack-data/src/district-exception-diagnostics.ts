@@ -149,7 +149,7 @@ export type OmpFailureKind=z.infer<typeof OmpFailureKindSchema>;
 export const OmpContainerExitCodeSchema=z.number().int().min(0).max(255);
 export const OmpDecodeCheckSchema=z.enum([
  'stream_size','final_newline','empty_stream','event_json','event_envelope','session_header','forbidden_event','unknown_event',
- 'event_order','multiple_turns','multiple_assistant_starts','tool_result','tool_update','text_update_schema',
+ 'event_order','multiple_turns','multiple_assistant_starts','tool_result','tool_update','text_update_schema','text_update_order','text_update_mismatch',
  'completed_at','assistant_identity','assistant_copy_mismatch','multiple_assistant_messages','assistant_content',
  'final_content','missing_final_assistant','incomplete_lifecycle','turn_message','agent_messages','message_role',
  'output_json','output_schema',

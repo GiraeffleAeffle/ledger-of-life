@@ -167,6 +167,58 @@ test('actual completion exit codes survive decoder holds and the closed broker p
  }
 });
 
+test('text updates must agree with each other and every final block before a rejection can settle',()=>{
+ const text=JSON.stringify(answer);
+ const updates:Record<string,unknown>[]=[
+  {type:'text_start',contentIndex:0},
+  {type:'text_delta',contentIndex:0,delta:text.slice(0,17)},
+  {type:'text_delta',contentIndex:0,delta:text.slice(17)},
+  {type:'text_end',contentIndex:0,content:text},
+ ];
+ function assertAmbiguous(events:Record<string,unknown>[],finalTexts:string[],check='text_update_mismatch'){
+  const stdout=eventStream([...events.map(assistantMessageEvent=>({type:'message_update',assistantMessageEvent})),{type:'message_end',message:message({content:finalTexts.map(text=>({type:'text',text}))})}]);
+  assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{
+   assert.ok(error instanceof OmpRunnerHold);assert.equal(error instanceof OmpAssessmentOutputRejected,false);
+   assert.equal(error.reason,'event_stream');assert.equal(error.decodeCheck,check);
+   assert.equal(assessmentBridgeHoldReason(error),'omp_event_stream');
+   const versions=assessmentBridgeFailureVersions('synthetic-lease',error);
+   assert.equal(versions.ompDecodeCheck,check);assert.equal(ompOutputRejectionFromVersions(versions),null);
+   return true;
+  });
+ }
+ // All three final copies agree, but contradict the valid JSON emitted earlier.
+ for(const finalText of ['{','{}'])assertAmbiguous(updates,[finalText]);
+ assertAmbiguous([...updates.slice(0,-1),{type:'text_end',contentIndex:0,content:'{}'}],[text]);
+ assertAmbiguous(updates.slice(0,-1),[text],'text_update_order');
+ assertAmbiguous([updates[1]!],[text],'text_update_order');
+ assertAmbiguous([updates[3]!],[text],'text_update_order');
+ assertAmbiguous([updates[0]!,updates[0]!],[text],'text_update_order');
+ assertAmbiguous([...updates,updates[1]!],[text],'text_update_order');
+ assertAmbiguous([...updates,updates[3]!],[text],'text_update_order');
+ assertAmbiguous(updates.map(update=>({...update,contentIndex:1})),[text]);
+ assertAmbiguous(updates,[text,'']);
+ // Equal concatenated text does not excuse inconsistent block boundaries.
+ const split=17,blocks=[text.slice(0,split),text.slice(split)];
+ const blockUpdates=blocks.flatMap((content,contentIndex)=>[
+  {type:'text_start',contentIndex},{type:'text_delta',contentIndex,delta:content},{type:'text_end',contentIndex,content},
+ ]);
+ assertAmbiguous(blockUpdates,[text.slice(0,split+1),text.slice(split+1)]);
+});
+
+test('consistent streamed blocks accept valid output and settle only genuinely invalid final output',()=>{
+ for(const text of [JSON.stringify(answer),'{','{}']){
+  const blocks=[text.slice(0,1),text.slice(1)],updates=blocks.flatMap((content,contentIndex)=>[
+   {type:'text_start',contentIndex},
+   {type:'text_delta',contentIndex,delta:content.slice(0,1)},
+   {type:'text_delta',contentIndex,delta:content.slice(1)},
+   {type:'text_end',contentIndex,content},
+  ]);
+  const stdout=eventStream([...updates.map(assistantMessageEvent=>({type:'message_update',assistantMessageEvent})),{type:'message_end',message:message({content:blocks.map(text=>({type:'text',text}))})}]);
+  if(text===JSON.stringify(answer))assert.deepEqual(inspectOmpEvents(stdout,0).value,answer);
+  else assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>error instanceof OmpAssessmentOutputRejected&&error.decodeCheck===(text==='{'?'output_json':'output_schema'));
+ }
+});
+
 test('settled output rejection requires a complete single-response stream and keeps only closed diagnostics',()=>{
  for(const [text,check] of [['PRIVATE_INVALID_JSON sk-ant-oat-secret','output_json'],[JSON.stringify({...answer,scores:{correctness:'PRIVATE_VALUE',sources:1,usefulness:1},PRIVATE_FIELD:'PRIVATE_VALUE'}),'output_schema']] as const){
   const stdout=eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]);
@@ -410,7 +462,7 @@ test('response copies allow only completedAt enrichment, not conflicting substan
 });
 
 test('stock serialized nested text updates are accepted; tool/failure/malformed updates cannot be hidden by a later final',()=>{
- const updates=[{type:'start'},{type:'text_start',contentIndex:0},{type:'text_delta',contentIndex:0,delta:'{}'},{type:'text_end',contentIndex:0,content:JSON.stringify(answer)},{type:'done',reason:'stop'}];
+ const updates=[{type:'start'},{type:'text_start',contentIndex:0},{type:'text_delta',contentIndex:0,delta:JSON.stringify(answer)},{type:'text_end',contentIndex:0,content:JSON.stringify(answer)},{type:'done',reason:'stop'}];
  assert.doesNotThrow(()=>inspectOmpEvents(eventStream([...updates.map(assistantMessageEvent=>({type:'message_update',assistantMessageEvent})),{type:'message_end',message:message()}]),0));
  for(const assistantMessageEvent of [
   {type:'error',reason:'error'},{type:'error',reason:'aborted'},{type:'done',reason:'length'},{type:'done',reason:'toolUse'},

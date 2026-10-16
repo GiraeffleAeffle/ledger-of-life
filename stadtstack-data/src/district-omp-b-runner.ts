@@ -200,6 +200,7 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
  let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0,agentStarted=false,assistantEnded=false,turnEnded=false,agentEnded=false;
  let openMessage:'user'|'assistant'|undefined;
  const assistantMessages=new Map<string,string>();
+ const textUpdates=new Map<number,{deltas:string[];text?:string}>();
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
@@ -241,8 +242,22 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
    if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error',exitCode);
    if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other',exitCode);
    if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))fail('tool_update');
-   if(!OmpTextUpdateSchema.safeParse(update).success)fail('text_update_schema');
+   const checkedUpdate=OmpTextUpdateSchema.safeParse(update);
+   if(!checkedUpdate.success)fail('text_update_schema');
    if(openMessage!=='assistant'||assistantStarts!==1||assistantEnded||turnEnded)fail('event_order');
+   const textUpdate=checkedUpdate.data;
+   if(textUpdate.type==='text_start'){
+    if(textUpdates.has(textUpdate.contentIndex))fail('text_update_order');
+    textUpdates.set(textUpdate.contentIndex,{deltas:[]});
+   }else if(textUpdate.type==='text_delta'||textUpdate.type==='text_end'){
+    const block=textUpdates.get(textUpdate.contentIndex);
+    if(!block||block.text!==undefined)fail('text_update_order');
+    if(textUpdate.type==='text_delta')block.deltas.push(textUpdate.delta);
+    else{
+     if(block.deltas.join('')!==textUpdate.content)fail('text_update_mismatch');
+     block.text=textUpdate.content;block.deltas.length=0;
+    }
+   }
   }
   if(event.type==='turn_end'){
    if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason',exitCode);
@@ -274,6 +289,16 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
   }
  }
  if(!final)fail('missing_final_assistant');
+ if(textUpdates.size){
+  const content=final.content as Array<Record<string,unknown>>;
+  if(textUpdates.size!==content.length)fail('text_update_mismatch');
+  for(let index=0;index<content.length;index++){
+   const block=textUpdates.get(index);
+   if(!block)fail('text_update_mismatch');
+   if(block.text===undefined)fail('text_update_order');
+   if(block.text!==content[index]!.text)fail('text_update_mismatch');
+  }
+ }
  if(!agentStarted||turns!==1||assistantStarts!==1||!assistantEnded||!turnEnded||!agentEnded)fail('incomplete_lifecycle');
  const text=(final.content as Array<Record<string,unknown>>).map(block=>String(block.text)).join('');
  if(Buffer.byteLength(text)>96*1024)throw new OmpRunnerHold('resource_limit');
