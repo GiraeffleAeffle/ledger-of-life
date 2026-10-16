@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -219,12 +219,79 @@ test('consistent streamed blocks accept valid output and settle only genuinely i
  }
 });
 
+test('only one complete lowercase json fence is normalized after raw stream reconciliation',()=>{
+ const json=JSON.stringify(answer);
+ for(const newline of ['\n','\r\n'])for(const whitespace of ['',' \t\r\n']){
+  const text=whitespace+'```json'+newline+json+newline+'```'+whitespace;
+  const final=message({content:[{type:'text',text}]}),events=[
+   {type:'message_update',assistantMessageEvent:{type:'text_start',contentIndex:0}},
+   {type:'message_update',assistantMessageEvent:{type:'text_delta',contentIndex:0,delta:text}},
+   {type:'message_update',assistantMessageEvent:{type:'text_end',contentIndex:0,content:text}},
+   {type:'message_end',message:final},
+  ];
+  const inspected=inspectOmpEvents(eventStream(events),0);
+  assert.deepEqual(inspected.value,answer);assert.equal(inspected.outputNormalization,'single-json-fence-v1');
+  assert.equal(inspected.responseSha256,digest(JSON.stringify({type:'message_end',message:final})));
+  assert.throws(()=>inspectOmpEvents(eventStream([{...events[0]},{...events[1],assistantMessageEvent:{type:'text_delta',contentIndex:0,delta:json}},...events.slice(2)]),0),(error:unknown)=>error instanceof OmpRunnerHold&&!(error instanceof OmpAssessmentOutputRejected)&&error.decodeCheck==='text_update_mismatch');
+ }
+ assert.equal(inspectOmpEvents(eventStream(),0).outputNormalization,undefined);
+ for(const text of [
+  'Commentary\n```json\n'+json+'\n```','```json\n'+json+'\n```\nCommentary',
+  '```\n'+json+'\n```','```JSON\n'+json+'\n```','```json '+json+'\n```',
+  '```json\n'+json+'\n```json','```json\n'+json,
+  '```json\n'+json+'\n```\n```json\n'+json+'\n```',
+  '```json\n'+json+'\n````',
+ ]){
+  assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]),0),(error:unknown)=>{
+   assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.decodeCheck,'output_json');
+   assert.equal(error.rejection.version,'omp-output-rejection-v2');
+   assert.equal('outputNormalization' in error.rejection,false);return true;
+  });
+ }
+ const multiple='```json\n'+json+'\n'+json+'\n```';
+ assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text:multiple}]})}]),0),(error:unknown)=>{
+  assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.decodeCheck,'output_json');
+  assert.ok(error.rejection.version==='omp-output-rejection-v2');
+  assert.equal(error.rejection.outputNormalization,'single-json-fence-v1');return true;
+ });
+});
+
+test('v2 diagnostics retain only schema object paths and unknown-key counts, never names or values',()=>{
+ const value={...answer,scores:{...answer.scores,PRIVATE_SCORE:'PRIVATE_VALUE'},PRIVATE_ROOT_ONE:true,PRIVATE_ROOT_TWO:'PRIVATE_VALUE'};
+ const text='```json\n'+JSON.stringify(value)+'\n```',stdout=eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]);
+ assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{
+  assert.ok(error instanceof OmpAssessmentOutputRejected);const proof=error.rejection;
+  assert.ok(proof.version==='omp-output-rejection-v2');assert.equal(proof.check,'output_schema');
+  assert.equal(proof.outputNormalization,'single-json-fence-v1');assert.equal(proof.outputSha256,digest(text));assert.equal(proof.streamSha256,digest(stdout));
+  assert.deepEqual(proof.issues.filter(issue=>issue.code==='unrecognized_keys'),[{code:'unrecognized_keys',path:'$.scores',keyCount:1},{code:'unrecognized_keys',path:'$',keyCount:2}]);
+  const versions=ompOutputRejectionVersions(proof);assert.equal(versions.ompOutputNormalization,'single-json-fence-v1');
+  assert.deepEqual(ompOutputRejectionFromVersions(versions),proof);StepReceiptSchema.shape.versions.parse(versions);
+  assert.doesNotMatch(JSON.stringify(proof)+JSON.stringify(versions),/PRIVATE_/);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputNormalization:'PRIVATE_FLAG'}),null);
+  for(const issue of [{code:'unrecognized_keys',path:'$'},{code:'unrecognized_keys',path:'$',keyCount:0},{code:'unrecognized_keys',path:'$',keyCount:98305},{code:'unrecognized_keys',path:'$.scores.correctness',keyCount:1},{code:'invalid_type',path:'$',keyCount:1}]){
+   assert.equal(OmpOutputRejectionSchema.safeParse({...proof,issueCount:1,issues:[issue]}).success,false);
+  }
+  return true;
+ });
+});
+
+test('immutable v1 proofs retain exact canonical bytes through explicit version-dispatched reading',()=>{
+ const legacy={version:'omp-output-rejection-v1' as const,check:'output_schema' as const,streamSha256:digest('Synthetic historical raw stream'),outputSha256:digest('Synthetic historical raw text'),issueCount:1,issues:[{code:'unrecognized_keys' as const,path:'$'}]};
+ const before=canonicalJson(legacy),versions=ompOutputRejectionVersions(legacy),decoded=ompOutputRejectionFromVersions(versions);
+ assert.deepEqual(decoded,legacy);assert.equal(canonicalJson(decoded),before);assert.equal(digest(canonicalJson(decoded)),digest(before));
+ assert.equal(versions.ompOutputNormalization,undefined);
+ assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputRejectionVersion:'omp-output-rejection-v3'}),null);
+ assert.equal(OmpOutputRejectionSchema.safeParse({...legacy,outputNormalization:'single-json-fence-v1'}).success,false);
+ assert.equal(OmpOutputRejectionSchema.safeParse({...legacy,issues:[{...legacy.issues[0],keyCount:1}]}).success,false);
+});
+
 test('settled output rejection requires a complete single-response stream and keeps only closed diagnostics',()=>{
  for(const [text,check] of [['PRIVATE_INVALID_JSON sk-ant-oat-secret','output_json'],[JSON.stringify({...answer,scores:{correctness:'PRIVATE_VALUE',sources:1,usefulness:1},PRIVATE_FIELD:'PRIVATE_VALUE'}),'output_schema']] as const){
   const stdout=eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]);
   let rejected:OmpAssessmentOutputRejected|undefined;
   assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;return true;});
   assert.ok(rejected);assert.equal(rejected.decodeCheck,check);assert.equal(rejected.containerExitCode,0);
+  assert.equal(rejected.rejection.version,'omp-output-rejection-v2');
   assert.equal(assessmentBridgeHoldReason(rejected),'quality_failed');OmpOutputRejectionSchema.parse(rejected.rejection);
   const versions=assessmentBridgeFailureVersions('synthetic-lease',rejected);
   assert.equal(versions.ompDecodeCheck,check);assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_|sk-ant-oat/);
@@ -493,8 +560,21 @@ test('credential capture wipes original stdout/stderr chunks on success, nonzero
 
 test('delivered source-free control contains the exact serialized output schema without changing the base request prompt',()=>{
  const schema=z.toJSONSchema(assessmentOutputSchema),serialized=canonicalJson(schema),bundle=ompAssessmentControl(),control=bundle.prompt;
- assert.equal(control,PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n'+serialized+'\n');
- assert.deepEqual(JSON.parse(control.slice(control.lastIndexOf('\n',control.length-2)+1,-1)),schema);
+ const prefix=PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n';
+ assert.ok(control.startsWith(prefix+serialized+'\n\nAllowed output property names per object'));
+ assert.deepEqual(JSON.parse(control.slice(prefix.length,prefix.length+serialized.length)),schema);
+ let objects=0;
+ function checkObjectKeys(node:Record<string,unknown>,path:string):void{
+  const properties=node.properties as Record<string,Record<string,unknown>>|undefined;
+  if(node.type==='object'){objects++;assert.ok(control.includes('- '+path+': '+Object.keys(properties??{}).join(', ')),path);}
+  for(const [key,child] of Object.entries(properties??{}))checkObjectKeys(child,path+'.'+key);
+  if(node.items&&!Array.isArray(node.items))checkObjectKeys(node.items as Record<string,unknown>,path+'[]');
+  for(const kind of ['anyOf','oneOf','allOf'])if(Array.isArray(node[kind]))for(const branch of node[kind])checkObjectKeys(branch,path);
+ }
+ checkObjectKeys(schema,'$');assert.equal(objects,15);
+ assert.ok(control.includes('Its first character must be { and its last character must be }'));
+ assert.ok(control.includes('No Markdown, code fences, commentary, or surrounding text'));
+ assert.ok(control.includes('Use ONLY the listed property names at every object level'));
  assert.equal(digest(serialized),assessmentDigest(schema));
  assert.equal(bundle.outputSchemaSha256,assessmentDigest(schema));assert.equal(bundle.systemPromptSha256,digest(control));
  assert.ok(control.startsWith(PROMPTS.B));assert.equal(control.includes('synthetic source, never an operational observation'),false);

@@ -13,7 +13,7 @@ import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
 import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
 import {OmpContainerExitCodeSchema,OmpDecodeCheckSchema,type OmpDecodeCheck,type OmpFailureKind} from './district-exception-diagnostics.ts';
-export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
+export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage;outputNormalization?:OmpOutputNormalization}
 
 export const OMP_VERSION='omp/18.9.2';
 export const OMP_HOST_BINARY='/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4';
@@ -57,9 +57,11 @@ const OmpTextUpdateSchema=z.discriminatedUnion('type',[
 // Only frozen-schema paths enter diagnostics; record keys/indices become wildcards.
 const outputJsonSchema=object(z.toJSONSchema(assessmentOutputSchema));
 const approvedOutputPaths=new Set<string>();
+const outputObjectKeys:{path:string;keys:string[]}[]=[];
 function collectOutputPaths(schema:Record<string,unknown>,path:string,depth=0):void{
  if(Buffer.byteLength(JSON.stringify(path))>200)return;
  approvedOutputPaths.add(path);if(depth>=12)return;
+ if(schema.type==='object')outputObjectKeys.push({path,keys:Object.keys(object(schema.properties))});
  if(typeof schema.$ref==='string'&&schema.$ref.startsWith('#/')){
   let target:unknown=outputJsonSchema;for(const key of schema.$ref.slice(2).split('/'))target=object(target)[key.replaceAll('~1','/').replaceAll('~0','~')];
   collectOutputPaths(object(target),path,depth+1);
@@ -71,11 +73,27 @@ function collectOutputPaths(schema:Record<string,unknown>,path:string,depth=0):v
 }
 collectOutputPaths(outputJsonSchema,'$');
 const OmpOutputIssueCodeSchema=z.enum(['invalid_json','invalid_type','too_big','too_small','invalid_format','not_multiple_of','unrecognized_keys','invalid_union','invalid_key','invalid_element','invalid_value','custom','other']);
-const OmpOutputIssueSchema=z.object({code:OmpOutputIssueCodeSchema,path:z.enum([...approvedOutputPaths] as [string,...string[]])}).strict();
-export const OmpOutputRejectionSchema=z.object({
+const OmpOutputPathSchema=z.enum([...approvedOutputPaths] as [string,...string[]]);
+const OmpOutputObjectPathSchema=z.enum([...new Set(outputObjectKeys.map(({path})=>path))] as [string,...string[]]);
+const OmpV1OutputIssueSchema=z.object({code:OmpOutputIssueCodeSchema,path:OmpOutputPathSchema}).strict();
+const OmpV2OutputIssueSchema=z.discriminatedUnion('code',[
+ z.object({code:z.literal('unrecognized_keys'),path:OmpOutputObjectPathSchema,keyCount:z.number().int().positive().max(96*1024)}).strict(),
+ z.object({code:OmpOutputIssueCodeSchema.exclude(['unrecognized_keys']),path:OmpOutputPathSchema}).strict(),
+]);
+export const OmpOutputNormalizationSchema=z.literal('single-json-fence-v1');
+export type OmpOutputNormalization=z.infer<typeof OmpOutputNormalizationSchema>;
+// Immutable historical proofs keep their original strict fields and hashes.
+const OmpV1OutputRejectionSchema=z.object({
  version:z.literal('omp-output-rejection-v1'),check:z.enum(['output_json','output_schema']),streamSha256:hash,outputSha256:hash,
- issueCount:z.number().int().positive(),issues:z.array(OmpOutputIssueSchema).min(1).max(32),
-}).strict().refine(value=>value.issues.length===Math.min(value.issueCount,32));
+ issueCount:z.number().int().positive(),issues:z.array(OmpV1OutputIssueSchema).min(1).max(32),
+}).strict();
+const OmpV2OutputRejectionSchema=z.object({
+ version:z.literal('omp-output-rejection-v2'),check:z.enum(['output_json','output_schema']),streamSha256:hash,outputSha256:hash,
+ issueCount:z.number().int().positive(),issues:z.array(OmpV2OutputIssueSchema).min(1).max(32),
+ outputNormalization:OmpOutputNormalizationSchema.optional(),
+}).strict();
+export const OmpOutputRejectionSchema=z.discriminatedUnion('version',[OmpV1OutputRejectionSchema,OmpV2OutputRejectionSchema])
+ .refine(value=>value.issues.length===Math.min(value.issueCount,32));
 export type OmpOutputRejection=z.infer<typeof OmpOutputRejectionSchema>;
 export class OmpAssessmentOutputRejected extends OmpRunnerHold{
  readonly rejection:OmpOutputRejection;
@@ -85,11 +103,12 @@ export class OmpAssessmentOutputRejected extends OmpRunnerHold{
 export function ompOutputRejectionVersions(input:OmpOutputRejection):Record<string,string>{
  const proof=OmpOutputRejectionSchema.parse(input);
  const versions:Record<string,string>={ompOutputRejectionVersion:proof.version,ompDecodeCheck:proof.check,ompOutputStreamSha256:proof.streamSha256,ompOutputSha256:proof.outputSha256,ompOutputIssueCount:String(proof.issueCount)};
+ if(proof.version==='omp-output-rejection-v2'&&proof.outputNormalization)versions.ompOutputNormalization=proof.outputNormalization;
  proof.issues.forEach((issue,index)=>{versions['ompOutputIssue'+index]=canonicalJson(issue);});
  return versions;
 }
 export function ompOutputRejectionFromVersions(versions:Record<string,string>):OmpOutputRejection|null{
- if(versions.ompOutputRejectionVersion!=='omp-output-rejection-v1')return null;
+ if(!['omp-output-rejection-v1','omp-output-rejection-v2'].includes(versions.ompOutputRejectionVersion??''))return null;
  const count=Number(versions.ompOutputIssueCount);
  if(!Number.isSafeInteger(count)||count<1||String(count)!==versions.ompOutputIssueCount)return null;
  const length=Math.min(count,32),issues:unknown[]=[];
@@ -100,7 +119,7 @@ export function ompOutputRejectionFromVersions(versions:Record<string,string>):O
   const encoded=versions['ompOutputIssue'+index];if(typeof encoded!=='string'||Buffer.byteLength(encoded)>256)return null;
   try{issues.push(JSON.parse(encoded));}catch{return null;}
  }
- const proof=OmpOutputRejectionSchema.safeParse({version:versions.ompOutputRejectionVersion,check:versions.ompDecodeCheck,streamSha256:versions.ompOutputStreamSha256,outputSha256:versions.ompOutputSha256,issueCount:count,issues});
+ const proof=OmpOutputRejectionSchema.safeParse({version:versions.ompOutputRejectionVersion,check:versions.ompDecodeCheck,streamSha256:versions.ompOutputStreamSha256,outputSha256:versions.ompOutputSha256,issueCount:count,issues,...versions.ompOutputRejectionVersion==='omp-output-rejection-v2'&&versions.ompOutputNormalization!==undefined?{outputNormalization:versions.ompOutputNormalization}:{}});
  return proof.success?proof.data:null;
 }
 function outputIssuePath(parts:readonly PropertyKey[]):string{
@@ -113,14 +132,27 @@ function outputIssuePath(parts:readonly PropertyKey[]):string{
  }
  return path;
 }
-function outputRejection(stdout:string,text:string,check:OmpOutputRejection['check'],issues?:readonly z.core.$ZodIssue[]):OmpAssessmentOutputRejected{
- const diagnostics=issues?.slice(0,32).map(issue=>{const code=OmpOutputIssueCodeSchema.safeParse(issue.code);return {code:code.success?code.data:'other' as const,path:outputIssuePath(issue.path)};})??[{code:'invalid_json' as const,path:'$'}];
- return new OmpAssessmentOutputRejected({version:'omp-output-rejection-v1',check,streamSha256:sha(stdout),outputSha256:sha(text),issueCount:issues?.length??1,issues:diagnostics});
+function outputRejection(stdout:string,text:string,check:OmpOutputRejection['check'],issues?:readonly z.core.$ZodIssue[],outputNormalization?:OmpOutputNormalization):OmpAssessmentOutputRejected{
+ const diagnostics:z.infer<typeof OmpV2OutputIssueSchema>[]=[];let issueCount=0;
+ function collect(found:readonly z.core.$ZodIssue[]):void{
+  for(const issue of found){
+   if(issue.code==='invalid_union'&&issue.errors.some(branch=>branch.length)){for(const branch of issue.errors)collect(branch);continue;}
+   issueCount++;if(diagnostics.length>=32)continue;
+   const code=OmpOutputIssueCodeSchema.safeParse(issue.code),path=outputIssuePath(issue.path);
+   if(issue.code==='unrecognized_keys')diagnostics.push({code:'unrecognized_keys',path,keyCount:issue.keys.length});
+   else diagnostics.push({code:code.success&&code.data!=='unrecognized_keys'?code.data:'other',path});
+  }
+ }
+ if(issues)collect(issues);else{issueCount=1;diagnostics.push({code:'invalid_json',path:'$'});}
+ return new OmpAssessmentOutputRejected({version:'omp-output-rejection-v2',check,streamSha256:sha(stdout),outputSha256:sha(text),issueCount,issues:diagnostics,...outputNormalization?{outputNormalization}:{}});
 }
 export interface OmpAssessmentControl {prompt:string;systemPromptSha256:string;outputSchemaSha256:string}
 /** Delivered control bytes, separate from the historical source request hash. */
 export function ompAssessmentControl():OmpAssessmentControl{
- const schema=canonicalJson(z.toJSONSchema(assessmentOutputSchema)),prompt=PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n'+schema+'\n';
+ const schema=canonicalJson(outputJsonSchema),keys=outputObjectKeys.map(({path,keys})=>'- '+path+': '+keys.join(', ')).join('\n');
+ const prompt=PROMPTS.B+'\n\nReturn only JSON matching this exact frozen assessment output schema:\n'+schema
+  +'\n\nAllowed output property names per object (repeated paths are alternative key sets):\n'+keys
+  +'\n\nReturn exactly one JSON object. Its first character must be { and its last character must be }. No Markdown, code fences, commentary, or surrounding text. Use ONLY the listed property names at every object level. For alternative key sets select one complete schema branch; never combine branches. Do not add input metadata or JSON-Schema keywords as output properties. Required fields, values and nullability must match the frozen schema exactly.\n';
  return {prompt,systemPromptSha256:sha(prompt),outputSchemaSha256:sha(schema)};
 }
 /** The reviewed stock CLI drops update/error payloads but retains errorStatus
@@ -302,13 +334,16 @@ export function inspectOmpEvents(stdout:string,exitCode:number){
  if(!agentStarted||turns!==1||assistantStarts!==1||!assistantEnded||!turnEnded||!agentEnded)fail('incomplete_lifecycle');
  const text=(final.content as Array<Record<string,unknown>>).map(block=>String(block.text)).join('');
  if(Buffer.byteLength(text)>96*1024)throw new OmpRunnerHold('resource_limit');
- let raw:unknown;try{raw=JSON.parse(text);}catch{throw outputRejection(stdout,text,'output_json');}
- const decoded=assessmentOutputSchema.safeParse(raw);if(!decoded.success)throw outputRejection(stdout,text,'output_schema',decoded.error.issues);
+ const fence=/^[ \t\r\n]*```json\r?\n([\s\S]*)\r?\n```[ \t\r\n]*$/.exec(text);
+ const outputNormalization=fence&&!/^[ \t]*```/m.test(fence[1]!)?'single-json-fence-v1' as const:undefined;
+ const jsonText=outputNormalization?fence![1]!:text;
+ let raw:unknown;try{raw=JSON.parse(jsonText);}catch{throw outputRejection(stdout,text,'output_json',undefined,outputNormalization);}
+ const decoded=assessmentOutputSchema.safeParse(raw);if(!decoded.success)throw outputRejection(stdout,text,'output_schema',decoded.error.issues,outputNormalization);
  const value=decoded.data;
  const usageRaw=object(final.usage),finalUsage=counts(usageRaw);
  const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
  const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
- return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage};
+ return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage,...outputNormalization?{outputNormalization}:{}};
 }
 /** Preserve limit metadata on failure, but certify retry only for the normal,
  * completely framed provider-failure path rejected by the successful decoder. */
@@ -389,7 +424,7 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  if(!after||after.dev!==initial.dev||after.ino!==initial.ino||after.size!==initial.size||after.mtimeMs!==initial.mtimeMs||after.ctimeMs!==initial.ctimeMs||afterSha!==binarySha256){token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  return {token,version:review.hostResolverVersion,binarySha256,accountLabelSha256};
 }
-export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string}
+export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputNormalization?:OmpOutputNormalization}
 /** A failed control/provider lease must not quarantine the shared evidence CAS.
  * The sibling is separately enrolled with the same authority/source bindings. */
 export function ompAssessmentScratchRoot(root:string):string{
@@ -464,8 +499,9 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     }
     const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
-    const answer:ModelAnswer={...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256};
+    const {outputNormalization,...modelResult}=parsed;
+    const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,...outputNormalization?{outputNormalization}:{}};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An
