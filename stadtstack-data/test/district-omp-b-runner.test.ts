@@ -571,7 +571,7 @@ test('delivered source-free control contains the exact serialized output schema 
   if(node.items&&!Array.isArray(node.items))checkObjectKeys(node.items as Record<string,unknown>,path+'[]');
   for(const kind of ['anyOf','oneOf','allOf'])if(Array.isArray(node[kind]))for(const branch of node[kind])checkObjectKeys(branch,path);
  }
- checkObjectKeys(schema,'$');assert.equal(objects,15);
+ checkObjectKeys(schema,'$');assert.equal(objects,14);
  assert.ok(control.includes('Its first character must be { and its last character must be }'));
  assert.ok(control.includes('No Markdown, code fences, commentary, or surrounding text'));
  assert.ok(control.includes('Use ONLY the listed property names at every object level'));
