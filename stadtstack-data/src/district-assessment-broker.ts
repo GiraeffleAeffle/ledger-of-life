@@ -12,18 +12,19 @@ import {assessmentItemSchema,assessmentOutputSchema,originalEvidence,assessmentP
 import {loadPolicyReceipt,recheckPolicyReceipt,type PolicyReceipt} from './district-policy-receipt.ts';
 import {inspectClaudeEvents} from './district-claude.ts';
 import type {ModelAnswer} from './district-model-contract.ts';
-import type {ReasonCode} from './district-step-receipt.ts';
+import {StepReceiptSchema,encodeStepReceipt,type ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
-import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,type OmpOutputRejection,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
-import {OmpFailureKindSchema,OmpContainerExitCodeSchema} from './district-exception-diagnostics.ts';
+import {OmpFailureKindSchema,OmpContainerExitCodeSchema,OmpDecodeCheckSchema} from './district-exception-diagnostics.ts';
 
 /** Closed, content-free native hold classification; never persist an error message. */
 export function assessmentBridgeHoldReason(error:unknown):ReasonCode{
  if(error instanceof DistrictExecutionHold)return error.reasonCode;
+ if(error instanceof OmpAssessmentOutputRejected)return 'quality_failed';
  if(error instanceof OmpRunnerHold&&error.subscriptionLimit)return 'budget_paused';
  if(error instanceof OmpRunnerHold)return `omp_${error.reason}`;
  return 'execution_exception';
@@ -36,6 +37,12 @@ export function assessmentBridgeFailureVersions(leaseId:string,error:unknown):Re
  if(kind.success)versions.ompFailureKind=kind.data;
  const exit=OmpContainerExitCodeSchema.safeParse(error.containerExitCode);
  if(exit.success)versions.ompContainerExitCode=String(exit.data);
+ const check=OmpDecodeCheckSchema.safeParse(error.decodeCheck);
+ if(check.success)versions.ompDecodeCheck=check.data;
+ if(error instanceof OmpAssessmentOutputRejected){
+  const rejection=OmpOutputRejectionSchema.safeParse(error.rejection);
+  if(rejection.success)versions.ompOutputRejection=canonicalJson(rejection.data);
+ }
  return versions;
 }
 
@@ -54,6 +61,47 @@ type EvidenceCheck={checked:CheckedEvidence}|{reason:ReasonCode};
 interface SubmissionRow extends QueryResultRow {lease_id:string;submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;receipt_artifact_sha256:string|null;reconciliation_input_sha256:string;provider_request_id:string|null;provider_response_id:string|null;state:'accepted'|'rejected';reason_code:ReasonCode;committed_at:Date}
 export interface RecordedBridgeAssessment {receipt:AssessmentReceipt;answer:ModelAnswer;providerRequestId:string|null;providerResponseId:string|null;clocks:Pick<BridgeAnswer,'startedAt'|'finishedAt'>}
 interface StagedSubmission {response:CasArtifact;answer:CasArtifact;receipt:CasArtifact|null;reconciliation:CasArtifact;parsed:RecordedBridgeAssessment|undefined}
+interface OmpRejectionBinding {leaseId:string;jobKey:string;runId:string;fencingToken:string;inputSha256:string;itemSha256:string;requestSha256:string}
+function rejectedOmpArtifacts(binding:OmpRejectionBinding,rejection:OmpOutputRejection){
+ const response={version:'assessment-vm-omp-rejected-response-v1',...binding,rejection,retained:'hashes-and-closed-diagnostics-only'};
+ const responseSha256=digest(canonicalJson(response));
+ const answer={version:'assessment-vm-omp-rejected-answer-v1',...binding,responseArtifactSha256:responseSha256,modelAnswer:null};
+ const answerSha256=digest(canonicalJson(answer));
+ const reconciliation={version:'assessment-vm-omp-rejected-reconciliation-v1',...binding,responseArtifactSha256:responseSha256,answerArtifactSha256:answerSha256,disposition:'held_quality',reasonCode:'quality_failed',assessmentReceiptSha256:null};
+ const reconciliationSha256=digest(canonicalJson(reconciliation));
+ const submissionSha256=semanticHash({version:'assessment-vm-omp-rejection-v1',...binding,responseSha256,answerSha256,reconciliationSha256});
+ return {response,answer,reconciliation,responseSha256,answerSha256,reconciliationSha256,submissionSha256};
+}
+/** Read-only terminal evidence: never treats generic rejected/ambiguous intents as settled. */
+export async function settledOmpOutputRejectionLeases(pool:Pick<Pool,'query'>,jobKey:string):Promise<string[]>{
+ HashSchema.parse(jobKey);
+ const rows=await pool.query<LeaseRow&{receipt:unknown;receipt_hash:string;receipt_id:string;submission_sha256:string;provider_response_sha256:string;answer_artifact_sha256:string;reconciliation_input_sha256:string;intent_sha256:string}>(`
+  SELECT l.*,r.receipt,r.receipt_sha256 AS receipt_hash,r.id AS receipt_id,s.submission_sha256,s.provider_response_sha256,s.answer_artifact_sha256,s.reconciliation_input_sha256,i.intent_sha256
+  FROM district_pipeline.jobs j JOIN district_pipeline.assessment_bridge_leases l ON l.job_id=j.id
+  JOIN district_pipeline.assessment_bridge_submission_intents i ON i.lease_id=l.id AND i.job_id=j.id AND i.run_id=l.run_id AND i.fencing_token=l.fencing_token AND i.input_sha256=l.input_sha256 AND i.client_id='vm-omp-docker'
+  JOIN district_pipeline.assessment_bridge_submissions s ON s.lease_id=l.id AND s.state='rejected' AND s.reason_code='quality_failed' AND s.receipt_artifact_sha256 IS NULL
+  JOIN district_pipeline.step_receipts r ON r.job_id=j.id AND r.run_id=l.run_id AND r.fencing_token=l.fencing_token AND r.fencing_token=j.fencing_token AND r.attempt=j.attempt
+  WHERE j.job_key=$1 AND j.spec->>'step'='assessment_b' AND j.state='held_quality' AND j.reason_code='quality_failed'
+   AND r.outcome='held_quality' AND l.state='held' AND l.reason_code='quality_failed' AND l.client_id='vm-omp-docker'
+   AND NOT EXISTS(SELECT 1 FROM unnest(ARRAY[s.provider_response_sha256,s.answer_artifact_sha256,s.reconciliation_input_sha256]) requested(hash)
+    WHERE NOT EXISTS(SELECT 1 FROM district_pipeline.artifacts a WHERE a.sha256=requested.hash AND a.disposition='retained'))`,[jobKey]);
+ const settled:string[]=[];
+ for(const row of rows.rows){
+  const parsed=StepReceiptSchema.safeParse(row.receipt);if(!parsed.success)continue;const receipt=parsed.data,v=receipt.versions;
+  if(receipt.id!==row.receipt_id||receipt.jobKey!==jobKey||receipt.runId!==row.run_id||receipt.leaseToken!==String(row.fencing_token)||receipt.step!=='assessment_b'||receipt.outcome!=='held_quality'||receipt.reasonCode!=='quality_failed'||encodeStepReceipt(receipt).sha256!==row.receipt_hash||v.transport!=='vm-omp-docker'||v.ompContainerExitCode!=='0'||v.ompBridgeLeaseId!==row.id)continue;
+  let raw:unknown;try{raw=JSON.parse(v.ompOutputRejection??'');}catch{continue;}
+  const proof=OmpOutputRejectionSchema.safeParse(raw);if(!proof.success||v.ompDecodeCheck!==proof.data.check)continue;
+  const binding={leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,itemSha256:row.item_sha256,requestSha256:row.request_sha256};
+  const expected=rejectedOmpArtifacts(binding,proof.data);
+  if(row.intent_sha256!==semanticHash({version:ASSESSMENT_BRIDGE_VERSION,leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,clientId:'vm-omp-docker',provider:'anthropic-subscription',model:'claude-haiku-5-5'})
+   ||row.submission_sha256!==expected.submissionSha256||v.ompSubmissionSha256!==row.submission_sha256||v.ompOutputSettlementSha256!==expected.answerSha256
+   ||row.provider_response_sha256!==expected.responseSha256||row.answer_artifact_sha256!==expected.answerSha256||row.reconciliation_input_sha256!==expected.reconciliationSha256)continue;
+  const hashes=[expected.responseSha256,expected.answerSha256,expected.reconciliationSha256];
+  if(hashes.some(hash=>!receipt.outputHashes.includes(hash)))continue;
+  settled.push(row.id);
+ }
+ return settled;
+}
 
 /** Mixed broker request/output interpretation stays semantic; live authorization
  * and custody imports are not transitive output fingerprints. */
@@ -435,6 +483,31 @@ export class DistrictAssessmentBroker {
    if(signal.aborted)await this.transaction(async client=>{await this.job(client,job.id,job.runId);const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE job_id=$1 AND run_id=$2 AND fencing_token=$3 FOR UPDATE',[job.id,job.runId,job.fencingToken]);if(found.rows[0])await this.hold(client,found.rows[0],signal.reason instanceof DistrictExecutionHold?signal.reason.reasonCode:'owner_stopped');});
   }
  }
+ private async settleVmOutputRejection(job:ClaimedJob,leaseId:string,error:OmpAssessmentOutputRejected,signal:AbortSignal):Promise<JobHandlerResult>{
+  const rejection=OmpOutputRejectionSchema.parse(error.rejection);
+  const initial=(await this.pool.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0];
+  if(!initial)throw new DistrictExecutionHold('lease_lost');
+  const evidence=await this.readCurrent(initial);if('reason' in evidence)throw new DistrictExecutionHold(evidence.reason);
+  const binding={leaseId,jobKey:job.jobKey,runId:job.runId,fencingToken:job.fencingToken,inputSha256:initial.input_sha256,itemSha256:initial.item_sha256,requestSha256:initial.request_sha256};
+  const documents=rejectedOmpArtifacts(binding,rejection);
+  const response=await this.persist(Buffer.from(canonicalJson(documents.response)),'provider_response',evidence.checked.sources,leaseId);
+  const answer=await this.persist(Buffer.from(canonicalJson(documents.answer)),'derived',evidence.checked.sources,leaseId);
+  const reconciliation=await this.persist(Buffer.from(canonicalJson(documents.reconciliation)),'derived',evidence.checked.sources,leaseId);
+  const checked=await this.readCurrent(initial);signal.throwIfAborted();
+  return this.transaction(async client=>{
+   const authority=await this.job(client,job.id,job.runId),reason=disposition(authority,job.runId,job.fencingToken);if(reason)throw new DistrictExecutionHold(reason);
+   const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
+   if(!row||row.state!=='active'||row.run_id!==job.runId||row.fencing_token!==job.fencingToken||row.client_id!=='vm-omp-docker')throw new DistrictExecutionHold('lease_lost');
+   const final=await this.current(client,row,checked);if('reason' in final)throw new DistrictExecutionHold(final.reason);
+   const intent=await client.query<{intent_sha256:string}>(`SELECT intent_sha256 FROM district_pipeline.assessment_bridge_submission_intents WHERE lease_id=$1 AND job_id=$2 AND run_id=$3 AND fencing_token=$4 AND input_sha256=$5 AND client_id='vm-omp-docker'`,[leaseId,job.id,job.runId,job.fencingToken,row.input_sha256]);
+   const expectedIntent=semanticHash({version:ASSESSMENT_BRIDGE_VERSION,leaseId,jobKey:job.jobKey,runId:job.runId,fencingToken:job.fencingToken,inputSha256:row.input_sha256,clientId:'vm-omp-docker',provider:'anthropic-subscription',model:'claude-haiku-5-5'});
+   if(intent.rows[0]?.intent_sha256!==expectedIntent)throw new DistrictExecutionHold('quality_failed');
+   await this.registerArtifacts(client,[response,answer,reconciliation]);
+   await client.query(`INSERT INTO district_pipeline.assessment_bridge_submissions(lease_id,submission_sha256,provider_response_sha256,answer_artifact_sha256,receipt_artifact_sha256,reconciliation_input_sha256,provider_request_id,provider_response_id,state,reason_code) VALUES($1,$2,$3,$4,NULL,$5,NULL,NULL,'rejected','quality_failed')`,[leaseId,documents.submissionSha256,response.sha256,answer.sha256,reconciliation.sha256]);
+   await this.hold(client,row,'quality_failed');
+   return {outcome:'held_quality',reasonCode:'quality_failed',outputs:[response,answer,reconciliation],versions:{...assessmentBridgeFailureVersions(leaseId,error),transport:'vm-omp-docker',ompBridgeLeaseId:leaseId,ompSubmissionSha256:documents.submissionSha256,ompOutputSettlementSha256:answer.sha256}};
+  });
+ }
  async waitForVmOmpAssessment(job:ClaimedJob,signal:AbortSignal):Promise<JobHandlerResult>{
   let leaseId:string|undefined;
   try{
@@ -477,6 +550,7 @@ export class DistrictAssessmentBroker {
      const current=await this.current(client,row,evidence);if('reason' in current)throw new DistrictExecutionHold(current.reason);
     });
    }});}catch(error){
+    if(error instanceof OmpAssessmentOutputRejected)return await this.settleVmOutputRejection(job,prepared.row.id,error,signal);
     const reason=assessmentBridgeHoldReason(error);
     await this.transaction(async client=>{
      const authority=await this.job(client,job.id,job.runId);

@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -20,11 +20,17 @@ import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {assessmentBridgeHoldReason,assessmentBridgeFailureVersions} from '../src/district-assessment-broker.ts';
 import {DistrictExecutionHold} from '../src/district-jobs.ts';
 import {ReasonCodeSchema} from '../src/district-step-receipt.ts';
-import {OmpFailureKindSchema} from '../src/district-exception-diagnostics.ts';
+import {OmpFailureKindSchema,OmpDecodeCheckSchema} from '../src/district-exception-diagnostics.ts';
 
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
 function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
-function eventStream(events:unknown[]=[{type:'message_end',message:message()}]){return [{type:'session',id:'session-one'},...events].map(event=>JSON.stringify(event)).join('\n')+'\n';}
+function eventStream(events:Record<string,unknown>[]=[{type:'message_end',message:message()}]){
+ const final=events.find(event=>event.type==='message_end'&&(event.message as {role?:string})?.role==='assistant')?.message;
+ const suffix:Record<string,unknown>[]=[];
+ if(final&&!events.some(event=>event.type==='turn_end'))suffix.push({type:'turn_end',message:final,toolResults:[],reason:'stop'});
+ if(final&&!events.some(event=>event.type==='agent_end'))suffix.push({type:'agent_end',messages:[final],reason:'stop'});
+ return [{type:'session',id:'session-one'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},...events,...suffix].map(event=>JSON.stringify(event)).join('\n')+'\n';
+}
 
 test('omp event inspection accepts a completed text-only message and repeated copies',()=>{
  const original=message(),final={...original,completedAt:1791800000100};
@@ -143,6 +149,62 @@ test('actual completion exit codes survive decoder holds and the closed broker p
   Object.assign(error,{containerExitCode:exit});
   assert.equal(assessmentBridgeFailureVersions('synthetic-lease',error).ompContainerExitCode,undefined);
  }
+});
+
+test('settled output rejection requires a complete single-response stream and keeps only closed diagnostics',()=>{
+ for(const [text,check] of [['PRIVATE_INVALID_JSON sk-ant-oat-secret','output_json'],[JSON.stringify({...answer,scores:{correctness:'PRIVATE_VALUE',sources:1,usefulness:1},PRIVATE_FIELD:'PRIVATE_VALUE'}),'output_schema']] as const){
+  const stdout=eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]);
+  let rejected:OmpAssessmentOutputRejected|undefined;
+  assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;return true;});
+  assert.ok(rejected);assert.equal(rejected.decodeCheck,check);assert.equal(rejected.containerExitCode,0);
+  assert.equal(assessmentBridgeHoldReason(rejected),'quality_failed');OmpOutputRejectionSchema.parse(rejected.rejection);
+  const versions=assessmentBridgeFailureVersions('synthetic-lease',rejected);
+  assert.equal(versions.ompDecodeCheck,check);assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_|sk-ant-oat/);
+  assert.equal(rejected.rejection.streamSha256,digest(stdout));assert.equal(rejected.rejection.outputSha256,digest(text));
+  if(check==='output_schema')assert.ok(rejected.rejection.issues.some(issue=>issue.path==='$.scores.correctness'));
+  const truncated=stdout.split('\n').slice(0,-2).join('\n')+'\n';
+  assert.throws(()=>inspectOmpEvents(truncated,0),(error:unknown)=>error instanceof OmpRunnerHold&&!(error instanceof OmpAssessmentOutputRejected)&&error.decodeCheck==='incomplete_lifecycle');
+  assert.throws(()=>inspectOmpEvents(stdout,1),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed');
+ }
+});
+
+test('framing rejection retains a closed check without promoting ambiguity to quality',()=>{
+ const cases:[string,string][]=[
+  [eventStream().slice(0,-1),'final_newline'],['','empty_stream'],['\n','event_json'],['null\n','event_envelope'],['{}\n','event_envelope'],['{\"type\":\"wrong\"}\n','session_header'],
+  [eventStream([{type:'tool_call'}]),'forbidden_event'],[eventStream([{type:'PRIVATE_EVENT'}]),'unknown_event'],
+  ['x'.repeat(2*1024*1024+1)+'\n','stream_size'],
+  [eventStream([{type:'message_end',message:message()},{type:'message_update',assistantMessageEvent:{type:'text_start',contentIndex:0}}]),'event_order'],
+  [eventStream([{type:'message_end',message:message()},{type:'turn_end',message:{role:'user'}}]),'turn_message'],
+  [eventStream([{type:'message_end',message:message()},{type:'turn_end',message:message()},{type:'agent_end',messages:[]}]),'agent_messages'],
+  [eventStream([{type:'turn_start'}]),'multiple_turns'],[eventStream([{type:'message_start',message:{role:'assistant'}}]),'multiple_assistant_starts'],
+  [eventStream([{type:'message_end',message:{role:'toolResult'}}]),'tool_result'],
+  [eventStream([{type:'message_update',assistantMessageEvent:{type:'toolcall_start'}}]),'tool_update'],
+  [eventStream([{type:'message_update',assistantMessageEvent:{type:'text_delta',contentIndex:0,delta:'PRIVATE_TEXT',PRIVATE_FIELD:true}}]),'text_update_schema'],
+  [eventStream([{type:'message_end',message:message({completedAt:-1})}]),'completed_at'],
+  [eventStream([{type:'message_end',message:message({responseId:null,timestamp:null})}]),'assistant_identity'],
+  [eventStream([{type:'message_end',message:message({content:[{type:'thinking',text:'PRIVATE_TEXT'}]})}]),'assistant_content'],
+  [eventStream([{type:'message_end',message:message({content:[]})}]),'final_content'],
+  [eventStream([]),'missing_final_assistant'],
+  [eventStream([{type:'message_end',message:{role:'PRIVATE_ROLE'}}]),'message_role'],
+  [eventStream([{type:'message_end',message:message()},{type:'turn_end',message:message({duration:1})}]),'assistant_copy_mismatch'],
+  [eventStream([{type:'message_end',message:message()},{type:'turn_end',message:message({responseId:'other'})}]),'multiple_assistant_messages'],
+ ];
+ for(const [stdout,check] of cases)assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{
+  assert.ok(error instanceof OmpRunnerHold);assert.equal(error instanceof OmpAssessmentOutputRejected,false);
+  assert.equal(error.decodeCheck,check);OmpDecodeCheckSchema.parse(error.decodeCheck);
+  const versions=assessmentBridgeFailureVersions('synthetic-lease',error);
+  assert.equal(versions.ompDecodeCheck,check);assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_/);return true;
+ });
+});
+
+test('output diagnostics bound issue cardinality and reject forged paths or prose',()=>{
+ const text=JSON.stringify({...answer,assertions:Array.from({length:80},()=>({PRIVATE_FIELD:'PRIVATE_VALUE'}))});
+ assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]),0),(error:unknown)=>{
+  assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.rejection.issues.length,32);assert.ok(error.rejection.issueCount>32);
+  assert.doesNotMatch(JSON.stringify(error.rejection),/PRIVATE_/);
+  assert.equal(OmpOutputRejectionSchema.safeParse({...error.rejection,issues:[{code:'invalid_type',path:'$.PRIVATE_FIELD'}],issueCount:1}).success,false);
+  return true;
+ });
 });
 
 test('omp argv and environment remain fixed and source-free',()=>{

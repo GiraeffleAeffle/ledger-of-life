@@ -147,12 +147,23 @@ export const OmpFailureKindSchema=z.enum([
 ]);
 export type OmpFailureKind=z.infer<typeof OmpFailureKindSchema>;
 export const OmpContainerExitCodeSchema=z.number().int().min(0).max(255);
+export const OmpDecodeCheckSchema=z.enum([
+ 'stream_size','final_newline','empty_stream','event_json','event_envelope','session_header','forbidden_event','unknown_event',
+ 'event_order','multiple_turns','multiple_assistant_starts','tool_result','tool_update','text_update_schema',
+ 'completed_at','assistant_identity','assistant_copy_mismatch','multiple_assistant_messages','assistant_content',
+ 'final_content','missing_final_assistant','incomplete_lifecycle','turn_message','agent_messages','message_role',
+ 'output_json','output_schema',
+]);
+export type OmpDecodeCheck=z.infer<typeof OmpDecodeCheckSchema>;
 export function formatDistrictBFailure(jobKey:string,step:string,receipt:Pick<StepReceipt,'outcome'|'reasonCode'|'versions'>):string|undefined {
- if(step!=='assessment_b'||receipt.outcome!=='held_execution'||!['omp_provider_failed','budget_paused'].includes(receipt.reasonCode)||!/^[a-f0-9]{64}$/.test(jobKey))return;
- const kind=OmpFailureKindSchema.safeParse(receipt.versions.ompFailureKind);
- if(kind.success){
-  const raw=receipt.versions.ompContainerExitCode;
-  const exit=typeof raw==='string'&&String(Number(raw))===raw?OmpContainerExitCodeSchema.safeParse(Number(raw)):undefined;
-  return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind.data}${exit?.success?' exit='+exit.data:''}\n`;
- }
+ if(step!=='assessment_b'||!/^[a-f0-9]{64}$/.test(jobKey))return;
+ const check=OmpDecodeCheckSchema.safeParse(receipt.versions.ompDecodeCheck);
+ const provider=receipt.outcome==='held_execution'&&['omp_provider_failed','budget_paused'].includes(receipt.reasonCode)?OmpFailureKindSchema.safeParse(receipt.versions.ompFailureKind):undefined;
+ const framing=receipt.outcome==='held_execution'&&receipt.reasonCode==='omp_event_stream'&&check.success;
+ const quality=receipt.outcome==='held_quality'&&receipt.reasonCode==='quality_failed'&&check.success&&['output_json','output_schema'].includes(check.data)&&receipt.versions.ompContainerExitCode==='0';
+ const kind=provider?.success?provider.data:framing?'event_stream':quality?'output_rejected':undefined;
+ if(!kind)return;
+ const raw=receipt.versions.ompContainerExitCode;
+ const exit=typeof raw==='string'&&String(Number(raw))===raw?OmpContainerExitCodeSchema.safeParse(Number(raw)):undefined;
+ return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind}${exit?.success?' exit='+exit.data:''}${check.success?' check='+check.data:''}\n`;
 }

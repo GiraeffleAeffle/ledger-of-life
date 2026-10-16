@@ -6,7 +6,7 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {DatabaseError} from 'pg';
 import {z} from 'zod';
 import {CivicPolicyStateError,HostOptedOutError} from '../src/civic-opt-out.ts';
-import {formatDistrictJobException,formatDistrictBFailure,OmpFailureKindSchema} from '../src/district-exception-diagnostics.ts';
+import {formatDistrictJobException,formatDistrictBFailure,OmpFailureKindSchema,OmpDecodeCheckSchema} from '../src/district-exception-diagnostics.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import {canonicalJobIdentity,canonicalResourceIdentity,runDistrictJobsCli,R1_MUNICIPALITIES,type DistrictJobSpec} from '../src/district-jobs.ts';
 
@@ -120,4 +120,18 @@ test('B failure stderr admits exactly a job prefix and one closed kind for a com
  assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,reasonCode:'lease_lost'}),undefined);
  assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,outcome:'succeeded',reasonCode:'completed'}),undefined);
  assert.equal(formatDistrictBFailure(key,'assessment_b',{...receipt,outcome:'held_quality',reasonCode:'quality_failed'}),undefined);
+});
+
+test('B decoder diagnostics admit only controlled checks on the correct committed dispositions',()=>{
+ const key=digest('synthetic decoder diagnostics');
+ for(const check of OmpDecodeCheckSchema.options){
+  const versions={ompDecodeCheck:check,ompContainerExitCode:'0',ompOutputRejection:'PRIVATE_NOT_LOGGED'};
+  assert.equal(formatDistrictBFailure(key,'assessment_b',{outcome:'held_execution',reasonCode:'omp_event_stream',versions}),`R1_B_FAILURE job=${key.slice(0,12)} kind=event_stream exit=0 check=${check}\n`);
+  assert.equal(formatDistrictBFailure(key,'assessment_b',{outcome:'held_quality',reasonCode:'quality_failed',versions}),['output_json','output_schema'].includes(check)?`R1_B_FAILURE job=${key.slice(0,12)} kind=output_rejected exit=0 check=${check}\n`:undefined);
+ }
+ for(const check of ['PRIVATE_VALUE','output_json\nPRIVATE_TOKEN','',null]){
+  const versions={ompDecodeCheck:check as unknown as string,ompContainerExitCode:'0'};
+  assert.equal(formatDistrictBFailure(key,'assessment_b',{outcome:'held_execution',reasonCode:'omp_event_stream',versions}),undefined);
+  assert.equal(formatDistrictBFailure(key,'assessment_b',{outcome:'held_quality',reasonCode:'quality_failed',versions}),undefined);
+ }
 });

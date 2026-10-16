@@ -12,7 +12,7 @@ import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
 import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
 import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
-import {OmpContainerExitCodeSchema,type OmpFailureKind} from './district-exception-diagnostics.ts';
+import {OmpContainerExitCodeSchema,OmpDecodeCheckSchema,type OmpDecodeCheck,type OmpFailureKind} from './district-exception-diagnostics.ts';
 export interface OmpParsedEvents {value:unknown;responseSha256:string;returnedModel:string;reportedModels:string[];usage:ReportedUsage}
 
 export const OMP_VERSION='omp/18.9.2';
@@ -32,7 +32,8 @@ export class OmpRunnerHold extends Error {
  readonly failureKind?:OmpFailureKind;
  /** Present only after an actual container completion, never a guessed code. */
  readonly containerExitCode?:number;
- constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind,containerExitCode?:number){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;const exit=OmpContainerExitCodeSchema.safeParse(containerExitCode);this.containerExitCode=exit.success?exit.data:undefined;}
+ readonly decodeCheck?:OmpDecodeCheck;
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind,containerExitCode?:number,decodeCheck?:OmpDecodeCheck){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;const exit=OmpContainerExitCodeSchema.safeParse(containerExitCode);this.containerExitCode=exit.success?exit.data:undefined;const check=OmpDecodeCheckSchema.safeParse(decodeCheck);this.decodeCheck=check.success?check.data:undefined;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -53,6 +54,46 @@ const OmpTextUpdateSchema=z.discriminatedUnion('type',[
  z.object({type:z.literal('text_end'),contentIndex:z.number().int().nonnegative(),content:z.string()}).strict(),
  z.object({type:z.literal('done'),reason:z.literal('stop')}).strict(),
 ]);
+// Only frozen-schema paths enter diagnostics; record keys/indices become wildcards.
+const outputJsonSchema=object(z.toJSONSchema(assessmentOutputSchema));
+const approvedOutputPaths=new Set<string>();
+function collectOutputPaths(schema:Record<string,unknown>,path:string,depth=0):void{
+ approvedOutputPaths.add(path);if(depth>=12)return;
+ if(typeof schema.$ref==='string'&&schema.$ref.startsWith('#/')){
+  let target:unknown=outputJsonSchema;for(const key of schema.$ref.slice(2).split('/'))target=object(target)[key.replaceAll('~1','/').replaceAll('~0','~')];
+  collectOutputPaths(object(target),path,depth+1);
+ }
+ for(const [key,value] of Object.entries(object(schema.properties)))collectOutputPaths(object(value),path+'.'+key,depth+1);
+ if(schema.items&&typeof schema.items==='object')collectOutputPaths(object(schema.items),path+'[]',depth+1);
+ if(schema.additionalProperties&&typeof schema.additionalProperties==='object')collectOutputPaths(object(schema.additionalProperties),path+'.*',depth+1);
+ for(const kind of ['anyOf','oneOf','allOf'])if(Array.isArray(schema[kind]))for(const branch of schema[kind])collectOutputPaths(object(branch),path,depth+1);
+}
+collectOutputPaths(outputJsonSchema,'$');
+const OmpOutputIssueCodeSchema=z.enum(['invalid_json','invalid_type','too_big','too_small','invalid_format','not_multiple_of','unrecognized_keys','invalid_union','invalid_key','invalid_element','invalid_value','custom','other']);
+const OmpOutputIssueSchema=z.object({code:OmpOutputIssueCodeSchema,path:z.enum([...approvedOutputPaths] as [string,...string[]])}).strict();
+export const OmpOutputRejectionSchema=z.object({
+ version:z.literal('omp-output-rejection-v1'),check:z.enum(['output_json','output_schema']),streamSha256:hash,outputSha256:hash,
+ issueCount:z.number().int().positive(),issues:z.array(OmpOutputIssueSchema).min(1).max(32),
+}).strict().refine(value=>value.issues.length===Math.min(value.issueCount,32));
+export type OmpOutputRejection=z.infer<typeof OmpOutputRejectionSchema>;
+export class OmpAssessmentOutputRejected extends OmpRunnerHold{
+ readonly rejection:OmpOutputRejection;
+ constructor(rejection:OmpOutputRejection){const checked=OmpOutputRejectionSchema.parse(rejection);super('event_stream',undefined,undefined,0,checked.check);this.rejection=checked;}
+}
+function outputIssuePath(parts:readonly PropertyKey[]):string{
+ let path='$';
+ for(const part of parts){
+  const candidate=typeof part==='number'?path+'[]':typeof part==='string'?path+'.'+part:'';
+  if(approvedOutputPaths.has(candidate))path=candidate;
+  else if(typeof part==='string'&&approvedOutputPaths.has(path+'.*'))path+='.*';
+  else break;
+ }
+ return path;
+}
+function outputRejection(stdout:string,text:string,check:OmpOutputRejection['check'],issues?:readonly z.core.$ZodIssue[]):OmpAssessmentOutputRejected{
+ const diagnostics=issues?.slice(0,32).map(issue=>{const code=OmpOutputIssueCodeSchema.safeParse(issue.code);return {code:code.success?code.data:'other' as const,path:outputIssuePath(issue.path)};})??[{code:'invalid_json' as const,path:'$'}];
+ return new OmpAssessmentOutputRejected({version:'omp-output-rejection-v1',check,streamSha256:sha(stdout),outputSha256:sha(text),issueCount:issues?.length??1,issues:diagnostics});
+}
 export interface OmpAssessmentControl {prompt:string;systemPromptSha256:string;outputSchemaSha256:string}
 /** Delivered control bytes, separate from the historical source request hash. */
 export function ompAssessmentControl():OmpAssessmentControl{
@@ -128,65 +169,94 @@ function ompProviderHold(stdout:string,fallback:OmpFailureKind,exitCode:number):
 }
 export function inspectOmpEvents(stdout:string,exitCode:number){
  if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero',exitCode);
- if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes||!stdout.endsWith('\n'))throw new OmpRunnerHold('event_stream');
- const lines=stdout.split('\n');lines.pop();if(!lines.length)throw new OmpRunnerHold('event_stream');
- let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0;const assistantMessages=new Map<string,string>();
+ function fail(check:OmpDecodeCheck):never{throw new OmpRunnerHold('event_stream',undefined,undefined,exitCode,check);}
+ if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes)fail('stream_size');
+ if(!stdout.length)fail('empty_stream');
+ if(!stdout.endsWith('\n'))fail('final_newline');
+ const lines=stdout.split('\n');lines.pop();
+ let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0,agentStarted=false,assistantEnded=false,turnEnded=false,agentEnded=false;
+ let openMessage:'user'|'assistant'|undefined;
+ const assistantMessages=new Map<string,string>();
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
   if(['length','toolUse','error','aborted','failed'].includes(reason))throw ompProviderHold(stdout,reason==='length'?'stop_length':reason==='error'?'stop_error':'stop_other',exitCode);
-  if(message.completedAt!==undefined&&tokenCount(message.completedAt)===undefined)throw new OmpRunnerHold('event_stream');
+  if(message.completedAt!==undefined&&tokenCount(message.completedAt)===undefined)fail('completed_at');
   const {completedAt:_completedAt,...substantive}=message;
   // The session enriches only the message_end clone with completedAt. Every
   // other field, including content, timestamp, route, stop state and usage,
   // must agree across copies of one stable logical response.
   const responseId=typeof message.responseId==='string'&&message.responseId.length>0?message.responseId:null;
-  if(responseId===null&&tokenCount(message.timestamp)===undefined)throw new OmpRunnerHold('event_stream');
+  if(responseId===null&&tokenCount(message.timestamp)===undefined)fail('assistant_identity');
   const identity=responseId===null?'timestamp:'+String(message.timestamp):'response:'+responseId,encoded=canonicalJson(substantive),previous=assistantMessages.get(identity);
-  if(previous!==undefined&&previous!==encoded)throw new OmpRunnerHold('event_stream');
-  assistantMessages.set(identity,encoded);if(assistantMessages.size>1)throw new OmpRunnerHold('event_stream');
+  if(previous!==undefined&&previous!==encoded)fail('assistant_copy_mismatch');
+  assistantMessages.set(identity,encoded);if(assistantMessages.size>1)fail('multiple_assistant_messages');
   const content=Array.isArray(message.content)?message.content:[];
-  if(content.some(block=>object(block).type!=='text'||typeof object(block).text!=='string'))throw new OmpRunnerHold('event_stream');
+  if(content.some(block=>object(block).type!=='text'||typeof object(block).text!=='string'))fail('assistant_content');
  };
  for(let i=0;i<lines.length;i++){
-  const line=lines[i]!;let event:Record<string,unknown>;try{event=object(JSON.parse(line));}catch{throw new OmpRunnerHold('event_stream');}
-  if(!Object.keys(event).length||typeof event.type!=='string')throw new OmpRunnerHold('event_stream');
-  if(i===0){if(event.type!=='session')throw new OmpRunnerHold('event_stream');continue;}
-  if(['tool_call','tool_result','tool_use','tool_progress','permission_request','error','aborted'].includes(event.type))throw new OmpRunnerHold('event_stream');
-  if(!['turn_start','turn_end','message_start','message_update','message_end','agent_start','agent_end'].includes(event.type))throw new OmpRunnerHold('event_stream');
-  if(event.type==='turn_start'&&++turns>1)throw new OmpRunnerHold('event_stream');
-  if(event.type==='message_start'&&object(event.message).role==='assistant'&&++assistantStarts>1)throw new OmpRunnerHold('event_stream');
-  if(['message_start','message_end'].includes(event.type)&&object(event.message).role==='toolResult')throw new OmpRunnerHold('event_stream');
+  const line=lines[i]!;let event:Record<string,unknown>;try{event=object(JSON.parse(line));}catch{fail('event_json');}
+  if(!Object.keys(event).length||typeof event.type!=='string')fail('event_envelope');
+  if(i===0){if(event.type!=='session')fail('session_header');continue;}
+  if(['tool_call','tool_result','tool_use','tool_progress','permission_request','error','aborted'].includes(event.type))fail('forbidden_event');
+  if(!['turn_start','turn_end','message_start','message_update','message_end','agent_start','agent_end'].includes(event.type))fail('unknown_event');
+  if(event.type==='agent_start'){if(agentStarted||i!==1)fail('event_order');agentStarted=true;continue;}
+  if(event.type==='turn_start'){if(++turns>1)fail('multiple_turns');if(!agentStarted||turnEnded)fail('event_order');continue;}
+  if(event.type==='message_start'&&object(event.message).role==='assistant'&&++assistantStarts>1)fail('multiple_assistant_starts');
+  if(['message_start','message_end'].includes(event.type)){
+   const role=object(event.message).role;if(role==='toolResult')fail('tool_result');
+   if(role!=='user'&&role!=='assistant')fail('message_role');
+   if(!agentStarted||turns!==1||turnEnded||assistantEnded&&event.type==='message_start')fail('event_order');
+   if(event.type==='message_start'){
+    if(openMessage||role==='user'&&assistantStarts!==0)fail('event_order');openMessage=role;
+   }else{
+    if(openMessage!==role)fail('event_order');openMessage=undefined;
+   }
+  }
   if(event.type==='message_update'){
    const update=object(event.assistantMessageEvent);
    if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error',exitCode);
    if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other',exitCode);
-   if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))throw new OmpRunnerHold('event_stream');
-   if(!OmpTextUpdateSchema.safeParse(update).success)throw new OmpRunnerHold('event_stream');
+   if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))fail('tool_update');
+   if(!OmpTextUpdateSchema.safeParse(update).success)fail('text_update_schema');
+   if(openMessage!=='assistant'||assistantStarts!==1||assistantEnded||turnEnded)fail('event_order');
   }
   if(event.type==='turn_end'){
-   rejectAssistant(object(event.message));
    if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason',exitCode);
-   if(Array.isArray(event.toolResults)&&event.toolResults.length)throw new OmpRunnerHold('event_stream');
+   rejectAssistant(object(event.message));
+   if(object(event.message).role!=='assistant')fail('turn_message');
+   if(openMessage||!assistantEnded||turnEnded)fail('event_order');turnEnded=true;
+   if(Array.isArray(event.toolResults)&&event.toolResults.length)fail('tool_result');
   }
   if(event.type==='agent_end'){
    if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'agent_reason',exitCode);
-   if(Array.isArray(event.messages))for(const message of event.messages)rejectAssistant(object(message));
+   if(!Array.isArray(event.messages))fail('agent_messages');
+   let assistants=0;for(const message of event.messages){
+    const copy=object(message);if(copy.role==='toolResult')fail('tool_result');
+    if(!['user','assistant'].includes(String(copy.role)))fail('message_role');
+    if(copy.role==='assistant')assistants++;rejectAssistant(copy);
+   }
+   if(assistants!==1)fail('agent_messages');
+   if(!turnEnded||agentEnded||i!==lines.length-1)fail('event_order');agentEnded=true;
   }
   if(event.type==='message_end'){
    const message=object(event.message);if(message.role!=='assistant')continue;
    rejectAssistant(message);
+   if(assistantStarts!==1||assistantEnded)fail('event_order');assistantEnded=true;
    if(message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!=='claude-haiku-5-5'||message.stopReason!=='stop')throw new OmpRunnerHold('model_identity_mismatch');
    if(message.upstreamModel!==undefined&&message.upstreamModel!=='claude-haiku-5-5')throw new OmpRunnerHold('model_identity_mismatch');
    const content=Array.isArray(message.content)?message.content:[];
-   if(!content.length||content.some(block=>object(block).type!=='text'))throw new OmpRunnerHold('event_stream');
+   if(!content.length||content.some(block=>object(block).type!=='text'))fail('final_content');
    if(!final){final=message;finalLine=line;}
   }
  }
- if(!final)throw new OmpRunnerHold('event_stream');
+ if(!final)fail('missing_final_assistant');
+ if(!agentStarted||turns!==1||assistantStarts!==1||!assistantEnded||!turnEnded||!agentEnded)fail('incomplete_lifecycle');
  const text=(final.content as Array<Record<string,unknown>>).map(block=>String(block.text)).join('');
  if(Buffer.byteLength(text)>96*1024)throw new OmpRunnerHold('resource_limit');
- let value:unknown;try{value=assessmentOutputSchema.parse(JSON.parse(text));}catch{throw new OmpRunnerHold('event_stream');}
+ let raw:unknown;try{raw=JSON.parse(text);}catch{throw outputRejection(stdout,text,'output_json');}
+ const decoded=assessmentOutputSchema.safeParse(raw);if(!decoded.success)throw outputRejection(stdout,text,'output_schema',decoded.error.issues);
+ const value=decoded.data;
  const usageRaw=object(final.usage),finalUsage=counts(usageRaw);
  const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
  const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
@@ -337,6 +407,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     const finishedAt=new Date().toISOString(),bytes=Buffer.concat(output,outputBytes),stdout=bytes.toString('utf8');bytes.fill(0);
     let parsed:OmpParsedEvents;
     try{parsed=inspectOmpEvents(stdout,result.exitCode);}catch(error){
+     if(error instanceof OmpAssessmentOutputRejected)throw error;
      const stderrBytes=Buffer.concat(errors,errorBytes);
      let failure:OmpRunnerHold|null;
      try{failure=inspectOmpLimitFailure(stdout,stderrBytes.toString('utf8'),finishedAt,result.exitCode,error);}finally{stderrBytes.fill(0);}

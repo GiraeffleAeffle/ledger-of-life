@@ -8,14 +8,15 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {Pool} from 'pg';
 import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictCas,type ArtifactKind} from '../src/district-cas.ts';
-import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type OwnerNotification,type NotificationAcknowledgement} from '../src/district-jobs.ts';
-import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
+import {DistrictJobStore,migrateDistrictJobs,runDistrictJobs,type OwnerNotification,type NotificationAcknowledgement,type ClaimedJob,type JobHandler,type JobHandlerResult} from '../src/district-jobs.ts';
+import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB,settledOmpOutputRejectionLeases} from '../src/district-assessment-broker.ts';
 import {BridgeLeaseSchema,BridgeStatusSchema,type BridgeLease} from '../src/district-assessment-bridge-contract.ts';
 import {assessmentItemSchema,type AssessmentOutput} from '../src/district-assessment.ts';
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
+import {inspectOmpEvents,OmpAssessmentOutputRejected} from '../src/district-omp-b-runner.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
 // Nothing invokes SSH, provider binaries, external sources or notification networks.
@@ -91,6 +92,43 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const claim=()=>f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'synthetic-mac-client',clientContractSha256});
   return {...f,authorizationId,run,claim,notifications,controller};
  };
+
+ for(const mode of ['output_json','output_schema','wrong_check','wrong_exit','missing_output'] as const)await t.test('native settled rejection and read-only terminal proof: '+mode,async st=>{
+  const f=await fixture(db,'native-rejection-'+mode);directories.push(f.directory);
+  const content=mode==='output_schema'?'{}':'PRIVATE_INVALID_JSON sk-ant-oat-secret';
+  const message={role:'assistant',responseId:'synthetic-response',timestamp:1,provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:content}]};
+  const stream=[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(event=>JSON.stringify(event)).join('\n')+'\n';
+  let rejection:OmpAssessmentOutputRejected|undefined;try{inspectOmpEvents(stream,0);}catch(error){assert.ok(error instanceof OmpAssessmentOutputRejected);rejection=error;}assert.ok(rejection);
+  const rejected=rejection,proceed=Promise.withResolvers<void>();
+  // Exercise the real settlement path against a genuinely fenced private test
+  // lease; fixture mode still cannot invoke a native runner or any provider.
+  const hooks=f.broker as unknown as {settleVmOutputRejection(job:ClaimedJob,id:string,error:OmpAssessmentOutputRejected,signal:AbortSignal):Promise<JobHandlerResult>};
+  const handler:JobHandler=async({job,signal})=>{
+   const leaseId=await f.broker.prepare(job,signal);await proceed.promise;
+   const result=await hooks.settleVmOutputRejection(job,leaseId,rejected,signal);
+   if(mode==='wrong_check')return {...result,versions:{...result.versions,ompDecodeCheck:'event_order'}};
+   if(mode==='wrong_exit')return {...result,versions:{...result.versions,ompContainerExitCode:'1'}};
+   if(mode==='missing_output')return {...result,outputs:[]};
+   return result;
+  };
+  const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+  let stderr='';st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+  const run=runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:handler},authorizationId,maxJobs:1,maxElapsedMs:60000,leaseMs:30000,ownerPresent:true});
+  try{
+   await ready(db,f.jobKey);
+   const lease=BridgeLeaseSchema.parse(await f.broker.dispatch({operation:'claim',jobKey:f.jobKey,clientId:'vm-omp-docker',clientContractSha256}));
+   assert.deepEqual(await settledOmpOutputRejectionLeases(db,f.jobKey),[],'Active intent is not a settlement');
+   proceed.resolve();const result=await run;assert.equal(result.reasonCode,'quality_failed');
+   const saved=await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[f.jobKey]);
+   assert.equal(saved.rows[0].receipt.outcome,'held_quality');assert.equal(saved.rows[0].receipt.reasonCode,'quality_failed');
+   const submission=await db.query(`SELECT s.state,s.reason_code,s.receipt_artifact_sha256,l.state AS lease_state FROM district_pipeline.assessment_bridge_submissions s JOIN district_pipeline.assessment_bridge_leases l ON l.id=s.lease_id WHERE s.lease_id=$1`,[lease.leaseId]);
+   assert.deepEqual(submission.rows[0],{state:'rejected',reason_code:'quality_failed',receipt_artifact_sha256:null,lease_state:'held'});
+   assert.deepEqual(await settledOmpOutputRejectionLeases(db,f.jobKey),mode==='output_json'||mode==='output_schema'?[lease.leaseId]:[]);
+   assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/PRIVATE_|sk-ant-oat/);
+   for(const hash of saved.rows[0].receipt.outputHashes)assert.doesNotMatch((await f.cas.read(hash)).toString('utf8'),/PRIVATE_|sk-ant-oat/);
+   if(mode==='output_json'||mode==='output_schema')assert.equal(stderr,`R1_B_FAILURE job=${f.jobKey.slice(0,12)} kind=output_rejected exit=0 check=${mode}\n`);
+  }finally{proceed.resolve();await run;st.mock.restoreAll();}
+ });
 
  await t.test('isolated fixture protocol requires explicit pinned opt-in and cannot authorize the production broker',async()=>{
   const f=await fixture(db,'fixture-boundary');directories.push(f.directory);
