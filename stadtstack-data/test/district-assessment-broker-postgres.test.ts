@@ -188,7 +188,8 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
   assert.equal(calls,1);
   const accepted=mode==='accepted'||mode==='quality';
-  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'completed'):'execution_exception');
+  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'max_jobs_reached'):'execution_exception');
+  assert.equal(result.state,mode==='accepted'?'completed':'held');
   const lease=(await db.query(`SELECT l.id,l.input_sha256,l.state,l.receipt_sha256,l.purge_ack_sha256,s.state AS submission_state FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id LEFT JOIN district_pipeline.assessment_bridge_submissions s ON s.lease_id=l.id WHERE j.job_key=$1`,[key])).rows[0];
   if(!accepted){
    assert.equal(lease.state,'held');assert.equal(lease.submission_state,null);assert.equal(lease.receipt_sha256,null);assert.equal(lease.purge_ack_sha256,null);
@@ -201,6 +202,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal(digest(ackBytes),lease.purge_ack_sha256);assert.equal(ack.version,'assessment-vm-omp-purge-ack-v1');assert.equal(ack.leaseId,lease.id);assert.equal(ack.inputSha256,lease.input_sha256);OmpNativeCleanupSchema.parse(ack.cleanup);
   assert.equal('modelFileWritesDenied' in ack,false,'Native cleanup never fabricates the Mac denial claim');
   const receipt=(await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[key])).rows[0]!.receipt;
+  assert.equal(receipt.outcome,mode==='accepted'?'succeeded':'held_quality');assert.equal(receipt.reasonCode,mode==='accepted'?'completed':'quality_failed');
   assert.ok(receipt.outputHashes.includes(lease.purge_ack_sha256));assert.equal(receipt.versions.ompPurgeAckSha256,lease.purge_ack_sha256);assert.equal(receipt.provider?.tokens.output,7);assert.equal(receipt.provider?.reservedMicroUsd,0);assert.match(stderr,/kind=output_accepted/);
  });
 

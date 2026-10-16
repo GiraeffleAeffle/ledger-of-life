@@ -323,7 +323,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
       const cleanup=await store.enqueue(jobSpec('exception-cleanup-diagnostic','residual_extract'));
       const cleaned=await run(await authorize([cleanup]),1,{residual_extract:async()=>{throw new TypeError(secret);}});
       assert.equal(cleaned.reasonCode,'execution_exception');
-      assert.equal(stderr,`R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=other at=none\n`);
+      assert.match(stderr,new RegExp(`^R1_EXCEPTION job=${cleanup.slice(0,12)} step=residual_extract class=Error code=other at=src/district-jobs\\.ts:[1-9][0-9]*\\n$`));
     }finally{st.mock.restoreAll();}
   });
 
