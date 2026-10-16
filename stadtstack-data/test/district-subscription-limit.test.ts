@@ -62,6 +62,9 @@ test('omp accepts only typed empty limit failures with normal exit and complete 
  assert.equal(versions.ompContainerExitCode,'0','Quota-proof wrapping preserves the actual normal completion code');
  assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_PROVIDER_ERROR|rate_limit_error|reset_at/);
  for(const reason of ['event_stream','resource_limit','model_identity_mismatch'] as const)assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold(reason))?.noOutput,false,'An unrelated successful-decoder rejection cannot certify a quota retry');
+ const framing=inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold('event_stream',undefined,undefined,0,'text_update_schema'));
+ assert.ok(framing);assert.equal(framing.noOutput,false);assert.equal(framing.decodeCheck,'text_update_schema');
+ assert.equal(assessmentBridgeFailureVersions(randomUUID(),framing).ompDecodeCheck,'text_update_schema','A typed quota wrapper cannot erase the original ambiguous decoder check');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,137,new OmpRunnerHold('provider_failed'))?.noOutput,false);
  for(const exitCode of [1,137])assert.equal(ompSubscriptionLimit(stream(),'',observedAt,exitCode)?.noOutput,false,'Abnormal process termination cannot certify empty output');
  const incomplete=events([{type:'session'},{type:'error',error}]);

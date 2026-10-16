@@ -291,7 +291,7 @@ export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:st
  const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
  if(!evidence)return null;
  if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
- return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode);
+ return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode,error instanceof OmpRunnerHold?error.decodeCheck:undefined);
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
