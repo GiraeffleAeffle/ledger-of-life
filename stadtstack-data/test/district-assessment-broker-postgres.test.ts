@@ -16,7 +16,8 @@ import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {inspectOmpEvents,OmpAssessmentOutputRejected} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,OmpAssessmentOutputRejected,ompAssessmentControl} from '../src/district-omp-b-runner.ts';
+import {ompOutputStructureFromVersions} from '../src/district-omp-output-diagnostics.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
 // Nothing invokes SSH, provider binaries, external sources or notification networks.
@@ -93,25 +94,29 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   return {...f,authorizationId,run,claim,notifications,controller};
  };
 
- for(const mode of ['output_json','output_schema','legacy_v1','normalized_schema','wrong_check','wrong_exit','missing_output'] as const)await t.test('native settled rejection and read-only terminal proof: '+mode,async st=>{
+ for(const mode of ['output_json','output_schema','legacy_v1','legacy_v2','normalized_schema','wrong_check','wrong_exit','missing_output','wrong_request'] as const)await t.test('native settled rejection and read-only terminal proof: '+mode,async st=>{
   const f=await fixture(db,'native-rejection-'+mode);directories.push(f.directory);
   const extraKeyBody=canonicalJson({itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'Synthetic legacy/current rejection fixture',PRIVATE_FIELD:'PRIVATE_VALUE'});
-  const content=mode==='legacy_v1'?extraKeyBody:mode==='normalized_schema'?'```json\n'+extraKeyBody+'\n```':mode==='output_schema'?'{}':'PRIVATE_INVALID_JSON sk-ant-oat-secret';
+  const content=['legacy_v1','legacy_v2'].includes(mode)?extraKeyBody:mode==='normalized_schema'?'```json\n'+extraKeyBody+'\n```':mode==='output_schema'?'{}':'PRIVATE_INVALID_JSON sk-ant-oat-secret';
   const message={role:'assistant',responseId:'synthetic-response',timestamp:1,provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:content}]};
   const stream=[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(event=>JSON.stringify(event)).join('\n')+'\n';
-  let rejection:OmpAssessmentOutputRejected|undefined;try{inspectOmpEvents(stream,0);}catch(error){assert.ok(error instanceof OmpAssessmentOutputRejected);rejection=error;}assert.ok(rejection);
-  // Literal pre-cutover v1 evidence has no keyCount or normalization fields.
-  const rejected=mode==='legacy_v1'?new OmpAssessmentOutputRejected({version:'omp-output-rejection-v1',check:'output_schema',streamSha256:digest(stream),outputSha256:digest(content),issueCount:1,issues:[{code:'unrecognized_keys',path:'$'}]}):rejection;
-  const settled=['output_json','output_schema','legacy_v1','normalized_schema'].includes(mode),proceed=Promise.withResolvers<void>();
+  let rejected:OmpAssessmentOutputRejected;
+  const settled=['output_json','output_schema','legacy_v1','legacy_v2','normalized_schema'].includes(mode),proceed=Promise.withResolvers<void>();
   // Exercise the real settlement path against a genuinely fenced private test
   // lease; fixture mode still cannot invoke a native runner or any provider.
   const hooks=f.broker as unknown as {settleVmOutputRejection(job:ClaimedJob,id:string,error:OmpAssessmentOutputRejected,signal:AbortSignal):Promise<JobHandlerResult>};
   const handler:JobHandler=async({job,signal})=>{
    const leaseId=await f.broker.prepare(job,signal);await proceed.promise;
+   const request=(await db.query<{request_sha256:string;request_artifact_sha256:string}>('SELECT request_sha256,request_artifact_sha256 FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0]!,requestBytes=(await f.cas.read(request.request_artifact_sha256)).length;
+   try{inspectOmpEvents(stream,0,{requestSha256:request.request_sha256,systemPromptSha256:ompAssessmentControl().systemPromptSha256,stdin:{intendedBytes:requestBytes,deliveredBytes:requestBytes,deliveredSha256:request.request_sha256,frameBytes:requestBytes+25}});assert.fail('Synthetic output must be rejected');}catch(error){assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;}
+   // Historical versions are literal immutable evidence, not regenerated v3.
+   if(mode==='legacy_v1')rejected=new OmpAssessmentOutputRejected({version:'omp-output-rejection-v1',check:'output_schema',streamSha256:digest(stream),outputSha256:digest(content),issueCount:1,issues:[{code:'unrecognized_keys',path:'$'}]});
+   if(mode==='legacy_v2')rejected=new OmpAssessmentOutputRejected({version:'omp-output-rejection-v2',check:'output_schema',streamSha256:digest(stream),outputSha256:digest(content),issueCount:1,issues:[{code:'unrecognized_keys',path:'$',keyCount:1}]});
    const result=await hooks.settleVmOutputRejection(job,leaseId,rejected,signal);
    if(mode==='wrong_check')return {...result,versions:{...result.versions,ompDecodeCheck:'event_order'}};
    if(mode==='wrong_exit')return {...result,versions:{...result.versions,ompContainerExitCode:'1'}};
    if(mode==='missing_output')return {...result,outputs:[]};
+   if(mode==='wrong_request'){const structure=ompOutputStructureFromVersions(result.versions!);assert.ok(structure);return {...result,versions:{...result.versions,ompStructureDelivery:canonicalJson({...structure.delivery,requestSha256:digest('Different synthetic request')})}};}
    return result;
   };
   const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[f.jobKey],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
@@ -124,14 +129,14 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    proceed.resolve();const result=await run;assert.equal(result.reasonCode,'quality_failed');
    const saved=await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[f.jobKey]);
    assert.equal(saved.rows[0].receipt.outcome,'held_quality');assert.equal(saved.rows[0].receipt.reasonCode,'quality_failed');
-   assert.equal(saved.rows[0].receipt.versions.ompOutputRejectionVersion,mode==='legacy_v1'?'omp-output-rejection-v1':'omp-output-rejection-v2');
+   assert.equal(saved.rows[0].receipt.versions.ompOutputRejectionVersion,mode==='legacy_v1'?'omp-output-rejection-v1':mode==='legacy_v2'?'omp-output-rejection-v2':'omp-output-rejection-v3');
    assert.equal(saved.rows[0].receipt.versions.ompOutputNormalization,mode==='normalized_schema'?'single-json-fence-v1':undefined);
    const submission=await db.query(`SELECT s.state,s.reason_code,s.receipt_artifact_sha256,l.state AS lease_state FROM district_pipeline.assessment_bridge_submissions s JOIN district_pipeline.assessment_bridge_leases l ON l.id=s.lease_id WHERE s.lease_id=$1`,[lease.leaseId]);
    assert.deepEqual(submission.rows[0],{state:'rejected',reason_code:'quality_failed',receipt_artifact_sha256:null,lease_state:'held'});
    assert.deepEqual(await settledOmpOutputRejectionLeases(db,f.jobKey),settled?[lease.leaseId]:[]);
    assert.doesNotMatch(JSON.stringify(saved.rows[0].receipt),/PRIVATE_|sk-ant-oat/);
    for(const hash of saved.rows[0].receipt.outputHashes)assert.doesNotMatch((await f.cas.read(hash)).toString('utf8'),/PRIVATE_|sk-ant-oat/);
-   if(settled)assert.equal(stderr,`R1_B_FAILURE job=${f.jobKey.slice(0,12)} kind=output_rejected exit=0 check=${rejected.decodeCheck}\n`);
+   if(settled){assert.match(stderr,new RegExp('^R1_B_FAILURE job='+f.jobKey.slice(0,12)+' kind=output_rejected exit=0 check='+rejected!.decodeCheck));if(mode!=='legacy_v1'&&mode!=='legacy_v2'){assert.match(stderr,/ structure=/);assert.ok(ompOutputStructureFromVersions(saved.rows[0].receipt.versions));}}
   }finally{proceed.resolve();await run;st.mock.restoreAll();}
  });
 

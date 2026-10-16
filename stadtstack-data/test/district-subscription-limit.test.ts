@@ -53,7 +53,7 @@ test('omp accepts only typed empty limit failures with normal exit and complete 
  assert.equal(proof.failureProof.terminalFrame,'assistant_turn_agent_error');
  assert.equal(assessmentBridgeHoldReason(new OmpRunnerHold('provider_failed',proof)),'budget_paused');
  assert.equal(JSON.stringify(proof).includes('PRIVATE_PROVIDER_ERROR'),false);
- assert.throws(()=>inspectOmpEvents(stream(),0),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed');
+ assert.throws(()=>inspectOmpEvents(stream(),0,{requestSha256:'a'.repeat(64),systemPromptSha256:'b'.repeat(64),stdin:{intendedBytes:2,deliveredBytes:2,deliveredSha256:'a'.repeat(64),frameBytes:27}}),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold('provider_failed'))?.noOutput,true);
  const classified=new OmpRunnerHold('provider_failed',undefined,'provider_error_rate_limit'),limited=inspectOmpLimitFailure(stream(),'',observedAt,0,classified);
  assert.ok(limited);assert.equal(limited.failureKind,'provider_error_rate_limit');assert.equal(limited.noOutput,true);assert.equal(assessmentBridgeHoldReason(limited),'budget_paused');

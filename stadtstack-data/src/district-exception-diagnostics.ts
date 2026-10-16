@@ -7,6 +7,8 @@ import {setTimeout as delay} from 'node:timers/promises';
 import {DatabaseError} from 'pg';
 import {z} from 'zod';
 import {ReasonCodeSchema,type StepReceipt} from './district-step-receipt.ts';
+import {canonicalJson} from './district-adapter-contract.ts';
+import {ompOutputStructureFromVersions} from './district-omp-output-diagnostics.ts';
 
 const sourceRoot=fileURLToPath(new URL('.',import.meta.url));
 /** Snapshot only real source files at module startup. No thrown string can add
@@ -161,9 +163,11 @@ export function formatDistrictBFailure(jobKey:string,step:string,receipt:Pick<St
  const provider=receipt.outcome==='held_execution'&&['omp_provider_failed','budget_paused'].includes(receipt.reasonCode)?OmpFailureKindSchema.safeParse(receipt.versions.ompFailureKind):undefined;
  const framing=receipt.outcome==='held_execution'&&receipt.reasonCode==='omp_event_stream'&&check.success;
  const quality=receipt.outcome==='held_quality'&&receipt.reasonCode==='quality_failed'&&check.success&&['output_json','output_schema'].includes(check.data)&&receipt.versions.ompContainerExitCode==='0';
- const kind=provider?.success?provider.data:framing?'event_stream':quality?'output_rejected':undefined;
+ const structure=ompOutputStructureFromVersions(receipt.versions);
+ const accepted=receipt.versions.transport==='vm-omp-docker'&&receipt.versions.ompOutputRejectionVersion===undefined&&structure!==null&&['succeeded','held_quality'].includes(receipt.outcome);
+ const kind=provider?.success?provider.data:framing?'event_stream':quality?'output_rejected':accepted?'output_accepted':undefined;
  if(!kind)return;
  const raw=receipt.versions.ompContainerExitCode;
  const exit=typeof raw==='string'&&String(Number(raw))===raw?OmpContainerExitCodeSchema.safeParse(Number(raw)):undefined;
- return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind}${exit?.success?' exit='+exit.data:''}${check.success?' check='+check.data:''}\n`;
+ return `R1_B_FAILURE job=${jobKey.slice(0,12)} kind=${kind}${exit?.success?' exit='+exit.data:''}${check.success?' check='+check.data:''}${structure?' structure='+canonicalJson(structure):''}\n`;
 }

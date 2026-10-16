@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -22,6 +22,8 @@ import {DistrictExecutionHold} from '../src/district-jobs.ts';
 import {ReasonCodeSchema,StepReceiptSchema} from '../src/district-step-receipt.ts';
 import {OmpFailureKindSchema,OmpDecodeCheckSchema} from '../src/district-exception-diagnostics.ts';
 
+const syntheticDelivery={requestSha256:digest('Synthetic native request'),systemPromptSha256:ompAssessmentControl().systemPromptSha256,stdin:{intendedBytes:24,deliveredBytes:24,deliveredSha256:digest('Synthetic native request'),frameBytes:49}};
+const inspectOmpEvents=(stdout:string,exitCode:number)=>inspectBoundOmpEvents(stdout,exitCode,syntheticDelivery);
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
 function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
 function eventStream(events:Record<string,unknown>[]=[{type:'message_end',message:message()}]){
@@ -244,24 +246,24 @@ test('only one complete lowercase json fence is normalized after raw stream reco
  ]){
   assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]),0),(error:unknown)=>{
    assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.decodeCheck,'output_json');
-   assert.equal(error.rejection.version,'omp-output-rejection-v2');
+   assert.equal(error.rejection.version,'omp-output-rejection-v3');
    assert.equal('outputNormalization' in error.rejection,false);return true;
   });
  }
  const multiple='```json\n'+json+'\n'+json+'\n```';
  assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text:multiple}]})}]),0),(error:unknown)=>{
   assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.decodeCheck,'output_json');
-  assert.ok(error.rejection.version==='omp-output-rejection-v2');
+  assert.ok(error.rejection.version==='omp-output-rejection-v3');
   assert.equal(error.rejection.outputNormalization,'single-json-fence-v1');return true;
  });
 });
 
-test('v2 diagnostics retain only schema object paths and unknown-key counts, never names or values',()=>{
+test('v3 diagnostics retain only schema object paths and unknown-key counts, never names or values',()=>{
  const value={...answer,scores:{...answer.scores,PRIVATE_SCORE:'PRIVATE_VALUE'},PRIVATE_ROOT_ONE:true,PRIVATE_ROOT_TWO:'PRIVATE_VALUE'};
  const text='```json\n'+JSON.stringify(value)+'\n```',stdout=eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]);
  assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{
   assert.ok(error instanceof OmpAssessmentOutputRejected);const proof=error.rejection;
-  assert.ok(proof.version==='omp-output-rejection-v2');assert.equal(proof.check,'output_schema');
+  assert.ok(proof.version==='omp-output-rejection-v3');assert.equal(proof.check,'output_schema');
   assert.equal(proof.outputNormalization,'single-json-fence-v1');assert.equal(proof.outputSha256,digest(text));assert.equal(proof.streamSha256,digest(stdout));
   assert.deepEqual(proof.issues.filter(issue=>issue.code==='unrecognized_keys'),[{code:'unrecognized_keys',path:'$.scores',keyCount:1},{code:'unrecognized_keys',path:'$',keyCount:2}]);
   const versions=ompOutputRejectionVersions(proof);assert.equal(versions.ompOutputNormalization,'single-json-fence-v1');
@@ -280,7 +282,7 @@ test('immutable v1 proofs retain exact canonical bytes through explicit version-
  const before=canonicalJson(legacy),versions=ompOutputRejectionVersions(legacy),decoded=ompOutputRejectionFromVersions(versions);
  assert.deepEqual(decoded,legacy);assert.equal(canonicalJson(decoded),before);assert.equal(digest(canonicalJson(decoded)),digest(before));
  assert.equal(versions.ompOutputNormalization,undefined);
- assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputRejectionVersion:'omp-output-rejection-v3'}),null);
+ assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputRejectionVersion:'omp-output-rejection-v4'}),null);
  assert.equal(OmpOutputRejectionSchema.safeParse({...legacy,outputNormalization:'single-json-fence-v1'}).success,false);
  assert.equal(OmpOutputRejectionSchema.safeParse({...legacy,issues:[{...legacy.issues[0],keyCount:1}]}).success,false);
 });
@@ -291,7 +293,7 @@ test('settled output rejection requires a complete single-response stream and ke
   let rejected:OmpAssessmentOutputRejected|undefined;
   assert.throws(()=>inspectOmpEvents(stdout,0),(error:unknown)=>{assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;return true;});
   assert.ok(rejected);assert.equal(rejected.decodeCheck,check);assert.equal(rejected.containerExitCode,0);
-  assert.equal(rejected.rejection.version,'omp-output-rejection-v2');
+  assert.equal(rejected.rejection.version,'omp-output-rejection-v3');
   assert.equal(assessmentBridgeHoldReason(rejected),'quality_failed');OmpOutputRejectionSchema.parse(rejected.rejection);
   const versions=assessmentBridgeFailureVersions('synthetic-lease',rejected);
   assert.equal(versions.ompDecodeCheck,check);assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_|sk-ant-oat/);
@@ -421,7 +423,7 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
- const files=['district-omp-b-runner.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  const expected=semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL('../src/'+file,import.meta.url)))})))});
  assert.equal(await ompRunnerContractSha256(),expected);
