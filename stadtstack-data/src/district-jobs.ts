@@ -33,7 +33,9 @@ export type ExecutionMode='attended'|'bounded_unattended';
 export interface OwnerNotification {id:string;phase:'startup'|'disposition';runId:string;authorizationId:string;state:'running'|'completed'|'held';reasonCode:ReasonCode|null;jobsStarted:number;receiptIds:string[];notificationApprovalSha256:string;destinationSha256:string;provider:string}
 export interface NotificationIdentity {notificationApprovalSha256:string;destinationSha256:string;provider:string}
 export interface NotificationAcknowledgement {provider:string;messageId:string;notificationId:string;payloadSha256:string;destinationSha256:string;acknowledgedAt:string}
-export interface NotificationConfig extends NotificationIdentity {notifyOwner:(notification:OwnerNotification,signal?:AbortSignal)=>Promise<NotificationAcknowledgement>}
+/** Delivery-only presentation metadata, never part of the immutable outbox payload. */
+export interface NotificationDisplayContext {scopes:{sourceId:string;step:string}[];hasHolds:boolean}
+export interface NotificationConfig extends NotificationIdentity {notifyOwner:(notification:OwnerNotification,signal?:AbortSignal,context?:NotificationDisplayContext)=>Promise<NotificationAcknowledgement>}
 const NotificationAcknowledgementSchema=z.object({provider:token,messageId:z.string().regex(/^[A-Za-z0-9._:-]{1,256}$/),notificationId:z.uuid(),payloadSha256:HashSchema,destinationSha256:HashSchema,acknowledgedAt:z.iso.datetime()}).strict();
 export class DistrictExecutionHold extends Error {readonly reasonCode:ReasonCode;constructor(reasonCode:ReasonCode){super(reasonCode);this.name='DistrictExecutionHold';this.reasonCode=reasonCode;}}
 interface JobRow extends QueryResultRow {id:string;job_key:string;spec:DistrictJobSpec;state:string;created_at:Date;attempt_started_at:Date;lease_expires_at:Date;lease_owner:string;attempt:number;fencing_token:string;host_lane_key:string|null;budget_id:string|null;reserved_micro_usd:string;claimed_dependency_receipt_ids:string[];cancellation_requested:boolean}
@@ -433,6 +435,17 @@ export class DistrictJobStore {
     for(const row of result.rows)if(digest(canonicalJson(row.payload))!==row.payload_sha256)throw Error('Owner notification byte binding mismatch');
     return result.rows.map(row=>row.payload);
   }
+  async notificationDisplayContext(notification:OwnerNotification):Promise<NotificationDisplayContext> {
+    const result=await this.pool.query<NotificationDisplayContext>(`SELECT
+      COALESCE((SELECT jsonb_agg(scope ORDER BY scope."sourceId",scope.step) FROM (
+        SELECT DISTINCT j.source_id AS "sourceId",j.step FROM district_pipeline.jobs j
+        JOIN district_pipeline.preauthorizations a ON j.job_key=ANY(a.allowed_job_keys)
+        WHERE a.id=$1
+      ) scope),'[]'::jsonb) AS scopes,
+      EXISTS(SELECT 1 FROM district_pipeline.step_receipts WHERE run_id=$2 AND outcome NOT IN ('succeeded','no_supported_case')) AS "hasHolds"`,
+      [notification.authorizationId,notification.runId]);
+    return result.rows[0];
+  }
   async claimNotification(id:string,claimToken:string):Promise<OwnerNotification|null> {
     return this.transaction(async client=>{
       const result=await client.query<{payload:OwnerNotification;payload_sha256:string}>(`WITH candidate AS (SELECT id FROM district_pipeline.owner_notifications WHERE id=$1 AND state<>'delivered' AND (claim_expires_at IS NULL OR claim_expires_at<=clock_timestamp()) FOR UPDATE SKIP LOCKED)
@@ -763,7 +776,10 @@ export async function deliverDistrictOwnerNotifications(store:DistrictJobStore,c
         await store.recordNotificationAttempt(notification.id,claimToken);
         const deadline=Promise.withResolvers<never>();
         timeout=setTimeout(()=>{controller.abort();deadline.reject(new NotificationAmbiguousError('Notification delivery deadline'));},Math.min(10000,remaining));
-        const raw=await Promise.race([Promise.resolve().then(()=>config.notifyOwner(notification,controller.signal)),deadline.promise]);
+        const raw=await Promise.race([Promise.resolve().then(async()=>{
+          const context=notification.phase==='disposition'?await store.notificationDisplayContext(notification):undefined;
+          return config.notifyOwner(notification,controller.signal,context);
+        }),deadline.promise]);
         // Every retry uses this same immutable notification ID/payload. A timeout
         // may follow provider acceptance; duplicates are informational, not ACKs.
         const acknowledgement=NotificationAcknowledgementSchema.parse(raw);
