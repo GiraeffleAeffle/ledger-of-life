@@ -13,7 +13,7 @@ import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssess
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
-import {assessmentOutputSchema,PROMPTS,digest as assessmentDigest} from '../src/district-assessment.ts';
+import {assessmentOutputSchema,assessmentItemSchema,deterministicChecks,PROMPTS,digest as assessmentDigest,type OriginalEvidence} from '../src/district-assessment.ts';
 import {z} from 'zod';
 import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,assertManagedSourceReadable,readCivicPolicyInventory,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
@@ -586,6 +586,21 @@ test('delivered source-free control contains the exact serialized output schema 
  assert.equal(digest(serialized),assessmentDigest(schema));
  assert.equal(bundle.outputSchemaSha256,assessmentDigest(schema));assert.equal(bundle.systemPromptSha256,digest(control));
  assert.ok(control.startsWith(PROMPTS.B));assert.equal(control.includes('synthetic source, never an operational observation'),false);
+ for(const rule of ['If outcome is abstain OR unresolved, scores.usefulness must be 0','value and unit must be both null or both non-null','Never invent a day for month/year/period precision','When date is null, dateRole may retain an attested role','Always include valueReview and criticalReview','every input claimId exactly once','data_missing must equal (missing.length > 0)','each criticalTarget claim exactly once'])assert.ok(control.includes(rule),rule);
+ assert.ok(Buffer.byteLength(control)<=65536,'Reviewed control bind remains within its independent bound');
+});
+test('B encoding clarifications preserve unresolved judgment while satisfying the unchanged deterministic checker',()=>{
+ const quote='Synthetic category with month precision 2026-10.',hash=digest(quote),rubric='Synthetic frozen rubric';
+ const locator={id:'span',page:null,table:null,start:0,end:quote.length,quote};
+ const evidence:OriginalEvidence=[{sourceId:'source',admittedSourceId:'source',url:'https://example.org/synthetic',originalSha256:hash,textSha256:hash,parserVersion:'synthetic',parserReceiptSha256:hash,admissionReceiptSha256:hash,ocrSuspected:false,text:quote,locators:[locator]}];
+ const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:'synthetic-encoding',question:'Synthetic independent review',claim:'Synthetic category/month proposition',rubric,rubricSha256:digest(rubric),sources:[{sourceId:'source',originalSha256:hash,textSha256:hash,parserVersion:'synthetic',parserReceiptSha256:hash,admissionReceiptSha256:hash,ocrSuspected:false,locators:[{id:locator.id,page:null,table:null,start:0,end:quote.length}]}],claimIds:['claim'],entityIds:[],constraints:[],criticalKinds:[]});
+ const output=assessmentOutputSchema.parse({itemId:item.itemId,outcome:'unresolved',assertions:[{claimId:'claim',sourceId:'source',locatorId:'span',quote,subjectId:null,objectId:null,value:'Synthetic category',unit:null,date:'2026-10',dateRole:'source_reference',financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'Synthetic encoding fixture; no operational observation.',valueReview:null,criticalReview:null});
+ assert.deepEqual(deterministicChecks(item,evidence,output),['abstention_usefulness','calendar_date_role:claim','value_unit:claim']);
+ const encoded=assessmentOutputSchema.parse({...output,scores:{...output.scores,usefulness:0},assertions:output.assertions.map(assertion=>({...assertion,value:null,unit:null,date:null}))});
+ assert.deepEqual(deterministicChecks(item,evidence,encoded),[]);
+ assert.equal(encoded.outcome,'unresolved');assert.equal(encoded.assertions[0].dateRole,'source_reference');assert.equal('quote' in encoded.assertions[0]&&encoded.assertions[0].quote,quote);
+ const held=assessmentOutputSchema.parse({...encoded,holdReasons:['insufficient_evidence','critical_unsupported']});
+ assert.deepEqual(deterministicChecks(item,evidence,held),['hold:critical_unsupported','hold:insufficient_evidence'],'Encoding never suppresses substantive holds');
 });
 
 for(const failure of ['credential','unsafe-output'] as const)test('parallel A evidence reads survive B '+failure+' in its disjoint enrolled lane',async t=>{
