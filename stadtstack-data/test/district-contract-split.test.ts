@@ -69,6 +69,10 @@ test('notification presentation stays outside every semantic contract and the OM
   assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
  }
 });
+test('stage drain control preserves campaign, parser security/output and B/OMP contracts',async()=>{
+ for(const name of ['residualPreparation','residual','assessmentQueue','policyRefresh','assessmentB'])assert.deepEqual(await contracts[name].compute(change('district-jobs.ts')),await contracts[name].compute(hash),name);
+ for(const compute of [parserIsolationContractSha256,parserOutputContractSha256,ompRunnerContractSha256])assert.equal(await compute(change('district-jobs.ts')),await compute(hash));
+});
 
 test('host resolver and native image cutovers change only B contracts among the scoped queued job contracts',async()=>{
  for(const file of ['district-omp-b-runner.ts','district-omp-output-diagnostics.ts','../scripts/build-omp-b-image.sh','../docker/omp-b/Dockerfile','../docker/omp-b/natives.sha256']){

@@ -2,14 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {fork} from 'node:child_process';
-import {mkdtemp,rm,open,readFile,lstat,readdir} from 'node:fs/promises';
+import {mkdtemp,rm,open,readFile,writeFile,lstat,readdir} from 'node:fs/promises';
 import {watch} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {Pool} from 'pg';
 import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
 import {DistrictCas} from '../src/district-cas.ts';
-import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,runDistrictJobsCli,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement,type ExecutionResource} from '../src/district-jobs.ts';
+import {DistrictJobStore,DistrictExecutionHold,R1_STAGE_DRAIN_EXIT_CODE,migrateDistrictJobs,insertR1MetadataSnapshot,runDistrictJobs,runDistrictJobsCli,deliverDistrictOwnerNotifications,artifactVerificationHandler,type AuthorizationInput,type ClaimedJob,type DistrictJobSpec,type JobHandler,type OwnerNotification,type NotificationAcknowledgement,type ExecutionResource} from '../src/district-jobs.ts';
 import {CANONICALIZATION_VERSION,STEP_RECEIPT_VERSION,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {reserveR1CodexCall} from '../src/district-codex-accounting.ts';
 import {NotificationAmbiguousError,NotificationTransientError} from '../src/district-jobs.ts';
@@ -600,6 +600,90 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     }
   });
 
+  await t.test('an in-flight CLI job finishes and cleans scratch before a drain leaves the next job queued',{timeout:30000},async st=>{
+    const first=await store.enqueue(jobSpec('stage-drain-active','residual_extract'),{priority:10}),second=await store.enqueue(jobSpec('stage-drain-pending','residual_extract'));
+    const approval=digest('stage-drain-route'),destination=digest('stage-drain-destination'),authorizationId=await authorize([first,second],{mode:'bounded_unattended',notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:'ntfy'});
+    const workspace=join(directory,'stage-drain-cli'),drainFile=join(directory,'stage-drain-request'),entered=Promise.withResolvers<string>(),closed=Promise.withResolvers<number|null>();
+    const child=fork(new URL('./helpers/stage-drain-cli.ts',import.meta.url),[isolated.href,authorizationId,cas.root,workspace,drainFile,approval,destination],{execArgv:['--experimental-strip-types'],stdio:['ignore','pipe','pipe','ipc']});
+    let stdout='',stderr='';child.stdout!.on('data',chunk=>{stdout+=chunk;});child.stderr!.on('data',chunk=>{stderr+=chunk;});
+    child.on('message',(message:{entered?:boolean;runId:string})=>{if(message.entered)entered.resolve(message.runId);});
+    child.once('error',error=>{entered.reject(error);closed.reject(error);});child.once('close',code=>{entered.reject(Error('CLI closed before handler admission'));closed.resolve(code);});
+    st.after(async()=>{if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');await closed.promise;});
+    const runId=await entered.promise;
+    await writeFile(drainFile,'synthetic private request content must not be emitted',{mode:0o600});
+    const active=await pool.query<{state:string}>('SELECT state FROM district_pipeline.jobs WHERE job_key=$1',[first]);
+    assert.equal(active.rows[0].state,'leased');assert.equal(stdout,'');
+    assert.equal((await pool.query('SELECT 1 FROM district_pipeline.resource_slots WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[first])).rowCount,1);
+    child.send({finish:true});
+    assert.equal(await closed.promise,R1_STAGE_DRAIN_EXIT_CODE,stderr);
+    const result=JSON.parse(stdout);assert.equal(result.runId,runId);assert.equal(result.state,'completed');assert.equal(result.reasonCode,'completed');
+    assert.equal(result.jobsStarted,1);assert.equal(result.receiptIds.length,1);assert.deepEqual(result.drained,{step:'residual_extract',completed:1,remaining:1});
+    assert.equal(stderr,'R1_STAGE_DRAINED step=residual_extract completed=1 remaining=1\n');
+    const jobs=await pool.query<{job_key:string;state:string;attempt:number;fencing_token:string}>('SELECT job_key,state,attempt,fencing_token FROM district_pipeline.jobs WHERE job_key=ANY($1::text[])',[[first,second]]);
+    assert.equal(jobs.rows.find(job=>job.job_key===first)!.state,'succeeded');
+    assert.deepEqual(jobs.rows.find(job=>job.job_key===second),{job_key:second,state:'queued',attempt:0,fencing_token:'0'});
+    const receipts=await pool.query<{outcome:string;reason:string}>("SELECT outcome,receipt->>'reasonCode' AS reason FROM district_pipeline.step_receipts WHERE run_id=$1",[runId]);
+    assert.deepEqual(receipts.rows,[{outcome:'succeeded',reason:'completed'}]);
+    assert.equal((await pool.query('SELECT jobs_started FROM district_pipeline.preauthorizations WHERE id=$1',[authorizationId])).rows[0].jobs_started,1);
+    assert.equal((await pool.query('SELECT 1 FROM district_pipeline.resource_slots WHERE job_id=ANY(SELECT id FROM district_pipeline.jobs WHERE job_key=ANY($1::text[]))',[[first,second]])).rowCount,0);
+    assert.deepEqual(await readdir(join(workspace,'scratch-root','scratch')),[]);
+    await assert.rejects(lstat(join(workspace,'policy','inventory.lock')),{code:'ENOENT'});
+    assert.equal(await readFile(drainFile,'utf8'),'synthetic private request content must not be emitted');
+  });
+
+  await t.test('a pre-existing env drain request exits before the first claim with no receipts or consumed attempts',async st=>{
+    const spec=jobSpec('stage-drain-before-first'),key=await store.enqueue(spec),approval=digest('stage-drain-before-route'),destination=digest('stage-drain-before-destination');
+    const authorizationId=await authorize([key],{mode:'bounded_unattended',notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:'ntfy'}),drainFile=join(directory,'stage-drain-before-request');
+    await writeFile(drainFile,'',{mode:0o600});
+    const previousUrl=process.env.DATABASE_URL,previousDrain=process.env.R1_STAGE_DRAIN_FILE,previousExit=process.exitCode;let stdout='',stderr='',calls=0;
+    process.env.DATABASE_URL=isolated.href;process.env.R1_STAGE_DRAIN_FILE=drainFile;
+    st.mock.method(process.stdout,'write',(chunk:string|Uint8Array)=>{stdout+=String(chunk);return true;});
+    st.mock.method(process.stderr,'write',(chunk:string|Uint8Array)=>{stderr+=String(chunk);return true;});
+    const phases:string[]=[];
+    try{
+      const result=await runDistrictJobsCli({verify_artifacts:async context=>{calls++;return artifactVerificationHandler(context);}},['run','--authorization-id',authorizationId,'--max-jobs','1','--max-seconds','60','--mode','bounded_unattended','--cas-root',cas.root],{
+        notificationApprovalSha256:approval,destinationSha256:destination,provider:'ntfy',notifyOwner:async notification=>{
+          phases.push(notification.phase);return {provider:'ntfy',messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:destination,acknowledgedAt:new Date().toISOString()};
+        },
+      });
+      assert.ok(result);assert.equal(calls,0);assert.equal(result.state,'completed');assert.equal(result.jobsStarted,0);assert.deepEqual(result.receiptIds,[]);
+      assert.deepEqual(result.drained,{step:'verify_artifacts',completed:0,remaining:1});assert.deepEqual(phases,['startup','disposition']);
+      assert.equal(stdout,JSON.stringify(result)+'\n');assert.equal(process.exitCode,R1_STAGE_DRAIN_EXIT_CODE);
+      reportR1ExecutorFailure(result);assert.equal(stderr,'R1_STAGE_DRAINED step=verify_artifacts completed=0 remaining=1\n');
+      assert.equal((await pool.query('SELECT 1 FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId])).rowCount,0);
+      assert.equal((await pool.query('SELECT jobs_started FROM district_pipeline.preauthorizations WHERE id=$1',[authorizationId])).rows[0].jobs_started,0);
+      assert.deepEqual((await pool.query('SELECT state,attempt,fencing_token FROM district_pipeline.jobs WHERE job_key=$1',[key])).rows[0],{state:'queued',attempt:0,fencing_token:'0'});
+      assert.equal(await store.enqueue(spec),key);
+      const firstClock=(await pool.query('SELECT first_started_at FROM district_pipeline.preauthorizations WHERE id=$1',[authorizationId])).rows[0].first_started_at;
+      await rm(drainFile);delete process.env.R1_STAGE_DRAIN_FILE;
+      const resumed=await runDistrictJobs({store,cas,handlers,authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:'ntfy',notifyOwner:async notification=>({provider:'ntfy',messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:destination,acknowledgedAt:new Date().toISOString()})});
+      assert.equal(resumed.reasonCode,'max_jobs_reached');assert.equal(resumed.jobsStarted,1);assert.equal(resumed.drained,undefined);
+      assert.deepEqual((await pool.query('SELECT first_started_at FROM district_pipeline.preauthorizations WHERE id=$1',[authorizationId])).rows[0].first_started_at,firstClock);
+    }finally{
+      st.mock.restoreAll();process.exitCode=previousExit;if(previousUrl===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=previousUrl;
+      if(previousDrain===undefined)delete process.env.R1_STAGE_DRAIN_FILE;else process.env.R1_STAGE_DRAIN_FILE=previousDrain;
+    }
+  });
+
+  await t.test('missing drain file and unconfigured existing file preserve normal results',async()=>{
+    for(const configured of [false,true]){
+      const key=await store.enqueue(jobSpec('stage-drain-absent-'+configured)),authorizationId=await authorize([key]),drainFile=join(directory,'stage-drain-absent-'+configured);
+      if(!configured)await writeFile(drainFile,'',{mode:0o600});
+      const result=await runDistrictJobs({store,cas,handlers,authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,...(configured?{drainFile}:{})});
+      assert.equal(result.state,'completed');assert.equal(result.reasonCode,'max_jobs_reached');assert.equal(result.jobsStarted,1);assert.equal(result.receiptIds.length,1);
+      assert.equal(Object.hasOwn(result,'drained'),false);
+    }
+  });
+
+  await t.test('a drain request never masks a real job hold',async()=>{
+    const key=await store.enqueue(jobSpec('stage-drain-real-hold')),authorizationId=await authorize([key]),drainFile=join(directory,'stage-drain-real-hold');
+    const result=await runDistrictJobs({store,cas,authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:60000,drainFile,handlers:{verify_artifacts:async()=>{
+      await writeFile(drainFile,'',{mode:0o600});return {outcome:'held_quality',reasonCode:'quality_failed'};
+    }}});
+    assert.equal(result.state,'held');assert.equal(result.reasonCode,'quality_failed');assert.equal(result.drained,undefined);
+    assert.equal((await pool.query('SELECT outcome FROM district_pipeline.step_receipts WHERE run_id=$1',[result.runId])).rows[0].outcome,'held_quality');
+  });
+
   for(const mode of ['max-time','term'] as const)await t.test('actual CLI drains aborted scratch and exits promptly: '+mode,{timeout:15000},async st=>{
     const key=await store.enqueue(jobSpec('cli-abort-'+mode)),approval=digest('cli-abort-notification-route'),destination=digest('cli-abort-destination');
     const authorizationId=await authorize([key],{mode:'bounded_unattended',notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:'ntfy'});
@@ -621,7 +705,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
         await new Promise<void>(resolve=>setTimeout(resolve,150));
         assert.equal(stdout,'','A result must not precede owned scratch cleanup');
       }finally{watcher.close();await holder.close();await rm(lock);}
-    }else child.kill('SIGTERM');
+    }else{await writeFile(join(workspace,'stage-drain'),'');child.kill('SIGTERM');}
     assert.equal(await closed.promise,2,stderr);const result=JSON.parse(stdout);
     assert.equal(result.reasonCode,mode==='max-time'?'max_time_reached':'owner_stopped');assert.equal(result.state,'held');
     assert.equal(await readFile(join(workspace,'cleanup-finished'),'utf8'),'closed');await assert.rejects(lstat(lock),{code:'ENOENT'});

@@ -22,7 +22,7 @@ try{
     return {outcome:'succeeded' as const,reasonCode:'completed' as const};
    },{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch',purpose:'classification',signal});
   }finally{clearInterval(live);await writeFile(join(directory,'cleanup-finished'),'closed',{mode:0o600});}
- }},['run','--authorization-id',authorizationId,'--max-jobs','1','--max-seconds',mode==='max-time'?'2':'60','--mode','bounded_unattended','--cas-root',casRoot],{
+ }},['run','--authorization-id',authorizationId,'--max-jobs','1','--max-seconds',mode==='max-time'?'2':'60','--mode','bounded_unattended','--cas-root',casRoot,'--drain-file',join(directory,'stage-drain')],{
   notificationApprovalSha256:approval,destinationSha256:destination,provider:'ntfy',
   notifyOwner:async notification=>({provider:'ntfy',messageId:randomUUID(),notificationId:notification.id,payloadSha256:digest(canonicalJson(notification)),destinationSha256:destination,acknowledgedAt:new Date().toISOString()}),
  });

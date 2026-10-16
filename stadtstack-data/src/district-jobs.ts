@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
-import {readFile} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import {readFile,lstat} from 'node:fs/promises';
+import {resolve,isAbsolute} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {performance} from 'node:perf_hooks';
 import {Pool, type PoolClient, type QueryResultRow} from 'pg';
@@ -28,7 +28,9 @@ const CONTINUATION_STEPS=new Set(['residual_prepare','residual_extract','assessm
 export function policyContinuationVersions(continuation:JobPolicyContinuation):Record<string,string>{
  return {[`policyRebinding.${continuation.fromReceiptSha256}.${continuation.refreshStepReceiptSha256}`]:continuation.toReceiptSha256};
 }
-export interface ExecutorResult {runId:string;state:'completed'|'held';reasonCode:ReasonCode;jobsStarted:number;receiptIds:string[];notificationReasonCode?:ReasonCode}
+export interface StageDrainResult {step:string;completed:number;remaining:number}
+export const R1_STAGE_DRAIN_EXIT_CODE=76;
+export interface ExecutorResult {runId:string;state:'completed'|'held';reasonCode:ReasonCode;jobsStarted:number;receiptIds:string[];notificationReasonCode?:ReasonCode;drained?:StageDrainResult}
 export type ExecutionMode='attended'|'bounded_unattended';
 export interface OwnerNotification {id:string;phase:'startup'|'disposition';runId:string;authorizationId:string;state:'running'|'completed'|'held';reasonCode:ReasonCode|null;jobsStarted:number;receiptIds:string[];notificationApprovalSha256:string;destinationSha256:string;provider:string}
 export interface NotificationIdentity {notificationApprovalSha256:string;destinationSha256:string;provider:string}
@@ -262,11 +264,13 @@ export class DistrictJobStore {
     await client.query(`WITH started AS MATERIALIZED (SELECT clock_timestamp() AS at) UPDATE district_pipeline.host_lanes SET last_started_at=started.at,next_start_at=started.at+min_start_interval_ms*interval '1 millisecond' FROM started WHERE lane_key=$1`,[laneKey]);
     return null;
   }
-  async claim(run:RunBounds,leaseMs:number,currentPolicy?:CurrentPolicyCheck):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}> {
+  async claim(run:RunBounds,leaseMs:number,currentPolicy?:CurrentPolicyCheck,drainFile?:string):Promise<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode;drained?:true}> {
     if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
-    return this.transaction<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode}>(async client=>{
+    return this.transaction<{kind:'job';job:ClaimedJob}|{kind:'stop';reasonCode:ReasonCode;drained?:true}>(async client=>{
+      let drainRequested=drainFile?await stageDrainRequested(drainFile):false;
       let auth=await this.assertRun(client,run);
       if(auth.jobs_started>=auth.max_jobs)return {kind:'stop',reasonCode:'authorization_jobs_exhausted'};
+      if(drainRequested)return {kind:'stop',reasonCode:'completed',drained:true};
       const candidates=await client.query<JobRow>(`SELECT j.* FROM district_pipeline.jobs j LEFT JOIN district_pipeline.host_lanes h ON h.lane_key=j.host_lane_key
         WHERE j.state IN ('queued','deferred') AND j.not_before<=clock_timestamp() AND j.job_key=ANY($1::text[]) AND j.ags=ANY($2::text[])
         AND NOT EXISTS (SELECT 1 FROM district_pipeline.job_dependencies d WHERE d.job_id=j.id AND NOT EXISTS (
@@ -287,7 +291,10 @@ export class DistrictJobStore {
       if(!hold)hold=await this.policyDisposition(client,row.id,row.spec,currentPolicy,value=>{continuation=value;});
       // Current-policy proof can perform slow custody I/O. Do not grant a lease
       // or record a disposition using authority clocks sampled before that work.
+      // Filesystem/policy work must precede the final authority clock sample.
+      drainRequested=drainFile?await stageDrainRequested(drainFile):false;
       auth=await this.assertRun(client,run);
+      if(drainRequested)return {kind:'stop',reasonCode:'completed',drained:true};
       // R1 has no authorization for paid API execution, irrespective of available budget.
       if(Number(row.reserved_micro_usd)>0)hold='paid_not_authorized';
       if(hold){await client.query(`UPDATE district_pipeline.jobs SET state=$2,reason_code=$3 WHERE id=$1`,[row.id,hold==='cancellation_requested'?'cancelled':hold.startsWith('policy_')||hold==='source_policy_stale'?'blocked_policy':hold==='origin_unresolved'?'held_origin':'held_execution',hold]);return {kind:'stop',reasonCode:hold};}
@@ -301,6 +308,14 @@ export class DistrictJobStore {
       await client.query('UPDATE district_pipeline.preauthorizations SET jobs_started=jobs_started+1 WHERE id=$1',[run.authorizationId]);
       const current=leased.rows[0];return {kind:'job',job:{id:current.id,jobKey:current.job_key,spec:current.spec,attempt:current.attempt,fencingToken:fence,runId:run.runId,enqueuedAt:current.created_at.toISOString(),startedAt:current.attempt_started_at.toISOString(),leaseExpiresAt:expiry.toISOString(),dependencyReceiptIds:receiptIds,category:auth.category,...(continuation?{policyContinuations:[continuation]}:{})}};
     });
+  }
+  async stageDrainStatus(run:RunBounds):Promise<{steps:string[];remaining:number}> {
+    const result=await this.pool.query<{steps:string[];remaining:number}>(`SELECT
+      COALESCE(array_agg(DISTINCT j.step ORDER BY j.step),'{}'::text[]) AS steps,
+      (count(*) FILTER (WHERE j.state IN ('queued','deferred')))::integer AS remaining
+      FROM district_pipeline.preauthorizations a JOIN district_pipeline.jobs j ON j.job_key=ANY(a.allowed_job_keys)
+      WHERE a.id=$1 AND j.ags=ANY(a.allowed_ags)`,[run.authorizationId]);
+    return result.rows[0];
   }
   async renew(run:RunBounds,job:ClaimedJob,leaseMs:number):Promise<string> {
     if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
@@ -555,7 +570,14 @@ async function waitForSlot(signal:AbortSignal):Promise<void> {
   signal.addEventListener('abort',abort,{once:true});
   await promise;
 }
-export interface ExecutorOptions {store:DistrictJobStore;cas:DistrictCas;handlers:Readonly<Record<string,JobHandler>>;authorizationId:string;mode?:ExecutionMode;ownerPresent?:true;maxJobs:number;maxElapsedMs:number;leaseMs?:number;signal?:AbortSignal;notifyOwner?:NotificationConfig['notifyOwner'];notificationApprovalSha256?:string;notificationDestinationSha256?:string;notificationProvider?:string;resourceLimits?:Partial<Record<ExecutionResource,number>>}
+/** Presence only: no content is read, no link is followed, and no request is
+ * consumed. Keep the request present until every configured executor drains.
+ */
+async function stageDrainRequested(path:string):Promise<boolean> {
+  try{await lstat(path);return true;}
+  catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return false;throw error;}
+}
+export interface ExecutorOptions {store:DistrictJobStore;cas:DistrictCas;handlers:Readonly<Record<string,JobHandler>>;authorizationId:string;mode?:ExecutionMode;ownerPresent?:true;maxJobs:number;maxElapsedMs:number;leaseMs?:number;signal?:AbortSignal;notifyOwner?:NotificationConfig['notifyOwner'];notificationApprovalSha256?:string;notificationDestinationSha256?:string;notificationProvider?:string;resourceLimits?:Partial<Record<ExecutionResource,number>>;drainFile?:string}
 /** Notification-only cleanup uses 60s of r1-vm-run.sh's 120s OS reserve.
  * It never extends the workload/authorization deadline or permits another claim.
  */
@@ -613,6 +635,8 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
   if(options.notificationProvider)token.parse(options.notificationProvider);
   const notificationConfig:NotificationConfig|undefined=mode==='bounded_unattended'?{notifyOwner:options.notifyOwner!,notificationApprovalSha256:options.notificationApprovalSha256!,destinationSha256:options.notificationDestinationSha256!,provider:options.notificationProvider!}:undefined;
   if(!Number.isInteger(options.maxJobs)||options.maxJobs<1||options.maxJobs>10000||!Number.isInteger(options.maxElapsedMs)||options.maxElapsedMs<1||options.maxElapsedMs>86400000)throw Error('Executor bounds required');
+  const drainFile=options.drainFile??process.env.R1_STAGE_DRAIN_FILE;
+  if(drainFile!==undefined&&(!isAbsolute(drainFile)||drainFile.includes('\0')))throw Error('Stage drain file must be an absolute path');
   await hostCodeVersions(); // Snapshot the immutable executor checkout before claiming/effects.
   const leaseMs=options.leaseMs??30000;if(!Number.isInteger(leaseMs)||leaseMs<50||leaseMs>300000)throw Error('Lease bound rejected');
   const resourceLimits={'codex-subscription':options.resourceLimits?.['codex-subscription']??Number(process.env.R1_CODEX_CONCURRENCY??1),'omp-b':options.resourceLimits?.['omp-b']??Number(process.env.R1_OMP_B_CONCURRENCY??1)};
@@ -620,6 +644,7 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
   const invocationStart=performance.now();
   const lock=await options.store.pool.connect();let run:RunBounds|undefined;let jobsStarted=0;const receiptIds:string[]=[];
   let activeJob:ClaimedJob|undefined,recoveryReceipt:StepReceipt|undefined;
+  let draining=false;
   let stopped:ReasonCode|null=null;const stopController=new AbortController();
   const ownerStop=()=>{stopped='owner_stopped';stopController.abort(new DistrictExecutionHold('owner_stopped'));};
   const databaseLost=()=>{stopped='lease_lost';stopController.abort(database.failure??new DistrictDatabaseConnectionLost());};
@@ -643,8 +668,12 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
     while(jobsStarted<options.maxJobs){
       if(stopped)break;
       if(performance.now()-monotonicStart>=availableMs){stopped=deadlineReason;break;}
-      const claim=await options.store.claim(run,leaseMs,currentPolicy);
-      if(claim.kind==='stop'){stopped=claim.reasonCode;break;}
+      const claim=await options.store.claim(run,leaseMs,currentPolicy,drainFile);
+      if(claim.kind==='stop'){
+        if(claim.drained){if(!stopped){stopped='completed';draining=true;}}
+        else stopped=claim.reasonCode;
+        break;
+      }
       const job=claim.job;activeJob=job;jobsStarted++;
       stopController.signal.throwIfAborted();
       const controller=new AbortController();const abortRun=()=>controller.abort(stopController.signal.reason);stopController.signal.addEventListener('abort',abortRun,{once:true});
@@ -720,11 +749,21 @@ async function runDistrictJobsInScope(options:ExecutorOptions,database:DistrictD
         if(diagnostic)process.stderr.write(diagnostic);
       }
     }
+    let drained:StageDrainResult|undefined;
+    if(draining){
+      const status=await options.store.stageDrainStatus(run);
+      // TERM/database loss still takes precedence; a drain never aborts a job
+      // or turns a shutdown/authority failure into a successful stop.
+      if(stopped==='completed'){
+        const step=status.steps.length===1&&Object.hasOwn(options.handlers,status.steps[0])?status.steps[0]:'mixed';
+        drained={step,completed:receiptIds.length,remaining:status.remaining};
+      }
+    }
     const reasonCode:ReasonCode=stopped??'max_jobs_reached';
-    const state=reasonCode==='no_ready_jobs'||reasonCode==='max_jobs_reached'?'completed':'held';
+    const state=drained||reasonCode==='no_ready_jobs'||reasonCode==='max_jobs_reached'?'completed':'held';
     await options.store.endRun(run.runId,state,reasonCode);
     const notificationReasonCode=await deliverDisposition(options.store,notificationConfig,run.runId);
-    return {runId:run.runId,state,reasonCode,jobsStarted,receiptIds,...(notificationReasonCode?{notificationReasonCode}:{})};
+    return {runId:run.runId,state,reasonCode,jobsStarted,receiptIds,...(notificationReasonCode?{notificationReasonCode}:{}),...(drained?{drained}:{})};
   } catch(error) {
     if(database.failure||isDistrictDatabaseConnectionError(error)){
       database.lose();
@@ -816,9 +855,9 @@ export async function runDistrictJobsCli(handlers:Readonly<Record<string,JobHand
 }
 async function runDistrictJobsCommand(handlers:Readonly<Record<string,JobHandler>>,argv:string[],notificationConfig:NotificationConfig|undefined,shutdown:AbortSignal):Promise<ExecutorResult|undefined> {
   const [command,...args]=argv;
-  if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH]');
+  if(command!=='migrate'&&command!=='run')throw Error('Usage: district-jobs.ts migrate | run --authorization-id UUID --max-jobs N --max-seconds N [--mode attended --owner-present | --mode bounded_unattended] [--cas-root PATH] [--drain-file PATH]');
   const flags:Record<string,string|true>={};
-  for(let i=0;i<args.length;i++){const arg=args[i];if(arg==='--owner-present'){if(flags[arg])throw Error('Duplicate CLI flag');flags[arg]=true;}else if(['--authorization-id','--max-jobs','--max-seconds','--cas-root','--mode','--codex-concurrency','--omp-b-concurrency'].includes(arg)){if(flags[arg]||!args[i+1]||args[i+1].startsWith('--'))throw Error('CLI flag value required');flags[arg]=args[++i];}else throw Error('Unknown CLI flag');}
+  for(let i=0;i<args.length;i++){const arg=args[i];if(arg==='--owner-present'){if(flags[arg])throw Error('Duplicate CLI flag');flags[arg]=true;}else if(['--authorization-id','--max-jobs','--max-seconds','--cas-root','--mode','--codex-concurrency','--omp-b-concurrency','--drain-file'].includes(arg)){if(flags[arg]||!args[i+1]||args[i+1].startsWith('--'))throw Error('CLI flag value required');flags[arg]=args[++i];}else throw Error('Unknown CLI flag');}
   if(!process.env.DATABASE_URL)throw Error('DATABASE_URL is required');
   if(command==='migrate'&&args.length)throw Error('Migration accepts no execution flags');
   const mode=flags['--mode']??'attended';
@@ -833,8 +872,13 @@ async function runDistrictJobsCommand(handlers:Readonly<Record<string,JobHandler
     const id=flags['--authorization-id'];const jobs=Number(flags['--max-jobs']),seconds=Number(flags['--max-seconds']);
     if(typeof id!=='string'||!Number.isInteger(jobs)||!Number.isInteger(seconds)||seconds<1)throw Error('Explicit authorization and positive job/time bounds required');
     if(mode==='attended'){process.stdin.on('end',stop);process.stdin.on('close',stop);process.stdin.resume();}
-    const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})}});
+    const result=await runDistrictJobs({store:new DistrictJobStore(pool),cas:new DistrictCas(typeof flags['--cas-root']==='string'?flags['--cas-root']:undefined),handlers,authorizationId:id,mode,ownerPresent:mode==='attended'?true:undefined,maxJobs:jobs,maxElapsedMs:seconds*1000,signal:abort.signal,notifyOwner:notificationConfig?.notifyOwner,notificationApprovalSha256:notificationConfig?.notificationApprovalSha256,notificationDestinationSha256:notificationConfig?.destinationSha256,notificationProvider:notificationConfig?.provider,resourceLimits:{...(flags['--codex-concurrency']?{'codex-subscription':Number(flags['--codex-concurrency'])}:{}),...(flags['--omp-b-concurrency']?{'omp-b':Number(flags['--omp-b-concurrency'])}:{})},...(typeof flags['--drain-file']==='string'?{drainFile:flags['--drain-file']}:{})});
     process.stdout.write(JSON.stringify(result)+'\n');if(result.state==='held')process.exitCode=2;
+    if(result.drained){
+      const {step,completed,remaining}=result.drained;
+      process.stderr.write(`R1_STAGE_DRAINED step=${step} completed=${completed} remaining=${remaining}\n`);
+      process.exitCode=R1_STAGE_DRAIN_EXIT_CODE;
+    }
     return result;
   } finally {
     shutdown.removeEventListener('abort',stop);process.stdin.removeListener('end',stop);process.stdin.removeListener('close',stop);process.stdin.pause();await pool.end();
