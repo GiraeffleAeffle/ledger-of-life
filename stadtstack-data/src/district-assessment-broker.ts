@@ -15,7 +15,7 @@ import type {ModelAnswer} from './district-model-contract.ts';
 import {StepReceiptSchema,encodeStepReceipt,type ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
-import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,type OmpOutputRejection,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionVersions,ompOutputRejectionFromVersions,type OmpOutputRejection,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
@@ -41,7 +41,7 @@ export function assessmentBridgeFailureVersions(leaseId:string,error:unknown):Re
  if(check.success)versions.ompDecodeCheck=check.data;
  if(error instanceof OmpAssessmentOutputRejected){
   const rejection=OmpOutputRejectionSchema.safeParse(error.rejection);
-  if(rejection.success)versions.ompOutputRejection=canonicalJson(rejection.data);
+  if(rejection.success)Object.assign(versions,ompOutputRejectionVersions(rejection.data));
  }
  return versions;
 }
@@ -89,10 +89,9 @@ export async function settledOmpOutputRejectionLeases(pool:Pick<Pool,'query'>,jo
  for(const row of rows.rows){
   const parsed=StepReceiptSchema.safeParse(row.receipt);if(!parsed.success)continue;const receipt=parsed.data,v=receipt.versions;
   if(receipt.id!==row.receipt_id||receipt.jobKey!==jobKey||receipt.runId!==row.run_id||receipt.leaseToken!==String(row.fencing_token)||receipt.step!=='assessment_b'||receipt.outcome!=='held_quality'||receipt.reasonCode!=='quality_failed'||encodeStepReceipt(receipt).sha256!==row.receipt_hash||v.transport!=='vm-omp-docker'||v.ompContainerExitCode!=='0'||v.ompBridgeLeaseId!==row.id)continue;
-  let raw:unknown;try{raw=JSON.parse(v.ompOutputRejection??'');}catch{continue;}
-  const proof=OmpOutputRejectionSchema.safeParse(raw);if(!proof.success||v.ompDecodeCheck!==proof.data.check)continue;
+  const proof=ompOutputRejectionFromVersions(v);if(!proof)continue;
   const binding={leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,itemSha256:row.item_sha256,requestSha256:row.request_sha256};
-  const expected=rejectedOmpArtifacts(binding,proof.data);
+  const expected=rejectedOmpArtifacts(binding,proof);
   if(row.intent_sha256!==semanticHash({version:ASSESSMENT_BRIDGE_VERSION,leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,clientId:'vm-omp-docker',provider:'anthropic-subscription',model:'claude-haiku-5-5'})
    ||row.submission_sha256!==expected.submissionSha256||v.ompSubmissionSha256!==row.submission_sha256||v.ompOutputSettlementSha256!==expected.answerSha256
    ||row.provider_response_sha256!==expected.responseSha256||row.answer_artifact_sha256!==expected.answerSha256||row.reconciliation_input_sha256!==expected.reconciliationSha256)continue;

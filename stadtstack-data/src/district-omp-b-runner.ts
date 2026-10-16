@@ -58,6 +58,7 @@ const OmpTextUpdateSchema=z.discriminatedUnion('type',[
 const outputJsonSchema=object(z.toJSONSchema(assessmentOutputSchema));
 const approvedOutputPaths=new Set<string>();
 function collectOutputPaths(schema:Record<string,unknown>,path:string,depth=0):void{
+ if(Buffer.byteLength(JSON.stringify(path))>200)return;
  approvedOutputPaths.add(path);if(depth>=12)return;
  if(typeof schema.$ref==='string'&&schema.$ref.startsWith('#/')){
   let target:unknown=outputJsonSchema;for(const key of schema.$ref.slice(2).split('/'))target=object(target)[key.replaceAll('~1','/').replaceAll('~0','~')];
@@ -79,6 +80,28 @@ export type OmpOutputRejection=z.infer<typeof OmpOutputRejectionSchema>;
 export class OmpAssessmentOutputRejected extends OmpRunnerHold{
  readonly rejection:OmpOutputRejection;
  constructor(rejection:OmpOutputRejection){const checked=OmpOutputRejectionSchema.parse(rejection);super('event_stream',undefined,undefined,0,checked.check);this.rejection=checked;}
+}
+/** Each receipt version value must fit the existing 256-byte identifier codec. */
+export function ompOutputRejectionVersions(input:OmpOutputRejection):Record<string,string>{
+ const proof=OmpOutputRejectionSchema.parse(input);
+ const versions:Record<string,string>={ompOutputRejectionVersion:proof.version,ompDecodeCheck:proof.check,ompOutputStreamSha256:proof.streamSha256,ompOutputSha256:proof.outputSha256,ompOutputIssueCount:String(proof.issueCount)};
+ proof.issues.forEach((issue,index)=>{versions['ompOutputIssue'+index]=canonicalJson(issue);});
+ return versions;
+}
+export function ompOutputRejectionFromVersions(versions:Record<string,string>):OmpOutputRejection|null{
+ if(versions.ompOutputRejectionVersion!=='omp-output-rejection-v1')return null;
+ const count=Number(versions.ompOutputIssueCount);
+ if(!Number.isSafeInteger(count)||count<1||String(count)!==versions.ompOutputIssueCount)return null;
+ const length=Math.min(count,32),issues:unknown[]=[];
+ for(const key of Object.keys(versions))if(/^ompOutputIssue\d+$/.test(key)){
+  const index=Number(key.slice('ompOutputIssue'.length));if(index>=length||key!=='ompOutputIssue'+index)return null;
+ }
+ for(let index=0;index<length;index++){
+  const encoded=versions['ompOutputIssue'+index];if(typeof encoded!=='string'||Buffer.byteLength(encoded)>256)return null;
+  try{issues.push(JSON.parse(encoded));}catch{return null;}
+ }
+ const proof=OmpOutputRejectionSchema.safeParse({version:versions.ompOutputRejectionVersion,check:versions.ompDecodeCheck,streamSha256:versions.ompOutputStreamSha256,outputSha256:versions.ompOutputSha256,issueCount:count,issues});
+ return proof.success?proof.data:null;
 }
 function outputIssuePath(parts:readonly PropertyKey[]):string{
  let path='$';

@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -19,7 +19,7 @@ import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisi
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {assessmentBridgeHoldReason,assessmentBridgeFailureVersions} from '../src/district-assessment-broker.ts';
 import {DistrictExecutionHold} from '../src/district-jobs.ts';
-import {ReasonCodeSchema} from '../src/district-step-receipt.ts';
+import {ReasonCodeSchema,StepReceiptSchema} from '../src/district-step-receipt.ts';
 import {OmpFailureKindSchema,OmpDecodeCheckSchema} from '../src/district-exception-diagnostics.ts';
 
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
@@ -160,6 +160,12 @@ test('settled output rejection requires a complete single-response stream and ke
   assert.equal(assessmentBridgeHoldReason(rejected),'quality_failed');OmpOutputRejectionSchema.parse(rejected.rejection);
   const versions=assessmentBridgeFailureVersions('synthetic-lease',rejected);
   assert.equal(versions.ompDecodeCheck,check);assert.doesNotMatch(JSON.stringify(versions),/PRIVATE_|sk-ant-oat/);
+  StepReceiptSchema.shape.versions.parse(versions);
+  assert.ok(Object.values(versions).every(value=>Buffer.byteLength(value)<=256));
+  assert.deepEqual(ompOutputRejectionFromVersions(versions),rejected.rejection);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputIssue0:'{"code":"PRIVATE_PROSE","path":"$"}'}),null);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputIssueCount:'01'}),null);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputIssue32:'{"code":"invalid_type","path":"$"}'}),null);
   assert.equal(rejected.rejection.streamSha256,digest(stdout));assert.equal(rejected.rejection.outputSha256,digest(text));
   if(check==='output_schema')assert.ok(rejected.rejection.issues.some(issue=>issue.path==='$.scores.correctness'));
   const truncated=stdout.split('\n').slice(0,-2).join('\n')+'\n';
@@ -202,6 +208,9 @@ test('output diagnostics bound issue cardinality and reject forged paths or pros
  assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:message({content:[{type:'text',text}]})}]),0),(error:unknown)=>{
   assert.ok(error instanceof OmpAssessmentOutputRejected);assert.equal(error.rejection.issues.length,32);assert.ok(error.rejection.issueCount>32);
   assert.doesNotMatch(JSON.stringify(error.rejection),/PRIVATE_/);
+  const versions=assessmentBridgeFailureVersions('synthetic-lease',error);
+  StepReceiptSchema.shape.versions.parse(versions);
+  assert.deepEqual(ompOutputRejectionFromVersions(versions),error.rejection);
   assert.equal(OmpOutputRejectionSchema.safeParse({...error.rejection,issues:[{code:'invalid_type',path:'$.PRIVATE_FIELD'}],issueCount:1}).success,false);
   return true;
  });
