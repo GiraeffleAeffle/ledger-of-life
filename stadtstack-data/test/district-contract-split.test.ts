@@ -63,6 +63,12 @@ test('exception stderr diagnostics do not enter queued semantics or the OMP runn
   assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
  }
 });
+test('notification presentation stays outside every semantic contract and the OMP runner contract',async()=>{
+ for(const file of ['district-notifications.ts','district-jobs.ts']){
+  for(const [name,{compute}] of Object.entries(contracts))assert.deepEqual(await compute(change(file)),await compute(hash),name+': '+file);
+  assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
+ }
+});
 
 test('host resolver and native image cutovers change only B contracts among the scoped queued job contracts',async()=>{
  for(const file of ['district-omp-b-runner.ts','../scripts/build-omp-b-image.sh','../docker/omp-b/Dockerfile','../docker/omp-b/natives.sha256']){

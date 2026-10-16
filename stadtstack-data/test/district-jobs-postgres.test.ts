@@ -629,6 +629,33 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const receipts=await pool.query("SELECT receipt->>'reasonCode' AS reason FROM district_pipeline.step_receipts WHERE run_id=$1",[result.runId]);assert.equal(receipts.rows[0].reason,result.reasonCode);
   });
 
+  await t.test('ntfy quiet presentation gets database source/step context without changing durable payloads or startup admission',async()=>{
+    const identity={notificationApprovalSha256:pipelineNotificationConfig.notificationApprovalSha256,notificationDestinationSha256:pipelineNotificationConfig.destinationSha256,notificationProvider:'ntfy'};
+    for(const held of [false,true]){
+      const name=held?'quiet-held':'quiet-completed',key=await store.enqueue(jobSpec(name));
+      const authorizationId=await authorize([key],{mode:'bounded_unattended',...identity}),phases:string[]=[];
+      const result=await runDistrictJobs({store,cas,handlers:{verify_artifacts:async({job})=>{
+        const startup=await pool.query<{state:string}>(`SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1 AND phase='startup'`,[job.runId]);
+        assert.equal(startup.rows[0].state,'delivered');
+        return held?{outcome:'held_execution',reasonCode:'execution_exception'}:{outcome:'succeeded',reasonCode:'completed'};
+      }},authorizationId,mode:'bounded_unattended',maxJobs:1,maxElapsedMs:60000,...identity,notifyOwner:async(notification,signal,context)=>{
+        if(notification.phase==='startup')assert.equal(context,undefined);
+        else assert.deepEqual(context,{scopes:[{sourceId:'synthetic-'+name,step:'verify_artifacts'}],hasHolds:held});
+        const durable=await pool.query<{payload:OwnerNotification;payload_sha256:string}>('SELECT payload,payload_sha256 FROM district_pipeline.owner_notifications WHERE id=$1',[notification.id]);
+        assert.deepEqual(durable.rows[0].payload,notification);assert.equal(durable.rows[0].payload_sha256,digest(canonicalJson(notification)));
+        return sendPipelineNotification(notification,{readToken:async()=> 'synthetic_fixture_publisher_token',send:async(_url,init)=>{
+          phases.push(notification.phase);const headers=new Headers(init?.headers),routine=notification.phase==='startup'||!held;
+          assert.equal(headers.get('Priority'),routine?'1':null);
+          assert.equal(headers.get('Title'),notification.phase==='startup'?'R1 run start (routine)':held?'R1 needs attention: synthetic-quiet-held / verify artifacts (execution_exception)':'R1 run complete (routine)');
+          return new Response(JSON.stringify({id:randomUUID(),event:'message',topic:'pipeline',message:String(init?.body),time:Math.floor(Date.now()/1000)}));
+        }},signal,context);
+      }});
+      assert.equal(result.state,held?'held':'completed');assert.deepEqual(phases,['startup','disposition']);
+      const outbox=await pool.query<{state:string}>('SELECT state FROM district_pipeline.owner_notifications WHERE run_id=$1',[result.runId]);
+      assert.equal(outbox.rowCount,2);for(const row of outbox.rows)assert.equal(row.state,'delivered');
+    }
+  });
+
   await t.test('bounded unattended mode proves approved channel readiness before work and stores real acknowledgement identities',async()=>{
     const approval=digest('approved-notification-route'),destination=digest('synthetic-approved-destination'),provider='ntfy',key=await store.enqueue(jobSpec('bounded-approved'));
     const identity={notificationApprovalSha256:approval,notificationDestinationSha256:destination,notificationProvider:provider};
