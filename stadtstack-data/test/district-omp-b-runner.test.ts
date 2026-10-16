@@ -40,6 +40,22 @@ test('omp event inspection accepts a completed text-only message and repeated co
  assert.equal(inspected.usage.perModel['claude-haiku-5-5']!.cliEstimatedApiCostUsd,0.1);
 });
 
+test('observed omp 18.9.2 envelope permits its user message, strict text updates and completedAt-only enrichment',()=>{
+ // Field shapes observed in the one authorized source-free diagnostic; all
+ // values below are invented fixtures, not recorded model output.
+ const text=JSON.stringify(answer),original=message({duration:10,ttft:1,requestControls:{fixture:true}});
+ const user={role:'user',content:[{type:'text',text:'Synthetic diagnostic fixture only.'}]};
+ const events=[{type:'session'},{type:'agent_start'},{type:'turn_start'},
+  {type:'message_start',message:user},{type:'message_end',message:user},
+  {type:'message_start',message:{role:'assistant',content:[]}},
+  {type:'message_update',assistantMessageEvent:{type:'text_start',contentIndex:0}},
+  {type:'message_update',assistantMessageEvent:{type:'text_delta',contentIndex:0,delta:text}},
+  {type:'message_update',assistantMessageEvent:{type:'text_end',contentIndex:0,content:text}},
+  {type:'message_end',message:{...original,completedAt:1791800000100}},
+  {type:'turn_end',message:original,toolResults:[]},{type:'agent_end',messages:[user,original]}];
+ assert.deepEqual(inspectOmpEvents(events.map(event=>JSON.stringify(event)).join('\n')+'\n',0).value,answer);
+});
+
 test('omp event inspection rejects tool use, terminal failures, wrong route, extra messages, malformed and incomplete streams',()=>{
  const invalid=[
   eventStream([{type:'tool_call',toolName:'shell'}]),
