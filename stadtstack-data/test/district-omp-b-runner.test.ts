@@ -404,7 +404,7 @@ test('response copies allow only completedAt enrichment, not conflicting substan
   message({responseId:'msg-two'}),
  ])assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_end',message:final},{type:'turn_end',message:copy,toolResults:[]}]),0));
  const withoutId=message({responseId:undefined});
- assert.doesNotThrow(()=>inspectOmpEvents(eventStream([{type:'message_end',message:{...withoutId,completedAt:1791800000100}},{type:'agent_end',messages:[withoutId]}]),0));
+ assert.doesNotThrow(()=>inspectOmpEvents(eventStream([{type:'message_end',message:{...withoutId,completedAt:1791800000100}},{type:'turn_end',message:withoutId,toolResults:[]},{type:'agent_end',messages:[withoutId]}]),0));
  assert.throws(()=>inspectOmpEvents(eventStream([{type:'turn_start'},{type:'message_end',message:final},{type:'turn_start'},{type:'agent_end',messages:[original]}]),0));
  assert.throws(()=>inspectOmpEvents(eventStream([{type:'message_start',message:{role:'assistant'}},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message:final}]),0));
 });
