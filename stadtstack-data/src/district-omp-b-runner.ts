@@ -452,7 +452,11 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  if(!after||after.dev!==initial.dev||after.ino!==initial.ino||after.size!==initial.size||after.mtimeMs!==initial.mtimeMs||after.ctimeMs!==initial.ctimeMs||afterSha!==binarySha256){token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  return {token,version:review.hostResolverVersion,binarySha256,accountLabelSha256};
 }
-export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;controlMode:'0444';accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization}
+/** Produced only after container absence and canonical scratch closure have both
+ * completed. This is not the Mac client's stronger file-write-denial assertion. */
+export const OmpNativeCleanupSchema=z.object({version:z.literal('omp-native-cleanup-v1'),requestSha256:hash,responseSha256:hash,runnerContractSha256:hash,imageId:image,scratchId:z.uuid(),containerId:hash,containerRemoved:z.literal(true),managedScratchClosed:z.literal(true),completedAt:z.iso.datetime()}).strict();
+export type OmpNativeCleanup=z.infer<typeof OmpNativeCleanupSchema>;
+export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;controlMode:'0444';accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization;cleanup:OmpNativeCleanup}
 /** A failed control/provider lease must not quarantine the shared evidence CAS.
  * The sibling is separately enrolled with the same authority/source bindings. */
 export function ompAssessmentScratchRoot(root:string):string{
@@ -528,7 +532,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
   runSignal.throwIfAborted();
   const socket=await canonicalDockerSocket(review.dockerSocket);
   if(await dockerDaemonIdentity(socket,runSignal)!==review.dockerDaemonId)throw new OmpRunnerHold('security_review_required');
-  return await withManagedSourceScratch(ompAssessmentScratchRoot(context.root),context.bindings,async scope=>{
+  const {scratchId,containerId,...run}=await withManagedSourceScratch(ompAssessmentScratchRoot(context.root),context.bindings,async scope=>{
    let container:ManagedDockerContainer|undefined,token:Buffer|undefined,payload:Buffer|undefined;
    const output:Buffer[]=[],errors:Buffer[]=[];let outputBytes=0,errorBytes=0;
    const aborted=Promise.withResolvers<never>(),onAbort=()=>aborted.reject(scope.signal.reason);
@@ -578,7 +582,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const {outputNormalization,outputStructure,...modelResult}=parsed;
     const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{}};
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{},scratchId:basename(scope.directory),containerId:container.id};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An
@@ -586,6 +590,9 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     try{await container?.remove();}finally{token?.fill(0);payload?.fill(0);for(const chunk of output)chunk.fill(0);for(const chunk of errors)chunk.fill(0);}
    }
   },{...context,purpose:'artifact',signal:runSignal});
+  // Both the callback's supervised removal and the scope's final cleanScratch
+  // must resolve before this acknowledgement exists; a failed cleanup throws.
+  return {...run,cleanup:OmpNativeCleanupSchema.parse({version:'omp-native-cleanup-v1',requestSha256:run.outputStructure.delivery.requestSha256,responseSha256:run.answer.responseSha256,runnerContractSha256:contract,imageId:review.imageId,scratchId,containerId,containerRemoved:true,managedScratchClosed:true,completedAt:new Date().toISOString()})};
  }catch(error){
   if(error instanceof OmpRunnerHold)throw error;
   if(deadline.signal.aborted)throw new OmpRunnerHold('resource_limit');

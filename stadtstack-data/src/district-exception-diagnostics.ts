@@ -119,15 +119,26 @@ function firstSourceFrame(error:{stack?:unknown;name?:unknown;message?:unknown})
   if(!stack.startsWith(prefix)||!stack.startsWith(message,prefix.length)||boundary!==undefined&&boundary!=='\r'&&boundary!=='\n')return 'none';
   frames=stack.slice(offset);
  }
- const frame=/^[ \t]*at ([^\r\n]*)/m.exec(frames);
- const location=frame&&/(?:^|[ (])((?:file:\/\/\/|\/)[^()\s]+):([1-9][0-9]{0,9}):[1-9][0-9]{0,9}\)?$/.exec(frame[1]);
- if(!location)return 'none';
- const path=location[1].startsWith('file:')?fileURLToPath(location[1]):location[1],source=relative(sourceRoot,path),line=Number(location[2]);
- if(isAbsolute(source)||!Object.hasOwn(sourceFiles,source)||line>sourceFiles[source])return 'none';
- return 'src/'+source+':'+line;
+ for(const frame of frames.matchAll(/^[ \t]*at ([^\r\n]*)/gm)){
+  const location=/(?:^|[ (])((?:file:\/\/\/|\/)[^()\s]+):([1-9][0-9]{0,9}):[1-9][0-9]{0,9}\)?$/.exec(frame[1]);
+  if(!location)continue;
+  const path=location[1].startsWith('file:')?fileURLToPath(location[1]):location[1],source=relative(sourceRoot,path),line=Number(location[2]);
+  if(!isAbsolute(source)&&Object.hasOwn(sourceFiles,source)&&line<=sourceFiles[source])return 'src/'+source+':'+line;
+ }
+ return 'none';
 }
 /** Content-free stderr projection only; never persisted or used for disposition. */
 export async function formatDistrictJobException(jobKey:string,step:string,error:unknown):Promise<string> {
+ // Unwrap only this project's real execution wrapper and only an own data
+ // property. Never invoke an untrusted cause accessor or emit arbitrary text.
+ try{
+  const classes=await(classCatalogue??=errorClasses());
+  for(let depth=0;depth<8&&error!==null&&typeof error==='object'&&classes.get(Object.getPrototypeOf(error))==='DistrictExecutionHold';depth++){
+   const cause=Object.getOwnPropertyDescriptor(error,'cause')?.value;
+   if(cause===null||typeof cause!=='object'||cause===error)break;
+   error=cause;
+  }
+ }catch{}
  let errorClass='other',code='other',at='none';
  if(error!==null&&(typeof error==='object'||typeof error==='function')){
   const value=error as {code?:unknown;stack?:unknown;name?:unknown;message?:unknown};

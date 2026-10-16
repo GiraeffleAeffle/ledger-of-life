@@ -16,8 +16,9 @@ import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {inspectOmpEvents,OmpAssessmentOutputRejected,ompAssessmentControl} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,OmpAssessmentOutputRejected,ompAssessmentControl,ompRunnerContractSha256,OmpNativeCleanupSchema,type runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {ompOutputStructureFromVersions} from '../src/district-omp-output-diagnostics.ts';
+import {modelIdentitySha256} from '../src/district-model-contract.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
 // Nothing invokes SSH, provider binaries, external sources or notification networks.
@@ -25,11 +26,12 @@ const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 const clientContractSha256=digest('synthetic-deny-write-client-contract');
 const identity={provider:'anthropic-subscription' as const,tool:'claude-cli' as const,toolVersion:'0.0.0-synthetic-test-only',model:'claude-haiku-5-5' as const,modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
 const evidence={...identity,modelIdentitySha256:createHash('sha256').update(JSON.stringify(identity)).digest('hex')};
+function outputFor(data:BridgeLease['data']):AssessmentOutput{
+ const input=data as {itemId:string;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]},source=input.evidence[0],locator=source.locators[0];
+ return {itemId:input.itemId,outcome:'supported',assertions:[{claimId:'claim1',sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:2,sources:2,usefulness:1},holdReasons:[],rationale:'Synthetic bridge integration fixture, never a civic assessment.',valueReview:null};
+}
 function answerFor(lease:BridgeLease){
- const data=lease.data as {itemId:string;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
- const source=data.evidence[0],locator=source.locators[0];
- const output:AssessmentOutput={itemId:data.itemId,outcome:'supported',assertions:[{claimId:'claim1',sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:2,sources:2,usefulness:1},holdReasons:[],rationale:'Synthetic bridge integration fixture, never a civic assessment.',valueReview:null};
- const startedAt=new Date().toISOString(),finishedAt=new Date().toISOString();
+ const output=outputFor(lease.data),startedAt=new Date().toISOString(),finishedAt=new Date().toISOString();
  const stdout=[JSON.stringify({type:'system',subtype:'init',tools:[],mcp_servers:[],model:identity.model}),JSON.stringify({type:'assistant',message:{id:'msg_synthetic_'+lease.leaseId,model:identity.model,content:[]}}),JSON.stringify({type:'result',subtype:'success',is_error:false,model:identity.model,request_id:'req_synthetic_'+lease.leaseId,structured_output:output,usage:{input_tokens:11,output_tokens:7},total_cost_usd:0.003})].join('\n')+'\n';
  return {stdout,evidence,startedAt,finishedAt};
 }
@@ -38,7 +40,7 @@ function submitFor(lease:BridgeLease){
  return {operation:'submit' as const,leaseId:lease.leaseId,inputSha256:lease.inputSha256,purgeAck:{sourceFiles:0 as const,responseFiles:0 as const,modelFileWritesDenied:true as const,completedAt:new Date().toISOString()},answer};
 }
 
-async function fixture(pool:Pool,name:string){
+async function fixture(pool:Pool,name:string,fixtureOmpRunner?:typeof runVmOmpAssessment){
  const directory=await mkdtemp(join(await realpath(tmpdir()),'assessment-broker-test-'));
  const stateDir=join(directory,'policy');
  // Explicit isolated TEST owner provisioning, never broker auto-provisioning.
@@ -46,7 +48,7 @@ async function fixture(pool:Pool,name:string){
  const policyOptions={stateDir,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  const cas=new DistrictCas(join(directory,'cas'),{maxBytes:1024*1024});
  await initializeManagedAcquisitionLane(cas.root,{...policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
- const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions,fixtureProtocol:true});
+ const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions,fixtureProtocol:true,...fixtureOmpRunner?{fixtureOmpRunner}:{}});
  const text='Synthetic original evidence '+name+' '+randomUUID()+'.',sourceSha256=digest(text),sourceId='source-'+randomUUID(),url='https://example.org/'+sourceId+'.txt';
  const scope={publisherId:'synthetic-test',sourceId,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-11'};
  const now=Date.now(),checkedAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+120000).toISOString();
@@ -153,6 +155,53 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const nativeRun=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId:nativeAuthorization,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
   assert.equal(nativeRun.state,'held');assert.equal(nativeRun.reasonCode,'isolation_unavailable');
   assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[nativeKey])).rowCount,0);
+ });
+
+ for(const mode of ['accepted','quality','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const)await t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
+  let calls=0,stderr='';
+  st.mock.method(process.stderr,'write',((chunk:unknown)=>{stderr+=String(chunk);return true;}) as typeof process.stderr.write);
+  st.after(()=>st.mock.restoreAll());
+  const runner:typeof runVmOmpAssessment=async(data,_context,_signal,deps)=>{
+   calls++;await deps?.beforeHandoff?.();
+   if(mode==='cleanup_failure')throw new CivicPolicyStateError('SCRATCH_CLEANUP_INCOMPLETE');
+   const startedAt=new Date().toISOString(),control=ompAssessmentControl(),request=Buffer.from(canonicalJson(data));
+   const output=outputFor(data);if(mode==='quality'){output.outcome='unresolved';output.scores.usefulness=0;}
+   const message={role:'assistant',responseId:'synthetic-native-response',timestamp:Date.now(),provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:canonicalJson(output)}],usage:{input:11,output:7,cacheRead:0,cacheWrite:0,totalTokens:18,cost:{total:0.003}}};
+   const stdout=[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(event=>JSON.stringify(event)).join('\n')+'\n';
+   const {outputStructure,outputNormalization,...parsed}=inspectOmpEvents(stdout,0,{requestSha256:digest(request),systemPromptSha256:control.systemPromptSha256,stdin:{intendedBytes:request.length,deliveredBytes:request.length,deliveredSha256:digest(request),frameBytes:request.length+25}});
+   const nativeIdentity={...identity,tool:'omp-cli' as const,toolVersion:'omp/18.9.2 sha256:'+digest('synthetic binary')},modelEvidence={...nativeIdentity,modelIdentitySha256:modelIdentitySha256(nativeIdentity)};
+   const finishedAt=new Date().toISOString(),imageId='sha256:'+digest('synthetic image'),runnerContractSha256=await ompRunnerContractSha256();
+   const cleanup=OmpNativeCleanupSchema.parse({version:'omp-native-cleanup-v1',requestSha256:digest(request),responseSha256:parsed.responseSha256,runnerContractSha256,imageId,scratchId:randomUUID(),containerId:digest('synthetic container'),containerRemoved:true,managedScratchClosed:true,completedAt:new Date().toISOString()});
+   if(mode==='cleanup_request')cleanup.requestSha256=digest('wrong request');
+   if(mode==='cleanup_incomplete')Object.assign(cleanup,{managedScratchClosed:false});
+   return {answer:{...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]},stdout,startedAt,finishedAt,imageId,settingsSha256:digest('synthetic settings'),systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,controlMode:'0444',accountLabelSha256:digest('synthetic account'),runnerContractSha256,toolVersion:nativeIdentity.toolVersion,outputStructure,...outputNormalization?{outputNormalization}:{},cleanup};
+  };
+  const f=await fixture(db,'native-'+mode,runner);directories.push(f.directory);
+  assert.throws(()=>new DistrictAssessmentBroker(db,f.cas,{policyOptions:f.policyOptions,fixtureOmpRunner:runner}),{name:'DistrictExecutionHold',message:'authorization_revoked'});
+  const key=await enqueueAssessmentB(f.broker,{itemArtifactSha256:f.itemArtifact.sha256,sourceScope:f.proof.receipt.scope,policyProofSha256:f.proof.receiptSha256,transport:'vm-omp'});
+  if(mode==='commit_failure'){
+   const jobId=(await db.query<{id:string}>('SELECT id FROM district_pipeline.jobs WHERE job_key=$1',[key])).rows[0]!.id;
+   await db.query(`ALTER TABLE district_pipeline.assessment_bridge_leases ADD CONSTRAINT synthetic_native_commit CHECK(state<>'submitted' OR job_id<>'${jobId}'::uuid)`);
+   st.after(async()=>{await db.query('ALTER TABLE district_pipeline.assessment_bridge_leases DROP CONSTRAINT synthetic_native_commit');});
+  }
+  const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+  const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+  assert.equal(calls,1);
+  const accepted=mode==='accepted'||mode==='quality';
+  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'completed'):'execution_exception');
+  const lease=(await db.query(`SELECT l.id,l.input_sha256,l.state,l.receipt_sha256,l.purge_ack_sha256,s.state AS submission_state FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id LEFT JOIN district_pipeline.assessment_bridge_submissions s ON s.lease_id=l.id WHERE j.job_key=$1`,[key])).rows[0];
+  if(!accepted){
+   assert.equal(lease.state,'held');assert.equal(lease.submission_state,null);assert.equal(lease.receipt_sha256,null);assert.equal(lease.purge_ack_sha256,null);
+   if(mode==='commit_failure')assert.match(stderr,/R1_EXCEPTION job=[a-f0-9]{12} step=assessment_b class=DatabaseError code=23514 at=src\/district-assessment-broker\.ts:[0-9]+\n/);
+   if(mode==='cleanup_failure')assert.match(stderr,/class=CivicPolicyStateError code=SCRATCH_CLEANUP_INCOMPLETE/);
+   assert.doesNotMatch(stderr,/kind=output_accepted/);return;
+  }
+  assert.equal(lease.state,'submitted');assert.equal(lease.submission_state,'accepted');assert.match(lease.receipt_sha256,/^[a-f0-9]{64}$/);assert.match(lease.purge_ack_sha256,/^[a-f0-9]{64}$/);
+  const ackBytes=await f.cas.read(lease.purge_ack_sha256),ack=JSON.parse(ackBytes.toString('utf8'));
+  assert.equal(digest(ackBytes),lease.purge_ack_sha256);assert.equal(ack.version,'assessment-vm-omp-purge-ack-v1');assert.equal(ack.leaseId,lease.id);assert.equal(ack.inputSha256,lease.input_sha256);OmpNativeCleanupSchema.parse(ack.cleanup);
+  assert.equal('modelFileWritesDenied' in ack,false,'Native cleanup never fabricates the Mac denial claim');
+  const receipt=(await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[key])).rows[0]!.receipt;
+  assert.ok(receipt.outputHashes.includes(lease.purge_ack_sha256));assert.equal(receipt.versions.ompPurgeAckSha256,lease.purge_ack_sha256);assert.equal(receipt.provider?.tokens.output,7);assert.equal(receipt.provider?.reservedMicroUsd,0);assert.match(stderr,/kind=output_accepted/);
  });
 
  await t.test('intent commits before transfer; genuine answer, inputs and purge acknowledgement persist on the VM',async()=>{

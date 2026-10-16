@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions,OmpNativeCleanupSchema} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
@@ -40,6 +40,12 @@ test('omp event inspection accepts a completed text-only message and repeated co
  assert.equal(inspected.returnedModel,'claude-haiku-5-5');assert.deepEqual(inspected.usage.topLevel,{inputTokens:7,outputTokens:3,cacheReadTokens:5,cacheCreationTokens:2});
  assert.equal(inspected.usage.cliEstimatedApiCostUsd,0.1);
  assert.equal(inspected.usage.perModel['claude-haiku-5-5']!.cliEstimatedApiCostUsd,0.1);
+});
+test('native cleanup acknowledgement requires complete typed absence evidence and never accepts Mac denial claims',()=>{
+ const cleanup={version:'omp-native-cleanup-v1',requestSha256:digest('request'),responseSha256:digest('response'),runnerContractSha256:digest('runner'),imageId:'sha256:'+digest('image'),scratchId:'00000000-0000-4000-8000-000000000001',containerId:digest('container'),containerRemoved:true,managedScratchClosed:true,completedAt:'2026-10-16T12:00:00.000Z'};
+ assert.deepEqual(OmpNativeCleanupSchema.parse(cleanup),cleanup);
+ for(const changed of [{containerRemoved:false},{managedScratchClosed:false},{containerId:'unknown'},{scratchId:'unknown'},{completedAt:null},{modelFileWritesDenied:true}])assert.equal(OmpNativeCleanupSchema.safeParse({...cleanup,...changed}).success,false);
+ for(const key of Object.keys(cleanup)){const missing={...cleanup} as Record<string,unknown>;delete missing[key];assert.equal(OmpNativeCleanupSchema.safeParse(missing).success,false,key);}
 });
 
 test('observed omp 18.9.2 envelope permits its user message, strict text updates and completedAt-only enrichment',()=>{

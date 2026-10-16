@@ -43,9 +43,9 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
 // cutover. B/runner pins advance for native diagnostics, unlocked evidence,
 // immutable native image addons, settled decoder rejection and physical inventory repacking;
 // terminal sealing adds no semantic change.
-test('terminal sealing preserves four scoped contracts and parser security through the B control cutover',async()=>{
+test('terminal sealing preserves four scoped contracts and parser security through the B acceptance cutover',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'75edda4227688dd7944a66ea8b4d6a24fd20017cf3863bf24bb51d1097e2649c');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'60d8313a3015271b973ff7c31b1d2ddd76374d79bb84d52be2b5f7b8bae0f571');
+ assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'fd05f9d217ecf6b59e7fdefcc5bc941e10563e0ae3077929505800fc018537c1');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'f2127aaa6029dfe938d703f61f99083f6736e9c8ede68c6544f2dae68a86fba9');
  assert.equal(await parserIsolationContractSha256(),'2917aca62d207e39159e3191c7ea51125aea24dd1fd37339f424111c03b25764');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
 });
