@@ -583,7 +583,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const preparedRun=await runDistrictJobs({store,cas:item.cas,handlers:{residual_prepare:prepareFixture},authorizationId:preparationAuthorization,ownerPresent:true,maxJobs:1,maxElapsedMs:120000});
    assert.equal(preparedRun.jobsStarted,1,canonicalJson(preparedRun));
    const preparationRows=await pool!.query('SELECT receipt FROM district_pipeline.step_receipts WHERE run_id=$1',[preparedRun.runId]),preparedReceipt=preparationRows.rows[0].receipt;
-   assert.equal(preparedReceipt.outcome,'succeeded');assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
+   assert.equal(preparedReceipt.outcome,'succeeded',canonicalJson({outcome:preparedReceipt.outcome,reasonCode:preparedReceipt.reasonCode,elapsedMs:preparedReceipt.elapsedMs,runState:preparedRun.state,runReason:preparedRun.reasonCode}));assert.equal(preparedReceipt.policyProofSha256,original.policyReceiptSha256);
    assert.equal(preparedReceipt.versions[`policyRebinding.${original.policyReceiptSha256}.${secondReceipt.receipt_sha256}`],checked.admissibilityReceiptSha256);
    const prepared=JSON.parse((await item.cas.read(textOutput.parserSha256!)).toString('utf8')),rubric='Synthetic exact-original policy continuation fixture';
    const locators=[{id:'synthetic-original',page:null,table:null,start:0,end:prepared.text.length}];
