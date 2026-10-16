@@ -40,6 +40,7 @@ export function assessmentBridgeFailureVersions(leaseId:string,error:unknown):Re
  if(exit.success)versions.ompContainerExitCode=String(exit.data);
  const check=OmpDecodeCheckSchema.safeParse(error.decodeCheck);
  if(check.success)versions.ompDecodeCheck=check.data;
+ if(error.controlMode==='0444')versions.ompControlMode='0444';
  if(error instanceof OmpAssessmentOutputRejected){
   const rejection=OmpOutputRejectionSchema.safeParse(error.rejection);
   if(rejection.success)Object.assign(versions,ompOutputRejectionVersions(rejection.data));
@@ -573,7 +574,7 @@ export class DistrictAssessmentBroker {
    if(receipt.requestSha256!==row.request_sha256||receipt.schemaSha256!==run.outputSchemaSha256||receipt.dependencies.length||receipt.provider!=='anthropic-subscription'||Date.parse(run.startedAt)<prepared.claimedAt.getTime()||Date.parse(run.finishedAt)>Math.min(row.expires_at.getTime(),receivedAt.getTime()))throw new DistrictExecutionHold('quality_failed');
    const structure=OmpOutputStructureSchema.parse(run.outputStructure);
    if(structure.delivery.requestSha256!==row.request_sha256||structure.delivery.systemPromptSha256!==run.systemPromptSha256)throw new DistrictExecutionHold('quality_failed');
-   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',...run.outputNormalization?{ompOutputNormalization:run.outputNormalization}:{}};
+   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',ompControlMode:run.controlMode,...run.outputNormalization?{ompOutputNormalization:run.outputNormalization}:{}};
    const transport={selector:'anthropic/claude-haiku-5-5',transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'The source-free control prompt includes the exact frozen output schema; stock omp may append generated context, footer, date, or cwd material despite this pinned file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,outputSchemaSha256:run.outputSchemaSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256,outputStructure:structure,...normalizationVersions};
    const response=await this.persist(Buffer.from(run.stdout),'provider_response',checked.checked.sources,row.id,'application/x-ndjson');
    const answer=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v1',inputSha256:row.input_sha256,responseArtifactSha256:response.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived',checked.checked.sources,row.id);

@@ -35,7 +35,8 @@ export class OmpRunnerHold extends Error {
  /** Present only after an actual container completion, never a guessed code. */
  readonly containerExitCode?:number;
  readonly decodeCheck?:OmpDecodeCheck;
- constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind,containerExitCode?:number,decodeCheck?:OmpDecodeCheck){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;const exit=OmpContainerExitCodeSchema.safeParse(containerExitCode);this.containerExitCode=exit.success?exit.data:undefined;const check=OmpDecodeCheckSchema.safeParse(decodeCheck);this.decodeCheck=check.success?check.data:undefined;}
+ readonly controlMode?:'0444';
+ constructor(reason:OmpRunnerHold['reason'],limit?:{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof},failureKind?:OmpFailureKind,containerExitCode?:number,decodeCheck?:OmpDecodeCheck,controlMode?:'0444'){super('Native omp assessment held');this.name='OmpRunnerHold';this.reason=reason;this.subscriptionLimit=limit?.limit;this.noOutput=limit?.noOutput??false;this.failureProof=limit?.failureProof;this.failureKind=reason==='provider_failed'?(failureKind??'exception_other'):undefined;const exit=OmpContainerExitCodeSchema.safeParse(containerExitCode);this.containerExitCode=exit.success?exit.data:undefined;const check=OmpDecodeCheckSchema.safeParse(decodeCheck);this.decodeCheck=check.success?check.data:undefined;this.controlMode=controlMode==='0444'?controlMode:undefined;}
 }
 export type OmpSpawn=(file:string,args:string[],options:SpawnOptions)=>ChildProcess;
 export interface OmpRunnerDependencies {spawn?:OmpSpawn;reviewPath?:string;beforeHandoff?:()=>Promise<void>}
@@ -100,7 +101,7 @@ export const OmpOutputRejectionSchema=z.discriminatedUnion('version',[OmpV1Outpu
 export type OmpOutputRejection=z.infer<typeof OmpOutputRejectionSchema>;
 export class OmpAssessmentOutputRejected extends OmpRunnerHold{
  readonly rejection:OmpOutputRejection;
- constructor(rejection:OmpOutputRejection){const checked=OmpOutputRejectionSchema.parse(rejection);super('event_stream',undefined,undefined,0,checked.check);this.rejection=checked;}
+ constructor(rejection:OmpOutputRejection,controlMode?:'0444'){const checked=OmpOutputRejectionSchema.parse(rejection);super('event_stream',undefined,undefined,0,checked.check,controlMode);this.rejection=checked;}
 }
 /** Each receipt version value must fit the existing 256-byte identifier codec. */
 export function ompOutputRejectionVersions(input:OmpOutputRejection):Record<string,string>{
@@ -355,7 +356,30 @@ export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:st
  const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
  if(!evidence)return null;
  if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
- return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode,error instanceof OmpRunnerHold?error.decodeCheck:undefined);
+ return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode,error instanceof OmpRunnerHold?error.decodeCheck:undefined,error instanceof OmpRunnerHold?error.controlMode:undefined);
+}
+/** Upstream resolvePromptInput warns and then uses the literal path on EACCES.
+ * Inspect transport logs only, never warning-looking source/assistant content. */
+function unavailableOmpSystemPrompt(stdout:string,stderr:string):boolean{
+ const warnings=['Could not read system prompt file','Could not read append system prompt file'];
+ if(warnings.some(warning=>stderr.includes(warning)))return true;
+ for(const line of stdout.split('\n')){
+  let log:Record<string,unknown>;
+  try{log=object(JSON.parse(line));}catch{if(warnings.some(warning=>line.includes(warning)))return true;continue;}
+  if(log.level==='warn'&&warnings.includes(String(log.message)))return true;
+ }
+ return false;
+}
+/** Prompt-control failures preempt quality settlement even for a normal exit.
+ * Preserve governed usage holds without granting no-output retry certification. */
+export function inspectOmpAssessmentCompletion(stdout:string,stderr:string,exitCode:number,delivery:OmpOutputDelivery,observedAt:string,controlMode?:'0444'):OmpParsedEvents{
+ try{
+  if(unavailableOmpSystemPrompt(stdout,stderr))throw new OmpRunnerHold('request_rejected',undefined,undefined,exitCode,'control_prompt_unavailable',controlMode);
+  return inspectOmpEvents(stdout,exitCode,delivery);
+ }catch(error){
+  if(error instanceof OmpAssessmentOutputRejected)throw new OmpAssessmentOutputRejected(error.rejection,controlMode);
+  throw inspectOmpLimitFailure(stdout,stderr,observedAt,exitCode,error)??error;
+ }
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
  if(process.platform!=='linux')throw new OmpRunnerHold('unavailable');
@@ -428,11 +452,49 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  if(!after||after.dev!==initial.dev||after.ino!==initial.ino||after.size!==initial.size||after.mtimeMs!==initial.mtimeMs||after.ctimeMs!==initial.ctimeMs||afterSha!==binarySha256){token.fill(0);throw new OmpRunnerHold('credential_unavailable');}
  return {token,version:review.hostResolverVersion,binarySha256,accountLabelSha256};
 }
-export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization}
+export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;controlMode:'0444';accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization}
 /** A failed control/provider lease must not quarantine the shared evidence CAS.
  * The sibling is separately enrolled with the same authority/source bindings. */
 export function ompAssessmentScratchRoot(root:string):string{
  const path=resolve(root);return join(dirname(path),basename(path)+'-omp-b-scratch');
+}
+export interface OmpControlFileIdentity {readonly uid:number;readonly gid:number;readonly dev:number;readonly ino:number;readonly bytes:number;readonly sha256:string;readonly mode:'0444'}
+function controlFileHold():OmpRunnerHold{return new OmpRunnerHold('request_rejected',undefined,undefined,undefined,'control_file');}
+/** Creation permissions are masked by umask; fchmod, not open's mode, makes
+ * this source-free control readable by the reviewed container's uid 65534. */
+export async function createOmpAssessmentControl(directory:string,prompt:Buffer):Promise<OmpControlFileIdentity>{
+ try{
+  await mkdir(directory,{mode:0o700});
+  const file=await open(join(directory,'system-prompt.md'),'wx',0o444);
+  let identity:OmpControlFileIdentity;
+  try{
+   await file.writeFile(prompt);await file.chmod(0o444);await file.sync();
+   const stat=await file.stat();
+   if(!stat.isFile()||(stat.mode&0o7777)!==0o444||stat.nlink!==1||stat.size!==prompt.length)throw controlFileHold();
+   identity={uid:stat.uid,gid:stat.gid,dev:stat.dev,ino:stat.ino,bytes:prompt.length,sha256:sha(prompt),mode:'0444'};
+  }finally{await file.close();}
+  await chmod(directory,0o755);
+  await assertOmpAssessmentControl(directory,identity);
+  return identity;
+ }catch(error){if(error instanceof OmpRunnerHold)throw error;throw controlFileHold();}
+}
+/** Recheck the exact bind input immediately before source-bearing stdin.
+ * No symlinks, replacement inode/owner, special modes, partial bytes or hashes. */
+export async function assertOmpAssessmentControl(directory:string,identity:OmpControlFileIdentity):Promise<void>{
+ const path=join(directory,'system-prompt.md');
+ const matches=(stat:Stats)=>stat.isFile()&&(stat.mode&0o7777)===0o444&&stat.nlink===1&&stat.uid===identity.uid&&stat.gid===identity.gid&&stat.dev===identity.dev&&stat.ino===identity.ino&&stat.size===identity.bytes;
+ try{
+  const folder=await lstat(directory);
+  if(!folder.isDirectory()||folder.isSymbolicLink()||(folder.mode&0o7777)!==0o755||folder.uid!==identity.uid||folder.gid!==identity.gid)throw controlFileHold();
+  if(!matches(await lstat(path)))throw controlFileHold();
+  const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
+  try{
+   if(!matches(await file.stat()))throw controlFileHold();
+   const bytes=await file.readFile();
+   try{if(bytes.length!==identity.bytes||sha(bytes)!==identity.sha256)throw controlFileHold();}finally{bytes.fill(0);}
+   if(!matches(await file.stat())||!matches(await lstat(path)))throw controlFileHold();
+  }finally{await file.close();}
+ }catch(error){if(error instanceof OmpRunnerHold)throw error;throw controlFileHold();}
 }
 /** One managed write checks authority once for the whole credential/request frame.
  * Counts/hashes describe the request portion only; credentials never enter proofs.
@@ -480,10 +542,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     if(payload.length>OMP_LIMITS.inputBytes)throw new OmpRunnerHold('request_rejected');
     const delivery={requestSha256:sha(payload),systemPromptSha256:sha(prompt)};
     await scope.assertActive();
-    const control=join(scope.directory,'control');await mkdir(control,{mode:0o700});
-    const file=await open(join(control,'system-prompt.md'),'wx',0o444);
-    try{await file.writeFile(prompt);await file.sync();}finally{await file.close();}
-    await chmod(control,0o755);
+    const control=join(scope.directory,'control'),controlIdentity=await createOmpAssessmentControl(control,prompt);
     container=await scope.createContainer({profile:'omp-b',socketPath:socket,daemonId:review.dockerDaemonId,imageId:review.imageId,contractSha256:contract,controlSha256:controlContract.systemPromptSha256,controlBytes:prompt.length});
     const session=await container.start(),streamFailure=Promise.withResolvers<never>();
     void streamFailure.promise.catch(()=>{});
@@ -505,26 +564,21 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     // the first source-bearing write; the broker rechecks fencing and policy.
     await Promise.race([deps.beforeHandoff?.()??Promise.resolve(),aborted.promise,streamFailure.promise]);
     await scope.assertActive();scope.signal.throwIfAborted();
+    await assertOmpAssessmentControl(control,controlIdentity);scope.signal.throwIfAborted();
     const startedAt=new Date().toISOString();
     const stdinDelivery=await Promise.race([handoffOmpAssessmentInput(session.stdin,token,payload,scope.signal),aborted.promise,streamFailure.promise]);
     token=undefined;payload=undefined;
     const result=await Promise.race([session.completion,aborted.promise,streamFailure.promise]);
     await scope.assertActive();
     const finishedAt=new Date().toISOString(),bytes=Buffer.concat(output,outputBytes),stdout=bytes.toString('utf8');bytes.fill(0);
+    const stderrBytes=Buffer.concat(errors,errorBytes);
     let parsed:OmpParsedEvents;
-    try{parsed=inspectOmpEvents(stdout,result.exitCode,{...delivery,stdin:stdinDelivery});}catch(error){
-     if(error instanceof OmpAssessmentOutputRejected)throw error;
-     const stderrBytes=Buffer.concat(errors,errorBytes);
-     let failure:OmpRunnerHold|null;
-     try{failure=inspectOmpLimitFailure(stdout,stderrBytes.toString('utf8'),finishedAt,result.exitCode,error);}finally{stderrBytes.fill(0);}
-     if(failure)throw failure;
-     throw error;
-    }
+    try{parsed=inspectOmpAssessmentCompletion(stdout,stderrBytes.toString('utf8'),result.exitCode,{...delivery,stdin:stdinDelivery},finishedAt,controlIdentity.mode);}finally{stderrBytes.fill(0);}
     const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const {outputNormalization,outputStructure,...modelResult}=parsed;
     const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{}};
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{}};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An
