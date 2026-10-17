@@ -20,7 +20,7 @@ export function authenticateTerminalReceiptRow(row:ReceiptRow){
 /** Current held disposition only: a resumed, leased or superseded attempt cannot
  * be re-labelled as a permanent exception. History consists of real receipts,
  * not inferred manual-resume events. No job or receipt is mutated here. */
-export async function loadTerminalException(pool:Pool,pin:TerminalException){
+export async function loadTerminalException(pool:Pick<Pool,'query'>,pin:TerminalException){
  const rows=await pool.query<ReceiptRow>(`SELECT j.id AS job_id,j.job_key,j.step AS job_step,j.spec,j.state,j.reason_code,j.attempt AS current_attempt,r.id AS receipt_id,r.job_id AS receipt_job_id,r.run_id,r.attempt,r.fencing_token,r.outcome,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1 ORDER BY r.attempt,r.id`,[pin.jobKey]);
  if(!rows.rows.length)throw Error('Terminal exception committed receipt unavailable');
  const history=rows.rows.map(row=>({row,...authenticateTerminalReceiptRow(row)})),selected=history.find(entry=>entry.receipt.id===pin.receiptId);

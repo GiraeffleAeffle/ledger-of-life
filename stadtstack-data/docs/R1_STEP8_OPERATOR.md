@@ -21,8 +21,9 @@ The input hash is independently pinned by the operator; it is not read from a
 neighboring mutable checksum file. Every path in the input must be absolute.
 `plan` only reads that input file and prints the complete declared read set and
 would-write destinations. It never calls a managed reader, takes an authority
-lock, exports a receipt, or connects to PostgreSQL. `execute` has real managed
-CAS/authority/audit writes: **do not run it against production as a dry run**.
+lock, exports a receipt, or connects to PostgreSQL. It is not a readiness audit.
+`audit` validates the selected generation without writes; see below.
+`execute` has real managed CAS/authority/audit writes: **do not run it against production as a dry run**.
 The implementation exercise uses only a disposable PG database and isolated
 fixture authority. Production processing and historical `out/` and `release/`
 are not modified by this work.
@@ -46,6 +47,43 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 - `expectedSources`: **27** and `expectedDocuments`: **208** for this production
   campaign. The command rejects an incomplete count or duplicate extraction
   jobs; the isolated synthetic fixture declares its own 1-source/1-document scope.
+- `currentGeneration`: pins the active catalogue and its immutable processing
+  approval, independently of the runtime HEAD used for publication/replay.
+  Follow `catalogue.processingPinReview.path` (relative to the catalogue when
+  relative), verify its `sha256`, and require that review's `activation` is
+  `confirmed`. Populate the production profile from those exact pinned bytes:
+
+  | Input field | Value from the active confirmed processing review |
+  | --- | --- |
+  | `processingCommit` | `to.commit` (full 40-character Git identity) |
+  | `catalogue` | Independently pinned active driver catalogue path and digest |
+  | `processingReview` | The catalogue-pointed review's absolute path and digest |
+  | `assessmentQueueContractSha256` | `contracts.current.assessmentQueue` |
+  | `B.jobContractSha256` | `contracts.assessmentBJobContract` |
+  | `B.runnerContractSha256` | `contracts.ompRunnerContract` |
+  | `B.runnerOutputContractSha256` | `contracts.ompRunnerOutputContract` |
+
+  The remaining semantic fields are `projectionVersion: "assessment-source-record-v2"`,
+  `B.receiptVersion: "assessment-receipt-v2"`, `B.selector: "anthropic/claude-sonnet-5-5"`,
+  `B.transport: "vm-omp"`, `B.nativeStreamVersion: "omp-native-stream-v2"` and
+  `B.thinking: "medium"`. The stream version is bound to the runner's exported
+  `OMP_NATIVE_STREAM_VERSION`, not guessed from a receipt version.
+
+  No processing commit, B contract or review digest is compiled into step 8.
+  A reviewed processing-window cutover requires a freshly independently pinned
+  input, not another code edit. The audit verifies the catalogue's review path
+  **and** digest, confirmed commit, queue contract, B job contract, runner contract
+  and output contract. Every admitting B step must match that exact job/selector/
+  runner identity and explicitly attest the required stream version and medium
+  thinking; missing/legacy stream markers and fenced-output normalization fail.
+  Do not compute replacement worker hashes from publication/replay HEAD or repin
+  sealed campaign generations to accommodate an operator code change. All 14
+  processing contracts must remain byte-identical to the active processing pin.
+
+  The production catalogue still has exactly 27 source scopes and 208 original
+  document memberships. The isolated fixture instead supplies synthetic control
+  records bound to its actual worker contracts and explicitly isolated authority;
+  those records are not production approvals.
 - `seals`: in explicitly approved source/run order. Each element contains
   `sealResult: {path, sha256}`, `jobKeys` (extraction keys), and
   `reconciliationJobKeys` from that source's completed seal inputs/results.
@@ -97,6 +135,78 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 The input file is an operator control artifact: generate it from real completed
 seal results and admitted staging provenance, then independently pin its digest.
 Do not fill missing campaign results with empty arrays or invented predecessors.
+
+## Validating read-only audit
+
+```sh
+DATABASE_URL='postgresql://max@/civic_r1?host=/var/run/postgresql' \
+  ./scripts/r1-step8.sh audit /absolute/path/step8-input.json INPUT_SHA256
+```
+
+The input must explicitly select exactly one completed seal generation per
+campaign source, not every historical seal in a directory. `audit` uses a
+repeatable-read **read-only** PG transaction and the lock-free managed-reader
+factory. It does not acquire inventory locks, initialize CAS, register roots,
+refresh policy, write receipts, export artifacts, or invoke providers.
+Inventory inode/digest, authority, source-root identities, every captured immutable
+entry/scratch segment pin and objection snapshot are checked around the batch.
+Finalization reloads the pinned inventory inside the epoch fence: segment removal,
+corruption or unsafe replacement cannot be hidden by a warm logical snapshot.
+Concurrent publication/detachment invalidates the whole result; rerun on a stable
+epoch instead of using a partial mixed view.
+
+The JSON report lists actual hashed reads, selected sources and blockers.
+`status: compatible` exits 0; `blocked` (including initialization failures)
+exits 1. Neither status claims publication, replay or value acceptance. Source
+checks authenticate canonical DB receipts and selected current attempts,
+dependencies and CAS inputs/outputs, original/prepared/archive/model cache
+bindings, catalogue membership, current source policy and predecessor inputs.
+Admitting assessment closures must use source-record projection v2, the approved
+A/C/preparation/reconciliation queue contract, and native Sonnet B receipt v2.
+Historical v1/Haiku receipts may remain in audited exception/history branches;
+they cannot supply an admitting B closure.
+
+For same-source identical bytes, the audit authenticates every selected native
+extraction and its model-call accounting before considering the derived
+`duplicate_source_content` dispositions. These are not caller-supplied terminal
+holds. Full document/job membership remains exact (including excluded documents);
+the smallest-document-ID canonical extraction alone can supply admission evidence.
+Derived own/canonical extraction pins, excluded native records, attempt histories
+and excluded assessment custody are checked against the sealed DB-backed closure.
+
+The audit reads migration-009 lifetime intents and immutable allowance
+attributions, retaining the real r1–r5 approval pins, frozen cohort, ordinals,
+queue/original/scope membership, stage authorization and zero-paid constraints.
+Historical failed/ambiguous calls are counted, never refunded or renumbered.
+Only authorized base-48 A/C calls may use the 24-per-original / 100-cohort
+supplement. Native B purge-ack payloads are checked against their actual lease,
+request, response, runner/image and completion clocks, not merely their presence.
+Production additionally requires the exact five native runs and released 0.3.2
+predecessor below, and all selected source/corpus/document/original memberships
+must equal the independently pinned frozen allowance cohort.
+
+`execute` runs this audit **before** claiming or creating a candidate generation.
+On success it writes supplementary managed `audit/current-generation.json`
+evidence, pinned by both the release gate and exception inventory. This carries
+the accounting and purge evidence without enriching or rewriting any historical
+source seal. Release acceptance requires this exact compatible evidence and its
+current-generation/campaign/admission bindings.
+
+The sealed extraction archive compares exact source bytes for
+`district-claims.ts`, `district-stage-evidence.ts`, `district-public-fields.ts`,
+`district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`,
+`district-claude.ts`, `district-model-contract.ts`,
+`district-prepared-document.ts`, `district-schema.ts`,
+`district-graph-claims.ts`, `topic-vocabulary.ts`, and
+`../regional/taxonomy.mjs`; cache-context bytes are
+`district-prepared-document.ts` again. None is changed by this operator cutover.
+The lock-free reader is in `r1-step8-managed-read-view.ts`, imported only by the
+step-8 audit and its tests. `civic-opt-out.ts` remains byte-identical to the active
+processing baseline, so neither its parser security nor OMP runner contract moves.
+The separate reader reuses public authority, objection and binding validators;
+its bounded, strict v1 inventory/segment adapter supplies only the missing
+lock-free read path. It never calls the existing locking inventory API.
+
 
 ### Native runs found read-only in the canonical DB
 
@@ -402,3 +512,149 @@ above. Receipt `tests-20261015T120425Z.tap`: TypeScript exit 0; 1,899 tests,
 1,851 passed, 0 failed, 0 cancelled, 48 skipped; test exit 0. This includes the
 held-quality serialization regression and all six frozen running-campaign
 contract assertions. No production seal was exported or rewritten by this test.
+
+## Current-generation audit verification
+
+Post-fix verification on `r1-step8-current` used the disposable-PG harness and
+the following explicitly targeted command, as authorized by the integration owner:
+
+```sh
+umask 022
+PYTHONDONTWRITEBYTECODE=1 \
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
+R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all \
+  --test-name-pattern='^(lock-free audit|pinned Codex assessment allowance|real residual queue handlers|operator plan|offline bootstrap|authentic live 0.3.2|acceptance requires)'
+```
+
+Receipt `tests-20261017T140812Z.tap`: TypeScript exit 0; 186 reported tests,
+186 passed, 0 failed/cancelled/skipped; test exit 0. This includes the real-PG
+production-topology fixture's complete guarded source export → preparation →
+publication → exact replay → candidate gate, genuine committed historical
+Haiku-admission rejection before candidate writes, and retained terminal history.
+Native Sonnet event bytes are explicitly synthetic fixture inputs; the receipt,
+lease, purge acknowledgment and accounting custody are exercised through real
+queue handlers and isolated authority, without invoking any real provider.
+The read-only preflight asserts unchanged inventory bytes and DB row counts.
+All ten entry/scratch segment finalization regressions pass, alongside stable
+epoch/no-lock/no-write checks and real-PG allowance accounting rejection cases.
+
+The earlier unfiltered `tests-20261017T132331Z.tap` was not green: it exposed
+the now-fixed strip-only runtime/type/error-matcher issues and the separate
+120-second B-broker aggregate fixture timeout. This targeted receipt is not
+represented as a passing unfiltered full gate. The final integrated HEAD still
+requires its complete gate and exact compatibility with the active security-review contracts.
+
+Production discovery was exercised again read-only on 2026-10-17 using the
+documented `discover` command. All five exact selected native runs still had one
+committed receipt each. The driver tree now contained historical/repeated seal
+generations, including some `355691be` results. Those paths are only discovery
+candidates, not a complete explicitly approved selection. The discovery contract
+now says `selectionValidated: false` regardless of raw file count: 27 copied or
+historical files do not prove 27 current source generations. Its `wouldRead` list named the actual
+driver catalogue, CAS/operator roots, authentic released predecessor, staging and
+policy/identity/critical provenance, Git predecessor members and canonical DB
+custody. It returned `writes: []`, `network: false`, `providers: false` and did
+not publish or replay. These historical candidates are not an approved selection
+and are not a successful production generation audit.
+
+### Window-independent processing-pin cutover
+
+After rebasing onto `b32bc962e617c876763f34c9734908f59116a00a`, the authorized
+focused verification command was:
+
+```sh
+umask 022
+PYTHONDONTWRITEBYTECODE=1 \
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
+R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all \
+  --test-name-pattern='^(lock-free audit|pinned Codex assessment allowance|real residual queue handlers|operator |offline bootstrap|authentic live 0.3.2|acceptance requires|terminal sealing preserves)'
+```
+
+Receipt `/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T163249Z.tap`:
+TypeScript exit 0; 190 reported tests, 190 passed, 0 failed/cancelled/skipped;
+test exit 0. The genuine isolated queue/candidate/exact-replay fixture now uses
+synthetic native stream-v2 events with thinking/text content and medium-thinking
+runner metadata. Independent negatives reject a stale B job contract, output
+contract, runner contract, empty/v1 stream marker, wrong thinking level, model
+fallback, pending review and a mismatched catalogue review path/digest. A second
+synthetic confirmed commit/contract set is accepted without changing code.
+The unchanged scoped extraction contract assertions also passed.
+
+A separate read-only control-chain check, under the same offline bootstrap and
+CPU 6–7 restriction, read only the active driver `full/catalogue.json` and its
+pointed `processing-pin-b32bc96.json`. It validated their exact digest/commit/
+contract relationship with the production policy function and exited 0:
+
+- Catalogue SHA-256: `c67e4566d36fd89d3633b1f47092ab80930ab41da17fbee981eb0b22b4ac8974`.
+- Confirmed review SHA-256: `61dd9b1c5414fb4d1e54f589d58348da25f61beaab82457959f13ac4c751d1c8`.
+- B job: `c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea`.
+- Processing runner: `95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2`.
+- Processing output: `0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361`.
+
+These are observed receipt values, **not compiled policy constants** or approval
+of a production source selection. The check reported `selectionValidated: false`,
+`publicationExecuted: false`, `writes: []`, `network: false`, `providers: false`.
+It did not connect to production PG, read selected source closures, publish,
+replay or run value acceptance. No unfiltered full gate was run for this cutover;
+the final integrated gate and confirmation of existing security-review eligibility
+remain the integration owner's responsibility.
+
+### Processing-contract-neutral managed reader
+
+The integration owner required all fourteen exported processing contracts to
+remain identical to the active window-14 baseline, including security contracts.
+The `ce69f9e` implementation did not meet this condition: twelve contracts matched,
+but adding the factory to `civic-opt-out.ts` changed parser isolation to
+`5ed076bac8718b46202c13b8341328caa7be43c4de2646fed2a6850d60e049fe`
+and the OMP runner to
+`e7aa21a60788f717dd1bf2581e8d4fe418fc069f01c71469a138cd3b08cf7ba7`.
+
+The factory now lives solely in `r1-step8-managed-read-view.ts`; the processing
+authority module and its original private inventory loader are restored.
+The adapter independently decodes the existing strict inventory/segment v1
+envelope, delegates source proof validation to `ManagedSourceBindingSchema`,
+and retains the live authority/objection checks. It validates chain and retired-root
+semantics, source/root/lease identities, safe inode metadata and exact segment
+digests. Finalization reopens and validates every captured segment inside the
+manifest/objection fence. Epoch hashing streams through a 64-KiB buffer rather
+than retaining a second inventory-sized buffer. No writing lock API is called.
+
+The decoded `publication`, `snapshot`, `code` and `approval` proof objects use
+the public codec's parsed values, not raw wire objects. This mirrors the private
+inventory decoder's nested key ordering before its JSON-stringification-sensitive
+entry-ID check: reordered wire keys with the original canonical ID remain valid,
+but an ID recomputed from raw nested key order fails closed. Validation does not
+rewrite the source inventory or sealed segment bytes.
+
+Using the actual fourteen exported functions (the same set as the processing
+cutover comparison), archived `b32bc96` and `ce69f9e` bytes were supplied through
+their supported hash callbacks; the restored runtime used normal filesystem
+reads. All fourteen final results equal `b32bc962e617c876763f34c9734908f59116a00a`:
+preparation extractor, residual preparation, residual job, joint extraction,
+assessment queue, assessment B, acquisition, policy refresh, structured state
+gauges, operator registry config, parser output, parser isolation, OMP output,
+and OMP runner. In particular, parser isolation is again
+`287e701cdbddef1c22b2d202b54983467651eccfe43ead8cb67365ead00a4942`
+and the OMP runner is again
+`95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2`.
+The test expectations were restored to those active pins, not updated to bless
+a new contract.
+
+The focused command from the preceding subsection was then run again on CPUs
+6–7, using disposable PG and isolated authority. Receipt
+`/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T164739Z.tap`:
+TypeScript exit 0; 190 tests, 190 passed, 0 failed/cancelled/skipped; test exit 0.
+This includes all ten captured-segment finalization regressions and the full
+guarded candidate/exact-replay fixture using the standalone reader.
+No full gate or production publication was run.
+
+The nested-proof normalization correction was verified with the same focused
+CPU 6–7 command. Receipt
+`/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T165726Z.tap`:
+TypeScript exit 0; 198 tests, 198 passed, 0 failed/cancelled/skipped; test exit 0.
+Eight added oracle-conformance cases cover `publication`, `snapshot`, `code`
+and `approval` in both hot inventories and sealed segments. Each accepts reordered
+wire keys with the writer's original canonical ID in both readers, then rejects
+an ID forged from raw nested key order in both readers. The audit leaves the
+forged inventory bytes untouched. Recomputing all fourteen exported runtime
+contracts after this correction again found no differences from `b32bc96`.

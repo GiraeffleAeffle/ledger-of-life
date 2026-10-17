@@ -16,6 +16,7 @@ import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AU
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
 import {compactCivicPolicyInventory,repackCivicPolicyInventory,readCivicPolicyInventory,recoverCivicPolicyLock} from '../src/civic-opt-out.ts';
+import {createReadOnlyManagedSourceAudit} from '../src/r1-step8-managed-read-view.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
@@ -56,6 +57,28 @@ function preparedFixture(hosts=['council.test']){
  const body={version:'district-prepared-v1',municipalityId:'synthetic',sourceSha256,sourceBytes:16,mimeType:'text/plain',references:hosts.map(host=>({id:hash(host),url:'https://'+host+'/document',sha256:sourceSha256,retrievedAt:now,locator:'fixture',mimeType:'text/plain',sourceType:'council',policy:{access:'public',robots:{state:'allowed',url:'https://'+host+'/robots.txt'},tdm:{state:'not_declared',evidence:[]},legalClassification:'not_assessed',publication:'facts_with_attribution_only'}})),extractorSha256:hash('extractor'),toolVersions:{node:'22'},text,textSha256:hash(text),offsetUnit:'utf16_code_units',textLength:text.length,method:'text',ocrUsed:false,limitations:[]};
  return {...body,receiptSha256:hash(canonical(body))};
 }
+
+test('lock-free audit reads a stable epoch without acquiring an existing inventory lock or writing',async t=>{
+ const {root,stateDir}=await sandbox(t),entry=rawEntry('Synthetic read-only audit');
+ await registerManagedCacheRoot(root,{kind:'fetch',...fixturePolicy(stateDir)});await publish(root,entry,'Synthetic read-only audit',stateDir);await markManagedCacheInventoryComplete(root,fixturePolicy(stateDir));
+ const lock=join(stateDir,'inventory.lock');await writeFile(lock,'Synthetic deliberately held lock',{mode:0o600});
+ const before=await readFile(join(stateDir,'inventory.json')),members=await readdir(stateDir),audit=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));
+ assert.equal((await audit.read(join(root,entry.relativePath),entry.contentSha256)).toString(),'Synthetic read-only audit');await audit.finish();
+ assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);assert.deepEqual(await readdir(stateDir),members);assert.equal(await readFile(lock,'utf8'),'Synthetic deliberately held lock');
+ await assert.rejects(audit.read(join(root,entry.relativePath)),{code:'CIVIC_POLICY_AUDIT_FINISHED'});
+});
+
+test('lock-free audit rejects publication, same-byte inode replacement and objection epoch changes',async t=>{
+ const {root,stateDir}=await sandbox(t),entry=rawEntry('Synthetic epoch audit'),path=join(root,entry.relativePath);
+ await registerManagedCacheRoot(root,{kind:'fetch',...fixturePolicy(stateDir)});await publish(root,entry,'Synthetic epoch audit',stateDir);await markManagedCacheInventoryComplete(root,fixturePolicy(stateDir));
+ const first=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));await first.read(path);
+ await publish(root,rawEntry('Second synthetic member'),'Second synthetic member',stateDir);await assert.rejects(first.finish(),CivicPolicyStateError);
+ const second=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));await second.read(path);
+ const inventoryPath=join(stateDir,'inventory.json'),replacement=join(stateDir,'audit-epoch-replacement.json');await writeFile(replacement,await readFile(inventoryPath),{mode:0o600});await rename(replacement,inventoryPath);
+ await assert.rejects(second.finish(),{code:'CIVIC_POLICY_AUDIT_EPOCH_CHANGED'});
+ const third=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));await third.read(path);
+ await recordHostOptOut({host:'council.test',reason:'municipality_objection'},fixturePolicy(stateDir));await assert.rejects(third.finish(),CivicPolicyStateError);
+});
 
 test('unprovisioned authority fails closed without writes, then canonical host blocking applies across schemes',async t=>{
  const {stateDir}=await sandbox(t,false);await assert.rejects(assertHostNotOptedOut('https://council.test/a', fixturePolicy(stateDir)),CivicPolicyStateError);await assert.rejects(lstat(stateDir),{code:'ENOENT'});
@@ -1816,6 +1839,49 @@ for(const family of ['entries','scratch'])for(const mutation of ['tamper','missi
  const purge=await recordHostOptOut({host:'sealed.test',reason:'municipality_objection'},policy);
  assert.equal(purge.purge.status,'error');assert.deepEqual(purge.purge.issues,[{code:'inventory_unavailable'}]);
  assert.equal(await readFile(join(root,'facts.json'),'utf8'),'Synthetic sealed publication');
+});
+
+for(const family of ['entries','scratch'])for(const mutation of ['tamper','missing','symlink','hardlink','mode'])test('lock-free audit finish revalidates captured '+family+' segment after '+mutation,async t=>{
+ const {root,stateDir,policy}=await compactionFixture(t),migration=await compactCivicPolicyInventory(policy),audit=await createReadOnlyManagedSourceAudit(policy);
+ await audit.read(join(root,'facts.json'));const manifest=await readFile(join(stateDir,'inventory.json'));
+ const pin=migration.segments.find(segment=>segment.family===family)!,path=join(stateDir,'inventory-segments',pin.sha256+'.json'),original=await readFile(path),target=join(stateDir,'audit-unrelated.json');
+ if(mutation==='tamper'){const tampered=Buffer.from(original);tampered[10]^=1;await writeFile(path,tampered,{mode:0o600});}
+ if(mutation==='missing')await rm(path);
+ if(mutation==='symlink'){await writeFile(target,original,{mode:0o600});await rm(path);await symlink(target,path);}
+ if(mutation==='hardlink')await link(path,target);
+ if(mutation==='mode')await chmod(path,0o644);
+ await assert.rejects(audit.finish(),CivicPolicyStateError);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),manifest);
+});
+
+for(const layout of ['hot','sealed'] as const)for(const [proofKind,field] of [['retained_publication','publication'],['authenticated_git_snapshot','snapshot'],['operator_registry_config','code'],['operator_registry_config','approval']] as const)test('lock-free audit normalizes reordered '+field+' proof keys before entry ID validation: '+layout,async t=>{
+ const {base,stateDir}=await sandbox(t),root=join(base,'normalization-artifacts'),policy=fixturePolicy(stateDir),bytes='Synthetic nested proof normalization',url='https://normalization.test/source';
+ await initializeManagedAcquisitionLane(root,{kind:'artifacts',decisionId:CIVIC_ACQUISITION_DECISION_ID,...policy});
+ const snapshot={gitCommit:'b'.repeat(40),path:proofKind==='operator_registry_config'?'stadtstack-data/sources/district-registry.json':'fixture/facts.json',blobOid:'c'.repeat(40),sha256:hash(bytes),bytes:Buffer.byteLength(bytes)};
+ const binding:ManagedSourceBinding=proofKind==='retained_publication'?{kind:proofKind,url,sourceSha256:null,publication:{manifestSha256:hash('normalization manifest'),releaseId:'normalization-fixture',memberPath:'facts.json',memberSha256:hash(bytes),memberBytes:Buffer.byteLength(bytes)}}:proofKind==='authenticated_git_snapshot'?{kind:proofKind,url,sourceSha256:null,purpose:'historical_change_reconstruction_only',snapshot}:{kind:proofKind,url,configurationSha256:hash(bytes),schemaContractSha256:hash('normalization schema'),code:snapshot,approval:{role:'district_source_registry',approver:'owner',decisionId:CIVIC_ACQUISITION_DECISION_ID,date:'2026-10-11',configurationSha256:hash(bytes),gitCommit:snapshot.gitCommit}};
+ await publish(root,{...binding,relativePath:'facts.json',contentSha256:hash(bytes),independentAllowed:false},bytes,stateDir);
+ if(layout==='sealed')await compactCivicPolicyInventory(policy);
+ const manifestPath=join(stateDir,'inventory.json'),physical=JSON.parse(await readFile(manifestPath,'utf8')),wire=layout==='hot'?physical:JSON.parse(await readFile(join(stateDir,'inventory-segments',physical.storage.segments[0].sha256+'.json'),'utf8')),entry=wire.entries[0],canonicalId=entry.id;
+ entry[field]=Object.fromEntries(Object.entries(entry[field]).reverse());
+ const persist=async()=>{
+  if(layout==='sealed'){
+   const serialized=JSON.stringify(wire)+'\n',pin=physical.storage.segments[0];pin.sha256=hash(serialized);pin.bytes=Buffer.byteLength(serialized);
+   await writeFile(join(stateDir,'inventory-segments',pin.sha256+'.json'),serialized,{mode:0o600});
+  }
+  await writeFile(manifestPath,JSON.stringify(physical)+'\n',{mode:0o600});
+ };
+ await persist();
+ // Reordering only the wire keys is legitimate: both readers must normalize
+ // nested proof objects and retain the writer's original canonical entry ID.
+ assert.equal((await readCivicPolicyInventory(policy)).entries[0].id,canonicalId);
+ const audit=await createReadOnlyManagedSourceAudit(policy);assert.equal((await audit.read(join(root,'facts.json'),hash(bytes),proofKind==='authenticated_git_snapshot'?'historical_change_reconstruction_only':undefined)).toString(),bytes);await audit.finish();
+ const before=await readFile(manifestPath);
+ // A forged ID over raw key order must not bypass the canonical writer codec.
+ entry.id=hash(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));
+ assert.notEqual(entry.id,canonicalId);await persist();
+ const forged=await readFile(manifestPath);assert.notDeepEqual(forged,before);
+ await assert.rejects(readCivicPolicyInventory(policy),CivicPolicyStateError);
+ await assert.rejects(createReadOnlyManagedSourceAudit(policy),{code:'CIVIC_POLICY_INVENTORY_UNAVAILABLE'});
+ assert.deepEqual(await readFile(manifestPath),forged);
 });
 
 test('manifest chain corruption fails closed, and archived scratch still prevents restoration from being blessed',async t=>{

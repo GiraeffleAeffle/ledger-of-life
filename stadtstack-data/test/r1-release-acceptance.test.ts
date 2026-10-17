@@ -11,9 +11,10 @@ import {dataReleaseId} from '../src/data-release.ts';
 import {FROZEN_R1_INPUTS} from '../src/pilot-value-audit.ts';
 import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
 import {RELEASE_ACCEPTANCE_RULES} from '../src/r1-release-context.ts';
+import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
-const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
+const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
 async function fixture(contributingSource='website',sourceSha256='c'.repeat(64)){
   const root=await mkdtemp(join(tmpdir(),'r1-release-acceptance-'));
   const save=async(name:string,value:unknown)=>{const path=join(root,name),bytes=JSON.stringify(value)+'\n';await mkdir(dirname(path),{recursive:true});await writeFile(path,bytes,{mode:0o600});return {path,sha256:hash(bytes)};};
@@ -27,6 +28,7 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
   const manifest={schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:'2026-10-15T12:00:00Z',files,quality:{publishedRecords:1,quarantinedRecords:0,cities:1}};
   const manifestPin=await save('candidate/release-manifest.json',manifest),comparison={releaseId:manifest.id,manifestSha256:manifestPin.sha256,files};
   const campaign=await save('campaign.json',{schemaVersion:'stadtstack-r1-step8-campaign-v1',sources:[{municipalityId:'synthetic-town',sourceId:'website',corpus:{path:'/synthetic/corpus',sha256:h},documents:[{documentId:'document:fixture',sha256:h,jobKey:b}]}]});
+  const currentGeneration={processingCommit:'a'.repeat(40),catalogue:campaign,processingReview:campaign,assessmentQueueContractSha256:h,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:h,runnerContractSha256:h,runnerOutputContractSha256:h,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
   const casRoot=join(root,'cas');
   const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot};
   const receiptPin=await save('replay-receipt.json',receipt);
@@ -65,11 +67,14 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
       for(const role of ['item','A','B','C'] as const)copy[role]=(await save(`audit/${index}-${role}.json`,JSON.parse(await readFile(row[role],'utf8')))).path;
       auditManifest.push(copy);
     }
+    const generationAuditEvidence=await save('current-generation-audit.json',{schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:'compatible',currentGeneration,campaign,blockers:[],writes:[],network:false,providers:false,publicationExecuted:false,
+      sources:[{municipalityId:'synthetic-town',sourceId:'website',corpusSha256:h,admittedRecordIds:[...new Set(inventory.sourceDispositions.flatMap(source=>source.admittedRecordIds))].sort()}],allowance:{schemaVersion:'stadtstack-r1-step8-allowance-evidence-v1'},purgeAcknowledgements:[]});
+    inventory.generationAuditEvidence=generationAuditEvidence;
     const exceptions=await save('exception-inventory.json',inventory),assessmentManifest=await save('assessments.json',auditManifest);
     const handoff=await save('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest,policy:{}});
     const audit=await persistReplay();
     const gate=await save('release-gate.json',{schemaVersion:'stadtstack-r1-step8-gate-v1',...gateState,releaseId:manifest.id,manifestSha256:manifestPin.sha256,candidateDirectory,campaign,
-      exceptionInventory:exceptions,step9Handoff:handoff,replayReceipt:receiptPin,replayAuditSha256:audit.sha256,generationNonce:'synthetic-generation'});
+      currentGeneration,generationAuditEvidence,exceptionInventory:exceptions,step9Handoff:handoff,replayReceipt:receiptPin,replayAuditSha256:audit.sha256,generationNonce:'synthetic-generation'});
     const step8={gate,exceptions,handoff};
     const bundle=(await loadStep8ExceptionBundle(step8)).bundle;
     const step8AssessmentCoverage=requireStep8AssessmentCoverage(bundle,bundle.requiredAssessments.map(entry=>entry.contentSha256));
@@ -89,6 +94,17 @@ test('whole release acceptance is immutable-input bound and option B defers only
   const changed={...selected,step8:{...selected.step8,exceptions:{...selected.step8.exceptions,sha256:'0'.repeat(64)}}};
   await assert.rejects(computeReleaseAcceptance(changed),/hash mismatch/);
   await assert.rejects(loadStep8ExceptionBundle(selected.step8,'0'.repeat(64)),/another release/);
+});
+
+test('acceptance requires the exact compatible generation audit and cannot substitute its policy or evidence',async t=>{
+ const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));const selected=await f.seal();
+ const gate=JSON.parse(await readFile(selected.step8.gate.path,'utf8')),audit=JSON.parse(await readFile(gate.generationAuditEvidence.path,'utf8'));
+ for(const [index,patch] of [{status:'blocked'},{sources:[]},{currentGeneration:{...audit.currentGeneration,assessmentQueueContractSha256:b}}].entries()){
+  const evidence=await f.save(`substituted-audit-${index}.json`,{...audit,...patch}),gatePin=await f.save(`substituted-gate-${index}.json`,{...gate,generationAuditEvidence:evidence});
+  await assert.rejects(loadStep8ExceptionBundle({...selected.step8,gate:gatePin}));
+ }
+ const changedPolicy=await f.save('substituted-policy-gate.json',{...gate,currentGeneration:{...gate.currentGeneration,assessmentQueueContractSha256:b}});
+ await assert.rejects(loadStep8ExceptionBundle({...selected.step8,gate:changedPolicy}),/generation audit binding mismatch/);
 });
 
 test('passed technical gates never override candidate-affecting risks, unknown cases or applicable source policy',async t=>{
