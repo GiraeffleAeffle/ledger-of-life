@@ -5,7 +5,7 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Pool} from 'pg';
-import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
+import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
 import {DistrictCas,type CasArtifact} from '../src/district-cas.ts';
 import {DistrictJobStore,DistrictExecutionHold,migrateDistrictJobs,runDistrictJobs,type ClaimedJob,type DistrictJobSpec,type EnqueueOptions,type JobHandler} from '../src/district-jobs.ts';
 import {assessmentQueueContract} from '../src/district-assessment-jobs.ts';
@@ -16,6 +16,7 @@ import {SubscriptionRuntimeError} from '../src/district-model-contract.ts';
 import {failureDiagnostic,runtimeToolEvidence} from '../src/district-model-diagnostics.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 const parent='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b',delegation='a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f';
@@ -29,14 +30,22 @@ async function fixture(t:TestContext,bodyCount=1,repeatedOriginal=false){
  await admin.query('CREATE DATABASE "'+database+'"');created=true;const url=new URL(base);url.pathname='/'+database;
  const pool=new Pool({connectionString:url.href,max:12});closePool=poolShutdownBarrier(pool);await migrateDistrictJobs(pool);
  directory=await mkdtemp(join(tmpdir(),'codex-allowance-'));const cas=new DistrictCas(join(directory,'cas')),store=new DistrictJobStore(pool),{policy}=await createCivicPolicyTestContext(t),nonce=randomUUID();
- const queue=await assessmentQueueContract(),corpus=digest('synthetic corpus '+nonce),policySha=digest('synthetic policy '+nonce),scope={publisherId:'synthetic-publisher',sourceId:'synthetic-'+nonce,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-17'};
- const originals=Array.from({length:bodyCount},(_,index)=>digest('synthetic original '+nonce+' '+(repeatedOriginal?0:index)));
+ const queue=await assessmentQueueContract(),corpus=digest('synthetic corpus '+nonce),scope={publisherId:'synthetic-publisher',sourceId:'synthetic-'+nonce,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-17'};
+ const sourceBytes=Array.from({length:bodyCount},(_,index)=>Buffer.from('synthetic original '+nonce+' '+(repeatedOriginal?0:index))),originals=sourceBytes.map(bytes=>digest(bytes)),admissions:{original:CasArtifact;policy:CasArtifact}[]=[];
+ for(let index=0;index<bodyCount;index++){
+  const source={url:'https://example.org/allowance/'+nonce+'/'+index,sha256:originals[index],mimeType:'text/plain'},checkedAt=new Date(Date.now()-1000).toISOString(),expiresAt=new Date(Date.now()+300000).toISOString();
+  const created=await createPolicyReceipt({source,scope,sourcePolicy:{robots:{state:'allowed',url:'https://example.org/robots.txt'},tdm:{state:'not_declared',evidence:[]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'},permission:{kind:'distribution_licence',distributionUrl:source.url,licenceId:'synthetic-test-only',termsUrl:'https://example.org/terms',termsSha256:digest('synthetic allowance terms'),approvalSha256:digest('synthetic allowance source approval')},checkedAt,expiresAt},policy);
+  const proof=await cas.put(Buffer.from(canonicalJson(created.receipt)),{kind:'receipt',mimeType:'application/json'}),original=await cas.put(sourceBytes[index],{kind:'source_original',mimeType:'text/plain',admission:{state:'allowed',sourceSha256:source.sha256,policyProofSha256:proof.sha256,checkedAt,expiresAt}});await store.addArtifact(proof);await store.addArtifact(original);
+  const snapshot=randomUUID();await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshot,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,source.url,digest('synthetic GET '+source.url),scope.observationWindow,checkedAt,semanticHash(scope)]);
+  await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','allowed',false,$6,$7,$8,$9,'synthetic_allowance_admission')`,[randomUUID(),snapshot,proof.sha256,source.sha256,created.receipt,created.receipt.optOutSnapshotSha256,created.receipt.version,checkedAt,expiresAt]);
+  admissions.push({original,policy:proof});
+ }
  const cohort={schemaVersion:'r1-nine-town-frozen-assessment-cohort-v1',purpose:'Synthetic content-free allowance fixture',parentApproval:{path:'synthetic-owner.json',sha256:parent},catalogueSha256:digest('synthetic catalogue'),sourceCount:1,documentCount:bodyCount,uniqueOriginalCount:new Set(originals).size,sources:[{source:scope.sourceId,corpusSha256:corpus,scope,documentCount:bodyCount}],documents:originals.map((originalSha256,index)=>({source:scope.sourceId,corpusSha256:corpus,documentId:'synthetic-document-'+index,originalSha256,scope}))};
  const cohortBytes=Buffer.from(canonicalJson(cohort));
  const record={schemaVersion:'r1-codex-assessment-allowance-v1',id:CODEX_ASSESSMENT_ALLOWANCE_PIN.id,issuedBy:'R1 VM lead (omp session in tmux on codex-workstation)',issuedAt:new Date(Date.now()-1000).toISOString(),expiresAt:'2026-10-25T21:59:59Z',parentApproval:{id:'r1-nine-town-models-2026-10-13',sha256:parent},delegationApproval:{id:'r1-b-model-sonnet-2026-10-17',sha256:delegation},cohort:{path:'stadtstack-data/reports/approvals/r1-frozen-assessment-cohort-2026-10-17.json',sha256:digest(cohortBytes)},assessment:{projectionVersion:'assessment-source-record-v2',queueContractSha256:queue,steps:['assessment_a','assessment_c']},bounds:{baseMaxCallsPerOriginal:48,maxExtraCallsPerOriginal:24,maxExtraCallsCohort:100,provider:'openai-subscription',paidMicroUsd:0,normalSubscriptionOnly:true},scope:'Synthetic fixture only'};
  const options:CodexAllowanceOptions={fixture:{policy,recordBytes:Buffer.from(canonicalJson(record)),cohortBytes}},pin=()=>{const bytes=options.fixture?.recordBytes;assert.ok(bytes);return {id:record.id,sha256:digest(bytes)};};
  const mutateRecord=(changes:Partial<typeof record>)=>{options.fixture!.recordBytes=Buffer.from(canonicalJson({...record,...changes}));};
- const spec=(step:string,selector:unknown,inputArtifactHashes:string[]=[]):DistrictJobSpec=>({step,lane:'synthetic-allowance',semanticContractSha256:queue,inputArtifactHashes,sourceScope:scope,selector,policyProofSha256:policySha});
+ const spec=(step:string,selector:unknown,inputArtifactHashes:string[]=[],index=0):DistrictJobSpec=>({step,lane:'synthetic-allowance',semanticContractSha256:queue,inputArtifactHashes:[...new Set([...inputArtifactHashes,admissions[index].original.sha256,admissions[index].policy.sha256])].sort(),sourceScope:scope,selector,policyProofSha256:admissions[index].policy.sha256});
  const authorize=(jobKey:string)=>store.authorize({approvalSha256:digest('synthetic authority '+randomUUID()),approvedBy:'synthetic-test-lead',expiresAt:new Date(Date.now()+120000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:10,maxElapsedMs:120000,category:'development'});
  async function run(jobKey:string,step:string,handler:JobHandler){const authorizationId=await authorize(jobKey);return runDistrictJobs({store,cas,authorizationId,ownerPresent:true,maxJobs:1,maxElapsedMs:120000,handlers:{[step]:handler}});}
  async function complete(input:DistrictJobSpec,outputs:CasArtifact[],dependencies:EnqueueOptions['dependencies']=[]){
@@ -46,12 +55,12 @@ async function fixture(t:TestContext,bodyCount=1,repeatedOriginal=false){
  }
  async function document(index=0,changes:{legacy?:boolean;value?:boolean;original?:string;maxCalls?:number}={}){
   const extractionArtifact=await cas.put(Buffer.from('synthetic extraction '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'}),itemArtifact=await cas.put(Buffer.from('synthetic v2 item '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'}),recordArtifact=await cas.put(Buffer.from('synthetic full record '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'});
-  const extractionSpec=spec('residual_extract',{documentId:'synthetic-document-'+index,corpusSha256:corpus,policyReceiptSha256:policySha,corpusObservations:[{sourceSha256:changes.original??originals[index]}]});
+  const extractionSpec=spec('residual_extract',{documentId:'synthetic-document-'+index,corpusSha256:corpus,policyReceiptSha256:admissions[index].policy.sha256,corpusObservations:[{sourceSha256:changes.original??originals[index]}]},[],index);
   const extraction=await complete(extractionSpec,[extractionArtifact]);
-  const prepareSpec=spec('assessment_prepare',{version:changes.value?'r1-value-assessment-item-job-v1':'r1-assessment-item-job-v1',extraction:extraction.pin,extractionArtifactSha256:extractionArtifact.sha256},[extractionArtifact.sha256]);if(changes.legacy)prepareSpec.semanticContractSha256=digest('synthetic historical projection-v1');
+  const prepareSpec=spec('assessment_prepare',{version:changes.value?'r1-value-assessment-item-job-v1':'r1-assessment-item-job-v1',extraction:extraction.pin,extractionArtifactSha256:extractionArtifact.sha256},[extractionArtifact.sha256],index);if(changes.legacy)prepareSpec.semanticContractSha256=digest('synthetic historical projection-v1');
   const preparation=await complete(prepareSpec,[itemArtifact,recordArtifact],[{jobKey:extraction.jobKey,expectedReceiptSha256:extraction.pin.receiptSha256}]);
   const selector={version:'r1-assessment-pass-job-v1',itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:changes.maxCalls??48,predecessors:[preparation.pin]};
-  const A=spec('assessment_a',selector,[itemArtifact.sha256,recordArtifact.sha256]);const jobKey=await store.enqueue(A,{dependencies:[{jobKey:preparation.jobKey,expectedReceiptSha256:preparation.pin.receiptSha256}]});
+  const A=spec('assessment_a',selector,[itemArtifact.sha256,recordArtifact.sha256],index);const jobKey=await store.enqueue(A,{dependencies:[{jobKey:preparation.jobKey,expectedReceiptSha256:preparation.pin.receiptSha256}]});
   return {index,extraction,preparation,selector,A,jobKey,original:originals[index],itemArtifact,recordArtifact};
  }
  async function seed(original:string,extraction:Awaited<ReturnType<typeof complete>>,count=48,maxCalls=48){
