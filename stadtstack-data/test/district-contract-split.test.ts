@@ -16,6 +16,7 @@ import {parserOutputContractSha256,parserIsolationContractSha256} from '../src/d
 import {ompRunnerOutputContractSha256,ompRunnerContractSha256} from '../src/district-omp-b-runner.ts';
 import {hostCodeVersions} from '../src/district-host-provenance.ts';
 import type {ContractSourceHash} from '../src/district-contract-source.ts';
+import {EXTRACTOR_SOURCE_FILES} from '../src/district-claims.ts';
 
 // Only fingerprint I/O is injected. These hashes are explicitly synthetic and do
 // not authorize an effect, image, parser, provider or production source.
@@ -61,6 +62,13 @@ test('exception stderr diagnostics do not enter queued semantics or the OMP runn
  for(const file of ['district-jobs.ts','district-exception-diagnostics.ts']){
   for(const name of ['residualPreparation','residual','assessmentQueue','assessmentB','policyRefresh'])assert.deepEqual(await contracts[name].compute(change(file)),await contracts[name].compute(hash),name+': '+file);
   assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
+ }
+});
+test('seal exception diagnostics stay outside all fourteen contracts and the generation replay set',async()=>{
+ for(const file of ['district-queue-text-run.ts','district-exception-diagnostics.ts']){
+  for(const [name,{compute}] of Object.entries(contracts))assert.deepEqual(await compute(change(file)),await compute(hash),name+': '+file);
+  for(const compute of [parserIsolationContractSha256,ompRunnerContractSha256])assert.equal(await compute(change(file)),await compute(hash),file);
+  assert.equal((EXTRACTOR_SOURCE_FILES as readonly string[]).includes(file),false,file);
  }
 });
 test('notification presentation stays outside every semantic contract and the OMP runner contract',async()=>{

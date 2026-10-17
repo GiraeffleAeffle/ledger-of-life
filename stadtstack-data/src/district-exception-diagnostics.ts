@@ -128,7 +128,7 @@ function firstSourceFrame(error:{stack?:unknown;name?:unknown;message?:unknown})
  return 'none';
 }
 /** Content-free stderr projection only; never persisted or used for disposition. */
-export async function formatDistrictJobException(jobKey:string,step:string,error:unknown):Promise<string> {
+async function formatException(error:unknown,jobKey:string|null,step:string):Promise<string> {
  // Unwrap only this project's real execution wrapper and only an own data
  // property. Never invoke an untrusted cause accessor or emit arbitrary text.
  try{
@@ -148,7 +148,14 @@ export async function formatDistrictJobException(jobKey:string,step:string,error
   try{const candidate=value.code;if(typeof candidate==='string'&&candidate.length<=64&&Object.hasOwn(codes,candidate))code=candidate;}catch{}
   try{at=firstSourceFrame(value);}catch{}
  }
+ if(jobKey===null)return `R1_EXCEPTION command=seal-text-contribution class=${errorClass} code=${code} at=${at}\n`;
  return `R1_EXCEPTION job=${jobKey.slice(0,12)} step=${step} class=${errorClass} code=${code} at=${at}\n`;
+}
+export function formatDistrictJobException(jobKey:string,step:string,error:unknown):Promise<string> {
+ return formatException(error,jobKey,step);
+}
+export function formatQueueTextSealException(error:unknown):Promise<string> {
+ return formatException(error,null,'');
 }
 
 /** Fixed native-B vocabulary. Provider labels come only from typed event fields,
