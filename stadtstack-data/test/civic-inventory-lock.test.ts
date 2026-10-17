@@ -2,14 +2,14 @@ import {test} from 'node:test';
 import type {TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {mkdtemp,realpath,mkdir,writeFile,readFile,rm,lstat,readdir,open} from 'node:fs/promises';
-import {promises as fs} from 'node:fs';
+import {constants,promises as fs} from 'node:fs';
 import {syncBuiltinESMExports} from 'node:module';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {randomUUID,createHash} from 'node:crypto';
 import {spawn} from 'node:child_process';
 import type {ChildProcessWithoutNullStreams} from 'node:child_process';
-import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recoverCivicPolicyLock,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recoverCivicPolicyLock,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import type {ManagedSourceContent} from '../src/civic-opt-out.ts';
 
 const moduleUrl=new URL('../src/civic-opt-out.ts',import.meta.url).href;
@@ -28,7 +28,7 @@ async function record(){
  return {pid:process.pid,nonce:randomUUID(),boot_id:(await readFile('/proc/sys/kernel/random/boot_id','utf8')).trim(),starttime:text.slice(text.lastIndexOf(')')+2).split(/\s+/)[19]!};
 }
 function child(t:TestContext,body:string,args:string[]=[]){
- const processChild=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {initializeManagedAcquisitionLane,withManagedSourceWrite,recoverCivicPolicyLock,withCivicPolicyShutdown,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};${body}`,...args],{stdio:['pipe','pipe','pipe']});
+ const processChild=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {assertCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recoverCivicPolicyLock,withCivicPolicyShutdown,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};${body}`,...args],{stdio:['pipe','pipe','pipe']});
  const closed=Promise.withResolvers<number|null>();let stdout='',stderr='';
  processChild.stdout.on('data',chunk=>{stdout+=chunk;});processChild.stderr.on('data',chunk=>{stderr+=chunk;});
  processChild.once('error',closed.reject);processChild.once('close',closed.resolve);
@@ -154,4 +154,115 @@ test('a released lock detached between open and fstat is contention, never unsaf
   await assert.rejects(initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,lockWaitMs:50}),{code:'CIVIC_POLICY_BUSY'});
   assert.deepEqual(JSON.parse(await readFile(lock,'utf8')),replacement);assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.lock.quarantine-')),false);
  }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+for(const disposition of ['released','turnover'] as const)test('safe lock detachment during lstat retries acquisition without recovery: '+disposition,async t=>{
+ const {policy,root,lock,stateDir}=await fixture(t),contents=JSON.stringify(await record());await writeFile(lock,contents,{mode:0o600});
+ const originalLstat=fs.lstat,originalOpen=fs.open;let detachments=0,acquisitions=0,inspections=0;
+ t.mock.method(fs,'lstat',async(...args:Parameters<typeof fs.lstat>)=>{
+  if(String(args[0])===lock&&(disposition==='turnover'||!detachments)){
+   const handle=await originalOpen(lock,'r');
+   try{
+    await rm(lock);const detached=await handle.stat();assert.equal(detached.nlink,0);detachments++;
+    if(disposition==='turnover')await writeFile(lock,contents,{mode:0o600});
+    return detached;
+   }finally{await handle.close();}
+  }
+  return originalLstat(...args);
+ });
+ t.mock.method(fs,'open',async(...args:Parameters<typeof fs.open>)=>{
+  if(String(args[0])===lock){if(Number(args[1])&constants.O_EXCL)acquisitions++;else inspections++;}
+  return originalOpen(...args);
+ });syncBuiltinESMExports();
+ try{
+  const operation=initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,lockWaitMs:disposition==='turnover'?80:3000});
+  if(disposition==='turnover')await assert.rejects(operation,{code:'CIVIC_POLICY_BUSY'});else await operation;
+  assert.ok(detachments>0);assert.ok(acquisitions>0);assert.equal(inspections,0,'A detached inode must never enter holder recovery');
+  assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.lock.quarantine-')||name.startsWith('inventory.wait-')),false);
+  if(disposition==='turnover')assert.equal(await readFile(lock,'utf8'),contents);else await assert.rejects(originalLstat(lock),{code:'ENOENT'});
+ }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+test('a waiter marker detached during lstat is absent, not unsafe state',async t=>{
+ const {policy,root,stateDir}=await fixture(t),marker=join(stateDir,'inventory.wait-'+randomUUID());await writeFile(marker,'',{mode:0o600});
+ const originalLstat=fs.lstat;let detached=false;
+ // Keep the existing cooperative-cooldown branch deterministic, without sleeps.
+ t.mock.method(performance,'now',()=>0);
+ t.mock.method(fs,'lstat',async(...args:Parameters<typeof fs.lstat>)=>{
+  if(String(args[0])===marker){
+   const handle=await open(marker,'r');
+   try{await rm(marker);const stat=await handle.stat();assert.equal(stat.nlink,0);detached=true;return stat;}
+   finally{await handle.close();}
+  }
+  return originalLstat(...args);
+ });syncBuiltinESMExports();
+ try{await initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID});assert.equal(detached,true);}
+ finally{t.mock.restoreAll();syncBuiltinESMExports();}
+});
+
+for(const target of ['lock','waiter','epoch'] as const)test(target+' metadata remains fail-closed even when detached',async t=>{
+ const {policy,root,lock,stateDir}=await fixture(t),path=target==='lock'?lock:join(stateDir,target==='epoch'?'inventory.json':'inventory.wait-'+randomUUID());
+ if(target!=='epoch')await writeFile(path,'',{mode:0o600});
+ const before=await readFile(path),inventory=await readFile(join(stateDir,'inventory.json'));
+ const faults=[
+  {name:'nonregular',fields:{nlink:0,isFile:()=>false}},
+  ...(target==='epoch'?[]:[{name:'symlink',fields:{nlink:0,isSymbolicLink:()=>true}}]),
+  {name:'foreign uid',fields:{nlink:0,uid:process.getuid!()+1}},
+  {name:'unsafe permissions',fields:{nlink:0,mode:0o100644}},
+  {name:'oversize',fields:{nlink:0,size:512*1024*1024}},
+  {name:'hardlink',fields:{nlink:2}},
+ ];
+ for(const fault of faults){
+  const originalLstat=fs.lstat,originalOpen=fs.open;let inspected=false;
+  if(target==='waiter')t.mock.method(performance,'now',()=>0);
+  if(target==='epoch')t.mock.method(fs,'open',async(...args:Parameters<typeof fs.open>)=>{
+   const handle=await originalOpen(...args);
+   if(String(args[0])===path){const stat=handle.stat;t.mock.method(handle,'stat',async(...args:Parameters<typeof handle.stat>)=>{inspected=true;return Object.assign(await stat.apply(handle,args),fault.fields);});}
+   return handle;
+  });
+  else t.mock.method(fs,'lstat',async(...args:Parameters<typeof fs.lstat>)=>{const stat=await originalLstat(...args);if(String(args[0])===path){inspected=true;return Object.assign(stat,fault.fields);}return stat;});
+  syncBuiltinESMExports();
+  try{
+   const operation=target==='epoch'?assertCivicPolicyAuthority(policy):initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID});
+   await assert.rejects(operation,{code:target==='epoch'?'CIVIC_POLICY_INVENTORY_UNAVAILABLE':'CIVIC_POLICY_STATE_UNSAFE'},fault.name);
+   assert.equal(inspected,true,fault.name);assert.deepEqual(await readFile(path),before);assert.deepEqual(await readFile(join(stateDir,'inventory.json')),inventory);
+   assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.lock.quarantine-')),false);
+  }finally{t.mock.restoreAll();syncBuiltinESMExports();}
+ }
+});
+
+for(const disposition of ['budget','shutdown'] as const)test('epoch detachment retry honors its monotonic budget and shutdown: '+disposition,{timeout:15000},async t=>{
+ const {policy,stateDir}=await fixture(t);
+ const worker=child(t,`
+  const [policyText,disposition]=process.argv.slice(1),policy=JSON.parse(policyText),path=join(policy.stateDir,'inventory.json'),bytes=await fs.readFile(path),open=fs.open,stop=new AbortController(),handles=[];let detachments=0;
+  fs.open=async(...args)=>{
+   const handle=await open(...args);
+   if(String(args[0])===path){
+    handles.push(handle);await fs.writeFile(path+'.replacement',bytes,{mode:0o600});await fs.rename(path+'.replacement',path);detachments++;
+    if(disposition==='shutdown'&&detachments===9)stop.abort();
+   }
+   return handle;
+  };syncBuiltinESMExports();
+  const started=performance.now();
+  if(disposition==='budget'){await assert.rejects(assertCivicPolicyAuthority({...policy,lockWaitMs:35}),{code:'CIVIC_POLICY_BUSY'});assert.ok(performance.now()-started>=35);}
+  else{await assert.rejects(withCivicPolicyShutdown(()=>assertCivicPolicyAuthority(policy),stop.signal),{code:'CIVIC_POLICY_SHUTDOWN'});assert.equal(detachments,9);}
+  assert.ok(detachments>0);assert.ok(handles.every(handle=>handle.fd===-1));await assert.rejects(fs.lstat(join(policy.stateDir,'inventory.lock')),{code:'ENOENT'});process.stdout.write('bounded\\n');
+ `,[JSON.stringify(policy),disposition]);
+ assert.equal(await worker.closed,0,worker.stderr());assert.match(worker.stdout(),/bounded/);await assert.rejects(lstat(join(stateDir,'inventory.lock')),{code:'ENOENT'});
+});
+
+test('shutdown during a detached lock retry preserves the replacement holder and never admits a root',{timeout:15000},async t=>{
+ const {base,policy,lock,stateDir}=await fixture(t),contents=JSON.stringify(await record()),other=join(base,'never-created');await writeFile(lock,contents,{mode:0o600});
+ const worker=child(t,`
+  const [policyText,root]=process.argv.slice(1),policy=JSON.parse(policyText),lock=join(policy.stateDir,'inventory.lock'),contents=await fs.readFile(lock),lstat=fs.lstat,stop=new AbortController();let detachments=0;
+  fs.lstat=async(...args)=>{
+   if(String(args[0])!==lock)return lstat(...args);
+   const handle=await fs.open(lock,'r');
+   try{await fs.unlink(lock);const stat=await handle.stat();assert.equal(stat.nlink,0);await fs.writeFile(lock,contents,{mode:0o600});if(++detachments===2)stop.abort();return stat;}
+   finally{await handle.close();}
+  };syncBuiltinESMExports();
+  await assert.rejects(withCivicPolicyShutdown(()=>initializeManagedAcquisitionLane(root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID}),stop.signal),{code:'CIVIC_POLICY_SHUTDOWN'});assert.equal(detachments,2);process.stdout.write('cancelled\\n');
+ `,[JSON.stringify(policy),other]);
+ assert.equal(await worker.closed,0,worker.stderr());assert.match(worker.stdout(),/cancelled/);assert.equal(await readFile(lock,'utf8'),contents);
+ await assert.rejects(lstat(other),{code:'ENOENT'});assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')||name.startsWith('inventory.lock.quarantine-')),false);
 });

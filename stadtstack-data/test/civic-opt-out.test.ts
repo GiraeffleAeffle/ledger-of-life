@@ -1102,12 +1102,12 @@ test('prepared plan exemption requires exact recursively content-free metadata',
 });
 
 test('inventory epoch reads reopen atomically detached inodes without forgiving missing or foreign state',async t=>{
- for(const disposition of ['replacement','missing','foreign'] as const){
-  const {stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),path=join(stateDir,'inventory.json'),bytes=await readFile(path,'utf8'),originalOpen=fsPromises.open;let interleaved=false;
+ for(const disposition of ['replacement','repeated','missing','foreign'] as const){
+  const {stateDir}=await sandbox(t),policy=fixturePolicy(stateDir),path=join(stateDir,'inventory.json'),bytes=await readFile(path,'utf8'),originalOpen=fsPromises.open;let detachments=0;
   t.mock.method(fsPromises,'open',async(...args:Parameters<typeof fsPromises.open>)=>{
    const handle=await originalOpen(...args);
-   if(String(args[0])===path&&!interleaved){
-    interleaved=true;
+   if(String(args[0])===path&&detachments<(disposition==='repeated'?12:1)){
+    detachments++;
     if(disposition==='missing')await rm(path);
     else{
      const replacement=join(stateDir,'inventory-replacement.json'),value=JSON.parse(bytes);
@@ -1118,8 +1118,8 @@ test('inventory epoch reads reopen atomically detached inodes without forgiving 
    return handle;
   });syncBuiltinESMExports();
   try{
-   if(disposition==='replacement')await assertCivicPolicyAuthority(policy);else await assert.rejects(assertCivicPolicyAuthority(policy),CivicPolicyStateError);
-   assert.equal(interleaved,true);
+   if(disposition==='replacement'||disposition==='repeated')await assertCivicPolicyAuthority(policy);else await assert.rejects(assertCivicPolicyAuthority(policy),CivicPolicyStateError);
+   assert.equal(detachments,disposition==='repeated'?12:1);
   }finally{t.mock.restoreAll();syncBuiltinESMExports();}
  }
 });

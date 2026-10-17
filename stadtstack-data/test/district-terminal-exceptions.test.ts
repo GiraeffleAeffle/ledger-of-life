@@ -40,15 +40,15 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
  for(const value of [{jobKeys:[],reconciliationJobKeys:[]},{jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[exception,exception]},{jobKeys:[jobKey],reconciliationJobKeys:[],terminalDocumentExceptions:[exception]}])assert.equal(QueueTextSealInputSchema.safeParse(value).success,false);
  assert.equal(TerminalAssessmentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,true);assert.equal(TerminalDocumentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,false);
 });
-// Acquisition, preparation/extraction/residual, policy-refresh and parser identities
-// retain the authenticated campaign baseline. Private proposition v2, compact
-// provider encoding v3, item holds, native Sonnet and bounded renewable ownership
-// advance assessment queue/B/runner/output pins only.
+// Acquisition, preparation/extraction/residual, policy-refresh and parser-output
+// identities retain the authenticated campaign baseline. Private proposition v2,
+// compact provider encoding v3, item holds, native Sonnet and renewable ownership
+// advance assessment pins; inventory detachment advances security-review pins only.
 test('terminal sealing preserves acquisition and upstream identities while assessment contracts advance',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'ec919ead603d2ab647adce1ebb2b3d17e78d0f4ba4ff928d7e44c9f8150d6bb2');assert.equal(await assessmentBJobContract(),'15748a9a3bc59081e8a9afc64683b25b7c4f4649c5c164cf2a6525d3d4994a46');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'8386fdba3f0e315ed59a9c451fcdc9644a9b0a3c221a7d40e45631e907653cfe');
+ assert.equal(await assessmentQueueContract(),'ec919ead603d2ab647adce1ebb2b3d17e78d0f4ba4ff928d7e44c9f8150d6bb2');assert.equal(await assessmentBJobContract(),'15748a9a3bc59081e8a9afc64683b25b7c4f4649c5c164cf2a6525d3d4994a46');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'a38956d2e32d639360355b7f61266f619944d5032cd4ea9cee5c08935c42448f');
  assert.equal(await ompRunnerOutputContractSha256(),'07325eb011a83d6af6de4b0b08333c68ec2e03796dc8c2c5cc972a5d0d899dae');
- assert.equal(await parserIsolationContractSha256(),'2917aca62d207e39159e3191c7ea51125aea24dd1fd37339f424111c03b25764');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
+ assert.equal(await parserIsolationContractSha256(),'c6cfee9bb917ee511e88a37f51f55ea1643c03ab879eaf73211869f367325fc8');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
  assert.equal(await acquisitionContract(),'ff1980b18c6c22def8f2ed8572957c355562d4814d1e9a3bbbc5125ad5f0bbcb');
 });

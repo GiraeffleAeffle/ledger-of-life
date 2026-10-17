@@ -360,23 +360,30 @@ async function atomicJson(path:string,value:unknown,exclusive=false,privateDirec
   const parent=await open(dirname(path),constants.O_RDONLY|constants.O_NOFOLLOW);try{await parent.sync();}finally{await parent.close();}
  }finally{try{await unlink(temporary);}catch(error){if(!missing(error))throw error;}}
 }
-async function requireInventoryEpoch(state:string,inventoryId:string):Promise<void>{
+async function requireInventoryEpoch(state:string,inventoryId:string,options:CivicPolicyOptions):Promise<void>{
  const expected=Buffer.from('{"schemaVersion":1,"inventoryId":'+JSON.stringify(inventoryId)+',');
- // A locked writer atomically replaces the inventory. An already-open old
- // inode can lose its final link before fstat; reopen the published name only.
- for(let attempt=0;attempt<8;attempt++){
+ const signal=inventoryLifetime?.controller.signal;let deadline:number|undefined;
+ // Only safe detached inodes are transient. Reopen the published name with
+ // bounded backoff; repeated atomic replacements are contention, not corruption.
+ for(;;){
+  // Stable epoch reads must remain available to an already-owned section
+  // draining after TERM. Cancellation applies to detached-inode retry waits.
+  if(deadline!==undefined){signal?.throwIfAborted();if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');}
   const handle=await open(join(state,'inventory.json'),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
   try{
    const stat=await handle.stat();
-   if(stat.nlink===0)continue;
-   if(!stat.isFile()||stat.uid!==process.getuid?.()||(stat.mode&0o077)!==0||stat.nlink!==1||stat.size<expected.length||stat.size>MAX_STATE)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
-   const prefix=Buffer.allocUnsafe(expected.length);let offset=0;
-   while(offset<prefix.length){const {bytesRead}=await handle.read(prefix,offset,prefix.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
-   if(offset!==prefix.length||!prefix.equals(expected))throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
-   return;
+   if(!stat.isFile()||stat.uid!==process.getuid?.()||(stat.mode&0o077)!==0||stat.size<expected.length||stat.size>MAX_STATE)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+   if(stat.nlink!==0){
+    if(stat.nlink!==1)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+    const prefix=Buffer.allocUnsafe(expected.length);let offset=0;
+    while(offset<prefix.length){const {bytesRead}=await handle.read(prefix,offset,prefix.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
+    if(offset!==prefix.length||!prefix.equals(expected))throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+    return;
+   }
   }finally{await handle.close();}
+  deadline??=performance.now()+inventoryLockWaitMs(options);
+  await waitForInventoryPoll(Math.min(5,Math.max(0,deadline-performance.now())),signal);
  }
- throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
 }
 interface AuthorityEnvironment {state:string;authorityId:string;mode:CivicPolicyAuthorityReceipt['mode'];machineSha256:string}
 async function authorityEnvironment(options:CivicPolicyOptions):Promise<AuthorityEnvironment>{
@@ -428,7 +435,7 @@ export async function assertCivicPolicyAuthority(options:CivicPolicyOptions={}):
   if(value.authorityId!==authorityId||value.mode!==mode)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_MISMATCH');
   if(value.stateId!==digest(state)||!sameIdentity(value.identity,stat)||value.machineSha256!==machineSha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
   if(!sameIdentity(value.hostsIdentity,await directory(join(state,'hosts'),false,true))||!sameIdentity(value.attemptsIdentity,await directory(join(state,'attempts'),false,true)))throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
-  await requireInventoryEpoch(state,value.inventoryId);
+  await requireInventoryEpoch(state,value.inventoryId,options);
   const authoritySha256=digest(JSON.stringify(value));
   if(options.authoritySha256!==undefined&&hex.parse(options.authoritySha256)!==authoritySha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_MISMATCH');
   return {schemaVersion:value.schemaVersion,authorityId:value.authorityId,authoritySha256,mode:value.mode,provisionedAt:value.provisionedAt};
@@ -542,7 +549,9 @@ async function hasInventoryWaiters(state:string):Promise<boolean>{
   if(!/^inventory\.wait-[a-f0-9-]{36}$/.test(entry.name))throw new CivicPolicyStateError();
   try{
    const stat=await lstat(join(state,entry.name));
-   if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||stat.nlink!==1||(stat.mode&0o777)!==0o600||stat.size!==0)throw new CivicPolicyStateError();
+   if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||(stat.mode&0o777)!==0o600||stat.size!==0)throw new CivicPolicyStateError();
+   if(stat.nlink===0)continue; // A waiter can remove its own marker during lstat.
+   if(stat.nlink!==1)throw new CivicPolicyStateError();
    return true;
   }catch(error){if(!missing(error))throw error;}
  }
@@ -710,13 +719,19 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   const deadline=performance.now()+waitMs;
   for(;;){
    signal?.throwIfAborted();
+   if(!quiescent&&performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
    catch(error){
     if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;
     if(quiescent)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
     if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
     try{
-     const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
+     const current=await lstat(path);
+     if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
+     // The holder may unlink during lstat. A safe detached inode is not a
+     // dead-holder proof: retry O_EXCL only, without recovery or path mutation.
+     if(current.nlink===0){await waitForInventoryPoll(Math.min(25,Math.max(0,deadline-performance.now())),signal);continue;}
+     if(current.nlink!==1)throw new CivicPolicyStateError();
      if(!provisioning&&(await recoverInventoryLock(state,false,signal)).status==='recovered')continue;
     }catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
     if(!provisioning&&!waiting){waitingPath=join(state,'inventory.wait-'+randomUUID());waiting=await open(waitingPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);waitingIdentity=await waiting.stat();}
