@@ -9,6 +9,7 @@ import {dataReleaseSchema,verifyDataRelease} from './data-release.ts';
 import {writeImmutable} from './district-assessment.ts';
 import {ReasonCodeSchema,JobOutcomeSchema} from './district-step-receipt.ts';
 import {RELEASE_ACCEPTANCE_RULES,readCandidateMaterialContext,bindReleaseExceptionContext,type CandidateMaterialContext} from './r1-release-context.ts';
+import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -18,6 +19,7 @@ export const Step8AcceptancePinsSchema=z.object({gate:AcceptancePinSchema,except
 export type Step8AcceptancePins=z.infer<typeof Step8AcceptancePinsSchema>;
 const gateSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-gate-v1'),status:z.string(),releaseId:HashSchema,
   manifestSha256:HashSchema,candidateDirectory:z.string().refine(isAbsolute),campaign:AcceptancePinSchema,
+  currentGeneration:Step8CurrentGenerationSchema,generationAuditEvidence:AcceptancePinSchema,
   exceptionInventory:AcceptancePinSchema,step9Handoff:AcceptancePinSchema,replayReceipt:AcceptancePinSchema,
   replayAuditSha256:HashSchema,checks:z.array(z.string()),generationNonce:z.string().min(1)}).passthrough();
 const handoffSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step9-handoff-v1'),releaseId:HashSchema,
@@ -28,6 +30,7 @@ const dispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),
   terminalDocumentException:z.unknown().optional(),terminalAssessmentExceptions:z.array(z.unknown()).optional(),assessmentItemHolds:z.array(z.unknown()).optional(),queueEvidence:z.unknown()}).strict();
 export const Step8ExceptionInventorySchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-exceptions-v1'),releaseId:HashSchema,
   campaign:AcceptancePinSchema,sourceDispositionInventory:AcceptancePinSchema.optional(),complete:z.boolean(),sourceDispositions:z.array(dispositionSchema),
+  generationAuditEvidence:AcceptancePinSchema.optional(),
   native:z.object({coverage:z.array(z.unknown()),fieldHolds:z.record(z.string(),z.unknown())}).strict(),
   preparation:z.object({publicationQuarantine:z.object({schemaVersion:z.literal('stadtstack-publication-quarantine-v1'),records:z.array(z.unknown())}).strict(),
     criticalHolds:z.array(z.unknown()),classification:classificationSchema}).strict(),assessments:z.array(z.unknown())}).strict();
@@ -210,6 +213,19 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
   const expected=campaign.sources.flatMap(source=>source.documents.map(document=>canonicalJson([source.municipalityId,source.sourceId,document.documentId,document.sha256,document.jobKey]))).sort();
   const actual=inventory.sourceDispositions.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.documentId,source.sourceSha256,source.jobKey])).sort();
   if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exception inventory omits or duplicates campaign documents');
+  const generationAudit=z.object({schemaVersion:z.literal('stadtstack-r1-step8-read-only-audit-v1'),status:z.literal('compatible'),
+    currentGeneration:Step8CurrentGenerationSchema,campaign:AcceptancePinSchema,blockers:z.array(z.unknown()).length(0),
+    writes:z.array(z.unknown()).length(0),network:z.literal(false),providers:z.literal(false),publicationExecuted:z.literal(false),
+    sources:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),corpusSha256:HashSchema,admittedRecordIds:z.array(z.string())}).passthrough()),
+    allowance:z.object({schemaVersion:z.literal('stadtstack-r1-step8-allowance-evidence-v1')}).passthrough(),purgeAcknowledgements:z.array(z.unknown())}).passthrough().parse(await readAcceptancePin(gate.generationAuditEvidence));
+  if(canonicalJson(generationAudit.currentGeneration)!==canonicalJson(gate.currentGeneration)||canonicalJson(generationAudit.campaign)!==canonicalJson(gate.campaign)
+    ||!inventory.generationAuditEvidence||canonicalJson(inventory.generationAuditEvidence)!==canonicalJson(gate.generationAuditEvidence))throw Error('Current generation audit binding mismatch');
+  const expectedSources=campaign.sources.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.corpus.sha256])).sort();
+  if(canonicalJson(expectedSources)!==canonicalJson(generationAudit.sources.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.corpusSha256])).sort()))throw Error('Current generation audit source coverage mismatch');
+  for(const source of generationAudit.sources){
+    const admitted=[...new Set(inventory.sourceDispositions.filter(entry=>entry.municipalityId===source.municipalityId&&entry.sourceId===source.sourceId).flatMap(entry=>entry.admittedRecordIds))].sort();
+    if(canonicalJson(admitted)!==canonicalJson([...source.admittedRecordIds].sort()))throw Error('Current generation audit admission mismatch');
+  }
   if(inventory.sourceDispositionInventory){
     const sourceInventory=record(await readAcceptancePin(inventory.sourceDispositionInventory));
     if(sourceInventory.schemaVersion!=='stadtstack-r1-step8-source-dispositions-v1'||sourceInventory.complete!==true||sourceInventory.generationNonce!==gate.generationNonce
@@ -248,7 +264,7 @@ export async function computeReleaseAcceptance(input:unknown){
   const blockers:string[]=[...bundle.candidateContext.materialBlockers];
   if(gate.status!=='passed')blockers.push('technical_gate_not_passed');
   if(!bundle.inventory.complete)blockers.push('exception_inventory_incomplete');
-  const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
+  const requiredChecks=['current assessment generation','allowance accounting','native B purge acknowledgments','exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
   if(requiredChecks.some(check=>!gate.checks.includes(check)))blockers.push('technical_gate_checks_incomplete');
   if(selected.ownerApproval.sha256!==OPTION_B_APPROVAL_SHA256)blockers.push('owner_option_B_approval_not_pinned');
   await readAcceptancePin(selected.ownerApproval);

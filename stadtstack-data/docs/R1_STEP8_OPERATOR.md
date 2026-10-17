@@ -21,8 +21,9 @@ The input hash is independently pinned by the operator; it is not read from a
 neighboring mutable checksum file. Every path in the input must be absolute.
 `plan` only reads that input file and prints the complete declared read set and
 would-write destinations. It never calls a managed reader, takes an authority
-lock, exports a receipt, or connects to PostgreSQL. `execute` has real managed
-CAS/authority/audit writes: **do not run it against production as a dry run**.
+lock, exports a receipt, or connects to PostgreSQL. It is not a readiness audit.
+`audit` validates the selected generation without writes; see below.
+`execute` has real managed CAS/authority/audit writes: **do not run it against production as a dry run**.
 The implementation exercise uses only a disposable PG database and isolated
 fixture authority. Production processing and historical `out/` and `release/`
 are not modified by this work.
@@ -46,6 +47,31 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 - `expectedSources`: **27** and `expectedDocuments`: **208** for this production
   campaign. The command rejects an incomplete count or duplicate extraction
   jobs; the isolated synthetic fixture declares its own 1-source/1-document scope.
+- `currentGeneration`: pins the active catalogue and its immutable processing
+  approval, independently of the runtime HEAD used for publication/replay.
+  The production profile is:
+
+  ```json
+  {
+    "processingCommit": "355691be56a5fcc5a76d4993955ba089bde4a494",
+    "catalogue": {"path": "/absolute/path/full/catalogue.json", "sha256": "CATALOGUE_SHA256"},
+    "processingReview": {"path": "/absolute/path/full/processing-pin-355691b.json", "sha256": "7847b1d05a3bc66238856590a0a5af23f62559044f18b402d00c77a64ffa729f"},
+    "assessmentQueueContractSha256": "0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9",
+    "projectionVersion": "assessment-source-record-v2",
+    "B": {
+      "jobContractSha256": "43539ee71a2dd9b906dea9ff5c4c09a2ba10b3e8fcb910147058b81a14f7223c",
+      "receiptVersion": "assessment-receipt-v2",
+      "selector": "anthropic/claude-sonnet-5-5",
+      "transport": "vm-omp"
+    }
+  }
+  ```
+
+  `CATALOGUE_SHA256` must be the actual independently checked catalogue digest,
+  not a literal value. The production catalogue has exactly 27 source scopes
+  and 208 original document memberships. The isolated fixture instead binds its
+  actual worker contracts and explicitly isolated authority; this does not
+  relax the immutable production approval pin.
 - `seals`: in explicitly approved source/run order. Each element contains
   `sealResult: {path, sha256}`, `jobKeys` (extraction keys), and
   `reconciliationJobKeys` from that source's completed seal inputs/results.
@@ -97,6 +123,68 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 The input file is an operator control artifact: generate it from real completed
 seal results and admitted staging provenance, then independently pin its digest.
 Do not fill missing campaign results with empty arrays or invented predecessors.
+
+## Validating read-only audit
+
+```sh
+DATABASE_URL='postgresql://max@/civic_r1?host=/var/run/postgresql' \
+  ./scripts/r1-step8.sh audit /absolute/path/step8-input.json INPUT_SHA256
+```
+
+The input must explicitly select exactly one completed seal generation per
+campaign source, not every historical seal in a directory. `audit` uses a
+repeatable-read **read-only** PG transaction and the lock-free managed-reader
+factory. It does not acquire inventory locks, initialize CAS, register roots,
+refresh policy, write receipts, export artifacts, or invoke providers.
+Inventory inode/digest, authority, source-root identities, every captured immutable
+entry/scratch segment pin and objection snapshot are checked around the batch.
+Finalization reloads the pinned inventory inside the epoch fence: segment removal,
+corruption or unsafe replacement cannot be hidden by a warm logical snapshot.
+Concurrent publication/detachment invalidates the whole result; rerun on a stable
+epoch instead of using a partial mixed view.
+
+The JSON report lists actual hashed reads, selected sources and blockers.
+`status: compatible` exits 0; `blocked` (including initialization failures)
+exits 1. Neither status claims publication, replay or value acceptance. Source
+checks authenticate canonical DB receipts and selected current attempts,
+dependencies and CAS inputs/outputs, original/prepared/archive/model cache
+bindings, catalogue membership, current source policy and predecessor inputs.
+Admitting assessment closures must use source-record projection v2, the approved
+A/C/preparation/reconciliation queue contract, and native Sonnet B receipt v2.
+Historical v1/Haiku receipts may remain in audited exception/history branches;
+they cannot supply an admitting B closure.
+
+The audit reads migration-009 lifetime intents and immutable allowance
+attributions, retaining the real r1–r5 approval pins, frozen cohort, ordinals,
+queue/original/scope membership, stage authorization and zero-paid constraints.
+Historical failed/ambiguous calls are counted, never refunded or renumbered.
+Only authorized base-48 A/C calls may use the 24-per-original / 100-cohort
+supplement. Native B purge-ack payloads are checked against their actual lease,
+request, response, runner/image and completion clocks, not merely their presence.
+Production additionally requires the exact five native runs and released 0.3.2
+predecessor below, and all selected source/corpus/document/original memberships
+must equal the independently pinned frozen allowance cohort.
+
+`execute` runs this audit **before** claiming or creating a candidate generation.
+On success it writes supplementary managed `audit/current-generation.json`
+evidence, pinned by both the release gate and exception inventory. This carries
+the accounting and purge evidence without enriching or rewriting any historical
+source seal. Release acceptance requires this exact compatible evidence and its
+current-generation/campaign/admission bindings.
+
+The sealed extraction archive compares exact source bytes for
+`district-claims.ts`, `district-stage-evidence.ts`, `district-public-fields.ts`,
+`district-inference.ts`, `district-answer-cache.ts`, `district-model.ts`,
+`district-claude.ts`, `district-model-contract.ts`,
+`district-prepared-document.ts`, `district-schema.ts`,
+`district-graph-claims.ts`, `topic-vocabulary.ts`, and
+`../regional/taxonomy.mjs`; cache-context bytes are
+`district-prepared-document.ts` again. None is changed by this operator cutover.
+The additive reader is in `civic-opt-out.ts`, outside that boundary. Its security
+fingerprints do change: execute step 8/9 on the final new HEAD with fresh parser
+and OMP security reviews, while authenticating source archives against their
+original processing contract. Do not silently reseal campaign source bytes.
+
 
 ### Native runs found read-only in the canonical DB
 

@@ -17,6 +17,7 @@ import {failureDiagnostic,runtimeToolEvidence} from '../src/district-model-diagn
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
+import {auditStep8Allowance} from '../src/r1-step8-allowance-audit.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 const parent='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b',delegation='a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f';
@@ -83,6 +84,25 @@ async function fixture(t:TestContext,bodyCount=1,repeatedOriginal=false){
 }
 
 test('pinned Codex assessment allowance against disposable PostgreSQL',{skip:!connectionString,timeout:300000},async t=>{
+ await t.test('step8 pins all real historical approvals and audits base accounting without writes',async t=>{
+  const f=await fixture(t),d=await f.document();await f.seed(d.original,d.extraction,48);
+  const client=await f.pool.connect();try{
+   await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+   const before=(await client.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents')).rows;
+   const evidence=await auditStep8Allowance(client,[d.original],async hash=>JSON.parse((await f.cas.read(hash)).toString('utf8')));
+   assert.equal(evidence.accounting.length,48);assert.equal(evidence.cohortExtraCalls,0);assert.equal(evidence.approvals.filter(pin=>/allowance/.test(pin.path)).length,5);
+   assert.deepEqual((await client.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents')).rows,before);await client.query('COMMIT');
+  }finally{client.release();}
+ });
+ await t.test('step8 rejects unattributed excess and unknown allowance pins in real immutable rows',async t=>{
+  const missing=await fixture(t),d=await missing.document();await missing.seed(d.original,d.extraction,49);
+  await assert.rejects(auditStep8Allowance(missing.pool,[d.original],async()=>assert.fail('No item read before allowance attribution')),/lifetime count/);
+  const unknown=await fixture(t),entry=await unknown.document();await unknown.seed(entry.original,entry.extraction);
+  assert.equal((await unknown.invoke(entry,async job=>{await unknown.reserve(job,entry.original);})).state,'completed');
+  await assert.rejects(auditStep8Allowance(unknown.pool,[entry.original],async()=>assert.fail('Unknown approval cannot read source item')),/Unknown historical allowance/);
+  const narrow=await fixture(t),limited=await narrow.document(0,{maxCalls:2});await narrow.seed(limited.original,limited.extraction,3,2);
+  await assert.rejects(auditStep8Allowance(narrow.pool,[limited.original],async()=>assert.fail('Narrow base has no supplement')),/lifetime count/);
+ });
  await t.test('base48 then exactly24 fresh A extras; concurrent final original slot has one winner',async t=>{
   const f=await fixture(t),d=await f.document();await f.seed(d.original,d.extraction);
   const before=await codexAssessmentAllowancePreflight(f.pool,[d.jobKey],f.pin(),f.options);assert.equal(before.jobs[0].capacity.baseRemaining,0);assert.equal(before.jobs[0].capacity.extraRemaining,24);
