@@ -8,6 +8,7 @@ import {SubscriptionLimitSchema,OmpLimitFailureProofSchema,retryableOmpFailurePr
 import {encodeStepReceipt,StepReceiptSchema} from './district-step-receipt.ts';
 import {completedCodexIntents,type CodexCompletionIntent,type CodexCompletionProof} from './district-subscription-cache.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
+import {codexCallCapacity,type CodexAllowanceOptions} from './district-codex-allowance.ts';
 
 export const SUBSCRIPTION_RESUME_APPROVAL='9882aa1a3938c41a358760705705b943b31e569e11a7b5a2f6579c8661a6b028';
 export const SUBSCRIPTION_PARENT_APPROVAL='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b';
@@ -49,7 +50,7 @@ export async function assertBSubscriptionResume(client:PoolClient,authorizationI
 /** Lead-only, no waits or provider calls. The same transaction issues fresh
  * canonical authority, records its basis and invokes guarded queue resume.
  * Codex's own reserveR1CodexCall creates r1_codex_resumptions lazily, unchanged. */
-export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,options:{checkPolicy:(spec:DistrictJobSpec)=>Promise<void>;notification?:NotificationIdentity;casRoot?:string;completionPolicy?:CivicPolicyOptions}){
+export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,options:{checkPolicy:(spec:DistrictJobSpec)=>Promise<void>;notification?:NotificationIdentity;casRoot?:string;completionPolicy?:CivicPolicyOptions;codexAllowance?:CodexAllowanceOptions}){
  const input=UsageResumeInputSchema.parse(raw),jobKeys=[...new Set(input.jobKeys)].sort();
  if(jobKeys.length!==input.jobKeys.length)throw Error('Duplicate resume job key');
  const parentBytes=await readFile(new URL('../reports/approvals/r1-nine-town-models-2026-10-13.json',import.meta.url));
@@ -116,9 +117,13 @@ export async function resumeSubscriptionUsage(pool:Pool,raw:UsageResumeInput,opt
     const ambiguous=await client.query(`SELECT 1 FROM district_pipeline.assessment_bridge_leases b WHERE b.job_id=$1 AND b.claimed_at IS NOT NULL AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_proven_bridge_limit_failures h WHERE h.bridge_lease_id=b.id AND h.reset_at<=clock_timestamp()) LIMIT 1`,[job.id]);
     if(ambiguous.rowCount)throw new DistrictExecutionHold('usage_unknown');
    }else{
-    // Count every intent for each original, not just this job's intents.
-    const originalCaps=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_documents d WHERE d.original_sha256 IN(SELECT original_sha256 FROM district_pipeline.r1_codex_call_intents WHERE job_id=$1) AND (SELECT count(*) FROM district_pipeline.r1_codex_call_intents i WHERE i.original_sha256=d.original_sha256)>=LEAST(d.max_calls,$2) LIMIT 1`,[job.id,parent.extraction.maxModelCallsPerDocument]);
-    if(originalCaps.rowCount)throw new DistrictExecutionHold('source_limit_exceeded');
+    // The same lifetime/cap/eligibility validator is used by reservation and
+    // read-only operator preflight, under the unchanged accounting lock here.
+    const originals=await client.query<{original_sha256:string}>('SELECT DISTINCT original_sha256 FROM district_pipeline.r1_codex_call_intents WHERE job_id=$1',[job.id]);
+    for(const original of originals.rows){
+     const capacity=await codexCallCapacity(client,job.job_key,original.original_sha256,parent.extraction.maxModelCallsPerDocument,options.codexAllowance);
+     if(!capacity.allowed)throw new DistrictExecutionHold('source_limit_exceeded');
+    }
     const ambiguous=await client.query<CodexCompletionIntent>(`SELECT i.id,i.request_sha256 FROM district_pipeline.r1_codex_call_intents i WHERE i.job_id=$1 AND NOT EXISTS(SELECT 1 FROM district_pipeline.r1_codex_usage_holds h JOIN district_pipeline.r1_subscription_usage_holds evidence ON evidence.codex_authorization_id=h.authorization_id WHERE h.failed_intent_id=i.id AND evidence.provider='openai-subscription' AND evidence.no_output AND evidence.reset_at<=clock_timestamp())`,[job.id]);
     if(ambiguous.rowCount){
      if(job.spec.step!=='residual_extract'||!options.casRoot)throw new DistrictExecutionHold('usage_unknown');

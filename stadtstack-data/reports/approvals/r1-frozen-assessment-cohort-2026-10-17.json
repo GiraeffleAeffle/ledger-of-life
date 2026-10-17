@@ -1,0 +1,3279 @@
+{
+  "schemaVersion": "r1-nine-town-frozen-assessment-cohort-v1",
+  "purpose": "Content-free exact frozen membership; not an allowance, owner approval, policy decision or execution authority",
+  "parentApproval": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-nine-town-models-2026-10-13.json",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "catalogueSha256": "08fd6165f8621ceecdf5f1eda795d7955dc34caa9526d6b6a74d441e58efd5d4",
+  "sourceCount": 27,
+  "documentCount": 208,
+  "uniqueOriginalCount": 193,
+  "sources": [
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "hoppegarten-council",
+      "corpusSha256": "f029a7437eeaf5ce6be088e2800f4d626f6d6c16e77590c55ea711afed97b8ed",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-council",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    },
+    {
+      "source": "hoppegarten-gazette",
+      "corpusSha256": "00543bbff9c15f67e528bc9cb7f0420a9cd6ce1f57d640a7c733886ad09d9043",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-gazette",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 4
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "hoppegarten-website",
+      "corpusSha256": "d03ca0bf167ea13e70cea2e5d87b092f9a5df49492c7ad2af2f8c4ee98b06c0b",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-website",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 2
+    },
+    {
+      "source": "ludwigslust-council",
+      "corpusSha256": "68852a3c8b9bc5ae544d1c5050ee5005263092485e07ee30d9fa88f42d8ccf5c",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-council",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 8
+    },
+    {
+      "source": "moelln-council",
+      "corpusSha256": "d7b1ba546e570df7bf1835a0d563125560f6c53f18dbb2bbebefd838db9af273",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-council",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "moelln-participation",
+      "corpusSha256": "33bcfccc88e685753608c69bd3e54362de985ee250eb7290d7ff0f39bfed88ee",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-participation",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 4
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 8
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 24
+    },
+    {
+      "source": "parchim-gazette",
+      "corpusSha256": "df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-gazette",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 2
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 7
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 8
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-council",
+      "corpusSha256": "b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-council",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 2
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 11
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 8
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 10
+    },
+    {
+      "source": "schwarzenbek-website",
+      "corpusSha256": "d6237b94f7c5706a7da0c86817dcbb9ab87b264053c97dbc9aa8cc11d8f20e7c",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-website",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    },
+    {
+      "source": "strausberg-council",
+      "corpusSha256": "fd86e3f07dff97a43535bbe6501eedbc45701fe3bdf37dbf8718f4ae126247d1",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-council",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 12
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 20
+    },
+    {
+      "source": "strausberg-website",
+      "corpusSha256": "978cacf37d75296e279d1525cd98510aca28fd8af1d0b09bda871a3b449fc8b3",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-website",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "documentCount": 1
+    }
+  ],
+  "documents": [
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-1ed41ba22a57375d2e28f69d",
+      "originalSha256": "c48e129a09cd8f08fff11c8486fbaa45ec2e5142e63adb44ec8a411d659cb595",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-2fbc812712f82c09c598fee4",
+      "originalSha256": "763d14659067a87e9d0450c75743ab539bf458bda743ab1a533c752876b80785",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-428d749811a290505c15c240",
+      "originalSha256": "c1178494728e2917072cf7da613d57023290bfd001e8a9f80b07ee620a0b17eb",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-6158a21226724e01f2ceba1b",
+      "originalSha256": "5d7c618f2eb49e2b017d54c1aa8f620b659da8da27ae6706eb136124dbca20ca",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-74e9a82597b93ce4afd42fd9",
+      "originalSha256": "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-980355a8d3fa52fc57a71914",
+      "originalSha256": "aa8741dfe462c253a6abc9fa8f476138a912b8e9c2f7850bbbe7a9883f241b66",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-a3ccf189413392f9184ab622",
+      "originalSha256": "0214f1a86f137318ab75d2f019422ed6d288816a225ef757c9f2cebf309ebca7",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-a6513b77befd86c4a89800a4",
+      "originalSha256": "ffd9cb5baa7060c902f5dc44c7d357c3c8dfa059a45604d42760958b46e16251",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-af051b8277cf23be91d5f936",
+      "originalSha256": "5c32a3a4919b4ba4b579cc945d784c4c22ee497d42ba708e57e01dc7e230d3b4",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-bd812b84caa1d7550bcf62a6",
+      "originalSha256": "ee2d23279e0e3b9af7843b42911e469edf1c9b2fa54f05b170b830f845be2156",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-da3c698d5c8e4d5c7e50b638",
+      "originalSha256": "c402f6646b2233a72f8ce555b67854d871765d2a43e799da23dd5c28e0d1ab45",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hagenow-publisher-gazette",
+      "corpusSha256": "4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268",
+      "documentId": "document-fb09c4daaf6fb6cbc04ea929",
+      "originalSha256": "620fd6d63a123f24816f3cddb802562758e108212ef6a5baa1a0273a51620f76",
+      "scope": {
+        "publisherId": "hagenow",
+        "sourceId": "hagenow-publisher-gazette",
+        "municipalityId": "hagenow",
+        "ags": "13076060",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-council",
+      "corpusSha256": "f029a7437eeaf5ce6be088e2800f4d626f6d6c16e77590c55ea711afed97b8ed",
+      "documentId": "document-870927ba985a307aa284d32f",
+      "originalSha256": "0a1638b05af875024ffe1e6398c3bf313ed5996c8b63ad2b38da703f96035e30",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-council",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-gazette",
+      "corpusSha256": "00543bbff9c15f67e528bc9cb7f0420a9cd6ce1f57d640a7c733886ad09d9043",
+      "documentId": "document-8af27f07dfd9b31a8275b77b",
+      "originalSha256": "eca9720cce49c5bc9f00fcb4d79c756a1518fb75d0440fd183ba87f54836c5b4",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-gazette",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-gazette",
+      "corpusSha256": "00543bbff9c15f67e528bc9cb7f0420a9cd6ce1f57d640a7c733886ad09d9043",
+      "documentId": "document-bf839fe3dc87be9fee4e375b",
+      "originalSha256": "6bda6b8fbc50052816a96a24addda43bd762006f94a1cfdbc4aaeb6a58dedccc",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-gazette",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-gazette",
+      "corpusSha256": "00543bbff9c15f67e528bc9cb7f0420a9cd6ce1f57d640a7c733886ad09d9043",
+      "documentId": "document-c8bb42b82e2d0085cbfbf9db",
+      "originalSha256": "8bdee194176d5e885706617a71e97ac205cf9581c24e1942d8d628df06c45ee8",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-gazette",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-gazette",
+      "corpusSha256": "00543bbff9c15f67e528bc9cb7f0420a9cd6ce1f57d640a7c733886ad09d9043",
+      "documentId": "document-cc7c82b2b22cf0b47d7ad71c",
+      "originalSha256": "93877e28734fa30dc49e366fa0b6be2e508b8d9e28addb0da764fc262ee643e9",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-gazette",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-05eb0e23092d66401671e5ea",
+      "originalSha256": "59ffac59c7744523ec6e440a231335bc5a67da50afc8694e914b1d67a6a121ee",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-1f01064fe88bf51cf2c1b627",
+      "originalSha256": "a90f660c61909311ebdf993d40ad053b396e076a8cc25ca11c36f48187e476ac",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-33138617a001ae65a340c84b",
+      "originalSha256": "badbec7cc5e2cca04885bce7d36cbc40ea57895691f07ed4c861b0fb768eda4a",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-4f5e57b8bdf6d074ad7fd49b",
+      "originalSha256": "c78d698037f6d996af501b727fe087503ed963ad9b0255e0ef8fc2ca5c05276e",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-61b200ad7041df49a46e8627",
+      "originalSha256": "60fb4fbe682120da9fe0cab362df5d8435dd8a5970dad17b8932ca66043131b1",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-68dbe6840a563acc5e38bd1b",
+      "originalSha256": "9c083d018f6d9534023d75847bda40974d3b61e4cc7b921ef79c771da71b7c9a",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-91b85a1e0198d7cae1236f24",
+      "originalSha256": "c85920d0e96032241846bc8bfe283108d5f3027632b8d59060d98244d897b8dd",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-c5be865376cf39875e1a915b",
+      "originalSha256": "b1fca06604e1fae489392982526c746e8b0b89833891beec4fa0e742bc794bd3",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-dc42be0e2283747cafb347c6",
+      "originalSha256": "38ae5f64519204a355f87ab4f670c388206bf61c4d18a336e8410b7e63b05f5e",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-e24551684b63d8400bb0812e",
+      "originalSha256": "a90f660c61909311ebdf993d40ad053b396e076a8cc25ca11c36f48187e476ac",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-fad61a55d81afaec21efd117",
+      "originalSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-participation",
+      "corpusSha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c",
+      "documentId": "document-fb12cf3d764d2cbd3d93e878",
+      "originalSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-participation",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-website",
+      "corpusSha256": "d03ca0bf167ea13e70cea2e5d87b092f9a5df49492c7ad2af2f8c4ee98b06c0b",
+      "documentId": "document-3d0a9f513be835dbaa0b5b92",
+      "originalSha256": "c26d6d97c23909d73f8727726747cfd19ac672ff8e5cd5985b41cc9e8e767f13",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-website",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "hoppegarten-website",
+      "corpusSha256": "d03ca0bf167ea13e70cea2e5d87b092f9a5df49492c7ad2af2f8c4ee98b06c0b",
+      "documentId": "document-a27f0e847934222a49840e59",
+      "originalSha256": "ce292570a233be504d15006f42563c908a5d9035c210c679c970744da3eb7047",
+      "scope": {
+        "publisherId": "hoppegarten",
+        "sourceId": "hoppegarten-website",
+        "municipalityId": "hoppegarten",
+        "ags": "12064227",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-council",
+      "corpusSha256": "68852a3c8b9bc5ae544d1c5050ee5005263092485e07ee30d9fa88f42d8ccf5c",
+      "documentId": "document-6f94da4ae64de4d5588b37d7",
+      "originalSha256": "a6db12d4a41680424113575a469374f4eac3bd4db72574f79a16a3624564f2d7",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-council",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-018fcff65b4c443f413d8fda",
+      "originalSha256": "10df1cfb7295a57ef19370eca4a717d9ded01ed2d078d1595052c49227fc5091",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-1155d03cb7e25f68fba62512",
+      "originalSha256": "f2ffaf5abfbb1f9ee99038fcdfdc833ad2536dffcef7a1e392f1ff8dca547051",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-23007b40bace728fe79dd10a",
+      "originalSha256": "6b77f7dc1678fdb3b716ec1d9ec3022ef6bb9f5fee132ff5858614aa1fc1e789",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-72e327b857ba4d8cf8d8dc16",
+      "originalSha256": "428136f9264b390e5e012675e3049f02f209d4968192ba4385276dded4e20c92",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-a6f7f2f33a0a60c57f516e13",
+      "originalSha256": "18ac8ad9c151f97ac31b3a37e5519a65edb54e510bae3156252f3a5c261449fd",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-ad84d6a6bd94b6eef4005d73",
+      "originalSha256": "a96d607d58976cf4983ccb7a2250fe9aa2a8e3d8495861f6d8bc1a58c78b7657",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-c288aee68bff89bd4ec6691e",
+      "originalSha256": "2bf5eaedb5b3069f716e0fb1a0aa9bc94ebcff69f396214dbfd366acb970bc91",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-d471dfbace8f44e85a884fac",
+      "originalSha256": "4ee174026eed269653eb057adbd5f6d33bb92154001705e226afdd73928c839f",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-e2ab546e9332593ecac845af",
+      "originalSha256": "c99edd6ba2713cdee4e30b78d267b28b1627d3e03d2fac9b00aad1b3e619e2cd",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-e6c5313108c91a774fd214a1",
+      "originalSha256": "76ded20f386a6e6b7f6fd3f72121e2b03c136ef54be072e379674007a0422f1a",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-e7d82772d874845d9bd76cd3",
+      "originalSha256": "911b9b9c10524cb7b98b03ffb8e08c2747f915f3670dcbef7f5225167542f915",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-gazette",
+      "corpusSha256": "6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b",
+      "documentId": "document-f537bace7ef159fc05beefb1",
+      "originalSha256": "f1451aec9178eacc7b51d5b702281c0059fcef6c3f3c95f8c55ce354ed2df4e1",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-048819cc635dc3008f024bd0",
+      "originalSha256": "911b9b9c10524cb7b98b03ffb8e08c2747f915f3670dcbef7f5225167542f915",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-1942ac34a47066cc0b68591c",
+      "originalSha256": "c6e9863c369cd200050790eeb5598ff93f1830165813d49be784ceb57a2079c2",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-1a4022a9a332f16896602c07",
+      "originalSha256": "988e6202892e8daa4bc59e8b0e27ac621b95e6c495eecefc0b7068643b851b06",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-4cfda6245740587a7397e2e3",
+      "originalSha256": "6dd0d9bd18045eb27155024b5597bbcf4bdab541de332a256d67ecbc462448d8",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-5ce9d031367975006b55d976",
+      "originalSha256": "ab47630c0fcd7bc4b009202b5ed07995c118aeb4f15248de674723b60e803f97",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-79c29a646dcf64681bb4057d",
+      "originalSha256": "ee24737fa6333ac1e7864b80c5899637c0a9a0dfd11e5908710cba865ded20a5",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-9acbb9ffb02a8984583cc804",
+      "originalSha256": "9882e66cd9267a4381d0e3478c2c9fb82de2f490006afe98db133bc123b6a35c",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ludwigslust-website",
+      "corpusSha256": "f99382159074c49b42c6a8b16b56b1c9c909bdcb76907a492b7452947a4a9bfe",
+      "documentId": "document-a37df59224210be5d651a422",
+      "originalSha256": "7b508a781c99c751089eb3be64298d873e0c9e06064fc40c96e8f473499b413f",
+      "scope": {
+        "publisherId": "ludwigslust",
+        "sourceId": "ludwigslust-website",
+        "municipalityId": "ludwigslust",
+        "ags": "13076090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-council",
+      "corpusSha256": "d7b1ba546e570df7bf1835a0d563125560f6c53f18dbb2bbebefd838db9af273",
+      "documentId": "document-c753d898574f3a33829e0745",
+      "originalSha256": "d88ea732245ced68e4e15b993624ceec346a7a68bc118d8c36e239ff9270d31f",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-council",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-19a938188ce8a52d25dcc093",
+      "originalSha256": "f3e51d9790afc3c451c4a2bab5dd32eac9c1772aad53748f3d33f8e152f74729",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-3131fa7d4bb0931299626fe5",
+      "originalSha256": "b5c6ca567b0e84914ce08a33ee524c96ce8df0c7e94c12a3f1812743a1b02dc9",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-6692d89e8cf605d348307858",
+      "originalSha256": "c6850e891562ba15fbf33bd941215d1c493871513a796d0b4211006bbd77808d",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-6fda9e95958b6f78aa83931e",
+      "originalSha256": "ee63e05237ceb9812647564b41f7d3951dca534dc60ff94fe91fd62172cc2888",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-81ad30057d183cedc816de65",
+      "originalSha256": "df6461d7c8dab82575090a6143157ae6ded80ea90794e7a47af75673c1ba4664",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-82b1fdebe14c174b6fd8fe80",
+      "originalSha256": "537d52f09156b731dd4c8366c87dda1f549be3dc7ba95b4526540bb22365df7a",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-85bad21a44abcf1c7e904837",
+      "originalSha256": "92a8cb107c28bec6d99bb36aa6c99d3479ebc3c9073cebd721b6d8e74c346bcf",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-8c88d1b20c02d37ea3c4bf5b",
+      "originalSha256": "23f6d709448ff74d6a90d37b46927a2cd31ef92a6dad04b1181d4643c22e6293",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-9875f0491989df506fc4cd91",
+      "originalSha256": "2e768d9ae1ebad3219cf6f7e29eeab686e55a67a92302e68b3ec835d6686bd6f",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-d0a197088b45361539f0905c",
+      "originalSha256": "a20a37a60ee93173dab6504b0681d04e39c69d74f1faffe4a4db6f1fc17eaa13",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-d2232ad216fa89a5f7b090c1",
+      "originalSha256": "b8512a19b1943e158339c3908e25e7fa5227520249d0ae633297a5bb8b94ca58",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-gazette",
+      "corpusSha256": "e490749e258ece1493ef549cc053e336e7ae9d7bc8cab29aad4dd68e9870398c",
+      "documentId": "document-de1f752b719b97380bdf2885",
+      "originalSha256": "d0dba39ebeb6fd5ecd87c38f62c1d526ece916a554814d253525476188461541",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-participation",
+      "corpusSha256": "33bcfccc88e685753608c69bd3e54362de985ee250eb7290d7ff0f39bfed88ee",
+      "documentId": "document-8e489a3de90f342e5870132d",
+      "originalSha256": "dda060eab7949442d935648d330a6cb8ef5b8c892c98dece466d3f984ce66958",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-participation",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-participation",
+      "corpusSha256": "33bcfccc88e685753608c69bd3e54362de985ee250eb7290d7ff0f39bfed88ee",
+      "documentId": "document-cc270521e67b9de37d3ad7d8",
+      "originalSha256": "019ab1e458f22836784659db9b16119a7b0919cc242c0fada8f07af307acb594",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-participation",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-participation",
+      "corpusSha256": "33bcfccc88e685753608c69bd3e54362de985ee250eb7290d7ff0f39bfed88ee",
+      "documentId": "document-d29f5027d25d7c70620d3783",
+      "originalSha256": "1cfb831a3cab03f7bf87909b9c05753e1b212a09d206ac1981fa152ea2e446a9",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-participation",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-participation",
+      "corpusSha256": "33bcfccc88e685753608c69bd3e54362de985ee250eb7290d7ff0f39bfed88ee",
+      "documentId": "document-e276d585f0ff72e1d67f3146",
+      "originalSha256": "20c9435025fc5babf96af1a718db48a7b78b3db50d23552cb81ecf101fee74fa",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-participation",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-2b40dca458921311aca0138f",
+      "originalSha256": "5076a53d697f8905a4461d5d346e305c4c1697c51e0306de7b6cba009592ffd9",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-2bc0ec82de2c39db7d978b75",
+      "originalSha256": "f3e51d9790afc3c451c4a2bab5dd32eac9c1772aad53748f3d33f8e152f74729",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-45947feed180622ea77d8478",
+      "originalSha256": "d9cfa897f23b3d5d37ef4c1fb996a90fef91d2d31a3821096631d2229de605b8",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-76d7800c47c995a6316cba2b",
+      "originalSha256": "2e768d9ae1ebad3219cf6f7e29eeab686e55a67a92302e68b3ec835d6686bd6f",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-8c49bf957edd6572293e4e0d",
+      "originalSha256": "537d52f09156b731dd4c8366c87dda1f549be3dc7ba95b4526540bb22365df7a",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-a0e4ddb84430c879ccaccfc8",
+      "originalSha256": "acec183e3611a0a8e50fdc85a386c667b14004e2144065e3c65405795912d1e7",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-ccf0b402cceda0e21b8f55c5",
+      "originalSha256": "db51d993cf33baaa58c5c4aba69c37815a86dade85b73aa23abc4ae5119f09e3",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "moelln-website",
+      "corpusSha256": "b6aa6ff27b5a29d927bc9ecb4600d33b4698c56e85def4314980d7aaa3fdfde3",
+      "documentId": "document-e61737a20072f8531228cdfb",
+      "originalSha256": "4c82f0367aaf45f9783f5a355ec62fce5fa65f44ef26b03286b62f0bf2c2b90e",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-website",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-086bedab771add7bae0fd8d6",
+      "originalSha256": "1b00833351ef26a917244d1fadd19c6ad0f8933cca50c6f07bb24d793f525102",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-0a376d032f94adb820590ad4",
+      "originalSha256": "43f19440ee934e73f7f3f5e4e053baed13a10d3f6f6c6c304ef098a2d03f142b",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-0ce19a5205a8e46cfd7a2109",
+      "originalSha256": "e2eb5f7d5d2fbdeda8303d3742ea8debc14f6718540bb482e5d127d971a9fea2",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-14102574a9ad2391a2fec7b1",
+      "originalSha256": "d603d29b3d3b8bc8f256d3e6a2bc010f77a49cd1903fdd95c713e56a8d11fb60",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-1ad0e35c5833c26153b6ad86",
+      "originalSha256": "f676b99a2f7f05c574d7b608575dc58d204a1995352881addf0bbf3c712cf449",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-1cfb171c14e0d7b559e25583",
+      "originalSha256": "1b55f14997dfea23a5d31804dd00d57aa098cb09783f7e6a5afc84d2b443686c",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-2798f4a1a32a3ea822af18bb",
+      "originalSha256": "1372110fe8278642ff08281e0a8975822a06270cf6bca8ce576a60c6f4bd6716",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-6a81c59e03c0ad6a3147bd11",
+      "originalSha256": "218865d4380d4bf8e2f64a22b49b91e0e0bb7de3b3225aa762c700fa3a14e3ca",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-7c1c9b3a70b44a985d0701d6",
+      "originalSha256": "c06b3991eb6fc10e9ee4d3e9c390d1baeb65780bc03bc94da1cc2a1bae5f07e3",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-8ee72ad71abd0e7028230f80",
+      "originalSha256": "a8570a842e42211c67b92c82741faeeade041ff41fd49c1cd5a1517165b04930",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-8f7512270d1d4450ccc977af",
+      "originalSha256": "e0b90164b83271b23063b7593673106be965eb3bdf2ed9052887fc221c569850",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-a3480b3b3128f2586ac7e689",
+      "originalSha256": "4c826beb83a91ed348b9f02b6a1a350b1f68232078e8947de780734365395c2c",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-ad3e9da8fbc3337990770eb5",
+      "originalSha256": "a10f6bfb149123a411bb7895293309c964fa053341ddbe1099f34e29f7cfc91b",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-b3154720eb261519b4ddb0fe",
+      "originalSha256": "007516bbef6f7629541d0cbd0c60a2146018f5e93e8957ba42edb068e3978505",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-b43744d29dfe8ec0dd369d73",
+      "originalSha256": "7aadfb326c48ebe01adbaf224df311a3167f9591f1cd3bbcac97f544cecfe0d6",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-b5d03aed048299e8154a0eb0",
+      "originalSha256": "630bed9fdfab91f35bd8712d2995b7050ef4480605b491bec47774b1bf8fae43",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-b6db0db02abc58ea14f62146",
+      "originalSha256": "bb0bc4f71ab34fb0c5d9e367d550f5b33f22509a874f4005d6eabe91aa619486",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-bd373a0495cb38889b4eea59",
+      "originalSha256": "2d390a19b758bbf0e45ee458de8dbea6be870b460bbfe085a4439c3182d2a3e8",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-c1851a305427d82a8e935b28",
+      "originalSha256": "981d96cc0ae4bf93ebeb252c11ba05d3fe41f7e7e5690edc7a9e0eb6d6881af0",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-c9759490bdec390a4963d238",
+      "originalSha256": "f7058563287cfc1052864c2c5d8a81450a6d46539d8be3bdae2a31738d1c4d7f",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-d3036f0626ede73ce3c5767c",
+      "originalSha256": "ffc79f80eb9930e120fb4c6b11702a74ee160ed4332e4f8913457a57c5f6b278",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-db9581bed13f6514f437ccba",
+      "originalSha256": "a57757c234798414cf3da44000950eab23ff20beec81fe33ca1240b15160a45b",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-dd16d1227b1e94619c297b4c",
+      "originalSha256": "d0480b052c39b12a1d25ac90f92435a3cd246e2b3777cfdf83ac505c076f0a1c",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-council",
+      "corpusSha256": "093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499",
+      "documentId": "document-e0c49ca2a554647935c0d39c",
+      "originalSha256": "b7a42a60ab634368c445f6f3a21acec7ae7ba295f8eec74687770fc0eaf17a6e",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-council",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-gazette",
+      "corpusSha256": "df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188",
+      "documentId": "document-581bea8cc25cfdc810686c2e",
+      "originalSha256": "313dc20f9aaa482be64daad16abe21161020ac6c33b7862666ddfacb26ad3934",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-gazette",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-gazette",
+      "corpusSha256": "df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188",
+      "documentId": "document-6e84578fc4b625393240b2da",
+      "originalSha256": "3281597106a91079297885fb7d7722ec6f445857ce8645bb43a959fb969fad54",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-gazette",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-0618751f2d71860dc87d4d72",
+      "originalSha256": "e25456dc85bacad71709636c81728944d865c38a0b0ecc8927c8815062f370b3",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-0c1bafd73909ba74d23912ef",
+      "originalSha256": "1211900ec711d1a4e23149c21f8e31ed2d37d3ed3e79d47d54a865a427ca01e7",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-15a6354e9eb711bb30e1a330",
+      "originalSha256": "4333b6f566c95861bf833fb9dd89da636185a1ba2abfb03ac944cf51b2169f43",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-7943713f485fd5d9122242dd",
+      "originalSha256": "b172097517ce1a8b4f5a6638dc3e47079dc222f0338e995f2720c57cc9cddb3d",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-b72bda0cfd5d3247f5ccc314",
+      "originalSha256": "6f4e8e6ebd1dfac27d32d9930228c29b58b6119a3d8f5ac5ad0aa18a702f1430",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-bad5339d6dc28f8b2153c53a",
+      "originalSha256": "693c4d797eb73b8db09a17e435666077f53551cfc787044550c22896f7b191a4",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "parchim-website",
+      "corpusSha256": "4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8",
+      "documentId": "document-e4b6ae6f8b991ad6cc8b02f8",
+      "originalSha256": "0208a339ad5585f9bceb2924653deb1dc18865df2aeb396a1fc86d3be1979d44",
+      "scope": {
+        "publisherId": "parchim",
+        "sourceId": "parchim-website",
+        "municipalityId": "parchim",
+        "ags": "13076108",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-0fc01672f7b7b62a02f08423",
+      "originalSha256": "580c13585d5f0c4803e5659b52c7cf507c29cac30e5ad18b2ccaad6f1d051c46",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-21818d948cdcc842b6733d54",
+      "originalSha256": "1e4dfb2abb525f7b9d2385705c2a576498a228dd0b29eb664df4c3cf9b04d0c2",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-50a23a5e2579bbb7dfadf237",
+      "originalSha256": "cb129ea6063dcfe3604f60efa5ca579beada4c503f66584ddfc1506d6ab382e9",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-5a43769a00431aad85888dad",
+      "originalSha256": "0d3058cffd510966d723ced803a46a54f99896e0007850da94c601afb5cf34fb",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-5ebc9a23956460e19fca8725",
+      "originalSha256": "bbec175e89b66a892a0396d624f21fda6c2f478a5815437ccf6c9118dbf3207a",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-6e3374ce95a72830fde73662",
+      "originalSha256": "c42ddd15dd22b8d54fc2f00b317724d5a15d2441c6e76ed683190b897de123f9",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-835c6c25cfea75303eb58a3b",
+      "originalSha256": "a65668670c5c5f64c43c167ef2881f668b36e020498a01138f5206bd684fb509",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-8fb0c39622508472397a75e2",
+      "originalSha256": "780f070638064296a32b1f4569b2157ff449ecaa8d84ce3abf917330bbc83c9f",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-946ee2ef0bdbd87f80263860",
+      "originalSha256": "8ade8f28e625e6926d207f79c769041fbf5aa4db9ee6727716623511046a4628",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-981afb92f3b7de47b07f88d6",
+      "originalSha256": "ceaecb28a7d16f6ec534e6b08eb4ea8806c6ab1b64795ba49f44129935d4271e",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-c8c00cf6b41182534fdcff5d",
+      "originalSha256": "5fbee4be6b2daffa6d879c83ef6b250ab806839e6e8fed44f097949440501275",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-gazette",
+      "corpusSha256": "9501552fdf688f36958522901be925873d8aa4aec97aaa6b9621558f0c02d577",
+      "documentId": "document-d293012468d967a0ce57d175",
+      "originalSha256": "fc863c2a21310291b795c19b5031352b54c3d63bdd34033554f9c0e5fb34d32f",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-0c9d61210f5204a02f51607b",
+      "originalSha256": "71b8f11829d1a6a7cbc94f5f247fe34dc1850012b74fb6eb37c1165cdd84df96",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-121feededb1020394d384099",
+      "originalSha256": "27ef7b4db47ee830feb6129ec86e2fc650ccd21a297903f9186f15fdac5c0f3e",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-40f0958f90724405cd843f60",
+      "originalSha256": "0d3058cffd510966d723ced803a46a54f99896e0007850da94c601afb5cf34fb",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-429fc204912ed89871033da1",
+      "originalSha256": "fa801bea440b9395094429c574673a960e850d682b42d53c6f4f957faf165b7a",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-7a073b1330e135a34c3691c6",
+      "originalSha256": "e4aa520f26616a0ba89639ccfd665584b60bfaa068506cf93f0eab67c31f29c3",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-8feee4000a779b2e5d3270be",
+      "originalSha256": "bbec175e89b66a892a0396d624f21fda6c2f478a5815437ccf6c9118dbf3207a",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-9aa2c23f19070c323340f7d2",
+      "originalSha256": "bbfecec5a4fc14d43e3390105b9a88bd566c227ab545af4d5c14a69b6a4a6969",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-b5b73959fecf32d9a8535b50",
+      "originalSha256": "1e4dfb2abb525f7b9d2385705c2a576498a228dd0b29eb664df4c3cf9b04d0c2",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-ccd427466b8592f3314d79a2",
+      "originalSha256": "c94e8c5d5da08a31cba54a0ccb858053455c3b3af7d545d2450e7bfb78e557ff",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-cf17bef53a48a15b9a465e3f",
+      "originalSha256": "ceaecb28a7d16f6ec534e6b08eb4ea8806c6ab1b64795ba49f44129935d4271e",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-eea9f6af629ed3fc603fe2ac",
+      "originalSha256": "064d2b1d37f843db60cecc58c47be4628d0c1a892203accd2e42aaf550566225",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-participation",
+      "corpusSha256": "0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2",
+      "documentId": "document-f17bca84c59f12f7e954fd05",
+      "originalSha256": "8ade8f28e625e6926d207f79c769041fbf5aa4db9ee6727716623511046a4628",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-participation",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-4ad1d570627ca0d42322862f",
+      "originalSha256": "1e4dfb2abb525f7b9d2385705c2a576498a228dd0b29eb664df4c3cf9b04d0c2",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-54592b57e99ecd8dce1776b7",
+      "originalSha256": "8ade8f28e625e6926d207f79c769041fbf5aa4db9ee6727716623511046a4628",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-54897b7f9698db390b921a00",
+      "originalSha256": "a65668670c5c5f64c43c167ef2881f668b36e020498a01138f5206bd684fb509",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-57b6d468f67f2c84bcd26864",
+      "originalSha256": "90ce342f68143c64003ae7b69de41f1d8ab3f82025dea421085f82e4e0c76612",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-6151adbd767efb4b6c3ebf2f",
+      "originalSha256": "ceaecb28a7d16f6ec534e6b08eb4ea8806c6ab1b64795ba49f44129935d4271e",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-6a3accd341b9dbb7b042835e",
+      "originalSha256": "ec7ee8625fbcbf0eba28917d0697e7cd47ba6d84d730d2415771ea7429a83de5",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-726c04d00ee3dcd0ff9a3fd2",
+      "originalSha256": "bbec175e89b66a892a0396d624f21fda6c2f478a5815437ccf6c9118dbf3207a",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ratzeburg-website",
+      "corpusSha256": "e7a9eb0904a960c4dbc08d2c80581e5bdf080a41885cda755c7eaae6d1800265",
+      "documentId": "document-ad352af1ca4ebe1e9e390bc2",
+      "originalSha256": "1c53e61a77a92da6a66853fd6133e6663b5ebab606f698b09fd83f60e58d1847",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-website",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-council",
+      "corpusSha256": "b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12",
+      "documentId": "document-703b27cffffe4a67c09db86f",
+      "originalSha256": "4e4159c6cfbbd53eea7b738bc6e0650af39fa8277c51bce331d801a9c2e762ed",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-council",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-council",
+      "corpusSha256": "b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12",
+      "documentId": "document-7ea57c417da2644f2f5f5961",
+      "originalSha256": "987fa52a4e56ef96da500bf1ca1bbd09c1389a127d4e451b99aaed2563742161",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-council",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-07be16612d8cad1e9d7002a6",
+      "originalSha256": "209be4c5e9ec847ac9d71b92a694026f457368c707f72b40d0a68d679ba77e3a",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-12900cea0f5093be1bfafe94",
+      "originalSha256": "ff425401e1e903df2cf018af8f1d6dcabdefbd467832d96a6088bfbe06c989cc",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-146bb2b4515c2c8dd8cba309",
+      "originalSha256": "4b7147d7cdb9819aef165bd17f1f15b7c67f5f5a9895c2a0d67fac334c79f112",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-1f11b1324f6f9188203fe63a",
+      "originalSha256": "968be4d6213642412aeb207a00936abc5fad1d775446bf7f29116348978bbb67",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-204f7776193b1b905332d461",
+      "originalSha256": "530de2b364471eb094af3aad386148a2e902bff684eca49535c1c8c7b483db89",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-2f1c29006c467033dea62553",
+      "originalSha256": "51ce690a4c5bb0638cffbc5cccda17b3cf44e2650290c4b6d9d9d3566cc87fbe",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-668a6689ba62c65a214862f2",
+      "originalSha256": "f78d377d2512466f9da4fbfb6b0695be132a4ba44095baa8500afd2b0b43cb1c",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-718b2d6073569dc21ba3b4e7",
+      "originalSha256": "fad9c5f1125b7bf9bcf177de04827f59cdd5036620fdcb7c9044caa9c5833c4f",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-9a71fcc1adcc72d7cd741ce4",
+      "originalSha256": "883f7309af5471b767b5c657547e0f71f93f6ac849a406750f479febfe4d0f7e",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-ac842ddeb4854cb8db61512b",
+      "originalSha256": "068dc9c768201a69a49197993afb47bddd472e0e3bdb5e2a534825076d628067",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-participation",
+      "corpusSha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b",
+      "documentId": "document-f5ff89cfbc299f19a696437e",
+      "originalSha256": "2bb3c59ce764c6d3f985e216902034818abb855f5711b8f5a831905ad37f23fe",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-182960dcef28da1c66642d9a",
+      "originalSha256": "b86c8c3966bf9653dc5bef5d23e90b4058408571b4f258a4eb6b753f6aedcd87",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-2dec1b7b4e81cb2502e1f2cf",
+      "originalSha256": "42ab932642c25e2cdd491a88cf7fe3907437c06f2ae94cca45a085221075f0bd",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-33526dd13b58e50e3e054a02",
+      "originalSha256": "b4ae54c26c29d3b8ab11c6c98b9bd8e99ce09675cbb0a63e3612065069bc8046",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-723af22b97a2c992c00e8a9f",
+      "originalSha256": "e3a3745017b85b82d30c9d67ca081c84751ba901c06249345e99b81aed23299f",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-9ec5dbac21a2f015c83ce491",
+      "originalSha256": "3405e9aaf789f875b81f9ae041ef0c3d513579eead961a66800f4fe748076fc0",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-c954334a0595977ee25f1c44",
+      "originalSha256": "48217d6986e45ed73a0a7d78d715f78742d7291fa7fc88778f720abbf90c84fc",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-d954cfbcda6c0d8fd91d8bc9",
+      "originalSha256": "9db0aa24f4c8b9e26a9d27c150ba5e21fe8a5109e8c016fa1e1caf48207e57ea",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "ruedersdorf-bei-berlin-website",
+      "corpusSha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173",
+      "documentId": "document-fe0b7e080657e5e88e0303cd",
+      "originalSha256": "277e52a81042c8a85cfda0b6ec0eec0d5c57d523e3b0a137d31841217acdaa7d",
+      "scope": {
+        "publisherId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-website",
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "ags": "12064428",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-07211c56946a6c31a4a5ef3e",
+      "originalSha256": "95acaf93400e88c78b870482ae7693cdf0b4cc081b212e3925d77c5b3c24ef89",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-0dd58dcf17c96422e22360c2",
+      "originalSha256": "d65083c1de6e978fe34b9cd85f1528014d576573aefc41fbb98a423895fd2bb6",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-0f43ad63143d21a2ecd5c419",
+      "originalSha256": "90008f32c685c21b2c6caa03897d513a8cad23f9d59b87e32779aaab3014f5e9",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-1866d3e936d7cbe61e3eec63",
+      "originalSha256": "de35d89563a9806aca2c423b77092fb1dc6a77833b840c3d4e813ee286f774e7",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-29d7c6e4b912c726c0e7b825",
+      "originalSha256": "75656726f334d013d19a4d2cd4c2308cfb33b5218ac48a168d0c9996cb1733e4",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-3006421d325bd3d6ba1709fb",
+      "originalSha256": "f02b0c4354be70ef716157aa495e850785a6bd2bafe0a80b96d806f2051e7ccb",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-3ed26525a85c467fbd72dc9a",
+      "originalSha256": "8995d88dfb87aa20ea807637de56d80d43bc5b71abc7f9e3ba8adf63ccdfe6f9",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-555562c9beb3131c67e641c7",
+      "originalSha256": "f7db598d26f5e76907150fe79c48157fa822ac10007f773e89a4c09eed6c618a",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-5e599c9104fad3b78b6f99f5",
+      "originalSha256": "c83baff187b6d377f8082c1ffba9e31961d1c2dac11aee8849073620b7542847",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-gazette",
+      "corpusSha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475",
+      "documentId": "document-ab23090dab90c5a8c26e8bcc",
+      "originalSha256": "9b4ed61eea1c96d0528d1d256e7dea89490964ea871c17d8e597b79aadcf8114",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "schwarzenbek-website",
+      "corpusSha256": "d6237b94f7c5706a7da0c86817dcbb9ab87b264053c97dbc9aa8cc11d8f20e7c",
+      "documentId": "document-35f2a6fbca9721b0b6ce638f",
+      "originalSha256": "95887c9b35e93dda56089801eb68132cd5ae3e8e7b2624542ace5e0467e47bd2",
+      "scope": {
+        "publisherId": "schwarzenbek",
+        "sourceId": "schwarzenbek-website",
+        "municipalityId": "schwarzenbek",
+        "ags": "01053116",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-council",
+      "corpusSha256": "fd86e3f07dff97a43535bbe6501eedbc45701fe3bdf37dbf8718f4ae126247d1",
+      "documentId": "document-6305081756ac34e01269baec",
+      "originalSha256": "7f553592e93df02be44375cad1050a130b1e422665ceac8387045abcf5826a0c",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-council",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-15d84f69d3161ae9888def97",
+      "originalSha256": "06c24f9cb3322a6a0400db6f925039c53c21c87053a19785c001a88ecbce1033",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-2caf47e8f1975bcd685f0562",
+      "originalSha256": "bd51d4517760d2b25c6f42b1f2fe55902613f2eb39012b3eee2adedf01ee5310",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-3334eead5a647e3e7d0beeff",
+      "originalSha256": "77da432c1477aad1a0afd8f0ad79a68f2fe370523d78329382721c27998f1edb",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-3c502e9a416ed3342d2f6af0",
+      "originalSha256": "23154301ecb4ea28dc04cc5227d60612da42876d9b614d005c9612b10cc0e4cc",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-52168a68ec3276e525071fc4",
+      "originalSha256": "b4ae49713459d408fe326c0bf47ca3719fee325de04667790408eedc167fd017",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-5439ed4b2df71b322aa4d17a",
+      "originalSha256": "a2f3de8381cd5bde707a06d38968de03c955bd5c6675534e5199aaa668a51e70",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-742835804fc8d94149f4d465",
+      "originalSha256": "db29a8f537c2830972b43e91c2540aa4e8a8f73773178199c1447661de0ebb17",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-900b4184c2ce6f7e377d3d98",
+      "originalSha256": "1848a032f2e492f0f22d0376c1826e33c4e6e1bb72e16ec0677f0b83cc6d456a",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-911e5bc229982b2423d58a05",
+      "originalSha256": "3a900192c42f6c2e200fdb2d32f0aaba1be5eff26c9e7f051fd6fb40f6f66059",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-b4ee976c38ea86ec5df36c3f",
+      "originalSha256": "2db84ce09167a6925cbea42cdc663432ff90f07473c10af4d7597e41cfe43c11",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-bac9b5feaa9d3321df0bfc6c",
+      "originalSha256": "0fb1732b3fce303650674e3ea23bed370726ac8a9028c1fc5ffc7bec43b3926a",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-gazette",
+      "corpusSha256": "7f6e88dfbcc1bd706eadd125a4310d51c724f77b4914c73101ab9721ef79d586",
+      "documentId": "document-ea9c9ed59c68367b1e6430c2",
+      "originalSha256": "8a61a0ec5ee09277440af15767a12817d587da89b8484a22ee7e283d33a5eb49",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-gazette",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-02210eadb00c902038b52bd7",
+      "originalSha256": "b1d33f6363d1eac99bcf518a5d6831ac74f18c4dcd9d7dfebfe2c60f605e809e",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-12fc2230f8cda70812155e27",
+      "originalSha256": "10a677bf90fff1f0b9a6324bf816071df6874ff665240250e37b2f82898f8dc7",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-28bc8256b8d68f0d3593a90c",
+      "originalSha256": "9988776d412ab214602a332609991c8f9e79b62b9f71c642aacf676f04624c76",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-344b84c3fa520501a26bacee",
+      "originalSha256": "bef7f2c0d9b2748d4067e3538850af2ce135e16d9f3b30ef233736c1f67fab1c",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-3d9c3b6425c34056e5c66ce3",
+      "originalSha256": "596e69c5c4b2b4639dc2ee368306a665bcb6614e0e602119b0fd1177e699a7fc",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-73c6851d467e27c52969bb7e",
+      "originalSha256": "97514f1bf11e20dddbaa9666b530475d3e40955909ba8f501e921e2adc6cb308",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-87c18ada2c9a79af59fa6fb6",
+      "originalSha256": "8bbe1726b87a7f0d62bd651b220aa34a2578a3c81797de23c87ba36b21ff036e",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-93074ed89f11985080d05596",
+      "originalSha256": "d5eec7c10701328e302b979e0580c561646c829fb035f13ece74754bd7365e8c",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-9a450d0a65485f5f3b2a862e",
+      "originalSha256": "1d061dc74e87911e8cc46a4dcdfd17f22d33d2d149f16c95a48fdbc9b71963bc",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-a5180e5dcc373ff107ac3bea",
+      "originalSha256": "a517db74f1f747870816474d56e2351e4eeb5f7e87c072df08b04160128909fb",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-a6d7cf06952539094e6341cc",
+      "originalSha256": "271fecb4d85fe16b6ef076b891078f180be06b353d56a26b8882b4961c759ceb",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-ac452fe6275621f5ca429b71",
+      "originalSha256": "2d7b2e04c2bb8173efc378ae8b3f6296016804eaf1a9de201caf1b75051f3daf",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-ae28a00392fc89c43c01d4d7",
+      "originalSha256": "8a844956580a5b76736cb5d875b905005144916f703bfb20288eb400711da461",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-b108cb8d0749b5c57fb5dd8e",
+      "originalSha256": "2fcf472426949d5320f9358575d9d8b5d01b0903774c9e4d2cf0c89f6c206ba8",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-b4930342c58df788ca9738c5",
+      "originalSha256": "beea6c35dbf52d13dec5d9174d9b8d362ca964da93aecadb3ce2443cabb41de6",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-c62e36eacfbf347e6406617e",
+      "originalSha256": "5aa164a4541d71d75cdc9754ab5774af2533fa4121bd54817d063e43a51bc68e",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-c837c73bf097f77f69ad507e",
+      "originalSha256": "8b2de9d9034fc34aebdc6386ffc16f704ffe7379f5aba960199050d9ed6889e0",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-e8a784b6e405862661d14ada",
+      "originalSha256": "7d45691db8ef8baa75f8be8e077d7e2a2152757f98e6cd6fead81eb12ac0ca55",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-ec6555f9d30447ba7993fd63",
+      "originalSha256": "e201ce26c46cc1de095c90b72c6a63b25d76dc2dfa0219a15575d6ad7df2bf2f",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-planning",
+      "corpusSha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4",
+      "documentId": "document-f5f3c6cdc1afb34cef583a92",
+      "originalSha256": "b8ba1f9cf8aff593c20f28838e71549ae5de75a65aac23da30677d5358699fc1",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-planning",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    },
+    {
+      "source": "strausberg-website",
+      "corpusSha256": "978cacf37d75296e279d1525cd98510aca28fd8af1d0b09bda871a3b449fc8b3",
+      "documentId": "document-0fe239e8c0e772ef0d7325b3",
+      "originalSha256": "23c9deb172879944de039bf33a330116f9ce7bee623794c7f323d28774925fa5",
+      "scope": {
+        "publisherId": "stadt-strausberg",
+        "sourceId": "strausberg-website",
+        "municipalityId": "strausberg",
+        "ags": "12064472",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      }
+    }
+  ]
+}

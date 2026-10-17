@@ -5,6 +5,7 @@ import {DistrictExecutionHold,type ClaimedJob} from './district-jobs.ts';
 import {SubscriptionRuntimeError} from './district-model-contract.ts';
 import {guardDistrictPool} from './district-database.ts';
 import {SubscriptionLimitSchema} from './district-subscription-limit.ts';
+import {codexCallCapacity,type CodexAllowanceOptions} from './district-codex-allowance.ts';
 export async function registerR1CodexDocument(pool:Pool,municipalityId:string,originalSha256:string,maxCalls:number){
  guardDistrictPool(pool);
  HashSchema.parse(originalSha256);
@@ -24,7 +25,7 @@ export async function registerR1CodexDocument(pool:Pool,municipalityId:string,or
 }
 
 /** Committed before a source-bearing effect; never refunded or silently replayed. */
-export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256:string,requestSha256:string,maxCalls=48){
+export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256:string,requestSha256:string,maxCalls=48,allowance:CodexAllowanceOptions={}){
  guardDistrictPool(pool);
  HashSchema.parse(originalSha256);HashSchema.parse(requestSha256);
  if(!Number.isInteger(maxCalls)||maxCalls<2||maxCalls>48||!['residual_extract','assessment_a','assessment_c'].includes(job.spec.step))throw new DistrictExecutionHold('authorization_revoked');
@@ -32,7 +33,7 @@ export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256
  try{
   await client.query('BEGIN');
   await client.query('SELECT pg_advisory_xact_lock(18441,81)');
-  const active=await client.query<{authorization_id:string;approval_sha256:string;approved_by:string;approved_at:Date}>(`SELECT a.id AS authorization_id,a.approval_sha256,a.approved_by,a.approved_at FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.id=$1 AND j.lease_owner=$2 AND j.fencing_token=$3 AND j.state='leased' AND NOT j.cancellation_requested AND j.lease_expires_at>clock_timestamp() AND r.state='running' AND a.state='approved' AND a.expires_at>clock_timestamp() AND a.first_started_at+a.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND r.started_at+r.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND j.job_key=ANY(a.allowed_job_keys) AND j.ags=ANY(a.allowed_ags)`,[job.id,job.runId,job.fencingToken]);
+  const active=await client.query<{authorization_id:string;approval_sha256:string;approved_by:string;approved_at:Date}>(`SELECT a.id AS authorization_id,a.approval_sha256,a.approved_by,a.approved_at FROM district_pipeline.jobs j JOIN district_pipeline.executor_runs r ON r.id=j.lease_owner JOIN district_pipeline.preauthorizations a ON a.id=r.authorization_id WHERE j.id=$1 AND j.lease_owner=$2 AND j.fencing_token=$3 AND j.job_key=$4 AND j.step=$5 AND j.state='leased' AND NOT j.cancellation_requested AND j.lease_expires_at>clock_timestamp() AND r.state='running' AND a.state='approved' AND a.expires_at>clock_timestamp() AND a.first_started_at+a.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND r.started_at+r.max_elapsed_ms*interval '1 millisecond'>clock_timestamp() AND j.job_key=ANY(a.allowed_job_keys) AND j.ags=ANY(a.allowed_ags)`,[job.id,job.runId,job.fencingToken,job.jobKey,job.spec.step]);
   if(active.rowCount!==1)throw new DistrictExecutionHold('lease_lost');
   const authorization=active.rows[0];
   const holds=await client.query<{authorization_id:string;held_at:Date}>(`SELECT h.authorization_id,h.held_at FROM district_pipeline.r1_codex_usage_holds h WHERE NOT EXISTS(SELECT 1 FROM district_pipeline.r1_codex_resumptions r WHERE r.held_authorization_id=h.authorization_id AND r.authorization_id=$1)`,[authorization.authorization_id]);
@@ -50,11 +51,16 @@ export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256
   const document=await client.query<{max_calls:number}>('SELECT max_calls FROM district_pipeline.r1_codex_documents WHERE original_sha256=$1 FOR UPDATE',[originalSha256]);
   const prior=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_call_intents i LEFT JOIN district_pipeline.r1_codex_usage_holds h ON h.failed_intent_id=i.id WHERE i.job_id=$1 AND i.request_sha256=$2 AND (h.authorization_id IS NULL OR h.authorization_id=$3)`,[job.id,requestSha256,authorization.authorization_id]);
   if(prior.rowCount)throw new DistrictExecutionHold('usage_unknown');
-  const count=await client.query<{count:string}>('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[originalSha256]);
-  if(Number(count.rows[0].count)>=document.rows[0].max_calls)throw new DistrictExecutionHold('source_limit_exceeded');
+  const capacity=await codexCallCapacity(client,job.jobKey,originalSha256,Math.min(maxCalls,document.rows[0].max_calls),allowance);
+  if(!capacity.allowed)throw new DistrictExecutionHold('source_limit_exceeded');
   const id=randomUUID();
-  await client.query('INSERT INTO district_pipeline.r1_codex_call_intents(id,original_sha256,job_id,fencing_token,request_sha256,stage) VALUES($1,$2,$3,$4,$5,$6)',[id,originalSha256,job.id,job.fencingToken,requestSha256,job.spec.step]);
+  const inserted=await client.query('INSERT INTO district_pipeline.r1_codex_call_intents(id,original_sha256,job_id,fencing_token,request_sha256,stage) SELECT $1,$2,$3,$4,$5,$6 WHERE $7::timestamptz IS NULL OR clock_timestamp()<$7::timestamptz RETURNING id',[id,originalSha256,job.id,job.fencingToken,requestSha256,job.spec.step,capacity.allowanceExpiresAt]);
+  if(inserted.rowCount!==1)throw new DistrictExecutionHold('source_limit_exceeded');
   await client.query('INSERT INTO district_pipeline.r1_codex_call_authorizations(intent_id,authorization_id,run_id) VALUES($1,$2,$3)',[id,authorization.authorization_id,job.runId]);
+  if(capacity.allowanceEligible&&capacity.baseRemaining===0){
+   if(!capacity.allowancePin||!capacity.allowanceCohortSha256||!capacity.allowanceQueueContractSha256||capacity.cohortExtraCalls===null)throw new DistrictExecutionHold('authorization_revoked');
+   await client.query('INSERT INTO district_pipeline.r1_codex_allowance_intents(intent_id,original_sha256,allowance_sha256,cohort_sha256,queue_contract_sha256,original_extra_ordinal,cohort_extra_ordinal) VALUES($1,$2,$3,$4,$5,$6,$7)',[id,originalSha256,capacity.allowancePin.sha256,capacity.allowanceCohortSha256,capacity.allowanceQueueContractSha256,capacity.lifetimeExtraCalls+1,capacity.cohortExtraCalls+1]);
+  }
   await client.query('COMMIT');return id;
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }

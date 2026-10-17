@@ -377,7 +377,42 @@ Database supervision changes host-code provenance and current custody/security c
 
 Apply migrations **005** and **006** in the operator's explicit migration step before launching a concurrent cohort; database-loss supervision adds no migration. Stored job/receipt pins are never rewritten. Host-only changes preserve the five scoped queued-job semantic contracts above, while acquisition and current custody/security admission pins still require explicit review against the deployed immutable checkout.
 
-Migration 004 counts cumulative selected `(municipality, original SHA)` identities (maximum 500) and durable pre-effect source-bearing Codex intents **per original SHA** across extraction, A and C. The hard ceiling is `min(48, selected maxModelCalls)`; failed/ambiguous intents are never refunded, and ambiguous effects cannot silently replay. Cache hits do not reserve a new call. All intents have `paid_micro_usd=0`; API-equivalent estimates are not invoices. The same migration creates authorization/run-scoped usage-limit holds and their immutable resumption audit directly: that authorization cannot continue Codex effects, with no waiting, automatic retry or fallback. Continuation requires a genuinely later explicit lead-issued stage authorization narrowing and citing #81; the accounting records its actual approval SHA, approver, approval time, run and the hold it supersedes. Only an explicitly recorded usage-limit failure may be attempted under that new authorization, consuming another cumulative intent. Native pause files are run-scoped. Allocate headroom for A/C before extraction; a 48-call extraction leaves none.
+Migration 004 counts cumulative selected `(municipality, original SHA)` identities (maximum 500) and durable pre-effect source-bearing Codex intents **per original SHA** across extraction, A and C. The ordinary ceiling remains `min(48, selected maxModelCalls)`; failed/ambiguous intents are never refunded, and ambiguous effects cannot silently replay. Cache hits do not reserve a new call. All intents have `paid_micro_usd=0`; API-equivalent estimates are not invoices. The same migration creates authorization/run-scoped usage-limit holds and their immutable resumption audit directly: that authorization cannot continue Codex effects, with no waiting, automatic retry or fallback. Continuation requires a genuinely later explicit lead-issued stage authorization narrowing and citing #81; the accounting records its actual approval SHA, approver, approval time, run and the hold it supersedes. Only an explicitly recorded usage-limit failure may be attempted under that new authorization, consuming another cumulative intent. Native pause files are run-scoped. Extraction never borrows assessment allowance.
+
+**Pinned fresh source-record A/C allowance.** Operational record
+`r1-codex-assessment-allowance-2026-10-17` is fixed by exact committed bytes, the
+owner #81/delegation #88 hashes, the frozen 27-source/208-document/193-original
+cohort and the final projection-v2 assessment queue contract. It expires no later
+than **2026-10-25T21:59:59Z** and admits at most **24 additional lifetime intents
+per original body and 100 across the entire pinned cohort**, normal
+`openai-subscription` only, paid **0**. There is no environment-selected approval.
+Missing, unissued, expired, altered or mismatched records never permit call49.
+The stored `max_calls` and all selector bounds stay at most48; narrower bounds
+are never widened. Extraction, preparation, B, historical/value assessment,
+foreign originals and old queue contracts cannot borrow this allowance.
+
+Core authenticates canonical A/C identities, pinned successful receipts and
+exact execution dependencies through C→A→source-item preparation→residual
+extraction, including frozen corpus/document/body membership and matching source
+policy/scope. The pinned v2 source-item producer attests the full record snapshot;
+the actual A/C handlers still reopen and reconstruct it before reserving. The
+shared validator reads no source CAS or authority inventory. Reservation and
+usage-resume enforce it under the existing accounting transaction advisory lock
+`18441/81`; read-only operator `codexAssessmentAllowancePreflight` uses one
+repeatable-read snapshot and authenticates the fixed record itself. Its
+`observedAt` clock is separate from the stable pin/bounds/eligibility/lifetime
+count report. Preflight does not reserve capacity; the final reservation wins.
+Lifetime excess is `max(0, all immutable intents−48)` per pinned body, including
+failed and ambiguous calls, never a resettable approval epoch. Apply additive
+**migration009** before allowance activation: its append-only attribution ledger
+binds each actual extra intent to the exact allowance/cohort/queue hashes, with
+lifetime original ordinals1–24 and cohort ordinals1–100. The same reservation
+transaction writes the intent, authorization binding and attribution under
+`18441/81`; database guards reject mismatched bodies/stages/queues, missing
+authorization bindings, skipped/reused positions and all updates/deletes.
+Counts must equal `max(total−48)`, not an inference from UUID or wall-clock order.
+No grant/receipt rewriting, subscription usage/ambiguity relaxation or semantic
+fingerprint change is introduced.
 
 **Owner-approved subscription reset disposition (migration 007).** The lead may use
 `district-r1.ts usage-holds --registry-config PATH --registry-descriptor PATH`
