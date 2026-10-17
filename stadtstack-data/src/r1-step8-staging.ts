@@ -119,5 +119,5 @@ export async function assembleStep8Staging(raw:unknown){
  for(const pin of provenance.inputs)await authenticated.read(pin.path);
  const component={campaign:campaignPin,registry:input.registry,privateProvenance,staging,...(input.identityAssessments?{identityAssessments:input.identityAssessments}:{}),...(input.criticalAssessments?{criticalAssessments:input.criticalAssessments}:{}),...(input.regionalPolicyReceipts?{regionalPolicyReceipts:input.regionalPolicyReceipts}:{})};
  const componentPin=await write('staging-component.json',encoded(component));
- return {schemaVersion:'stadtstack-r1-step8-staging-result-v1',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:staging.length,productionExecution:false,valueAccepted:false,hostedReleaseAuthorized:false};
+ return {schemaVersion:'stadtstack-r1-step8-staging-result-v1',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:staging.length,publicationExecuted:false,valueAccepted:false,hostedReleaseAuthorized:false};
 }
