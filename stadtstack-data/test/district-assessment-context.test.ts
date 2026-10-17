@@ -20,7 +20,7 @@ import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prep
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
-import {assertCompactSourceProviderData,resolveProviderQuoteReferences} from '../src/district-assessment-projection.ts';
+import {compactSourceProviderData} from '../src/district-assessment-projection.ts';
 
 async function largeItem(t:TestContext,critical=false){
  // Many chunks, one independently extraction-cited chunk; irrelevant duplicate
@@ -56,9 +56,9 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  verifyAssessmentContext(context,f.text,f.prepared.textSha256,f.item.sources[0].locators);
  const AInput=buildAssessmentPassInput(f.item,evidence,'A'),BInput=buildAssessmentPassInput(f.item,evidence,'B');assert.equal(canonicalJson(AInput.data),canonicalJson(BInput.data));
  const projected=JSON.parse(JSON.stringify(AInput.data.claim));
- assert.equal(projected.version,'r1-provider-propositions-v3');
- assertCompactSourceProviderData({providerEncoding:AInput.data.providerEncoding,claim:AInput.data.claim},JSON.parse(f.item.claim),evidence);
- assert.deepEqual(resolveProviderQuoteReferences(projected.propositions,evidence),JSON.parse(f.item.claim).propositions);
+ assert.equal(projected.version,'r1-provider-propositions-v2');
+ assert.equal(AInput.providerEncodingVersion,projected.version);assert.equal(BInput.providerEncodingVersion,projected.version);
+ assert.deepEqual(projected,{...JSON.parse(f.item.claim),version:'r1-provider-propositions-v2'});
  const output=assessmentOutputSchema.parse(answer(AInput).value);
  const A=syntheticAssessmentReceipt(f.item,'A',output,AInput.data),B=syntheticAssessmentReceipt(f.item,'B',output,BInput.data);
  const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(canonicalJson(CInput.data.evidence),canonicalJson(AInput.data.evidence));
@@ -100,7 +100,7 @@ test('minimal over-cap context and C review envelope have a distinct pre-effect 
  const f=await largeItem(t),wideText=f.text.replaceAll('x','漢'),textSha256=digest(wideText);
  assert.throws(()=>buildPreparedAssessmentContext(wideText,textSha256,f.record.extraction.chunk,[`text-sha256:${textSha256};chars:${f.chunk.start}-${f.chunk.end}`],[{start:f.chunk.start,end:f.chunk.end}]),{reasonCode:'assessment_context_exceeded'});
  const evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
- const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(11000)});
+ const output=assessmentOutputSchema.parse({itemId:f.item.itemId,outcome:'abstain',assertions:[],scores:{correctness:0,sources:0,usefulness:0},holdReasons:[],rationale:'x'.repeat(9000)});
  const A=syntheticAssessmentReceipt(f.item,'A',output,input.data),B=syntheticAssessmentReceipt(f.item,'B',output,input.data);
  const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.ok(Buffer.byteLength(canonicalJson(CInput.data))>ASSESSMENT_CONTEXT_BYTES);assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS.C,CInput.data))<=ASSESSMENT_RECONCILIATION_BYTES);
  const huge={...output,rationale:'x'.repeat(22000)},hugeA=syntheticAssessmentReceipt(f.item,'A',huge,input.data),hugeB=syntheticAssessmentReceipt(f.item,'B',huge,input.data);
@@ -206,4 +206,19 @@ test('pilot item-one critical finalization has satisfiable complete strict A/B/C
   const data=role==='C'?C.data:buildAssessmentPassInput(f.item,evidence,role).data;
   assert.ok(Buffer.byteLength(encodeSubscriptionInput(PROMPTS[role],data))<(role==='C'?ASSESSMENT_RECONCILIATION_BYTES:ASSESSMENT_CONTEXT_BYTES));
  }
+});
+
+test('sealed historical compact requests reauthenticate exactly after full-v2 becomes the default',async t=>{
+ const f=await largeItem(t),evidence=await originalEvidence(f.item,f.context),current=buildAssessmentPassInput(f.item,evidence,'A');
+ assert.equal(current.providerEncodingVersion,'r1-provider-propositions-v2');
+ const historical={...current.data,...compactSourceProviderData(JSON.parse(f.item.claim),evidence,current.data.criticalTarget)};
+ const output=assessmentOutputSchema.parse(answer(current).value);
+ const A=syntheticAssessmentReceipt(f.item,'A',output,historical),B=syntheticAssessmentReceipt(f.item,'B',output,historical);
+ const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(CInput.providerEncodingVersion,'r1-provider-propositions-v3');
+ const C=syntheticAssessmentReceipt(f.item,'C',output,CInput.data,CInput.dependencies),before=canonicalJson({A,B,C});
+ const final=await reconcile(f.item,{A,B,C},f.context);
+ const [item,a,b,c,artifact]=await Promise.all([f.put(f.item),f.put(A),f.put(B),f.put(C),f.put(final)]);
+ const replay=await verifyPinnedAssessment(f.context.cas,artifact.sha256,{itemArtifactSha256:item.sha256,AArtifactSha256:a.sha256,BArtifactSha256:b.sha256,CArtifactSha256:c.sha256},f.context);
+ assert.equal(canonicalJson(replay.assessments),before);assert.equal(replay.final.disposition,'ai_reconciled');
+ assert.notEqual(A.requestSha256,current.requestSha256);
 });

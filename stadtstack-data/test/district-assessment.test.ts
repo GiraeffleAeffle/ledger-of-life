@@ -143,6 +143,7 @@ test('broker pass and receipt helpers preserve validated answer provenance/clock
   assert.deepEqual(thirdInput.dependencies, [A.receiptSha256, B.receiptSha256]);
   const C = createAssessmentReceipt(item, 'C', answer, clocks, evidence, thirdInput);
   assert.deepEqual(C.dependencies, thirdInput.dependencies);
+  assert.equal(B.providerEncodingVersion,input.providerEncodingVersion);assert.equal(C.providerEncodingVersion,thirdInput.providerEncodingVersion);
   assert.throws(() => buildAssessmentPassInput(item, evidence, 'A', { A, B }), /Blind passes/);
   const contaminated = receipt(item, 'A', output, { ...input.data, targetScore: 2 });
   assert.throws(() => buildAssessmentPassInput(item, evidence, 'C', { A: contaminated, B }), /Blind request/);

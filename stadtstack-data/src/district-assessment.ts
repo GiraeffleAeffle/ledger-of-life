@@ -12,7 +12,7 @@ import { loadPolicyReceipt, recheckPolicyReceipt } from './district-policy-recei
 import { StepReceiptSchema, CANONICALIZATION_VERSION } from './district-step-receipt.ts';
 import { PreparedDocumentSchema, verifyPreparedDocument } from './district-prepared-document.ts';
 import { CIVIC_ACQUISITION_DECISION_ID, ManagedSourceBindingSchema, type CivicPolicyOptions, type ManagedSourceContext } from './civic-opt-out.ts';
-import {AssessmentContextSchema,AssessmentContextHold,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
+import {AssessmentContextSchema,AssessmentContextHold,ASSESSMENT_CONTEXT_BYTES,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
 import {ValueAssessmentContextSchema,assertValueAssessmentContext,assertValueSourceContext} from './district-value-context.ts';
 import {validateValueTargetTranscript,valueCallSchema} from './pilot-value-transcript.ts';
 import {SourceRecordBindingSchema,sourceRecordPropositions,compactSourceProviderData} from './district-assessment-projection.ts';
@@ -292,7 +292,16 @@ export function assertSourceRecordProjection(item:AssessmentItem){
  if(item.claim!==canonical(projection)||canonical(ids)!==canonical(item.claimIds)||canonical([...item.entityIds].sort())!==canonical(entityIds))throw new AssessmentContextHold();
  return projection;
 }
-export function assessmentProviderInput(item: AssessmentItem, evidence: OriginalEvidence): Record<string, unknown> {
+export const AssessmentProviderEncodingSchema=z.enum(['assessment-provider-unprojected-v1','r1-provider-propositions-v1','r1-provider-propositions-v2','r1-provider-propositions-v3']);
+export type AssessmentProviderEncoding=z.infer<typeof AssessmentProviderEncodingSchema>;
+export function assessmentProviderEncoding(data:Record<string,unknown>):AssessmentProviderEncoding {
+ const claim=data.claim;
+ return claim&&typeof claim==='object'&&'version' in claim
+  ?AssessmentProviderEncodingSchema.parse(claim.version):'assessment-provider-unprojected-v1';
+}
+/** Explicit encoding is reserved for authenticating immutable historical requests.
+ * Fresh A/B always choose by canonical byte size, never by an assessment outcome. */
+function providerInput(item: AssessmentItem, evidence: OriginalEvidence, recordedEncoding?:AssessmentProviderEncoding): Record<string, unknown> {
   const data: Record<string, unknown> = { itemId: item.itemId, question: item.question, claim: item.claim, rubric: item.rubric,
     claimIds: item.claimIds, entityIds: item.entityIds, evidence };
   const sourceProjection=assertSourceRecordProjection(item);
@@ -329,13 +338,24 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
     projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(item.criticalTarget),
     claimProjection: project(item.criticalTarget.claimProjection),
     claims: item.criticalTarget.claims.map(claim => ({ ...claim, context: project(claim.context) })) };
+  let contextBounded=false;
   if(sourceProjection){
-    const compact=compactSourceProviderData(sourceProjection,evidence,data.criticalTarget);
-    data.claim=compact.claim;data.providerEncoding=compact.providerEncoding;
-    if(item.criticalTarget)data.criticalTarget=compact.criticalTarget;
+    if(recordedEncoding!=='r1-provider-propositions-v3'){
+      data.claim={...sourceProjection,version:'r1-provider-propositions-v2'};
+      contextBounded=Buffer.byteLength(canonical(data))<=ASSESSMENT_CONTEXT_BYTES;
+    }
+    if(recordedEncoding==='r1-provider-propositions-v3'||recordedEncoding===undefined&&!contextBounded){
+      const compact=compactSourceProviderData(sourceProjection,evidence,data.criticalTarget);
+      data.claim=compact.claim;data.providerEncoding=compact.providerEncoding;
+      if(item.criticalTarget)data.criticalTarget=compact.criticalTarget;
+    }
   }
-  assertAssessmentContextBound(data);
+  if(recordedEncoding!==undefined&&assessmentProviderEncoding(data)!==recordedEncoding)throw Error('Blind request encoding binding failed');
+  if(!contextBounded)assertAssessmentContextBound(data);
   return data;
+}
+export function assessmentProviderInput(item:AssessmentItem,evidence:OriginalEvidence):Record<string,unknown>{
+ return providerInput(item,evidence);
 }
 export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvidence, output: AssessmentOutput): string[] {
   const issues: string[] = [];
@@ -447,7 +467,7 @@ const legacyReceiptSchema = z.object({ version: z.literal('assessment-receipt-v1
   returnedModel: z.string().nullable(), modelEvidence: ModelEvidenceSchema, decoding: z.literal('subscription-runtime-pinned'),
   startedAt: z.iso.datetime(), finishedAt: z.iso.datetime(), usage: z.unknown(), actualBilledUsd: z.null(),
   estimatedApiUsd: z.number().nullable(), dependencies: z.array(hash), output: assessmentOutputSchema,
-  deterministicIssues: z.array(z.string()), receiptSha256: hash }).strict();
+  deterministicIssues: z.array(z.string()), providerEncodingVersion:AssessmentProviderEncodingSchema.optional(), receiptSha256: hash }).strict();
 const nativeBReceiptSchema=legacyReceiptSchema.extend({version:z.literal(NATIVE_B_RECEIPT_VERSION),role:z.literal('B'),
  provider:z.literal('anthropic-subscription'),requestedModel:z.literal(NATIVE_B_MODEL),returnedModel:z.literal(NATIVE_B_MODEL),
  modelEvidence:NativeBModelEvidenceSchema}).strict();
@@ -469,33 +489,49 @@ export function validateReceipt(receipt: unknown, item: AssessmentItem, role: ty
   return r;
 }
 export interface AssessmentPassInput {
-  role: typeof roles[number]; data: Record<string, unknown>; requestSha256: string; dependencies: string[];
+  role: typeof roles[number]; data: Record<string, unknown>; providerEncodingVersion:AssessmentProviderEncoding; requestSha256: string; dependencies: string[];
   assessments: { A: AssessmentReceipt; B: AssessmentReceipt } | null;
   discrepancies: { mismatches: string[]; A: string[]; B: string[] } | null;
 }
+/** Old receipts predate the explicit encoding field. Their recorded request hash
+ * selects the exact historical wire; this is authentication, never a provider retry
+ * or permission to use a historical encoding for a fresh blind pass. */
+function receiptProviderInput(item:AssessmentItem,evidence:OriginalEvidence,receipt:AssessmentReceipt):Record<string,unknown>{
+ const encodings:ReadonlyArray<AssessmentProviderEncoding|undefined>=receipt.providerEncodingVersion!==undefined
+  ?[receipt.providerEncodingVersion]:item.sourceRecord?['r1-provider-propositions-v2','r1-provider-propositions-v3']:[undefined];
+ for(const encoding of encodings){
+  let data:Record<string,unknown>;
+  try{data=providerInput(item,evidence,encoding);}
+  catch(error){if(receipt.providerEncodingVersion===undefined&&error instanceof AssessmentContextHold&&error.reasonCode==='assessment_context_exceeded')continue;throw error;}
+  if(digest(data)===receipt.requestSha256)return data;
+ }
+ throw Error('Blind request encoding/hash binding failed');
+}
 export function buildAssessmentPassInput(item: AssessmentItem, evidence: OriginalEvidence, role: typeof roles[number],
   previous?: { A: unknown; B: unknown }): AssessmentPassInput {
-  const data = assessmentProviderInput(item, evidence), blindRequestSha256 = digest(data);
   if (role !== 'C') {
     if (previous) throw Error('Blind passes cannot receive other assessments');
-    return { role, data, requestSha256: blindRequestSha256, dependencies: [], assessments: null, discrepancies: null };
+    const data=assessmentProviderInput(item,evidence);
+    return { role, data, providerEncodingVersion:assessmentProviderEncoding(data), requestSha256:digest(data), dependencies: [], assessments: null, discrepancies: null };
   }
   if (!previous) throw Error('Reconciliation requires A/B receipts');
   const A = validateReceipt(previous.A, item, 'A'), B = validateReceipt(previous.B, item, 'B');
-  if (A.dependencies.length || B.dependencies.length || A.requestSha256 !== blindRequestSha256
-    || B.requestSha256 !== blindRequestSha256) throw Error('Blind request binding failed');
+  const data=receiptProviderInput(item,evidence,A),blindRequestSha256=digest(data),providerEncodingVersion=assessmentProviderEncoding(data);
+  if (A.dependencies.length || B.dependencies.length || B.requestSha256 !== blindRequestSha256
+    || B.providerEncodingVersion!==undefined&&B.providerEncodingVersion!==providerEncodingVersion) throw Error('Blind request binding failed');
   const assessments = { A, B }, discrepancies = { mismatches: mismatchReport(A.output, B.output),
     A: deterministicChecks(item, evidence, A.output), B: deterministicChecks(item, evidence, B.output) };
   data.assessments = assessments; data.mismatchReport = discrepancies;
   assertAssessmentContextBound(data, 'C');
-  return { role, data, requestSha256: digest(data), dependencies: [A.receiptSha256, B.receiptSha256], assessments, discrepancies };
+  return { role, data, providerEncodingVersion, requestSha256: digest(data), dependencies: [A.receiptSha256, B.receiptSha256], assessments, discrepancies };
 }
 /** Answer provenance must come from validated provider events, not assessment JSON alone. */
 export function createAssessmentReceipt(item: AssessmentItem, role: typeof roles[number], answer: ModelAnswer,
   clocks: { startedAt: string; finishedAt: string }, evidence: OriginalEvidence, suppliedInput?: AssessmentPassInput): AssessmentReceipt {
   const expected = buildAssessmentPassInput(item, evidence, role, suppliedInput?.assessments ?? undefined);
-  if (suppliedInput && (suppliedInput.role !== role || suppliedInput.requestSha256 !== expected.requestSha256
-    || digest(suppliedInput.data) !== expected.requestSha256 || canonical(suppliedInput.dependencies) !== canonical(expected.dependencies))) throw Error('Assessment pass input changed');
+  if (suppliedInput && (suppliedInput.role !== role || suppliedInput.providerEncodingVersion!==expected.providerEncodingVersion
+    || suppliedInput.requestSha256 !== expected.requestSha256 || digest(suppliedInput.data) !== expected.requestSha256
+    || canonical(suppliedInput.dependencies) !== canonical(expected.dependencies))) throw Error('Assessment pass input changed');
   const provider = answer.evidence.provider, config = PROVIDER_CONFIGS[provider];
   hash.parse(answer.responseSha256);
   const nativeB=role==='B'&&answer.requestedModel===NATIVE_B_MODEL;
@@ -507,7 +543,7 @@ export function createAssessmentReceipt(item: AssessmentItem, role: typeof roles
   }
   const output = assessmentOutputSchema.parse(answer.value);
   const body = { version: nativeB?NATIVE_B_RECEIPT_VERSION:'assessment-receipt-v1' as const, canonicalizationVersion: CANONICALIZATION_VERSION,
-    role, itemSha256: digest(item), requestSha256: expected.requestSha256,
+    role, itemSha256: digest(item), providerEncodingVersion:expected.providerEncodingVersion, requestSha256: expected.requestSha256,
     responseSha256: answer.responseSha256, outputSha256: digest(output), promptSha256: bytesHash(PROMPTS[role]),
     schemaSha256: digest(z.toJSONSchema(assessmentOutputSchema)), rubricSha256: item.rubricSha256, provider,
     requestedModel: answer.requestedModel, returnedModel: answer.returnedModel, modelEvidence: answer.evidence,
@@ -546,7 +582,8 @@ export async function reconcile(item: AssessmentItem, receipts: { A: unknown; B:
   const { A: a, B: b } = input.assessments!;
   const c = validateReceipt(receipts.C, item, 'C');
   if (canonical(c.dependencies) !== canonical(input.dependencies)) throw Error('Third-pass dependency binding failed');
-  if (c.requestSha256 !== input.requestSha256) throw Error('Blind request binding failed');
+  if (c.requestSha256 !== input.requestSha256
+    ||c.providerEncodingVersion!==undefined&&c.providerEncodingVersion!==input.providerEncodingVersion) throw Error('Blind request binding failed');
   const issues = { A: input.discrepancies!.A, B: input.discrepancies!.B, C: deterministicChecks(item, evidence, c.output) };
   const held = Object.values(issues).some(v => v.length > 0) || c.output.outcome === 'unresolved';
   return { version: 'assessment-disposition-v1', canonicalizationVersion: CANONICALIZATION_VERSION, itemId: item.itemId, itemSha256: digest(item),

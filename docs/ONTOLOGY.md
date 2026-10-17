@@ -160,6 +160,26 @@ serialization categories: the original source modality remains unchanged and
 assessed, `confirmed` is not independent verification, and encoding cannot
 promote a proposed relation's graph/comparison eligibility.
 
+Blind A/B choose their shared provider representation **before inference** by
+canonical UTF-8 byte count: full source-proposition provider v2 at or below
+22,000 bytes; otherwise lossless compact provider v3 if it fits; otherwise an
+explicit pre-call context hold. This changes serialization, not the proposition
+set, quotation windows, source roles or eligibility. C inherits the recorded
+encoding and exact blind request hash, adding genuine reviews under its separate
+36,000-byte cap. New receipts bind `providerEncodingVersion` and request SHA-256;
+immutable older receipts without that field dispatch by their recorded request
+hash, never by today's default. Historical bytes are not rewritten or reusable
+as approval of a changed item/contract.
+
+**Known output-form limitation:** the authorized six-arm Sonnet comparison on
+17 October 2026 observed leading prose/non-JSON material before the object in all
+three compact-v3 outputs; the three full-v2 outputs decoded, including two
+supported judgments and one insufficient-evidence abstention. This small
+diagnostic is not a universal failure-rate estimate. Compact-only items remain
+at risk of an honest output-quality hold. No embedded-object salvage, decoder
+relaxation, output-dependent encoding switch, provider retry or model fallback
+is authorized by the hybrid selector.
+
 Non-quantitative text propositions use assertion `value:null` and `unit:null`;
 their proposed wording is the claim payload, not a measurement. Typed critical
 quantities retain genuine source-attested value/unit and financial-role checks.

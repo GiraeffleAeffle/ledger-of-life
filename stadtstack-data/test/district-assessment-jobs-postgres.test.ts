@@ -18,7 +18,6 @@ import {admittedAssessmentFixture,recordFor,answer} from './district-assessment.
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
 import {buildPreparedAssessmentContext,AssessmentContextHold} from '../src/district-assessment-context.ts';
-import {assertCompactSourceProviderData} from '../src/district-assessment-projection.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
@@ -139,7 +138,8 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;asserted:unknown})=>p.selector==='/'+field&&p.asserted===f.record[field]));
   assert.equal('verification' in projected,false);assert.equal('extraction' in projected,false);
   const reject=async(input:AssessmentPassInput)=>{
-   assertCompactSourceProviderData({providerEncoding:input.data.providerEncoding,claim:input.data.claim},residualRecordPropositions(f.record),input.data.evidence as Parameters<typeof assertCompactSourceProviderData>[2]);return answer(input,true);
+   assert.equal(input.providerEncodingVersion,'r1-provider-propositions-v2');
+   assert.deepEqual(input.data.claim,{...residualRecordPropositions(f.record),version:'r1-provider-propositions-v2'});return answer(input,true);
   };
   await f.run(f.AJobKey,f.handlers(reject));await f.runB();
   const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);

@@ -39,7 +39,7 @@ test('source projection v2 separates genuine statements from generated identity 
  assert.deepEqual(f.item.sourceRecord?.record,f.record);assert.equal(f.item.sourceRecord?.recordSha256,semanticHash(f.record));
  const data=assessmentProviderInput(f.item,f.evidence),wire=canonicalJson(data);
  assert.equal('sourceRecord' in data,false);assert.equal(wire.includes('PRIVATE_GENERATED_ABSENCE_REASON'),false);
- assert.equal(wire.includes('faithfulness'),false);assert.equal(wire.includes('r1-provider-propositions-v3'),true);
+ assert.equal(wire.includes('faithfulness'),false);assert.equal(wire.includes('r1-provider-propositions-v2'),true);
  assert.equal(canonicalJson(data),canonicalJson(buildAssessmentPassInput(f.item,f.evidence,'B').data));
  const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(f.item,f.evidence,'A')).value);
  assert.deepEqual(deterministicChecks(f.item,f.evidence,output),[]);
@@ -147,6 +147,7 @@ test('legacy projection and v1 receipts remain readable; native Sonnet B alone u
  const clocks={startedAt:'2026-10-17T00:00:00Z',finishedAt:'2026-10-17T00:00:01Z'};
  const receipt=createAssessmentReceipt(f.item,'B',native,clocks,f.evidence,input);
  assert.equal(receipt.version,'assessment-receipt-v2');assert.equal(validateReceipt(receipt,f.item,'B').requestedModel,NATIVE_B_MODEL);
+ assert.equal(receipt.providerEncodingVersion,input.providerEncodingVersion);assert.equal(receipt.requestSha256,input.requestSha256);
  assert.throws(()=>createAssessmentReceipt(f.item,'A',native,clocks,f.evidence));
  const downgraded={...receipt,version:'assessment-receipt-v1'};assert.throws(()=>validateReceipt(downgraded,f.item,'B'));
  const wrongTool={...native,evidence:{...native.evidence,tool:'claude-cli' as const}};
@@ -183,4 +184,48 @@ test('compact provider encoding re-derives exact quotes and private partition wi
  assert.throws(()=>compactSourceProviderData(ambiguous,f.evidence));
  const missing=structuredClone(projection);missing.propositions[0].quote='not a supplied literal quote';
  assert.throws(()=>compactSourceProviderData(missing,f.evidence));
+});
+
+test('hybrid selects full v2 at the exact UTF-8 bound, compact v3 only above it, or holds before a provider',async t=>{
+ const f=await fixture(t),base=assessmentProviderInput(f.item,f.evidence);
+ const remaining=22000-Buffer.byteLength(canonicalJson(base));assert.ok(remaining>0);
+ const item={...f.item,question:f.item.question+'漢'.repeat(Math.floor(remaining/3))+'x'.repeat(remaining%3)};
+ const A=buildAssessmentPassInput(item,f.evidence,'A'),B=buildAssessmentPassInput(item,f.evidence,'B');
+ assert.equal(Buffer.byteLength(canonicalJson(A.data)),22000);assert.equal(A.providerEncodingVersion,'r1-provider-propositions-v2');
+ assert.equal(A.requestSha256,B.requestSha256);assert.deepEqual(A.data,B.data);assert.equal('providerEncoding' in A.data,false);
+ const overflow={...item,question:item.question+'x'},compactA=buildAssessmentPassInput(overflow,f.evidence,'A'),compactB=buildAssessmentPassInput(overflow,f.evidence,'B');
+ assert.equal(compactA.providerEncodingVersion,'r1-provider-propositions-v3');assert.equal(compactA.requestSha256,compactB.requestSha256);
+ assert.ok(Buffer.byteLength(canonicalJson(compactA.data))<22000);
+ assertCompactSourceProviderData({providerEncoding:compactA.data.providerEncoding,claim:compactA.data.claim},assertSourceRecordProjection(overflow)!,f.evidence);
+ const response=answer(compactA),output=assessmentOutputSchema.parse(response.value);
+ const a=createAssessmentReceipt(overflow,'A',response,{startedAt:'2026-10-17T00:00:00Z',finishedAt:'2026-10-17T00:00:01Z'},f.evidence,compactA);
+ const b=syntheticAssessmentReceipt(overflow,'B',output,compactB.data);
+ const C=buildAssessmentPassInput(overflow,f.evidence,'C',{A:a,B:b});
+ assert.equal(a.providerEncodingVersion,'r1-provider-propositions-v3');assert.equal(a.requestSha256,compactA.requestSha256);
+ assert.equal(C.providerEncodingVersion,compactA.providerEncodingVersion);assert.deepEqual(C.data.claim,compactA.data.claim);
+ assert.deepEqual(C.data.evidence,compactA.data.evidence);
+ for(const role of ['A','B'] as const)assert.throws(()=>buildAssessmentPassInput({...item,question:item.question+'x'.repeat(22000)},f.evidence,role),{reasonCode:'assessment_context_exceeded'});
+});
+
+test('immutable receipts select their recorded encoding/hash rather than the new hybrid default',async t=>{
+ const f=await fixture(t),full=assessmentProviderInput(f.item,f.evidence),projection=assertSourceRecordProjection(f.item)!;
+ const compact={...full,...compactSourceProviderData(projection,f.evidence,full.criticalTarget)};
+ const current=buildAssessmentPassInput(f.item,f.evidence,'A'),output=assessmentOutputSchema.parse(answer(current).value);
+ assert.equal(current.providerEncodingVersion,'r1-provider-propositions-v2');
+ const stamp=(role:'A'|'B',data:Record<string,unknown>,encoding?:'r1-provider-propositions-v2'|'r1-provider-propositions-v3')=>{
+  const {receiptSha256:_hash,...body}=syntheticAssessmentReceipt(f.item,role,output,data);
+  const recorded={...body,...(encoding===undefined?{}:{providerEncodingVersion:encoding})};
+  return {...recorded,receiptSha256:digest(canonicalJson(recorded))};
+ };
+ for(const encoding of [undefined,'r1-provider-propositions-v3'] as const){
+  const A=stamp('A',compact,encoding),B=stamp('B',compact,encoding),before=canonicalJson({A,B});
+  const C=buildAssessmentPassInput(f.item,f.evidence,'C',{A,B});
+  assert.equal(C.providerEncodingVersion,'r1-provider-propositions-v3');assert.deepEqual(C.data.claim,compact.claim);
+  assert.equal(canonicalJson({A,B}),before,'historical receipt bytes/hashes are not rewritten');
+  assert.throws(()=>buildAssessmentPassInput(f.item,f.evidence,'C',{A,B:stamp('B',full,'r1-provider-propositions-v2')}),/Blind request/);
+ }
+ assert.throws(()=>buildAssessmentPassInput(f.item,f.evidence,'C',{A:stamp('A',compact,'r1-provider-propositions-v2'),B:stamp('B',compact,'r1-provider-propositions-v3')}),/encoding\/hash/);
+ const A=stamp('A',compact),B=stamp('B',compact),{receiptSha256:_hash,...body}=A;
+ const wrong={...body,requestSha256:digest('unretained request')};
+ assert.throws(()=>buildAssessmentPassInput(f.item,f.evidence,'C',{A:{...wrong,receiptSha256:digest(canonicalJson(wrong))},B}),/encoding\/hash/);
 });
