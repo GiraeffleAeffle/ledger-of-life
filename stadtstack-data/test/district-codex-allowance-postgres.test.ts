@@ -151,17 +151,22 @@ test('pinned Codex assessment allowance against disposable PostgreSQL',{skip:!co
   await assert.rejects(codexAssessmentAllowancePreflight(f.pool,[d.jobKey],f.pin(),f.options),sourceLimit);
   assert.equal((await f.invoke(d,async job=>{await assert.rejects(f.reserve(job,d.original),sourceLimit);})).state,'completed');
  });
- for(const mode of ['legacy','value','foreign-original','wrong-queue','expired','unissued','not-fresh','forged-cohort','narrowed','declared'] as const){
+ for(const mode of ['legacy','value','foreign-original','wrong-queue','historical-r3-queue','expired','unissued','not-fresh','forged-cohort','narrowed','declared'] as const){
   await t.test(mode+' cannot borrow beyond the stored base bound',async t=>{
    const bound=mode==='narrowed'||mode==='declared'?36:48;
    const f=await fixture(t),d=await f.document(0,{legacy:mode==='legacy',value:mode==='value',original:mode==='foreign-original'?digest('foreign original'):undefined,maxCalls:bound});
    await f.seed(d.original,d.extraction,bound,mode==='narrowed'?36:48);
    if(mode==='wrong-queue')f.mutateRecord({assessment:{...f.record.assessment,queueContractSha256:digest('wrong queue')}});
+   if(mode==='historical-r3-queue'){
+    const queue='ec919ead603d2ab647adce1ebb2b3d17e78d0f4ba4ff928d7e44c9f8150d6bb2';assert.notEqual(queue,await assessmentQueueContract());
+    f.mutateRecord({assessment:{...f.record.assessment,queueContractSha256:queue}});
+   }
    if(mode==='expired')f.mutateRecord({issuedAt:new Date(Date.now()-60000).toISOString(),expiresAt:new Date(Date.now()-1000).toISOString()});
    if(mode==='unissued')f.mutateRecord({issuedAt:''});
    if(mode==='not-fresh')f.mutateRecord({issuedAt:new Date().toISOString()});
    if(mode==='forged-cohort')f.mutateRecord({cohort:{...f.record.cohort,sha256:digest('forged cohort')}});
    assert.equal((await f.invoke(d,async job=>{await assert.rejects(f.reserve(job,d.original,bound),sourceLimit);})).state,'completed');
+   if(mode==='historical-r3-queue')assert.equal(Number((await f.pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[d.original])).rows[0].count),48,'a stale real approval contract creates no new intent');
   });
  }
  await t.test('missing allowance and caller-forged pin do not activate extra capacity',async t=>{

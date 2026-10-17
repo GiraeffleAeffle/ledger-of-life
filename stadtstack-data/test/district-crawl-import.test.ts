@@ -828,7 +828,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
      assert.equal(cases.filter((entry:{reason:string})=>entry.reason==='assessment_item_hold:assessment_context_exceeded').length,1);
     });
    });
-   await st.test('terminal assessment context and A/B holds retain receipt-authenticated source ancestry',async()=>{
+   await st.test('terminal assessment context and A/B holds retain receipt-authenticated source ancestry',async terminalTest=>{
     const terminal=await fixture('terminal-assessment-context',{body:item.bytes});
     await withFixtureAuthorizedCorpus(terminal.indexBytes,policy,async()=>{
      const imported=await importCrawlCorpusForResidual(store,terminal.cas,terminal.manifest),preparedKey=await enqueueResidualPreparation(store,terminal.cas,imported.jobs[0]);
@@ -848,6 +848,58 @@ test('offline frozen crawl import preserves managed originals and produces enque
      const input={jobKeys:[extractionKey],reconciliationJobKeys:[],terminalAssessmentExceptions:[await pin(AKey,'assessment_a'),await pin(BKey,'assessment_b')]},sealed=await sealQueueTextContribution(pool!,terminal.cas,input);
      assert.equal(sealed.records,0);assert.equal(sealed.committedDocuments,1);assert.equal(sealed.terminalAssessmentExceptions.length,2);
      const composition=await loadR1TextCompositionInput(JSON.parse((await terminal.cas.read(sealed.compositionArtifactSha256)).toString('utf8')),pin=>terminal.cas.read(pin.sha256));assert.equal((await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],composition.contributions[0])).terminalAssessmentExceptions.length,2);
+     await terminalTest.test('old and current preparations for identical items preserve native-B quality history without ambiguous fresh selection',async()=>{
+      const original=imported.jobs[0],current=(await pool!.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>("SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1 AND r.outcome='succeeded'",[preparationKey])).rows[0];
+      const extractionPin=(current.spec.selector as {extraction:{receiptSha256:string}}).extraction;
+      const put=async(value:unknown)=>{
+       const source=await loadResidualSource(terminal.cas,original,{store}),bytes=Buffer.from(canonicalJson(value)),hash=digest(bytes);
+       const artifact=await withManagedSourceWrite(terminal.cas.root,[{...source.sourceBinding,relativePath:`sha256/${hash.slice(0,2)}/${hash}`,contentSha256:hash,independentAllowed:true}],()=>terminal.cas.put(bytes,{kind:'derived',mimeType:'application/json'}),policy);
+       await store.addArtifact(artifact);return artifact;
+      };
+      const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>,phase:string)=>runDistrictJobs({store,cas:terminal.cas,handlers,authorizationId:await authorize(key,phase),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+      const dependencies=[{jobKey:extractionKey,expectedReceiptSha256:extractionPin.receiptSha256}];
+      const oldKey=await store.enqueue({...current.spec,semanticContractSha256:digest('synthetic previous assessment queue, identical item bytes')},{dependencies});
+      const historicalPreparation:JobHandler=async()=>({outcome:'succeeded',reasonCode:'completed',outputs:await Promise.all(current.receipt.outputHashes.map(async hash=>put(JSON.parse((await terminal.cas.read(hash)).toString('utf8')))))});
+      historicalPreparation.currentPolicy=assessmentHandlers.assessment_prepare.currentPolicy;
+      assert.equal((await run(oldKey,{assessment_prepare:historicalPreparation},'identical-history-preparation')).state,'completed');
+      const old=(await pool!.query<{receipt:StepReceipt;receipt_sha256:string}>('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[oldKey])).rows[0];
+      assert.deepEqual(old.receipt.outputHashes,current.receipt.outputHashes);
+      const oldPin={jobKey:oldKey,receiptId:old.receipt.id,receiptSha256:old.receipt_sha256},currentPin={jobKey:preparationKey,receiptId:current.receipt.id,receiptSha256:current.receipt_sha256};
+      const nativeKey=await enqueueAssessmentB(terminalBroker,{itemArtifactSha256:aSpec.selector.itemArtifactSha256,sourceScope:aSpec.sourceScope,policyProofSha256:aSpec.policyProofSha256,transport:'vm-omp'});
+      // Genuine committed fixture receipt/ancestry, not a provider call or a
+      // claim that synthetic terminal output exercises native effect settlement.
+      const nativeQuality:JobHandler=async context=>{
+       const assessment=assessmentItemSchema.parse(JSON.parse((await context.cas.read(aSpec.selector.itemArtifactSha256)).toString('utf8')));
+       const evidence=await originalEvidence(assessment,{cas:context.cas,policyOptions:policy}),input=buildAssessmentPassInput(assessment,evidence,'B'),response=groundedAnswer(input);
+       const identity={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,toolVersion:'synthetic-native-terminal-only',model:NATIVE_B_MODEL,modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
+       const native={...response,value:{...response.value as AssessmentOutput,outcome:'abstain',scores:{...(response.value as AssessmentOutput).scores,usefulness:0},assertions:[],holdReasons:['insufficient_evidence'],valueReview:null,criticalReview:null},evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},requestedModel:NATIVE_B_MODEL,returnedModel:NATIVE_B_MODEL,reportedModels:[NATIVE_B_MODEL]};
+       const receipt=createAssessmentReceipt(assessment,'B',native,{startedAt:new Date().toISOString(),finishedAt:new Date().toISOString()},evidence,input);
+       assert.equal(receipt.version,'assessment-receipt-v2');assert.equal(receipt.output.outcome,'abstain');assert.ok(receipt.deterministicIssues.includes('hold:insufficient_evidence'));
+       return {outcome:'held_quality',reasonCode:'quality_failed',outputs:[await put(receipt)]};
+      };
+      nativeQuality.currentPolicy=assessmentHandlers.assessment_b.currentPolicy;
+      assert.equal((await run(nativeKey,{assessment_b:nativeQuality},'native-quality-history')).state,'held');
+      const nativePin=await pin(nativeKey,'assessment_b'),selected={jobKeys:[extractionKey],reconciliationJobKeys:[],terminalAssessmentExceptions:[nativePin]};
+      // Literal old serialization from real committed pins, before the new
+      // per-terminal preparation field existed. No receipt or job is invented.
+      const historical=await buildQueueTextRun(pool!,terminal.cas,selected,{terminalAssessmentHistory:{preparationPins:[oldPin],recordedPins:new Map()}});
+      const historicalQueue=JSON.parse(Buffer.from(historical.contribution.artifacts.extractionRun.bytes).toString('utf8')).queue;
+      assert.equal(historicalQueue.terminalAssessmentExceptions[0].preparation,undefined);
+      assert.ok(historicalQueue.stepReceipts.some((step:{receipt:StepReceipt})=>step.receipt.jobKey===oldKey));
+      assert.equal((await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],historical.contribution)).contribution.runId,historical.contribution.runId);
+      const fresh=await sealQueueTextContribution(pool!,terminal.cas,selected);
+      assert.deepEqual(fresh.terminalAssessmentExceptions[0].preparation,currentPin);assert.equal(fresh.records,0);
+      const freshComposition=await loadR1TextCompositionInput(JSON.parse((await terminal.cas.read(fresh.compositionArtifactSha256)).toString('utf8')),pin=>terminal.cas.read(pin.sha256));
+      const marker=await put({synthetic:'second preparation in the same current contract'});
+      const duplicate=await store.enqueue({...current.spec,inputArtifactHashes:[...current.spec.inputArtifactHashes,marker.sha256]},{dependencies});
+      assert.equal((await run(duplicate,assessmentHandlers,'same-contract-ambiguous-preparation')).state,'completed');
+      await assert.rejects(buildQueueTextRun(pool!,terminal.cas,selected),/unique committed preparation ancestry/);
+      // Exact recorded generations remain authentic even after another current
+      // preparation commits; neither history is rebound to a later candidate.
+      assert.equal((await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],historical.contribution)).contribution.runId,historical.contribution.runId);
+      const replay=await exportQueueTextContribution(pool!,terminal.cas,[extractionKey],freshComposition.contributions[0]);
+      assert.equal(replay.contribution.runId,fresh.runId);assert.deepEqual(replay.terminalAssessmentExceptions[0].preparation,currentPin);
+     });
     });
    });
    await st.test('persisted v1 source targets retain authenticated historical terminal and reconciliation seals',async()=>{

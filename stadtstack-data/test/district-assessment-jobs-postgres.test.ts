@@ -10,7 +10,7 @@ import {assessmentQueueContract,assessmentQueueHandlers,enqueuePreparedAssessmen
 import {DistrictAssessmentBroker,assessmentBJobHandler,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
 import {BridgeLeaseSchema,BridgeStatusSchema} from '../src/district-assessment-bridge-contract.ts';
 import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,type AssessmentItem,type AssessmentOutput,type AssessmentPassInput} from '../src/district-assessment.ts';
-import {knowledgeEvidenceHash,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
+import {DistrictKnowledgeRecordSchema,knowledgeEvidenceHash,type DistrictKnowledgeRecord} from '../src/district-schema.ts';
 import {PROVIDER_CONFIGS,SubscriptionRuntimeError,type ModelAnswer} from '../src/district-model-contract.ts';
 import {initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {registerR1CodexDocument,reserveR1CodexCall} from '../src/district-codex-accounting.ts';
@@ -18,6 +18,7 @@ import {admittedAssessmentFixture,recordFor,answer} from './district-assessment.
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
 import {buildPreparedAssessmentContext,AssessmentContextHold} from '../src/district-assessment-context.ts';
+import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
@@ -32,8 +33,9 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
  db=new Pool({connectionString:url.href,max:8});closeDb=poolShutdownBarrier(db);const pool=db;await migrateDistrictJobs(pool);
  async function fixture(name:string,originalText?:string,mutate?:(record:DistrictKnowledgeRecord,text:string)=>void,mutateItem?:(item:AssessmentItem)=>void){
   const text=originalText??'Strausberg synthetic original evidence '+name+' '+randomUUID()+'.',f=await admittedAssessmentFixture(text,true);directories.push(f.directory);
-  const cas=f.context.cas,policy=f.context.policyOptions,store=new DistrictJobStore(pool),record=recordFor(f,text),rubric='Synthetic frozen rubric: exact evidence only; AI agreement is not independent gold.';
-  if(mutate){mutate(record,text);record.verification.evidenceHash=knowledgeEvidenceHash(record);}
+  const cas=f.context.cas,policy=f.context.policyOptions,store=new DistrictJobStore(pool),recordInput=recordFor(f,text),rubric='Synthetic frozen rubric: exact evidence only; AI agreement is not independent gold.';
+  if(mutate){mutate(recordInput,text);recordInput.verification.evidenceHash=knowledgeEvidenceHash(recordInput);}
+  const record=DistrictKnowledgeRecordSchema.parse(recordInput); // Same typed boundary as committed extraction.
   await initializeManagedAcquisitionLane(cas.root,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
   const put=async(value:unknown,kind:'derived'|'receipt'|'source_original'|'parser_output'='derived',raw=false)=>{
    const bytes=raw?Buffer.from(value as string):Buffer.from(canonicalJson(value)),hash=digest(bytes);
@@ -98,6 +100,43 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const count=await pool.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[f.source.originalSha256]);assert.equal(Number(count.rows[0].count),2);
   const exported=await exportAssessmentResults(pool,f.cas,[f.AJobKey,f.BJobKey,CJobKey,finalKey],f.policy);
   assert.equal(exported.results.length,4);assert.equal(canonicalJson(exported).includes('Synthetic provider fixture'),false);
+ });
+ const relationRecord=(record:DistrictKnowledgeRecord,text:string)=>{
+  const graph=normalizeGraphClaims({entities:[
+   {mentionId:'operator',name:'Stadtwerk',type:'organization',quote:text,identifiers:[]},
+   {mentionId:'facility',name:'Museum',type:'facility',quote:text,identifiers:[]},
+  ],relations:[{fromMention:'operator',toMention:'facility',type:'operates',quote:text,predicateQuote:'betreibt',
+   modality:'asserted',time:null,conditions:null}]},{municipalityId:record.municipalityId,sourceSha256:record.extraction.inputSha256,ags:record.ags});
+  record.entities=graph.entities;record.relations=graph.relations;
+ };
+ await t.test('canonical-CAS qualification ordering passes typed A/C preflight and reconciliation without changing the projection',async()=>{
+  const f=await fixture('qualification-order','Strausberg Stadtwerk betreibt das Museum.',relationRecord);
+  const before=canonicalJson(f.item),projection=JSON.parse(f.item.claim),rawRecord=JSON.parse(canonicalJson(f.record)),raw=residualRecordPropositions(rawRecord);
+  assert.notDeepEqual(raw.qualifications,projection.qualifications,'fixture reproduces raw conditions/time versus typed time/conditions order');
+  assert.deepEqual(raw.qualifications.map(canonicalJson).sort(),projection.qualifications.map(canonicalJson).sort());
+  assert.deepEqual(raw.propositions.map(p=>p.claimId),f.item.claimIds);
+  assert.equal(canonicalJson(residualRecordPropositions(f.item.sourceRecord!.record)),f.item.claim);
+  let calls=0;const provider=async(input:AssessmentPassInput)=>{calls++;return answer(input);};
+  assert.equal((await f.run(f.AJobKey,f.handlers(provider))).state,'completed');
+  assert.equal((await f.runB()).state,'completed');
+  const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);
+  assert.equal((await f.run(CJobKey,f.handlers(provider))).state,'completed');
+  const finalKey=await enqueueAssessmentResolution(pool,f.store,f.cas,{...pair,CJobKey},'reconcile',f.policy);
+  assert.equal((await f.run(finalKey,f.handlers())).state,'completed');assert.equal(calls,2);
+  assert.equal(canonicalJson(f.item),before,'private projection and history bytes are never reordered or rewritten');
+  assert.equal((await exportAssessmentResults(pool,f.cas,[f.AJobKey,f.BJobKey,CJobKey,finalKey],f.policy)).results.length,4);
+ });
+ await t.test('a genuinely different record fails closed before A request or provider intent as an execution invariant',async()=>{
+  const f=await fixture('different-private-record','Strausberg Stadtwerk betreibt das Museum.',relationRecord,item=>{
+   const changed=item.sourceRecord!.record;changed.summary='Different synthetic committed-record content.';
+   changed.verification.evidenceHash=knowledgeEvidenceHash(changed);item.sourceRecord!.recordSha256=semanticHash(changed);
+   const projection=residualRecordPropositions(changed);item.claim=canonicalJson(projection);item.claimIds=projection.propositions.map(p=>p.claimId);
+  });
+  let calls=0;const result=await f.run(f.AJobKey,f.handlers(async input=>{calls++;return answer(input);}));
+  assert.equal(result.state,'held');assert.equal(result.reasonCode,'execution_exception');assert.equal(calls,0);
+  const row=(await pool.query("SELECT j.state,r.receipt FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id AND r.attempt=j.attempt WHERE j.job_key=$1",[f.AJobKey])).rows[0];
+  assert.equal(row.state,'held_execution');assert.deepEqual(row.receipt.outputHashes,[]);
+  assert.equal(Number((await pool.query("SELECT count(*) FROM district_pipeline.r1_codex_call_intents i JOIN district_pipeline.jobs j ON j.id=i.job_id WHERE j.job_key=$1",[f.AJobKey])).rows[0].count),0);
  });
  for(const unresolved of [false,true])await t.test('disagreement C '+(unresolved?'holds':'reconciles'),async()=>{
   const f=await fixture('disagreement-'+unresolved);await f.run(f.AJobKey,f.handlers());await f.runB(true);

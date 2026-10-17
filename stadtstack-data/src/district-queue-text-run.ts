@@ -8,7 +8,7 @@ import type {DistrictCas} from './district-cas.ts';
 import {loadCommittedResidualOutputs,loadResidualSource,ResidualInputSchema,residualJobContract,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument} from './district-prepared-document.ts';
 import {assessmentItemSchema,validateReceipt,verifyPinnedAssessment} from './district-assessment.ts';
-import {reconstructResidualAssessmentItem} from './district-assessment-jobs.ts';
+import {assessmentQueueContract,reconstructResidualAssessmentItem} from './district-assessment-jobs.ts';
 import {AssessmentItemHoldPinSchema,loadAssessmentItemHold} from './district-assessment-item-holds.ts';
 import {CriticalAssessmentInventorySchema,CriticalAdmissionsSchema,CRITICAL_ADMISSIONS_VERSION,type CriticalAssessmentInventory} from './district-critical-assessment-contract.ts';
 import {admitCriticalKnowledge} from './district-critical-assessment.ts';
@@ -42,6 +42,8 @@ export const QueueTextSealInputSchema=z.object({jobKeys:z.array(HashSchema).max(
 });
 interface CommittedStep {spec:DistrictJobSpec;receipt:StepReceipt;sha256:string}
 const pinSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict();
+type PreparationPin=z.infer<typeof pinSchema>;
+interface TerminalAssessmentHistory {preparationPins:PreparationPin[];recordedPins:Map<string,PreparationPin>}
 const reconciliationSelectorSchema=z.object({itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,AJobKey:HashSchema,BJobKey:HashSchema,CJobKey:HashSchema.optional(),predecessors:z.array(pinSchema)}).passthrough();
 const pathFor=(cas:DistrictCas,hash:string)=>join(cas.root,'sha256',hash.slice(0,2),hash);
 const artifact=(value:unknown)=>{const bytes=Buffer.from(canonicalJson(value));return {bytes,sha256:digest(bytes)};};
@@ -49,7 +51,7 @@ const artifact=(value:unknown)=>{const bytes=Buffer.from(canonicalJson(value));r
 /** No new clock, run UUID, work-plan assignment or model call is created here.
  * Original queue receipts are the execution authority; v2 is the native output
  * envelope. Recomputing this closure is also the export authentication gate. */
-export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,serialization:{extractionAttemptHistory?:boolean}={}){
+export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,serialization:{extractionAttemptHistory?:boolean;terminalAssessmentHistory?:TerminalAssessmentHistory}={}){
  const input=QueueTextSealInputSchema.parse(raw),store=new DistrictJobStore(pool),includeAttemptHistory=serialization.extractionAttemptHistory===true||input.attemptHistory!==undefined||input.terminalDocumentExceptions.length>0||input.terminalAssessmentExceptions.length>0||input.assessmentItemHolds.length>0;
  const committed:Awaited<ReturnType<typeof loadCommittedResidualOutputs>>=input.jobKeys.length?await loadCommittedResidualOutputs(pool,cas,input.jobKeys):{receipts:[],results:[],sources:[],selectors:[]};
  const terminalDocuments=await Promise.all([...input.terminalDocumentExceptions].sort((a,b)=>a.jobKey.localeCompare(b.jobKey)).map(async pin=>{
@@ -94,6 +96,17 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   }
   const pins=z.object({predecessors:z.array(pinSchema).optional()}).passthrough().parse(entry.spec.selector).predecessors;
   for(const pin of pins??[]){const dependency=byId.get(pin.receiptId);if(!dependency||dependency.sha256!==pin.receiptSha256||dependency.receipt.jobKey!==pin.jobKey||!entry.receipt.dependencyReceiptIds.includes(pin.receiptId))throw Error('Queue seal dependency pin mismatch');}
+ };
+ const preparationPin=(entry:CommittedStep):PreparationPin=>({jobKey:entry.receipt.jobKey,receiptId:entry.receipt.id,receiptSha256:entry.sha256});
+ const ancestorPreparations=(entry:CommittedStep,itemHash:string)=>{
+  const pending=[...entry.receipt.dependencyReceiptIds],seen=new Set<string>(),pins:PreparationPin[]=[];
+  while(pending.length){
+   const id=pending.pop()!;if(seen.has(id))continue;seen.add(id);
+   const dependency=byId.get(id);if(!dependency)throw Error('Terminal assessment predecessor unavailable');
+   if(dependency.spec.step==='assessment_prepare'&&dependency.receipt.outputHashes.includes(itemHash))pins.push(preparationPin(dependency));
+   pending.push(...dependency.receipt.dependencyReceiptIds);
+  }
+  return pins;
  };
  const prepared=new Map<string,z.infer<typeof PreparedDocumentSchema>>(),archives=new Set<string>(),currentAdmissionReceipts:Record<string,string>={};
  const callRequirements:Array<{originalSha256:string;requestSha256:string;jobKey?:string;runId?:string}>=[];
@@ -181,6 +194,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   const result=committed.results[index],original=committed.sources[index],extraction=steps.get(result.result.taskId)!;assertTerminalSourceScope(entry.spec,original.receipt.scope,result.policyReceiptSha256);
   remember({spec:entry.spec,receipt:entry.receipt,receipt_sha256:entry.sha256});await closeDependencies(steps.get(pin.jobKey)!);
   let recordIds:string[];
+  let selectedPreparation:PreparationPin|undefined;
   if(pin.step==='assessment_prepare'){
    const selector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(entry.spec.selector);
    if(selector.extraction.jobKey!==extraction.receipt.jobKey||selector.extraction.receiptId!==extraction.receipt.id||selector.extraction.receiptSha256!==extraction.sha256||!entry.receipt.dependencyReceiptIds.includes(extraction.receipt.id)||!extraction.receipt.outputHashes.includes(selector.extractionArtifactSha256)||!entry.spec.inputArtifactHashes.includes(selector.extractionArtifactSha256))throw Error('Terminal assessment preparation changes extraction ancestry');
@@ -188,15 +202,25 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   }else{
    const selector=z.object({itemArtifactSha256:HashSchema}).passthrough().parse(entry.spec.selector),item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),record=result.result.records.find(record=>record.id===item.itemId);
    if(!record||!entry.spec.inputArtifactHashes.includes(selector.itemArtifactSha256)||canonicalJson(item)!==canonicalJson(reconstructResidualAssessmentItem(record,prepared.get(result.result.taskId)!,result.preparedArtifactSha256,result.policyReceiptSha256,item)))throw Error('Terminal assessment item differs from extracted original');
-   const emitted=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.step='assessment_prepare' AND r.outcome='succeeded' AND r.receipt->'outputHashes' ? $1 AND r.receipt->'dependencyReceiptIds' ? $2`,[selector.itemArtifactSha256,extraction.receipt.id]);
+   // A/C/reconcile carry exact preparation ancestry. Native B has no such
+   // predecessor: fresh sealing must choose the current contract, never an
+   // arbitrary old preparation that happened to emit byte-identical items.
+   // Historical exports instead re-open only their immutable generation pins.
+   const history=serialization.terminalAssessmentHistory,recorded=history?.recordedPins.get(pin.jobKey);
+   if(recorded&&!history!.preparationPins.some(candidate=>canonicalJson(candidate)===canonicalJson(recorded)))throw Error('Terminal assessment recorded preparation is outside its generation');
+   const ancestors=history?[]:ancestorPreparations(steps.get(pin.jobKey)!,selector.itemArtifactSha256);
+   const selectedPins=history?(recorded?[recorded]:history.preparationPins):ancestors.length?ancestors:undefined;
+   const emitted=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.step='assessment_prepare' AND r.outcome='succeeded' AND r.receipt->'outputHashes' ? $1 AND r.receipt->'dependencyReceiptIds' ? $2 AND ${selectedPins?'r.id=ANY($3::uuid[])':"j.spec->>'semanticContractSha256'=$3"}`,[selector.itemArtifactSha256,extraction.receipt.id,selectedPins?selectedPins.map(candidate=>candidate.receiptId):await assessmentQueueContract()]);
    if(emitted.rows.length!==1)throw Error('Terminal assessment item lacks unique committed preparation ancestry');
-   const preparation=remember(emitted.rows[0]);await closeDependencies(preparation);
+   const preparation=remember(emitted.rows[0]);selectedPreparation=preparationPin(preparation);
+   if(selectedPins&&!selectedPins.some(candidate=>canonicalJson(candidate)===canonicalJson(selectedPreparation)))throw Error('Terminal assessment preparation receipt pin mismatch');
+   await closeDependencies(preparation);assertTerminalSourceScope(preparation.spec,original.receipt.scope,result.policyReceiptSha256);
    const preparationSelector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(preparation.spec.selector);
-   if(preparationSelector.extraction.jobKey!==extraction.receipt.jobKey||preparationSelector.extraction.receiptId!==extraction.receipt.id||preparationSelector.extraction.receiptSha256!==extraction.sha256||!extraction.receipt.outputHashes.includes(preparationSelector.extractionArtifactSha256))throw Error('Terminal assessment preparation pin mismatch');
+   if(preparationSelector.extraction.jobKey!==extraction.receipt.jobKey||preparationSelector.extraction.receiptId!==extraction.receipt.id||preparationSelector.extraction.receiptSha256!==extraction.sha256||!extraction.receipt.outputHashes.includes(preparationSelector.extractionArtifactSha256)||!preparation.spec.inputArtifactHashes.includes(preparationSelector.extractionArtifactSha256))throw Error('Terminal assessment preparation pin mismatch');
    recordIds=[record.id];
   }
   for(const id of recordIds)terminalHeldRecords.add(id);
-  terminalAssessmentExceptions.push({...pin,municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceSha256:original.document.sha256,corpusSha256:result.corpusSha256,outcome:entry.receipt.outcome,recordIds,receipt:entry.receipt,attemptHistory:entry.attemptHistory});
+  terminalAssessmentExceptions.push({...pin,...(selectedPreparation&&(!serialization.terminalAssessmentHistory||serialization.terminalAssessmentHistory.recordedPins.has(pin.jobKey))?{preparation:selectedPreparation}:{}),municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceSha256:original.document.sha256,corpusSha256:result.corpusSha256,outcome:entry.receipt.outcome,recordIds,receipt:entry.receipt,attemptHistory:entry.attemptHistory});
  }
  const assessmentItemHolds=[],itemHoldReasons=new Map<string,string>();
  for(const pin of [...input.assessmentItemHolds].sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256))){
@@ -314,13 +338,21 @@ export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:
 /** Preserve historical non-exception exports without changing their frozen job
  * implementation. Terminal exports authenticate the new complete queue closure. */
 export async function exportQueueTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
- const authenticated=authenticateTextRunContribution(contribution),queue=z.object({reconciliationJobKeys:z.array(HashSchema),attemptHistory:z.literal('committed-v1').optional(),extractionAttemptHistory:z.array(z.unknown()).optional(),terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema.strip()).default([]),terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema.strip()).default([]),assessmentItemHolds:z.array(AssessmentItemHoldPinSchema.strip()).default([])}).passthrough().parse(authenticated.extractionRun.queue);
+ const authenticated=authenticateTextRunContribution(contribution),queue=z.object({
+  reconciliationJobKeys:z.array(HashSchema),attemptHistory:z.literal('committed-v1').optional(),extractionAttemptHistory:z.array(z.unknown()).optional(),
+  terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema.strip()).default([]),
+  terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema.strip().extend({preparation:pinSchema.optional()})).default([]),
+  assessmentItemHolds:z.array(AssessmentItemHoldPinSchema.strip()).default([]),
+  stepReceipts:z.array(z.object({spec:z.object({step:z.string()}),receipt:z.object({jobKey:HashSchema,id:z.uuid()}),sha256:HashSchema})),
+ }).passthrough().parse(authenticated.extractionRun.queue);
  if(!queue.terminalDocumentExceptions.length&&!queue.terminalAssessmentExceptions.length&&!queue.assessmentItemHolds.length&&queue.attemptHistory===undefined&&queue.extractionAttemptHistory===undefined){const original=await exportResidualTextContribution(pool,cas,jobKeys,contribution);return {...original,terminalDocumentExceptions:[],terminalAssessmentExceptions:[],assessmentItemHolds:[]};}
  if(authenticated.sourceArtifactKind!=='native_extraction_output'||authenticated.extractionRun.assignmentMode!=='codex-only')throw Error('Terminal exception export requires a genuine native queue contribution');
- const expected=await buildQueueTextRun(pool,cas,{jobKeys:[...jobKeys],...queueSchemaInput(queue)},{extractionAttemptHistory:queue.extractionAttemptHistory!==undefined});
+ const preparationPins=queue.stepReceipts.filter(step=>step.spec.step==='assessment_prepare').map(step=>({jobKey:step.receipt.jobKey,receiptId:step.receipt.id,receiptSha256:step.sha256}));
+ const recordedPins=new Map(queue.terminalAssessmentExceptions.flatMap(pin=>pin.preparation?[[pin.jobKey,pin.preparation] as const]:[]));
+ const expected=await buildQueueTextRun(pool,cas,{jobKeys:[...jobKeys],...queueSchemaInput(queue)},{extractionAttemptHistory:queue.extractionAttemptHistory!==undefined,terminalAssessmentHistory:{preparationPins,recordedPins}});
  for(const key of ['extractionRun','records','quarantine','crawl','registry','preparationPlan'] as const)if(contribution.artifacts[key]?.sha256!==expected.contribution.artifacts[key]?.sha256)throw Error('Queue text terminal exception seal differs from committed lineage');
  return {contribution,stepReceipts:expected.committed.receipts,results:expected.committed.results,terminalDocumentExceptions:expected.terminalDocumentExceptions,terminalAssessmentExceptions:expected.terminalAssessmentExceptions,assessmentItemHolds:expected.assessmentItemHolds};
 }
 function queueSchemaInput(queue:{reconciliationJobKeys:string[];attemptHistory?:'committed-v1';terminalDocumentExceptions:z.infer<typeof TerminalDocumentExceptionSchema>[];terminalAssessmentExceptions:z.infer<typeof TerminalAssessmentExceptionSchema>[];assessmentItemHolds:z.infer<typeof AssessmentItemHoldPinSchema>[]}){
- return {reconciliationJobKeys:queue.reconciliationJobKeys,...(queue.attemptHistory?{attemptHistory:queue.attemptHistory}:{}),terminalDocumentExceptions:queue.terminalDocumentExceptions,terminalAssessmentExceptions:queue.terminalAssessmentExceptions,assessmentItemHolds:queue.assessmentItemHolds};
+ return {reconciliationJobKeys:queue.reconciliationJobKeys,...(queue.attemptHistory?{attemptHistory:queue.attemptHistory}:{}),terminalDocumentExceptions:queue.terminalDocumentExceptions,terminalAssessmentExceptions:queue.terminalAssessmentExceptions.map(pin=>TerminalAssessmentExceptionSchema.strip().parse(pin)),assessmentItemHolds:queue.assessmentItemHolds};
 }

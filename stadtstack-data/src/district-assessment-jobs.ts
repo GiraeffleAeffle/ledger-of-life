@@ -199,6 +199,7 @@ export async function enqueueValueAssessments(pool:Pool,store:DistrictJobStore,c
  return {version:'r1-value-assessment-jobs-v1',releaseId:report.server.releaseId,maxModelCalls:manifest.maxModelCalls,jobs};
 }
 async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<typeof PassSelectorSchema>,options:Omit<AssessmentEvidenceContext,'cas'>){
+ try{
  for(const pin of selector.predecessors){
   const steps=await pool.query<{step:string}>('SELECT step FROM district_pipeline.jobs WHERE job_key=$1',[pin.jobKey]);
   const row=await committed(pool,pin.jobKey,steps.rows[0]?.step??'');
@@ -219,14 +220,26 @@ async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<
  }else{
   if(record.id!==item.itemId)throw new DistrictExecutionHold('quality_failed');
   if(!item.sourceRecord||canonicalJson(item.sourceRecord.record)!==canonicalJson(record))throw new DistrictExecutionHold('quality_failed');
-  if(criticalKnowledgeTarget(record)&&canonicalJson(prepareCriticalAssessment(record,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
-  if(!criticalKnowledgeTarget(record)){
-   const projection=residualRecordPropositions(record);
+  // The raw CAS object above authenticates membership, not iteration order.
+  // Reuse the bound schema-parsed snapshot: nested unset qualification arrays
+  // were produced in schema order, which canonical JSON property order changes.
+  const sourceRecord=item.sourceRecord.record;
+  if(criticalKnowledgeTarget(sourceRecord)){
+   if(canonicalJson(prepareCriticalAssessment(sourceRecord,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
+  }else{
+   const projection=residualRecordPropositions(sourceRecord);
    if(item.claim!==canonicalJson(projection)||canonicalJson(item.claimIds)!==canonicalJson(projection.propositions.map(proposition=>proposition.claimId)))throw new DistrictExecutionHold('quality_failed');
   }
  }
  const evidence=await originalEvidence(item,{cas:context.cas,...options});
  return {item,evidence};
+ }catch(error){
+  // Broken committed bindings are execution invariants, not model judgments.
+  // Keep intrinsic evidence/context quality and policy holds unchanged.
+  if(error instanceof DistrictExecutionHold&&error.reasonCode==='quality_failed'&&!(error instanceof AssessmentContextHold))
+   throw new DistrictExecutionHold('execution_exception',{cause:error});
+  throw error;
+ }
 }
 async function assessmentFromJob(pool:Pool,cas:DistrictCas,jobKey:string,role:'A'|'B'|'C',item:AssessmentItem,policy:CivicPolicyOptions={}){
  const row=await committed(pool,jobKey,'assessment_'+role.toLowerCase());
