@@ -25,7 +25,7 @@ import type {TerminalDocumentException,TerminalAssessmentException} from '../../
 import {auditStep8} from '../../src/r1-step8-audit.ts';
 import {assessmentQueueContract} from '../../src/district-assessment-jobs.ts';
 import {assessmentBJobContract} from '../../src/district-assessment-broker.ts';
-import {STEP8_PROCESSING_COMMIT} from '../../src/r1-step8-current-policy.ts';
+import {OMP_NATIVE_STREAM_VERSION,ompRunnerContractSha256,ompRunnerOutputContractSha256} from '../../src/district-omp-b-runner.ts';
 
 /** Synthetic admitted text/native queue + authentic retained 0.3.2 core. No live
  * facts, independent assessments or production writes are claimed by this test. */
@@ -70,10 +70,10 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  const campaignSha256=await writeManagedSourceArtifact(fixtureRoot,campaignPath,campaignBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});provenance.inputs.push({path:campaignPath,sha256:campaignSha256,bytes:campaignBytes.length,bindings:[{...binding,independentAllowed:false}]});
  const campaignRaw=JSON.parse(campaignBytes.toString('utf8'));await assert.rejects(authenticateStep8Campaign({...campaignRaw,sources:[...campaignRaw.sources,{...campaignRaw.sources[0],corpus:{...campaignRaw.sources[0].corpus,sha256:'b'.repeat(64)}}]},path=>readFile(path),policy),/Duplicate campaign source identity/);
  const control=async(name:string,value:unknown)=>{const path=join(fixtureRoot,name),bytes=Buffer.from(canonicalJson(value)),sha256=await writeManagedSourceArtifact(fixtureRoot,path,bytes,[binding],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});return {path,sha256};};
- const queueContract=await assessmentQueueContract(),BContract=await assessmentBJobContract();
- const processingReview=await control('processing-review.json',{activation:'confirmed',to:{commit:STEP8_PROCESSING_COMMIT},contracts:{current:{assessmentQueue:queueContract},assessmentBJobContract:BContract}});
- const activeCatalogue=await control('active-catalogue.json',{processingCodeRevision:STEP8_PROCESSING_COMMIT.slice(0,7),processingPinReview:processingReview,rows:[{scope,originals:corpus.documents.map((document:{id:string;sha256:string})=>({documentId:document.id,sha256:document.sha256}))}]});
- const currentGeneration={processingCommit:STEP8_PROCESSING_COMMIT,catalogue:activeCatalogue,processingReview,assessmentQueueContractSha256:queueContract,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:BContract,receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
+ const processingCommit='a'.repeat(40),queueContract=await assessmentQueueContract(),BContract=await assessmentBJobContract(),runnerContractSha256=await ompRunnerContractSha256(),runnerOutputContractSha256=await ompRunnerOutputContractSha256();
+ const processingReview=await control('processing-review.json',{activation:'confirmed',to:{commit:processingCommit},contracts:{current:{assessmentQueue:queueContract},assessmentBJobContract:BContract,ompRunnerContract:runnerContractSha256,ompRunnerOutputContract:runnerOutputContractSha256}});
+ const activeCatalogue=await control('active-catalogue.json',{processingCodeRevision:processingCommit.slice(0,7),processingPinReview:processingReview,rows:[{scope,originals:corpus.documents.map((document:{id:string;sha256:string})=>({documentId:document.id,sha256:document.sha256}))}]});
+ const currentGeneration={processingCommit,catalogue:activeCatalogue,processingReview,assessmentQueueContractSha256:queueContract,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:BContract,runnerContractSha256,runnerOutputContractSha256,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
  const provenanceBytes=Buffer.from(canonicalJson(provenance)),provenancePath=join(fixtureRoot,'provenance.json');await writeManagedSourceArtifact(fixtureRoot,provenancePath,provenanceBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
  const sealBytes=Buffer.from(canonicalJson(sealed)),sealPath=join(fixtureRoot,'seal-result.json');await writeManagedSourceArtifact(fixtureRoot,sealPath,sealBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
  const legacySealPin=input.legacyGeneration?await control('historical-haiku-seal-result.json',input.legacyGeneration.sealed):undefined;

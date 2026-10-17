@@ -11,7 +11,7 @@ import {dataReleaseId} from '../src/data-release.ts';
 import {FROZEN_R1_INPUTS} from '../src/pilot-value-audit.ts';
 import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
 import {RELEASE_ACCEPTANCE_RULES} from '../src/r1-release-context.ts';
-import {STEP8_PROCESSING_COMMIT} from '../src/r1-step8-current-policy.ts';
+import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
 const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
@@ -28,7 +28,7 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
   const manifest={schemaVersion:'stadtstack-data-release-v1',id:dataReleaseId(files),generatedAt:'2026-10-15T12:00:00Z',files,quality:{publishedRecords:1,quarantinedRecords:0,cities:1}};
   const manifestPin=await save('candidate/release-manifest.json',manifest),comparison={releaseId:manifest.id,manifestSha256:manifestPin.sha256,files};
   const campaign=await save('campaign.json',{schemaVersion:'stadtstack-r1-step8-campaign-v1',sources:[{municipalityId:'synthetic-town',sourceId:'website',corpus:{path:'/synthetic/corpus',sha256:h},documents:[{documentId:'document:fixture',sha256:h,jobKey:b}]}]});
-  const currentGeneration={processingCommit:STEP8_PROCESSING_COMMIT,catalogue:campaign,processingReview:campaign,assessmentQueueContractSha256:h,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:h,receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
+  const currentGeneration={processingCommit:'a'.repeat(40),catalogue:campaign,processingReview:campaign,assessmentQueueContractSha256:h,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:h,runnerContractSha256:h,runnerOutputContractSha256:h,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
   const casRoot=join(root,'cas');
   const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot};
   const receiptPin=await save('replay-receipt.json',receipt);

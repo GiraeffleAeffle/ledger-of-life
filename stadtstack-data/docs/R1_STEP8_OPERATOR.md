@@ -49,29 +49,41 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
   jobs; the isolated synthetic fixture declares its own 1-source/1-document scope.
 - `currentGeneration`: pins the active catalogue and its immutable processing
   approval, independently of the runtime HEAD used for publication/replay.
-  The production profile is:
+  Follow `catalogue.processingPinReview.path` (relative to the catalogue when
+  relative), verify its `sha256`, and require that review's `activation` is
+  `confirmed`. Populate the production profile from those exact pinned bytes:
 
-  ```json
-  {
-    "processingCommit": "355691be56a5fcc5a76d4993955ba089bde4a494",
-    "catalogue": {"path": "/absolute/path/full/catalogue.json", "sha256": "CATALOGUE_SHA256"},
-    "processingReview": {"path": "/absolute/path/full/processing-pin-355691b.json", "sha256": "7847b1d05a3bc66238856590a0a5af23f62559044f18b402d00c77a64ffa729f"},
-    "assessmentQueueContractSha256": "0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9",
-    "projectionVersion": "assessment-source-record-v2",
-    "B": {
-      "jobContractSha256": "43539ee71a2dd9b906dea9ff5c4c09a2ba10b3e8fcb910147058b81a14f7223c",
-      "receiptVersion": "assessment-receipt-v2",
-      "selector": "anthropic/claude-sonnet-5-5",
-      "transport": "vm-omp"
-    }
-  }
-  ```
+  | Input field | Value from the active confirmed processing review |
+  | --- | --- |
+  | `processingCommit` | `to.commit` (full 40-character Git identity) |
+  | `catalogue` | Independently pinned active driver catalogue path and digest |
+  | `processingReview` | The catalogue-pointed review's absolute path and digest |
+  | `assessmentQueueContractSha256` | `contracts.current.assessmentQueue` |
+  | `B.jobContractSha256` | `contracts.assessmentBJobContract` |
+  | `B.runnerContractSha256` | `contracts.ompRunnerContract` |
+  | `B.runnerOutputContractSha256` | `contracts.ompRunnerOutputContract` |
 
-  `CATALOGUE_SHA256` must be the actual independently checked catalogue digest,
-  not a literal value. The production catalogue has exactly 27 source scopes
-  and 208 original document memberships. The isolated fixture instead binds its
-  actual worker contracts and explicitly isolated authority; this does not
-  relax the immutable production approval pin.
+  The remaining semantic fields are `projectionVersion: "assessment-source-record-v2"`,
+  `B.receiptVersion: "assessment-receipt-v2"`, `B.selector: "anthropic/claude-sonnet-5-5"`,
+  `B.transport: "vm-omp"`, `B.nativeStreamVersion: "omp-native-stream-v2"` and
+  `B.thinking: "medium"`. The stream version is bound to the runner's exported
+  `OMP_NATIVE_STREAM_VERSION`, not guessed from a receipt version.
+
+  No processing commit, B contract or review digest is compiled into step 8.
+  A reviewed processing-window cutover requires a freshly independently pinned
+  input, not another code edit. The audit verifies the catalogue's review path
+  **and** digest, confirmed commit, queue contract, B job contract, runner contract
+  and output contract. Every admitting B step must match that exact job/selector/
+  runner identity and explicitly attest the required stream version and medium
+  thinking; missing/legacy stream markers and fenced-output normalization fail.
+  Do not compute replacement worker hashes from the later publication/replay
+  HEAD: its security-review footprint can differ from the processing pin without
+  changing the authentic sealed processing evidence.
+
+  The production catalogue still has exactly 27 source scopes and 208 original
+  document memberships. The isolated fixture instead supplies synthetic control
+  records bound to its actual worker contracts and explicitly isolated authority;
+  those records are not production approvals.
 - `seals`: in explicitly approved source/run order. Each element contains
   `sealResult: {path, sha256}`, `jobKeys` (extraction keys), and
   `reconciliationJobKeys` from that source's completed seal inputs/results.
@@ -534,3 +546,45 @@ policy/identity/critical provenance, Git predecessor members and canonical DB
 custody. It returned `writes: []`, `network: false`, `providers: false` and did
 not publish or replay. These historical candidates are not an approved selection
 and are not a successful production generation audit.
+
+### Window-independent processing-pin cutover
+
+After rebasing onto `b32bc962e617c876763f34c9734908f59116a00a`, the authorized
+focused verification command was:
+
+```sh
+umask 022
+PYTHONDONTWRITEBYTECODE=1 \
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
+R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all \
+  --test-name-pattern='^(lock-free audit|pinned Codex assessment allowance|real residual queue handlers|operator |offline bootstrap|authentic live 0.3.2|acceptance requires|terminal sealing preserves)'
+```
+
+Receipt `/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T163249Z.tap`:
+TypeScript exit 0; 190 reported tests, 190 passed, 0 failed/cancelled/skipped;
+test exit 0. The genuine isolated queue/candidate/exact-replay fixture now uses
+synthetic native stream-v2 events with thinking/text content and medium-thinking
+runner metadata. Independent negatives reject a stale B job contract, output
+contract, runner contract, empty/v1 stream marker, wrong thinking level, model
+fallback, pending review and a mismatched catalogue review path/digest. A second
+synthetic confirmed commit/contract set is accepted without changing code.
+The unchanged scoped extraction contract assertions also passed.
+
+A separate read-only control-chain check, under the same offline bootstrap and
+CPU 6–7 restriction, read only the active driver `full/catalogue.json` and its
+pointed `processing-pin-b32bc96.json`. It validated their exact digest/commit/
+contract relationship with the production policy function and exited 0:
+
+- Catalogue SHA-256: `c67e4566d36fd89d3633b1f47092ab80930ab41da17fbee981eb0b22b4ac8974`.
+- Confirmed review SHA-256: `61dd9b1c5414fb4d1e54f589d58348da25f61beaab82457959f13ac4c751d1c8`.
+- B job: `c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea`.
+- Processing runner: `95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2`.
+- Processing output: `0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361`.
+
+These are observed receipt values, **not compiled policy constants** or approval
+of a production source selection. The check reported `selectionValidated: false`,
+`publicationExecuted: false`, `writes: []`, `network: false`, `providers: false`.
+It did not connect to production PG, read selected source closures, publish,
+replay or run value acceptance. No unfiltered full gate was run for this cutover;
+the final integrated gate and fresh publication-HEAD security reviews remain
+the integration owner's responsibility.

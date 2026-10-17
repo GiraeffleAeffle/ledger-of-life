@@ -24,7 +24,7 @@ import {authenticateScopedGeneration,verifyCachedGeneration,verifyReplayAnswer,r
 import {ModelEvidenceSchema} from './district-model-contract.ts';
 import {StructuredJobResultSchema} from './district-structured-jobs.ts';
 import {loadPriorPublicationRelease} from './district-publication-predecessor.ts';
-import {STEP8_PROCESSING_REVIEW_SHA256,STEP8_STRUCTURED_RUN_IDS,STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
+import {assertStep8ProcessingPin,assertStep8NativeBStep,STEP8_STRUCTURED_RUN_IDS,STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {auditStep8Allowance} from './r1-step8-allowance-audit.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException} from './district-terminal-exceptions.ts';
 import type {Step8Input} from './r1-step8.ts';
@@ -48,7 +48,7 @@ export function assertStep8AdmissionProfile(policy:Step8Input['currentGeneration
  const parsed=assessmentItemSchema.parse(item);requireThat(parsed.sourceRecord?.version===policy.projectionVersion&&!parsed.valueTarget,'Admitting item is not source-record v2');
  for(const step of steps){
   if(step.spec.step==='assessment_b'){
-   const selected=selector(step);requireThat(step.spec.semanticContractSha256===policy.B.jobContractSha256&&selected.transport===policy.B.transport&&selected.requestedModel==='claude-sonnet-5-5','Admitting B job is outside approved native Sonnet profile');
+   assertStep8NativeBStep(policy,step.spec,step.receipt.versions);
   }else requireThat(step.spec.semanticContractSha256===policy.assessmentQueueContractSha256,'Admitting assessment closure is outside approved queue contract');
  }
 }
@@ -73,10 +73,8 @@ export async function auditStep8(input:Step8Input,pool:Pool){
    requireThat(input.seals.length===input.expectedSources,'Incomplete explicit sealed source set');
    requireThat(new Set(input.seals.map(source=>source.sealResult.sha256)).size===input.seals.length,'Duplicate selected seal generation');
    const catalogue=JSON.parse((await plain(input.currentGeneration.catalogue)).toString('utf8')),review=JSON.parse((await plain(input.currentGeneration.processingReview)).toString('utf8'));
-   requireThat(catalogue.processingCodeRevision===input.currentGeneration.processingCommit.slice(0,7)&&review.to.commit===input.currentGeneration.processingCommit&&review.activation==='confirmed','Inactive processing pin/catalogue');
-   requireThat(review.contracts.current.assessmentQueue===input.currentGeneration.assessmentQueueContractSha256&&review.contracts.assessmentBJobContract===input.currentGeneration.B.jobContractSha256,'Processing approval contract mismatch');
-   requireThat(catalogue.processingPinReview.sha256===input.currentGeneration.processingReview.sha256,'Catalogue processing review pin mismatch');
-   if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208&&input.currentGeneration.processingReview.sha256===STEP8_PROCESSING_REVIEW_SHA256,'Production requires the frozen 27-source active processing approval');
+   assertStep8ProcessingPin(input.currentGeneration,catalogue,review);
+   if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208,'Production requires the frozen 27-source campaign');
    if(reader.authority.mode!=='isolated-fixture')requireThat(canonicalJson([...input.structuredRunIds].sort())===canonicalJson([...STEP8_STRUCTURED_RUN_IDS].sort())&&canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires the five committed K1/K2 runs and authentic released 0.3.2 predecessor');
    campaign=await authenticateStep8Campaign(JSON.parse((await managed(input.campaign)).toString('utf8')),async path=>reader.read(path),input.policy);
    requireThat(campaign.sources.length===input.expectedSources&&campaign.sources.reduce((n,source)=>n+source.documents.length,0)===input.expectedDocuments,'Campaign totals mismatch');
