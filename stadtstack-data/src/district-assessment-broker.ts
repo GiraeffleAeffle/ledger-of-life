@@ -59,6 +59,10 @@ type LeaseState='ready'|'active'|'held'|'expired'|'cancelled'|'submitted';
 interface LeaseRow extends QueryResultRow {id:string;job_id:string;run_id:string;fencing_token:string;requested_model:'claude-haiku-5-5'|typeof NATIVE_B_MODEL;item_sha256:string;request_artifact_sha256:string;request_sha256:string;input_sha256:string;authority_id:string;authority_sha256:string;policy_snapshot_sha256:string;client_contract_sha256:string;state:LeaseState;reason_code:ReasonCode|null;created_at:Date;deadline_at:Date;client_id:string|null;claimed_at:Date|null;expires_at:Date;receipt_sha256:string|null;purge_ack_sha256:string|null}
 interface JobAuthorityRow extends QueryResultRow {id:string;job_key:string;spec:DistrictJobSpec;fencing_token:string;state:string;lease_owner:string|null;lease_expires_at:Date|null;cancellation_requested:boolean;run_state:string;run_started_at:Date;run_max_elapsed_ms:number;authorization_id:string;approval_sha256:string;approved_by:string;approved_at:Date;expires_at:Date;allowed_job_keys:string[];allowed_ags:string[];max_jobs:number;max_elapsed_ms:number;jobs_started:number;first_started_at:Date|null;category:string;execution_mode:string;authorization_state:string;notification_approval_sha256:string|null;notification_destination_sha256:string|null;notification_provider:string|null;now:Date}
 interface SourceReference {sha256:string;url:string;policyReceiptSha256:string}
+interface PendingArtifact {bytes:Buffer;kind:ArtifactKind;mimeType:string;sha256:string}
+function pendingArtifact(bytes:Buffer,kind:ArtifactKind,mimeType='application/json'):PendingArtifact{
+ return {bytes,kind,mimeType,sha256:digest(bytes)};
+}
 interface PolicyPin {originalSha256:string;originalReceiptSha256:string;original:PolicyReceipt;currentReceiptSha256:string;current:PolicyReceipt;configured:string|undefined}
 interface CheckedEvidence {item:AssessmentItem;evidence:OriginalEvidence;data:Record<string,unknown>;sources:SourceReference[];sourceAuthority:CivicPolicyAuthorityReceipt;policySnapshotSha256:string;optOutSnapshotSha256:string;artifactHashes:string[];policyPins:PolicyPin[];validUntil:number}
 type EvidenceCheck={checked:CheckedEvidence}|{reason:ReasonCode};
@@ -244,10 +248,26 @@ export class DistrictAssessmentBroker {
   if(!same(finalAuthority,sourceAuthority)||finalOptout.authorityId!==sourceAuthority.authorityId||finalOptout.authoritySha256!==sourceAuthority.authoritySha256||finalOptout.sha256!==optout.sha256)throw new DistrictExecutionHold('authorization_revoked');
   return {item,evidence,data,sources,sourceAuthority,optOutSnapshotSha256:optout.sha256,artifactHashes:[...artifactHashes],policyPins,policySnapshotSha256:semanticHash({sourceAuthority,optOutSnapshotSha256:optout.sha256,sources:snapshots.sort((a,b)=>a.sourceId.localeCompare(b.sourceId))}),validUntil};
  }
- private async persist(bytes:Buffer,kind:ArtifactKind,sources:SourceReference[],observationId:string,mimeType='application/json'):Promise<CasArtifact>{
-  const hash=digest(bytes),storageKey=`sha256/${hash.slice(0,2)}/${hash}`;
+ private async persistBatch(pending:PendingArtifact[],sources:SourceReference[],observationId:string,signal?:AbortSignal):Promise<CasArtifact[]>{
+  signal?.throwIfAborted();
   await initializeManagedAcquisitionLane(this.cas.root,{...this.context.policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
-  const artifact=await withManagedSourceWrite(this.cas.root,sources.map(source=>({kind:'prepared_source' as const,relativePath:storageKey,contentSha256:hash,sourceSha256:source.sha256,url:source.url,observationId,receiptSha256:source.policyReceiptSha256,independentAllowed:false})),()=>this.cas.put(bytes,{kind,mimeType}),this.context.policyOptions);
+  // One reconciliation and one governed write scope; every path retains its
+  // own exact source bindings and the authority's before/after digest checks.
+  return withManagedSourceWrite(this.cas.root,pending.flatMap(artifact=>sources.map(source=>({
+   kind:'prepared_source' as const,relativePath:`sha256/${artifact.sha256.slice(0,2)}/${artifact.sha256}`,contentSha256:artifact.sha256,
+   sourceSha256:source.sha256,url:source.url,observationId,receiptSha256:source.policyReceiptSha256,independentAllowed:false,
+  }))),async()=>{
+   const artifacts:CasArtifact[]=[];
+   for(const artifact of pending){
+    signal?.throwIfAborted();
+    artifacts.push(await this.cas.put(artifact.bytes,{kind:artifact.kind,mimeType:artifact.mimeType}));
+   }
+   signal?.throwIfAborted();
+   return artifacts;
+  },this.context.policyOptions);
+ }
+ private async persist(bytes:Buffer,kind:ArtifactKind,sources:SourceReference[],observationId:string,mimeType='application/json'):Promise<CasArtifact>{
+  const [artifact]=await this.persistBatch([pendingArtifact(bytes,kind,mimeType)],sources,observationId);
   return artifact;
  }
  private async registerArtifacts(client:PoolClient,artifacts:CasArtifact[]):Promise<void>{
@@ -593,6 +613,7 @@ export class DistrictAssessmentBroker {
      const found=await client.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1 FOR UPDATE',[leaseId]),row=found.rows[0];
      if(!row||row.state!=='active'||row.fencing_token!==job.fencingToken)throw new DistrictExecutionHold('lease_lost');
      const current=await this.current(client,row,evidence);if('reason' in current)throw new DistrictExecutionHold(current.reason);
+     await assertBSubscriptionResume(client,authority.authorization_id,job.id);
     });
    }});}catch(error){
     if(error instanceof OmpAssessmentOutputRejected)return await this.settleVmOutputRejection(job,prepared.row.id,error,signal);
@@ -623,17 +644,14 @@ export class DistrictAssessmentBroker {
    if(cleanup.requestSha256!==row.request_sha256||cleanup.responseSha256!==run.answer.responseSha256||cleanup.runnerContractSha256!==run.runnerContractSha256||cleanup.imageId!==run.imageId||Date.parse(cleanup.completedAt)<Date.parse(run.finishedAt)||Date.parse(cleanup.completedAt)>receivedAt.getTime())throw new DistrictExecutionHold('execution_exception');
    // Native cleanup is a distinct immutable acknowledgement, never a fabricated
    // Mac proof claiming file writes were denied. The database purge gate stays intact.
-   const purgeAck=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-purge-ack-v1',leaseId:row.id,inputSha256:row.input_sha256,cleanup})),'receipt',checked.checked.sources,row.id);
-   signal.throwIfAborted();
-   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',ompControlMode:run.controlMode,ompPurgeAckSha256:purgeAck.sha256,...run.outputNormalization?{ompOutputNormalization:run.outputNormalization}:{}};
+   const pendingPurge=pendingArtifact(Buffer.from(canonicalJson({version:'assessment-vm-omp-purge-ack-v1',leaseId:row.id,inputSha256:row.input_sha256,cleanup})),'receipt');
+   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',ompControlMode:run.controlMode,ompPurgeAckSha256:pendingPurge.sha256,...run.outputNormalization?{ompOutputNormalization:run.outputNormalization}:{}};
    const transport={selector:NATIVE_B_SELECTOR,bootstrapSelector:'anthropic/claude-haiku-5-5',effectiveModel:NATIVE_B_MODEL,transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'The source-free control prompt includes the exact frozen output schema; stock omp may append generated context, footer, date, or cwd material despite this pinned file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,outputSchemaSha256:run.outputSchemaSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256,outputStructure:structure,...normalizationVersions};
-   const response=await this.persist(Buffer.from(run.stdout),'provider_response',checked.checked.sources,row.id,'application/x-ndjson');
-   signal.throwIfAborted();
-   const answer=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v2',inputSha256:row.input_sha256,responseArtifactSha256:response.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived',checked.checked.sources,row.id);
-   signal.throwIfAborted();
-   const savedReceipt=await this.persist(Buffer.from(canonicalJson(receipt)),'receipt',checked.checked.sources,row.id);
-   signal.throwIfAborted();
-   const reconciliation=await this.persist(Buffer.from(canonicalJson({version:'assessment-vm-omp-reconciliation-v2',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:savedReceipt.sha256,B:receipt,deterministicIssues:receipt.deterministicIssues,disposition:'assessment_recorded',providerResponseArtifactSha256:response.sha256,transport})),'derived',checked.checked.sources,row.id);
+   const pendingResponse=pendingArtifact(Buffer.from(run.stdout),'provider_response','application/x-ndjson');
+   const pendingAnswer=pendingArtifact(Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v2',inputSha256:row.input_sha256,responseArtifactSha256:pendingResponse.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived');
+   const pendingReceipt=pendingArtifact(Buffer.from(canonicalJson(receipt)),'receipt');
+   const pendingReconciliation=pendingArtifact(Buffer.from(canonicalJson({version:'assessment-vm-omp-reconciliation-v2',itemArtifactSha256:row.item_sha256,requestArtifactSha256:row.request_artifact_sha256,requestSha256:row.request_sha256,inputSha256:row.input_sha256,receiptArtifactSha256:pendingReceipt.sha256,B:receipt,deterministicIssues:receipt.deterministicIssues,disposition:'assessment_recorded',providerResponseArtifactSha256:pendingResponse.sha256,transport})),'derived');
+   const [purgeAck,response,answer,savedReceipt,reconciliation]=await this.persistBatch([pendingPurge,pendingResponse,pendingAnswer,pendingReceipt,pendingReconciliation],checked.checked.sources,row.id,signal);
    signal.throwIfAborted();
    const result=await this.transaction(async client=>{
     await this.job(client,job.id,job.runId);
