@@ -20,6 +20,8 @@ import {recheckResidualPolicy} from './district-policy-refresh.ts';
 import {buildPreparedAssessmentContext,AssessmentContextHold} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {bankSchema,parseCandidateCollection,prepareValueAssessment,bindCandidateValueContext,valueAssessmentTarget,canonical as valueCanonical,type Report} from './evaluate-pilot-value.ts';
+import {sourceRecordPropositions} from './district-assessment-projection.ts';
+import {NATIVE_B_RECEIPT_VERSION} from './district-b-native-model.ts';
 
 export const R1_ASSESSMENT_RUBRIC='Assess only the admissible original evidence. Verify exact source quotations, claim and entity identity, date and date role, stage and modality, and financial plan/approval/payment/actual roles. Hold missing evidence, suspected OCR and unsupported critical claims. Score correctness, sources and usefulness 0–2. Abstention has zero usefulness. AI agreement is not independent validation.';
 const PredecessorSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict();
@@ -28,7 +30,7 @@ const PassSelectorSchema=z.object({version:z.literal('r1-assessment-pass-job-v1'
 const ItemBundleSchema=z.object({version:z.literal('r1-assessment-items-v1'),items:z.array(z.object({itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48)}).strict())}).strict();
 export async function assessmentQueueContract(hash?:(file:string)=>Promise<string>){
  // Item building, evidence context, reconciliation and model framing are semantic.
- const files=['district-assessment-jobs.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','evaluate-pilot-value.ts','../evaluation/pilot-questions.json','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
+ const files=['district-assessment-jobs.ts','district-assessment-projection.ts','district-b-native-model.ts','district-schema.ts','district-graph-claims.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','evaluate-pilot-value.ts','../evaluation/pilot-questions.json','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
  return semanticHash(await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))}))));
 }
 /** Operational usage/failure metadata is not CAS content or a nested managed lane. */
@@ -57,22 +59,9 @@ async function persist(store:DistrictJobStore,cas:DistrictCas,item:AssessmentIte
  await recheck();
  await store.addArtifact(artifact);return artifact;
 }
-/** The same hint-free projection used by critical reviews, without expanding their taxonomy. */
+/** Real assertions are distinct from authenticated bookkeeping and unset roles. */
 export function residualRecordPropositions(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number]){
- const {extraction:_generation,verification:_judgment,sources,...claims}=record;
- const sourceProjection=sources.map(source=>({id:source.id,url:source.url,sha256:source.sha256}));
- const projection=z.record(z.string(),z.unknown()).parse(assessmentBlindProjection({...claims,sources:sourceProjection}));
- const metadata=new Set(['id','kind','municipalityId','ags','districtId','sources']);
- const propositions=Object.entries(projection).sort(([left],[right])=>left<right?-1:left>right?1:0).filter(([field])=>!metadata.has(field)&&!field.endsWith('Quote')).flatMap(([field,value])=>{
-  const claim=(selector:string,member:unknown)=>{
-   const quote=member&&typeof member==='object'&&'quote' in member?member.quote:projection[field+'Quote']??null;
-   const body={selector,value:member,quote,sources:sourceProjection};
-   return {...body,claimId:'proposition:'+semanticHash({recordId:record.id,...body})};
-  };
-  return Array.isArray(value)?value.map((member,index)=>claim('/'+field+'/'+index,member)):[claim('/'+field,value)];
- });
- if(!propositions.length)throw new DistrictExecutionHold('quality_failed');
- return {version:'r1-record-propositions-v1',recordId:record.id,projectionSha256:semanticHash(projection),sources:sourceProjection,propositions};
+ return sourceRecordPropositions(record,assessmentBlindProjection);
 }
 /** Quotes are reopened in the actual UTF-16 prepared text; model semantics are never constraints. */
 export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string):AssessmentItem{
@@ -98,7 +87,10 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  if(!locators.length)throw new AssessmentContextHold();
  const unique=[...new Map(locators.map(locator=>[locator.id,locator])).values()].sort((a,b)=>a.start-b.start||a.end-b.end);
  const assessmentContext=buildPreparedAssessmentContext(prepared.text,prepared.textSha256,cited,record.sources.map(source=>source.locator),unique);
- const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Independently verify every source-bound proposition in the supplied record projection. Return supported only with an evidence assertion for every claimId; otherwise abstain or mark unresolved.',claim:canonicalJson(projection),rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique,assessmentContext}],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
+ const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,
+  sourceRecord:{version:'assessment-source-record-v2',recordSha256:semanticHash(record),record},
+  question:'Independently verify every actual source proposition and positive classification in propositions. Bindings are authenticated retained bookkeeping, not municipal statements; qualifications explicitly record unset values, never affirmative facts. Return supported only with an evidence assertion for every claimId. asserted is the proposed claim payload, not assertion.value: for these non-quantitative text propositions use value:null and unit:null. Quantitative critical claims have separate claimIds and require genuine source-attested quantities/units. Missing evidence or unresolved classification stays abstain/unresolved.',
+  claim:canonicalJson(projection),rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique,assessmentContext}],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
  return target?prepareCriticalAssessment(record,base):base;
 }
 export async function enqueueResidualAssessmentItems(pool:Pool,store:DistrictJobStore,cas:DistrictCas,extractionJobKey:string){
@@ -136,7 +128,7 @@ export async function buildValueAssessmentItem(report:Report,questionId:string,l
  };
  visit(target);
  const item=prepareValueAssessment(report,{version:'assessment-item-v1',itemId:questionId,question:row.question.question,
-  claim:canonicalJson({instruction:'Answer the frozen question from this lane only. Assess every material stage, finance and identity claim with typed evidence assertions. Use the supplied claimId for each cited locator; omitted evidence is unavailable, never inferred.',claimLocators}),
+  claim:canonicalJson({version:'value-answer-claims-v2',instruction:'Answer the frozen question from this lane only. Assess every material stage, finance and identity claim with typed evidence assertions. Use the supplied claimId for each cited locator; omitted evidence is unavailable, never inferred. Supplied record IDs, hashes and unknown/null fields are context, not additional source propositions. Assertion value/unit are both null for non-quantitative claims; only a genuine source-stated quantity uses a non-null value and its source-attested unit. Never put a title, status, identifier, date or whole claim object in assertion.value.',claimLocators}),
   rubric,rubricSha256:digest(rubric),sources,claimIds:claimLocators.length?claimLocators.map(claim=>claim.claimId):['question:'+questionId],entityIds:[...entityIds].sort(),constraints:[],
   criticalKinds:sources.length?['stage','finance','identity',...(sources.some(source=>source.ocrSuspected)?['ocr']:[])]:[]},lane);
  return bindCandidateValueContext(item,context,custodyReceiptSha256);
@@ -196,6 +188,7 @@ async function checkedItem(pool:Pool,context:JobHandlerContext,selector:z.infer<
   if(!row||valueCanonical(valueAssessmentTarget(report,row,item.valueTarget.lane))!==valueCanonical(item.valueTarget))throw new DistrictExecutionHold('quality_failed');
  }else{
   if(record.id!==item.itemId)throw new DistrictExecutionHold('quality_failed');
+  if(!item.sourceRecord||canonicalJson(item.sourceRecord.record)!==canonicalJson(record))throw new DistrictExecutionHold('quality_failed');
   if(criticalKnowledgeTarget(record)&&canonicalJson(prepareCriticalAssessment(record,item))!==canonicalJson(item))throw new DistrictExecutionHold('quality_failed');
   if(!criticalKnowledgeTarget(record)){
    const projection=residualRecordPropositions(record);
@@ -212,7 +205,7 @@ async function assessmentFromJob(pool:Pool,cas:DistrictCas,jobKey:string,role:'A
   await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);
   let raw;
   try{raw=await json(cas,hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}
-  if(raw.version==='assessment-receipt-v1')receipts.push({receipt:validateReceipt(raw,item,role),artifactSha256:hash});
+  if(raw.version==='assessment-receipt-v1'||raw.version===NATIVE_B_RECEIPT_VERSION)receipts.push({receipt:validateReceipt(raw,item,role),artifactSha256:hash});
  }
  if(receipts.length!==1||row.spec.policyProofSha256!==(item.valueContext?.custodyReceiptSha256??item.sources[0].admissionReceiptSha256))throw new DistrictExecutionHold('quality_failed');
  const {receipt,artifactSha256}=receipts[0];if(receipt.provider!==(role==='B'?'anthropic-subscription':'openai-subscription'))throw new DistrictExecutionHold('quality_failed');
@@ -396,7 +389,7 @@ export async function exportAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:
    await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);
    let raw;try{raw=await json(cas,hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}
    if(raw.version==='r1-assessment-items-v1')items.push(...ItemBundleSchema.parse(raw).items);
-   if(raw.version==='assessment-receipt-v1'){
+   if(raw.version==='assessment-receipt-v1'||raw.version===NATIVE_B_RECEIPT_VERSION){
     const selected=z.object({itemArtifactSha256:HashSchema}).passthrough().parse(row.spec.selector);
     const item=assessmentItemSchema.parse(await json(cas,selected.itemArtifactSha256));
     const role=z.enum(['A','B','C']).parse(raw.role),receipt=validateReceipt(raw,item,role);

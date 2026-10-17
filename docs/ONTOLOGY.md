@@ -34,7 +34,7 @@ Operation includes a durable sponsor reservation ledger: account rolling/global 
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
 | 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
-| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence |
+| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment |
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
 Financial custody still depends on identity, home and signed operations. The civic lens reuses the city Context and CitySignal rather than introducing a separate atlas or portfolio.
@@ -135,6 +135,36 @@ benefit indicators. Places opens the exact Münster case without altering chosen
 everyone can find the clearly dated historical example there.
 
 **Relation evidence.** Solid means evidence-backed observation/report with its original status; proposed links identify a plan and do not inherit delivered status. Dashed means a modeled causal assumption in a fictional **Scenario**. Its allocation conserves capital as wages + local suppliers + external purchases + reserve; wages divided by assumed cost per job-year yields job-years, not permanent hires. Municipal receipts, transfers and service costs are editable *independent* assumptions; no investment→tax conversion, permanent employment, municipal retention of all tax, housing growth or causal improvement is inferred. Switching to observed hides this loop. Neither simulation nor public signals enter the personal Position/net-worth model.
+
+**Civic assessment (source projection v2).** A governed private item separates actual
+source propositions from deterministically authenticated bookkeeping and explicit
+unset qualifications. A generated `source_document:<hash>`, scoped entity ID or
+record hash is not a municipal statement requiring a quotation. The complete
+private record and its hash remain lossless, but earlier model judgments stay
+outside blind A/B requests. Null dates, empty statuses, `unknown` stages and
+`precision:none` on unlocated geometry remain explicitly unset, not false source
+assertions, observations of zero, or grounds for inventing dates. Printed identifiers, positive case/type classifications,
+actual dates/statuses, entities and relations still require source evidence;
+unresolved classifications remain held. `caseQuote` grounds printed case
+identifiers/classifications, `stageQuote` grounds original status and stage, and
+date-role quotations remain distinct.
+
+Non-quantitative text propositions use assertion `value:null` and `unit:null`;
+their proposed wording is the claim payload, not a measurement. Typed critical
+quantities retain genuine source-attested value/unit and financial-role checks.
+Supported admission covers every real proposition, including those on a critical
+record, plus its critical claims. Changed items require fresh A/B/C receipts,
+without resetting lifetime call caps; historical v1 items/receipts remain history,
+not transferable approval of v2. Value-test answers assess their actual answers
+and cited evidence, never every metadata/null field in an MCP response.
+
+This implements the frozen rebuild plan's original-evidence and typed-role intent
+([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)
+and [§6](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#6-phases-effort-and-acceptance-gates)), not a relaxed output schema, score target or majority override.
+AI reconciliation remains provisional; owner exceptions/rights and sampled audit
+are separate. The v2 artifacts are implementation/prototype work, not evidence of
+a deployed or independently validated release.
+
 
 ## Money flow of one tenancy
 

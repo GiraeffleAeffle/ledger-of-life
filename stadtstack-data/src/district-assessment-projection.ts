@@ -1,0 +1,65 @@
+import {z} from 'zod';
+import {HashSchema,semanticHash} from './district-adapter-contract.ts';
+import {DistrictKnowledgeRecordSchema,type DistrictKnowledgeRecord} from './district-schema.ts';
+
+// The full private snapshot is never provider data. It preserves even prior model
+// metadata while the blind, source-assertion partition is independently rebuilt.
+export const SourceRecordBindingSchema=z.object({version:z.literal('assessment-source-record-v2'),recordSha256:HashSchema,record:DistrictKnowledgeRecordSchema}).strict();
+const source=z.object({id:z.string(),url:z.string(),sha256:HashSchema}).strict();
+const retained=z.object({selector:z.string(),value:z.unknown(),valueSha256:HashSchema}).strict();
+export const SourcePropositionProjectionSchema=z.object({
+ version:z.literal('r1-record-propositions-v2'),recordId:z.string(),recordSha256:HashSchema,projectionSha256:HashSchema,
+ sources:z.array(source),
+ bindings:z.array(retained.extend({basis:z.enum(['retained_record','source_document_sha256','graph_identity'])}).strict()),
+ qualifications:z.array(retained.extend({reason:z.enum(['null','empty_string','empty_array','unknown'])}).strict()),
+ context:z.array(retained),
+ propositions:z.array(z.object({selector:z.string(),asserted:z.unknown(),quote:z.string().nullable(),
+  assertionEncoding:z.object({value:z.null(),unit:z.null()}).strict(),claimId:z.string()}).strict()).min(1),
+}).strict();
+export type SourcePropositionProjection=z.infer<typeof SourcePropositionProjectionSchema>;
+const pointer=(key:string)=>key.replaceAll('~','~0').replaceAll('/','~1');
+const metadata=new Set(['id','kind','municipalityId','ags','districtId']);
+const graphMetadata=new Set(['mentionId','entityId','identityBasis','fromMention','toMention','fromId','toId']);
+const quoteFields:Record<string,string>={title:'titleQuote',summary:'summaryQuote',caseKey:'caseQuote',caseKeyType:'caseQuote',
+ caseType:'caseQuote',documentDate:'documentDateQuote',stage:'stageQuote',originalStatus:'stageQuote',stageDate:'stageDateQuote'};
+/** No classifier outcome or unknown placeholder is silently converted to fact.
+ * Positive classifications stay source propositions, even without a usable quote.
+ * Text-model records have no typed quantity field: asserted is the claim payload,
+ * never assertion.value. Quantitative critical targets retain their own encoding. */
+export function sourceRecordPropositions(record:DistrictKnowledgeRecord,blind:(value:unknown)=>unknown):SourcePropositionProjection{
+ const {extraction:_extraction,verification:_verification,sources,...claims}=record;
+ const projection=z.record(z.string(),z.unknown()).parse(blind(claims));
+ const bindings:SourcePropositionProjection['bindings']=[],qualifications:SourcePropositionProjection['qualifications']=[],context:SourcePropositionProjection['context']=[];
+ const retain=(selector:string,value:unknown)=>({selector,value,valueSha256:semanticHash(value)});
+ const unset=(value:unknown,field:string):SourcePropositionProjection['qualifications'][number]['reason']|null=>value===null?'null':value===''?'empty_string':Array.isArray(value)&&!value.length?'empty_array':value==='unknown'&&['stage','caseType'].includes(field)||value==='none'&&field==='precision'?'unknown':null;
+ const clean=(value:unknown,selector:string):unknown=>{
+  if(Array.isArray(value))return value.map((member,index)=>clean(member,selector+'/'+index));
+  if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).flatMap(([key,member])=>{
+   const path=selector+'/'+pointer(key),reason=unset(member,key);
+   if(graphMetadata.has(key)){bindings.push({...retain(path,member),basis:'graph_identity'});return [];}
+   if(reason){qualifications.push({...retain(path,member),reason});return [];}
+   return [[key,clean(member,path)]];
+  }));
+  return value;
+ };
+ const propositions:SourcePropositionProjection['propositions']=[];
+ for(const [field,value] of Object.entries(projection).sort(([a],[b])=>a<b?-1:a>b?1:0)){
+  const selector='/'+pointer(field),reason=unset(value,field);
+  if(metadata.has(field)){bindings.push({...retain(selector,value),basis:'retained_record'});continue;}
+  if(record.caseKeyType==='source_document'&&(field==='caseKey'||field==='caseKeyType')){
+   if(record.caseKey!==`source_document:${record.extraction.inputSha256}`)throw Error('Generated source-document identity changed');
+   bindings.push({...retain(selector,value),basis:'source_document_sha256'});continue;
+  }
+  if(reason){qualifications.push({...retain(selector,value),reason});continue;}
+  if(field.endsWith('Quote')){context.push(retain(selector,value));continue;}
+  const add=(member:unknown,path:string)=>{
+   const asserted=clean(member,path),associated=member&&typeof member==='object'&&'quote' in member?member.quote:projection[quoteFields[field]??field+'Quote'];
+   const quote=typeof associated==='string'&&associated.length?associated:null;
+   const body={selector:path,asserted,quote,assertionEncoding:{value:null,unit:null}};
+   propositions.push({...body,claimId:'proposition:'+semanticHash({version:'r1-record-propositions-v2',recordId:record.id,...body})});
+  };
+  if(Array.isArray(value))value.forEach((member,index)=>add(member,selector+'/'+index));else add(value,selector);
+ }
+ return SourcePropositionProjectionSchema.parse({version:'r1-record-propositions-v2',recordId:record.id,recordSha256:semanticHash(record),
+  projectionSha256:semanticHash(projection),sources:sources.map(({id,url,sha256})=>({id,url,sha256})),bindings,qualifications,context,propositions});
+}

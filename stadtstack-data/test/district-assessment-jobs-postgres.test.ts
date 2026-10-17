@@ -48,7 +48,7 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   visit(record);
   const locators=[...quotes].map(quote=>{const start=text.indexOf(quote);assert.ok(start>=0);return {id:`span:${start}:${start+quote.length}`,page:null,table:null,start,end:start+quote.length};}).sort((a,b)=>a.start-b.start||a.end-b.end);
   const boundedSource={...f.source,locators,assessmentContext:buildPreparedAssessmentContext(text,f.source.textSha256,record.extraction.chunk,record.sources.map(source=>source.locator),locators)};
-  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,question:'Verify every proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[boundedSource],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[],constraints:[],criticalKinds:[]});
+  const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,sourceRecord:{version:'assessment-source-record-v2',recordSha256:semanticHash(record),record},question:'Verify every actual source proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[boundedSource],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[record.id,...record.entities.map(entity=>entity.entityId)],constraints:[],criticalKinds:[]});
   mutateItem?.(item);
   const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
   const snapshot=randomUUID(),scope=f.policy.scope;
@@ -127,18 +127,19 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   await unlink(f.cas.root+'/sha256/'+hash.slice(0,2)+'/'+hash);
   const result=await f.run(key,f.handlers());assert.equal(result.state,'held');
  });
- for(const field of ['summary','documentDate','stage'] as const)await t.test('unsupported actual '+field+' proposition cannot admit a non-critical record',async()=>{
+ for(const field of ['summary','documentDate','stage','caseType'] as const)await t.test('unsupported actual '+field+' proposition cannot admit a non-critical record',async()=>{
   const mutate=(record:DistrictKnowledgeRecord,text:string)=>{
    if(field==='summary')record.summary='The original establishes an entirely different synthetic project.';
    else if(field==='documentDate'){record.documentDate='2027-01-01';record.documentDateQuote=text;}
+   else if(field==='caseType')record.caseType='budget';
    else {record.stage='draft';record.stageQuote=text;record.originalStatus='Synthetic draft assertion unsupported by the original';}
   };
   const f=await fixture('wrong-'+field,undefined,mutate);
-  const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;value:unknown})=>p.selector==='/'+field&&p.value===f.record[field]));
+  const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;asserted:unknown})=>p.selector==='/'+field&&p.asserted===f.record[field]));
   assert.equal('verification' in projected,false);assert.equal('extraction' in projected,false);
   const reject=async(input:AssessmentPassInput)=>{
    const supplied=JSON.parse(JSON.stringify(input.data.claim));
-   const restored={...supplied,version:'r1-record-propositions-v1',propositions:supplied.propositions.map(({sourceIds,...p}:Record<string,unknown>&{sourceIds:string[]})=>({...p,sources:sourceIds.map(id=>supplied.sources.find((source:{id:string})=>source.id===id))}))};
+   const restored={...supplied,version:'r1-record-propositions-v2'};
    assert.equal(canonicalJson(restored),f.item.claim);return answer(input,true);
   };
   await f.run(f.AJobKey,f.handlers(reject));await f.runB();

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { subscriptionChat } from './district-model.ts';
 import { PROVIDER_CONFIGS, ModelEvidenceSchema, assertModelResponseIdentity, type ExtractorProvider, type ModelAnswer } from './district-model-contract.ts';
-import { StructuredLocatorSchema } from './district-adapter-contract.ts';
+import { StructuredLocatorSchema,semanticHash } from './district-adapter-contract.ts';
 import { CriticalRecordTargetSchema, CriticalRecordReviewSchema } from './district-critical-assessment-contract.ts';
 import { DistrictCas } from './district-cas.ts';
 import { loadPolicyReceipt, recheckPolicyReceipt } from './district-policy-receipt.ts';
@@ -15,6 +15,8 @@ import { CIVIC_ACQUISITION_DECISION_ID, ManagedSourceBindingSchema, type CivicPo
 import {AssessmentContextSchema,AssessmentContextHold,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
 import {ValueAssessmentContextSchema,assertValueAssessmentContext,assertValueSourceContext} from './district-value-context.ts';
 import {validateValueTargetTranscript,valueCallSchema} from './pilot-value-transcript.ts';
+import {SourceRecordBindingSchema,sourceRecordPropositions} from './district-assessment-projection.ts';
+import {NATIVE_B_MODEL,NATIVE_B_RECEIPT_VERSION,NativeBModelEvidenceSchema,assertNativeBReceiptIdentity,assertNativeBResponseIdentity} from './district-b-native-model.ts';
 export interface AssessmentEvidenceContext {
   cas: DistrictCas; policyOptions?: CivicPolicyOptions;
   currentAdmissionReceipts?: Readonly<Record<string,string>>;
@@ -106,6 +108,7 @@ export const assessmentItemSchema = z.object({
   claimIds: z.array(z.string()).min(1), entityIds: z.array(z.string()),
   // Only independently source-verified constraints belong here. Unknown semantics remain model decisions.
   constraints: z.array(assertionSchema), criticalKinds: z.array(z.enum(['stage', 'finance', 'identity', 'ocr'])),
+  sourceRecord: SourceRecordBindingSchema.optional(),
   valueTarget: valueTargetSchema.optional(),
   valueContext: ValueAssessmentContextSchema.optional(),
   criticalTarget: CriticalRecordTargetSchema.optional(),
@@ -127,6 +130,7 @@ export const PROMPTS = Object.freeze({
 export async function originalEvidence(item: AssessmentItem, context: AssessmentEvidenceContext = configuredEvidence) {
   if (new Set(item.sources.map(s => s.mcpSourceId ?? s.sourceId)).size !== item.sources.length) throw Error('Duplicate source identities');
   if (bytesHash(item.rubric) !== item.rubricSha256) throw Error('Rubric binding failed');
+  if(item.sourceRecord)assertSourceRecordProjection(item);
   if (!item.sources.length && (!item.valueTarget || Object.keys(item.valueTarget.sources).length)) throw Error('Missing original evidence');
   if(item.valueContext){assertValueAssessmentContext(item);validateValueTargetTranscript(item.valueTarget!);}
   if (item.valueTarget && Object.keys(item.valueTarget.sources).length !== item.sources.length) throw Error('Value target original source coverage mismatch');
@@ -274,10 +278,29 @@ const propositionProjectionSchema = z.object({
   propositions: z.array(z.object({ selector: z.string(), value: z.unknown(), quote: z.string().nullable(),
     sources: z.array(propositionSourceSchema), claimId: z.string() }).strict()),
 }).strict();
+/** Authenticate private bookkeeping and rebuild the exact provider partition.
+ * V1 artifacts have no sourceRecord and retain their historical interpretation. */
+export function assertSourceRecordProjection(item:AssessmentItem){
+ if(!item.sourceRecord)return null;
+ const {record,recordSha256}=item.sourceRecord;
+ if(item.valueTarget||record.id!==item.itemId||semanticHash(record)!==recordSha256||record.sources.length!==item.sources.length
+  ||item.sources.some(source=>source.originalSha256!==record.extraction.inputSha256||source.textSha256!==record.extraction.textSha256
+    ||!record.sources.some(original=>original.id===(source.mcpSourceId??source.sourceId)&&original.sha256===source.originalSha256)))throw new AssessmentContextHold();
+ const projection=sourceRecordPropositions(record,assessmentBlindProjection);
+ const ids=[...new Set([...projection.propositions.map(p=>p.claimId),...(item.criticalTarget?.claims.map(p=>p.claimId)??[])])];
+ const entityIds=[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])].sort();
+ if(item.claim!==canonical(projection)||canonical(ids)!==canonical(item.claimIds)||canonical([...item.entityIds].sort())!==canonical(entityIds))throw new AssessmentContextHold();
+ return projection;
+}
 export function assessmentProviderInput(item: AssessmentItem, evidence: OriginalEvidence): Record<string, unknown> {
   const data: Record<string, unknown> = { itemId: item.itemId, question: item.question, claim: item.claim, rubric: item.rubric,
     claimIds: item.claimIds, entityIds: item.entityIds, evidence };
-  if (!item.valueTarget && !item.criticalTarget) {
+  const sourceProjection=assertSourceRecordProjection(item);
+  if(sourceProjection){
+    assertResidualAssessmentContext(item);
+    data.claim={...sourceProjection,version:'r1-provider-propositions-v2'};
+  }
+  if (!item.valueTarget && !item.criticalTarget && !sourceProjection) {
     let parsed: unknown;
     try { parsed = JSON.parse(item.claim); } catch { if (evidence.some(source => source.assessmentContext)) throw new AssessmentContextHold(); }
     if (parsed && typeof parsed === 'object' && 'version' in parsed && parsed.version === 'r1-record-propositions-v1') {
@@ -313,6 +336,7 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
 }
 export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvidence, output: AssessmentOutput): string[] {
   const issues: string[] = [];
+  const sourceProjection=assertSourceRecordProjection(item);
   if (output.itemId !== item.itemId) issues.push('item_id');
   if (output.outcome !== 'supported' && output.scores.usefulness !== 0) issues.push('abstention_usefulness');
   if (output.outcome === 'supported' && output.assertions.length === 0 && output.valueReview?.kind !== 'abstention') issues.push('missing_assertions');
@@ -336,6 +360,7 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
       if (!match || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== a.date || a.dateRole === null) issues.push('calendar_date_role:' + a.claimId);
     }
     if ((a.value === null) !== (a.unit === null)) issues.push('value_unit:' + a.claimId);
+    if(sourceProjection?.propositions.some(proposition=>proposition.claimId===a.claimId)&&(a.value!==null||a.unit!==null))issues.push('non_quantitative_value:'+a.claimId);
     const constraint = item.constraints.find(c => c.claimId === a.claimId);
     if (constraint && canonical(constraint) !== canonical(a)) issues.push('source_constraint:' + a.claimId);
   }
@@ -406,7 +431,7 @@ export function mismatchReport(a: AssessmentOutput, b: AssessmentOutput) {
   }
   return mismatches;
 }
-const receiptSchema = z.object({ version: z.literal('assessment-receipt-v1'), canonicalizationVersion: z.literal(CANONICALIZATION_VERSION),
+const legacyReceiptSchema = z.object({ version: z.literal('assessment-receipt-v1'), canonicalizationVersion: z.literal(CANONICALIZATION_VERSION),
   role: z.enum(roles), itemSha256: hash,
   requestSha256: hash, responseSha256: hash, outputSha256: hash, promptSha256: hash, schemaSha256: hash,
   rubricSha256: hash, provider: z.enum(['openai-subscription', 'anthropic-subscription']), requestedModel: z.string(),
@@ -414,15 +439,23 @@ const receiptSchema = z.object({ version: z.literal('assessment-receipt-v1'), ca
   startedAt: z.iso.datetime(), finishedAt: z.iso.datetime(), usage: z.unknown(), actualBilledUsd: z.null(),
   estimatedApiUsd: z.number().nullable(), dependencies: z.array(hash), output: assessmentOutputSchema,
   deterministicIssues: z.array(z.string()), receiptSha256: hash }).strict();
+const nativeBReceiptSchema=legacyReceiptSchema.extend({version:z.literal(NATIVE_B_RECEIPT_VERSION),role:z.literal('B'),
+ provider:z.literal('anthropic-subscription'),requestedModel:z.literal(NATIVE_B_MODEL),returnedModel:z.literal(NATIVE_B_MODEL),
+ modelEvidence:NativeBModelEvidenceSchema}).strict();
+const receiptSchema=z.discriminatedUnion('version',[legacyReceiptSchema,nativeBReceiptSchema]);
 export type AssessmentReceipt = z.infer<typeof receiptSchema>;
 export function validateReceipt(receipt: unknown, item: AssessmentItem, role: typeof roles[number]): AssessmentReceipt {
   const r = receiptSchema.parse(receipt); const { receiptSha256, ...body } = r;
   if (digest(body) !== receiptSha256 || r.itemSha256 !== digest(item) || r.role !== role || r.outputSha256 !== digest(r.output)
     || r.promptSha256 !== bytesHash(PROMPTS[role]) || r.schemaSha256 !== digest(z.toJSONSchema(assessmentOutputSchema))
-    || r.rubricSha256 !== item.rubricSha256 || r.requestedModel !== PROVIDER_CONFIGS[r.provider].model
+    || r.rubricSha256 !== item.rubricSha256
     || (r.returnedModel !== null && r.returnedModel !== r.requestedModel)) throw Error('Assessment receipt binding failed');
   const evidence = r.modelEvidence;
-  assertModelResponseIdentity({ evidence, requestedModel: r.requestedModel, returnedModel: r.returnedModel });
+  if(r.version===NATIVE_B_RECEIPT_VERSION)assertNativeBReceiptIdentity(r);
+  else {
+    if(r.requestedModel!==PROVIDER_CONFIGS[r.provider].model)throw Error('Assessment receipt binding failed');
+    assertModelResponseIdentity({ evidence, requestedModel: r.requestedModel, returnedModel: r.returnedModel });
+  }
   if (evidence.provider !== r.provider || Date.parse(r.finishedAt) < Date.parse(r.startedAt)) throw Error('Pinned model evidence binding failed');
   return r;
 }
@@ -456,11 +489,15 @@ export function createAssessmentReceipt(item: AssessmentItem, role: typeof roles
     || digest(suppliedInput.data) !== expected.requestSha256 || canonical(suppliedInput.dependencies) !== canonical(expected.dependencies))) throw Error('Assessment pass input changed');
   const provider = answer.evidence.provider, config = PROVIDER_CONFIGS[provider];
   hash.parse(answer.responseSha256);
-  assertModelResponseIdentity(answer);
-  if (answer.requestedModel !== config.model || answer.reportedModels.some(model => model !== config.model)
-    || (provider === 'anthropic-subscription' && (answer.returnedModel !== config.model || !answer.reportedModels.includes(config.model)))) throw Error('Actual provider model identity mismatch');
+  const nativeB=role==='B'&&answer.requestedModel===NATIVE_B_MODEL;
+  if(nativeB)assertNativeBResponseIdentity(answer);
+  else {
+    assertModelResponseIdentity(answer);
+    if (answer.requestedModel !== config.model || answer.reportedModels.some(model => model !== config.model)
+      || (provider === 'anthropic-subscription' && (answer.returnedModel !== config.model || !answer.reportedModels.includes(config.model)))) throw Error('Actual provider model identity mismatch');
+  }
   const output = assessmentOutputSchema.parse(answer.value);
-  const body = { version: 'assessment-receipt-v1' as const, canonicalizationVersion: CANONICALIZATION_VERSION,
+  const body = { version: nativeB?NATIVE_B_RECEIPT_VERSION:'assessment-receipt-v1' as const, canonicalizationVersion: CANONICALIZATION_VERSION,
     role, itemSha256: digest(item), requestSha256: expected.requestSha256,
     responseSha256: answer.responseSha256, outputSha256: digest(output), promptSha256: bytesHash(PROMPTS[role]),
     schemaSha256: digest(z.toJSONSchema(assessmentOutputSchema)), rubricSha256: item.rubricSha256, provider,

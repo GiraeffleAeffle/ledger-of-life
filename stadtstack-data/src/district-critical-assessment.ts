@@ -19,8 +19,8 @@ export function prepareCriticalAssessment(recordInput: PublicKnowledgeRecord, it
   if (item.sources.length !== record.sources.length || item.sources.some(source => !expected.has((source.mcpSourceId ?? source.sourceId) + ':' + source.originalSha256))) throw Error('Critical assessment original source membership mismatch');
   const entityIds = [...new Set([record.id, ...record.entities.map(entity => entity.entityId)])].sort();
   const criticalKinds = [...new Set(target.claims.map(claim => claim.kind === 'finalization' ? 'stage' as const : 'finance' as const))];
-  return assessmentItemSchema.parse({ ...item, claim: 'Independently verify or reject every source-bound critical claim and the complete supplied record projection.',
-    claimIds: target.claims.map(claim => claim.claimId), entityIds, criticalKinds, criticalTarget: target });
+  return assessmentItemSchema.parse({ ...item, claim: item.sourceRecord?item.claim:'Independently verify or reject every source-bound critical claim and the complete supplied record projection.',
+    claimIds: item.sourceRecord?[...new Set([...item.claimIds,...target.claims.map(claim=>claim.claimId)])]:target.claims.map(claim => claim.claimId), entityIds, criticalKinds, criticalTarget: target });
 }
 /** New claims require actual A/B/C replay; authenticated unchanged originals retain only their original gates. */
 export async function admitCriticalKnowledge(recordsInput: readonly PublicKnowledgeRecord[], inventoryInput: unknown, cas: DistrictCas,

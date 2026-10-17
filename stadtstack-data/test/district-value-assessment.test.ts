@@ -37,6 +37,7 @@ test('candidate input authenticates all 30 evidence rows and current graph inven
 test('value contexts are a distinct strict bounded lane, with genuine three-pass fixture ingest',async t=>{
  const f=await valueAssessmentFixture();t.after(()=>rm(f.directory,{recursive:true,force:true}));
  const item=await buildValueAssessmentItem(f.report,'W01','withoutGraph',[f.source],f.policyArtifact.sha256,f.context);
+ const claim=JSON.parse(item.claim);assert.equal(claim.version,'value-answer-claims-v2');assert.match(claim.instruction,/only a genuine source-stated quantity/);assert.match(claim.instruction,/both null for non-quantitative claims/);assert.equal(item.sourceRecord,undefined,'value targets retain their separate authenticated context, not source-record propositions');
  assertValueAssessmentContext(item);assert.throws(()=>assertResidualAssessmentContext(item),AssessmentContextHold);
  const evidence=await originalEvidence(item,f.context);assert.equal(evidence[0].text,null);
  const selected=evidence[0].selectedContext!;assert.equal(selected.spans.length,1);

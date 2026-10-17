@@ -55,8 +55,8 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  verifyAssessmentContext(context,f.text,f.prepared.textSha256,f.item.sources[0].locators);
  const AInput=buildAssessmentPassInput(f.item,evidence,'A'),BInput=buildAssessmentPassInput(f.item,evidence,'B');assert.equal(canonicalJson(AInput.data),canonicalJson(BInput.data));
  const projected=JSON.parse(JSON.stringify(AInput.data.claim));
- assert.equal(projected.version,'r1-provider-propositions-v1');
- const restored={...projected,version:'r1-record-propositions-v1',propositions:projected.propositions.map(({sourceIds,...p}:Record<string,unknown>&{sourceIds:string[]})=>({...p,sources:sourceIds.map(id=>projected.sources.find((source:{id:string})=>source.id===id))}))};
+ assert.equal(projected.version,'r1-provider-propositions-v2');
+ const restored={...projected,version:'r1-record-propositions-v2'};
  assert.deepEqual(restored,JSON.parse(f.item.claim));
  const output=assessmentOutputSchema.parse(answer(AInput).value);
  const A=syntheticAssessmentReceipt(f.item,'A',output,AInput.data),B=syntheticAssessmentReceipt(f.item,'B',output,BInput.data);
@@ -183,11 +183,11 @@ test('pilot item-one critical finalization has satisfiable complete strict A/B/C
  const output=assessmentOutputSchema.required().parse({
   itemId:f.item.itemId,outcome:'supported',scores:{correctness:2,sources:2,usefulness:1},holdReasons:[],
   rationale:'Synthetic satisfiability witness, not a model assessment or independent verification.',
-  assertions:target.claims.map(claim=>{
+  assertions:[...assessmentOutputSchema.parse(answer(input).value).assertions.filter(assertion=>!target.claims.some(claim=>claim.claimId===assertion.claimId)),...target.claims.map(claim=>{
    const locator=source.locators.find(locator=>locator.quote===claim.quote);assert.ok(locator);
    return {claimId:claim.claimId,sourceId:claim.sourceId,locatorId:locator.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,
     unit:null,value:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality};
-  }),valueReview:null,criticalReview:{
+  })],valueReview:null,criticalReview:{
    recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,
    claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',
     rationale:'Synthetic inspection of the complete supplied evidence; this is only a schema satisfiability witness.'})),
@@ -197,7 +197,8 @@ test('pilot item-one critical finalization has satisfiable complete strict A/B/C
  assert.deepEqual(A.deterministicIssues,[]);assert.deepEqual(B.deterministicIssues,[]);
  const projected=input.data.criticalTarget as Record<string,unknown>;
  assert.equal(projected.claimProjectionSha256,target.claimProjectionSha256);
- assert.deepEqual((projected.claims as {claimId:string}[]).map(claim=>claim.claimId),f.item.claimIds);
+ assert.deepEqual((projected.claims as {claimId:string}[]).map(claim=>claim.claimId),target.claims.map(claim=>claim.claimId));
+ assert.ok(f.item.claimIds.length>target.claims.length,'critical items also require every actual non-critical source proposition');
  const C=buildAssessmentPassInput(f.item,evidence,'C',{A,B});
  for(const role of ['A','B','C'] as const){
   const data=role==='C'?C.data:buildAssessmentPassInput(f.item,evidence,role).data;
