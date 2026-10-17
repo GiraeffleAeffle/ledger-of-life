@@ -40,7 +40,7 @@ export async function districtR1AssessmentCli(argv=process.argv.slice(2),context
  return withDistrictDatabaseScope(database=>withCivicPolicyShutdown(async()=>{
   context.phase='startup';const [command,...rawArgs]=argv;
   if(command==='--help'||command==='help'){
-   process.stdout.write(`Usage: district-r1-assessment-cli.ts enqueue-assessment-b --registry-config PATH --registry-descriptor PATH [bounded JSON stdin]\nNative B: vm-omp only, ${NATIVE_B_SELECTOR}; no model or transport fallback.\n`);return;
+   process.stdout.write(`Usage: district-r1-assessment-cli.ts enqueue-assessment-b --registry-config DESCRIPTOR_PATH --registry-config-sha256 HASH [bounded JSON stdin]\nNative B: vm-omp only, ${NATIVE_B_SELECTOR}; no model or transport fallback.\n`);return;
   }
   if(command!=='enqueue-assessment-b')throw Error('Unknown native assessment command');
   if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');

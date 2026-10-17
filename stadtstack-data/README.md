@@ -795,7 +795,7 @@ never production.
 Historical Haiku selectors, intents and v1/v2/v3 rejection evidence remain
 authenticated by their explicit historical version/model, without rewriting.
 
-Invoke `node src/district-r1-assessment-cli.ts enqueue-assessment-b --registry-config PATH --registry-descriptor PATH`
+Invoke `node src/district-r1-assessment-cli.ts enqueue-assessment-b --registry-config DESCRIPTOR_PATH --registry-config-sha256 HASH`
 with the existing bounded JSON `{jobs:[{transport:"vm-omp",itemArtifactSha256,sourceScope,policyProofSha256}]}` on stdin;
 stdout remains `{jobKeys}`. It reuses the same admitted registry, scope, managed
 read/binding and content-free failure gates. No model override is accepted.
