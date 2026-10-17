@@ -663,3 +663,103 @@ wire keys with the writer's original canonical ID in both readers, then rejects
 an ID forged from raw nested key order in both readers. The audit leaves the
 forged inventory bytes untouched. Recomputing all fourteen exported runtime
 contracts after this correction again found no differences from `b32bc96`.
+
+## Offline retained staging assembly
+
+Step 8 now has an explicit producer for its non-knowledge staging and external
+provenance input. This carries forward the **exact released 0.3.2 bytes**; it does
+not acquire municipal sources, refresh policy, admit new claims or authorize
+release. The read-only plan checks the fixed predecessor Git commit, manifest
+SHA/ID, catalogue city set and every selected on-disk member against those Git
+bytes. Embedded attribution is decoded with the existing retained importer;
+absent original source hashes stay null.
+
+```sh
+# From stadtstack-data, with the pinned Node PATH and private umask:
+./scripts/r1-step8.sh retained-plan /home/max/civic-rebuild-r1/stadtstack-data/release
+```
+
+Capture that JSON privately as `retained-plan.json` and independently hash its
+exact bytes. It is a collect-compatible `stadtstack-retained-import-plan-v1`
+targeting the existing `RETAINED_PUBLICATION_ROOT`. Its exact set is catalogue,
+regional topics, authentic core, and both feed and signals for all eight released
+catalogue cities: **19 members**. No knowledge, graph, coverage or target manifest
+member is used as reconstruction input. The plan makes no managed/DB writes and
+does not even open the authority inventory.
+
+Only in Main's authorized production write window, after campaign drain:
+
+```sh
+npm run collect -- /absolute/retained-plan.json RETAINED_PLAN_SHA256
+./scripts/r1-step8.sh assemble-staging /absolute/assembly.json ASSEMBLY_SHA256
+```
+
+`collect` is the existing governed retained importer, not a network collector.
+Current opt-outs still apply. The assembly command uses the Step8 offline guard;
+it does not invoke collect or silently import missing copies. Its strict input is:
+
+```json
+{
+  "schemaVersion": "stadtstack-r1-step8-staging-assembly-v1",
+  "retainedPlan": {"path": "/absolute/retained-plan.json", "sha256": "actual plan digest"},
+  "provenances": [{"path": "/absolute/sealed-source-provenance.json", "sha256": "actual inventory digest"}],
+  "campaign": {"path": "/absolute/final-campaign.json", "sha256": "actual campaign digest"},
+  "registry": {"path": "/absolute/already-managed-registry.json", "sha256": "actual registry digest"},
+  "managedRoot": "/home/max/civic-rebuild-r1/stadtstack-data/cache/r1-step8-staging-UNIQUE",
+  "policy": {
+    "stateDir": "/home/max/.local/state/stadtstack-data/civic-policy",
+    "authorityId": "owner-2026-10-11-codex-workstation",
+    "authoritySha256": "actual authority pin"
+  }
+}
+```
+
+The explanatory digest strings above are not executable pins. Supply the final
+27-source/208-document campaign and all sealed-source provenance pins needed to
+authenticate its exact corpus paths and the registry. Optional
+`identityAssessments`, `criticalAssessments`, `regionalPolicyReceipts` are path/hash
+pins and must already occur in genuine authenticated supplied provenance.
+Historical Git membership is never accepted as general source custody.
+
+No new source-enrollment authority is introduced. Campaign identity/hash/job
+membership is validated against the actual frozen managed corpora. The campaign
+is then copied byte-for-byte through existing `writeManagedSourceArtifact` as a
+derivative with its authentic contributing corpus bindings and
+`independentAllowed:false`. Registry and optional controls are **not** enrolled
+from a bare operator file; they must already be readable with real managed
+bindings in the supplied provenance. The aggregate provenance includes all
+required corpora, registry, optional inputs, exact retained copies and the managed
+campaign. Retained copies are checked against both authentic member bytes and
+their actual retained-publication inventory bindings.
+
+The assembly root must be fresh beneath this package's real cache directory.
+Atomic generation reservation plus sibling `.claim` fencing prevents concurrent
+assemblers mixing outputs. Assembly writes only `campaign.json`,
+`private-publication-provenance.json` and `staging-component.json` in that new
+managed control root. Its stdout pins the component and returns `inputs`:
+`campaign`, `registry`, `privateProvenance`, exact `staging`, and supplied optional
+pins. Merge those **input fields**, not the result envelope, into the complete
+Step8 input, recompute its independent digest, then run plan → discover → audit
+→ execute as above. Revalidate all dependencies after assembly; a changed or
+revoked file fails closed. Existing/partial roots are never repaired or reused.
+
+`test/r1-step8-staging.test.ts` includes the real operator retained-plan CLI and
+an opt-in disposable-PG topology child. The latter imports all 19 actual released
+Git members using isolated authority, rejects incomplete plans/changed source
+declarations/unbound registry controls, assembles real managed provenance, and
+reaches compatible read-only Step8 audit while asserting unchanged inventory/DB
+counts during that audit. Native text/assessment evidence remains explicitly
+synthetic fixture material. This is not production publication or value proof.
+
+Focused staging verification on branch `r1-step8-staging` (base `478b3e3`) used
+CPUs 6–7, a fresh socket-only disposable PostgreSQL cluster and isolated policy
+authority. `test/r1-step8-staging.test.ts`, `test/r1-step8-governance.test.ts` and
+`test/r1-step8.test.ts`: **12 passed, 0 failed/cancelled/skipped**, exit 0.
+The real-member topology child reached compatible audit with all 19 authentic
+members and unchanged inventory/DB counts during audit. Its first run exposed a
+fixture-only strict-pin projection error, fixed before this passing run.
+All fourteen actual exported processing-contract calculations still equal
+`b32bc96` (zero differences). The disposable cluster stopped cleanly and was
+removed. No full gate, production import/assembly, publication or value test ran.
+
+

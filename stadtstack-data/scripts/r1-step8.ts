@@ -4,13 +4,19 @@ import {step8SocketConnection} from '../src/r1-step8-governance.ts';
 import {Step8InputSchema,step8ReadPlan,discoverStep8Plan,runStep8} from '../src/r1-step8.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import {auditStep8} from '../src/r1-step8-audit.ts';
+import {buildStep8RetainedPlan,assembleStep8Staging} from '../src/r1-step8-staging.ts';
 
 const [mode,path,sha256,...extra]=process.argv.slice(2);
 if(!process.env.STADTSTACK_STEP8_OFFLINE)throw Error('Use scripts/r1-step8.sh: offline transport/provider guard is required');
-if(extra.length||!path||!sha256||!['plan','audit','execute','discover'].includes(mode??''))throw Error('Usage: r1-step8.sh plan|audit|execute INPUT_JSON INPUT_SHA256; or discover PRODUCTION_PACKAGE_ROOT DRIVER_ROOT');
-if(mode==='discover'){
+if(extra.length||!path||!['plan','audit','execute','discover','retained-plan','assemble-staging'].includes(mode??'')||(mode==='retained-plan'?sha256!==undefined:!sha256))throw Error('Usage: r1-step8.sh plan|audit|execute|assemble-staging INPUT_JSON INPUT_SHA256; discover PACKAGE_ROOT DRIVER_ROOT; retained-plan PUBLICATION_ROOT');
+if(mode==='retained-plan'){
+ console.log(JSON.stringify(await buildStep8RetainedPlan(path),null,2));
+}else if(mode==='assemble-staging'){
+ const bytes=await readFile(path);if(digest(bytes)!==sha256)throw Error('Step8 staging assembly pin mismatch');
+ console.log(JSON.stringify(await assembleStep8Staging(JSON.parse(bytes.toString('utf8'))),null,2));
+}else if(mode==='discover'){
  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:1,application_name:'r1-step8-read-only-discovery',options:'-c default_transaction_read_only=on'});
- try{console.log(JSON.stringify(await discoverStep8Plan(path,sha256,pool),null,2));}finally{await pool.end();}
+ try{console.log(JSON.stringify(await discoverStep8Plan(path,sha256!,pool),null,2));}finally{await pool.end();}
 }else{
  const bytes=await readFile(path);if(digest(bytes)!==sha256)throw Error('Step8 operator manifest pin mismatch');
  const input=Step8InputSchema.parse(JSON.parse(bytes.toString('utf8')));

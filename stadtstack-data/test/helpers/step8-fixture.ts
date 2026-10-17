@@ -86,6 +86,11 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  // complete build/replay/gate under the operator's actual offline bootstrap.
  createRequire(import.meta.url)('../../scripts/r1-step8-offline.cjs');
  try{
+  if(process.env.R1_TEST_STEP8_STAGING==='1'&&!input.expectDatedSliceHold){
+   const {exerciseRealRetainedStaging}=await import('./step8-staging-fixture.ts');
+   await exerciseRealRetainedStaging(t,manifest,pool,input.fixtureRoot,sealed.privateProvenance);
+   return;
+  }
   const inventoryBefore=await readFile(join(policy.stateDir!,'inventory.json')),counts=()=>pool.query('SELECT (SELECT count(*) FROM district_pipeline.jobs) AS jobs,(SELECT count(*) FROM district_pipeline.step_receipts) AS receipts,(SELECT count(*) FROM district_pipeline.artifacts) AS artifacts,(SELECT count(*) FROM district_pipeline.r1_codex_call_intents) AS intents,(SELECT count(*) FROM district_pipeline.assessment_bridge_leases) AS leases');
   const beforeCounts=(await counts()).rows,preflight=await auditStep8(manifest,pool);
   assert.equal(preflight.status,'compatible',JSON.stringify(preflight.blockers));assert.deepEqual(preflight.writes,[]);assert.equal(preflight.publicationExecuted,false);
