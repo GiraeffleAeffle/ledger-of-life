@@ -67,6 +67,7 @@ test('notification presentation stays outside every semantic contract and the OM
  for(const file of ['district-notifications.ts','district-jobs.ts']){
   for(const [name,{compute}] of Object.entries(contracts))assert.deepEqual(await compute(change(file)),await compute(hash),name+': '+file);
   assert.equal(await ompRunnerContractSha256(change(file)),await ompRunnerContractSha256(hash),file);
+  assert.equal(await parserIsolationContractSha256(change(file)),await parserIsolationContractSha256(hash),file);
  }
 });
 test('stage drain control preserves campaign, parser security/output and B/OMP contracts',async()=>{

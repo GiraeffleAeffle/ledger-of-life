@@ -16,7 +16,7 @@ for(const phase of ['startup','disposition'] as const)test(`ntfy ${phase} uses f
  let reads=0,sends=0;
  const result=await sendPipelineNotification(input,{readToken:async()=>{reads++;return token;},send:async(url,init)=>{
   sends++;assert.equal(url,'https://ntfy.stadtstack.eu/pipeline');assert.equal(init?.method,'POST');assert.equal(init?.redirect,'error');
-  const headers=new Headers(init?.headers);assert.equal(headers.get('Authorization'),`Bearer ${token}`);assert.equal(headers.get('Content-Type'),'text/plain; charset=utf-8');assert.equal(headers.get('Title'),phase==='startup'?'R1 run start (routine)':'R1 needs attention: strausberg-gazette / residual extract (execution_exception)');assert.equal(headers.get('Priority'),phase==='startup'?'1':null);
+  const headers=new Headers(init?.headers);assert.equal(headers.get('Authorization'),`Bearer ${token}`);assert.equal(headers.get('Content-Type'),'text/plain; charset=utf-8');assert.equal(headers.get('Title'),'R1 Executor-Protokoll');assert.equal(headers.get('Priority'),'1');
   assert.ok(init?.signal instanceof AbortSignal);assert.equal(init.signal.aborted,false);assert.equal(init?.body,message(input));
   assert.equal(String(init?.body).includes(token),false);assert.equal(String(init?.body).includes(input.authorizationId),false);assert.equal(String(init?.body).includes(input.runId),false);
   return ack(String(init?.body));
@@ -27,30 +27,30 @@ for(const phase of ['startup','disposition'] as const)test(`ntfy ${phase} uses f
  assert.equal(pipelineNotificationConfig.destinationSha256,result.destinationSha256);assert.equal(pipelineNotificationConfig.notificationApprovalSha256,input.notificationApprovalSha256);
 });
 
-test('only clean completions are silent; held runs and held receipts retain default priority',async()=>{
+test('all completed and held dispositions are silent neutral protocol entries',async()=>{
  for(const entry of [
-  {state:'completed',reasonCode:'max_jobs_reached',hasHolds:false,routine:true},
-  {state:'completed',reasonCode:'no_ready_jobs',hasHolds:false,routine:true},
-  {state:'completed',reasonCode:'max_jobs_reached',hasHolds:true,routine:false},
-  {state:'held',reasonCode:'budget_paused',hasHolds:false,routine:false},
-  {state:'held',reasonCode:'notification_failed',hasHolds:false,routine:false},
-  {state:'held',reasonCode:'lease_lost',hasHolds:true,routine:false},
+  {state:'completed',reasonCode:'max_jobs_reached',hasHolds:false},
+  {state:'completed',reasonCode:'no_ready_jobs',hasHolds:false},
+  {state:'completed',reasonCode:'max_jobs_reached',hasHolds:true},
+  {state:'held',reasonCode:'budget_paused',hasHolds:false},
+  {state:'held',reasonCode:'notification_failed',hasHolds:false},
+  {state:'held',reasonCode:'lease_lost',hasHolds:true},
  ] as const){
   const input:OwnerNotification={...notification,phase:'disposition',state:entry.state,reasonCode:entry.reasonCode,jobsStarted:2};
   const before=canonicalJson(input);
   const result=await sendPipelineNotification(input,{readToken:async()=>token,send:async(_url,init)=>{
-   const headers=new Headers(init?.headers);assert.equal(headers.get('Priority'),entry.routine?'1':null);
-   assert.equal(headers.get('Title'),entry.routine?'R1 run complete (routine)':`R1 needs attention: strausberg-gazette / residual extract (${entry.reasonCode})`);
+   const headers=new Headers(init?.headers);assert.equal(headers.get('Priority'),'1');
+   assert.equal(headers.get('Title'),'R1 Executor-Protokoll');
    assert.equal(init?.body,message(input));return ack(String(init?.body));
   }},undefined,{...context,hasHolds:entry.hasHolds});
   assert.equal(canonicalJson(input),before);assert.equal(result.payloadSha256,digest(before));
  }
 });
 
-test('attention titles bound and normalize source/step text without changing the ACK payload',async()=>{
+test('delivery context cannot alter neutral headers or the ACK payload',async()=>{
  const input:OwnerNotification={...notification,phase:'disposition',state:'held',reasonCode:'execution_exception'};
  await sendPipelineNotification(input,{readToken:async()=>token,send:async(_url,init)=>{
-  const title=new Headers(init?.headers).get('Title')!;assert.ok(title.length<256);assert.doesNotMatch(title,/[\r\n]/);assert.ok(title.endsWith('(execution_exception)'));
+  const headers=new Headers(init?.headers);assert.equal(headers.get('Title'),'R1 Executor-Protokoll');assert.equal(headers.get('Priority'),'1');
   assert.equal(init?.body,message(input));return ack(String(init?.body));
  }},undefined,{scopes:[{sourceId:'synthetic\r\nsource'+'x'.repeat(300),step:'residual_extract'}],hasHolds:true});
 });
