@@ -157,7 +157,8 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[nativeKey])).rowCount,0);
  });
 
- for(const mode of ['accepted','quality','rejected','usage_limit','historical_model','slow_staging','expired_staging','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const)await t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
+ const nativeModes=['accepted','quality','rejected','historical_model','slow_staging','expired_staging','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const;
+ const nativeTest=(mode:typeof nativeModes[number]|'usage_limit')=>t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
   let calls=0,stderr='';
   st.mock.method(process.stderr,'write',((chunk:unknown)=>{stderr+=String(chunk);return true;}) as typeof process.stderr.write);
   st.after(()=>st.mock.restoreAll());
@@ -247,6 +248,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal(receipt.outcome,mode==='quality'?'held_quality':'succeeded');assert.equal(receipt.reasonCode,mode==='quality'?'quality_failed':'completed');
   assert.ok(receipt.outputHashes.includes(lease.purge_ack_sha256));assert.equal(receipt.versions.ompPurgeAckSha256,lease.purge_ack_sha256);assert.equal(receipt.provider?.tokens.output,7);assert.equal(receipt.provider?.reservedMicroUsd,0);assert.match(stderr,/kind=output_accepted/);
  });
+ for(const mode of nativeModes)await nativeTest(mode);
 
  await t.test('intent commits before transfer; genuine answer, inputs and purge acknowledgement persist on the VM',async()=>{
   const f=await start('accepted');
@@ -519,4 +521,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    }
   }
  });
+ // A genuine quota hold stops all B execution until governed resume. Keep it last:
+ // later synthetic scenarios must not bypass that correct global stop.
+ await nativeTest('usage_limit');
 });
