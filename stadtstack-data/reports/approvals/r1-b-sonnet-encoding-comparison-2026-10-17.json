@@ -1,0 +1,30 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-encoding-comparison-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-b-model-sonnet-2026-10-17 (#88) and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-17T04:04:38Z",
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-b-model-sonnet-2026-10-17.json",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "itemsSha256": "990679678aafbb839b59fd81b88940878cbd6359419459af51910e5424e94664",
+   "maxModelCalls": 6,
+   "expiresAt": "2026-10-17T18:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true
+  }
+ },
+ "reason": "Compare full provider encoding v2 and compact v3 on the same items and classify invalid-JSON failures by closed syntactic category (no text retained), to choose the production encoding. Private diagnostics, never admissions; code 4d63206."
+}

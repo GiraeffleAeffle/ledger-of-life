@@ -1,0 +1,32 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15-addendum-2",
+ "amends": {"id": "r1-omp-b-review-2026-10-15", "path": "stadtstack-data/reports/approvals/r1-omp-b-review-2026-10-15.json"},
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval and not a human review",
+ "issuedAt": "2026-10-16T02:36:00Z",
+ "installedReview": {
+  "path": "/etc/stadtstack/omp-b-review.json",
+  "owner": "root:root 0644",
+  "sha256": "4d0ef4b3d02c9a49ea8aa3ac09764c8a9263f9005a296856c9f894e4198cedf3",
+  "codeCommit": "f066c347dacc2d2f95cadf7ab5dd7f1faf27f73a",
+  "imageId": "sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169",
+  "runnerContractSha256": "c723819722404d8a1bb9099efba47953d8ec77d463e2a005224e6e746a5cc400",
+  "unchangedFields": "ompBinarySha256 647237… (container omp/18.9.2), hostResolverBinarySha256/hostResolverVersion (omp/18.10.4 root copy), dockerDaemonId, dockerSocket",
+  "validation": "Parsed with OmpReviewSchema of f066c34 and compared with ompRunnerContractSha256() of the checkout: schema valid, contract match, reviewedAt not in the future."
+ },
+ "image": {
+  "lineage": "Runtime image rebuilt from the pinned node:22-bookworm-slim base plus CA certificates, as before; the reviewed image 91c2c2c4… is used only as the authenticated source of the omp/18.9.2 executable and its embedded native addons (extracted network-disabled with an empty HOME).",
+  "nativeAddons": {
+   "pi_natives.linux-x64-baseline.node": "a5c48a5718258a55be65410ae036fafb7af8bdf4643f44c83379af5d7a6cf584",
+   "pi_natives.linux-x64-modern.node": "fa537a8c0765dc76e5199aae9dadb99cec9d69d41b3d36a47a032452196cb078"
+  },
+  "readiness": "Full frozen argv plus --help through the real entrypoint under the unchanged runtime profile passed; a source-free invalid dummy-token invocation reached a typed provider 401 (no real credential, no quota-consuming call)."
+ },
+ "reviewsCovered": [
+  "Everything listed in r1-omp-b-review-2026-10-15 and addendum-1",
+  "Broker lock fix f7f5a5c..c6aee9c (BrokerReview)",
+  "Native addons 718ac00 (OmpPinReview)",
+  "Warming race 4f61925, custody snapshot reuse cd455a7, repack f99d813/feb5bfd (LockWaitReview); these change only host security fingerprints"
+ ],
+ "rootCauseNote": "Lane B never produced an assessment before this cutover: omp/18.9.2 could not extract its native addon under the 32 MiB file-size limit and noexec tmpfs, so every container exited before any event."
+}

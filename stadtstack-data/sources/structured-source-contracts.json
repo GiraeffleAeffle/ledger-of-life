@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "district-structured-source-contracts-v1",
+  "phase": "R1",
+  "planSha256": "cec8d20a8f443db49744e1b8ce51be6283184526e0895aa0010abcf8b0c2bdf2",
+  "catalogSha256": "c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40",
+  "questionBankSha256": "2e74ab25477c83ed58a34e1a57ae76c16ed7f524fe7e6865106bfcc32bad18cc",
+  "baseCommit": "47083b92ad18613763536ea79d4db1aaccaa6eea",
+  "baseRegistrySha256": "9095c7a241fa5cc1a2d75030286d8690cc5bf6d3e05990c56f7a5199c304b554",
+  "implementationOrder": ["A", "B", "C"],
+  "coverageMeaning": "Code and authored native-format fixtures are not operational coverage. Actual per-source/per-town ingestion is recorded by bounded Postgres job and structured-run receipts. Distribution-specific admission remains mandatory.",
+  "families": [
+    {"rank":1,"wave":"A","adapter":"genesis","contract":"sources/genesis-contract.json","coverage":"not_checked"},
+    {"rank":2,"wave":"A","adapter":"mastr","contract":"sources/mastr-contract.json","coverage":"not_checked"},
+    {"rank":3,"wave":"C","adapter":"zensus","contract":"sources/zensus-contract.json","coverage":"not_checked"},
+    {"rank":4,"wave":"C","adapter":"gtfs","contract":"sources/gtfs-contract.json","coverage":"not_checked"},
+    {"rank":5,"wave":"A","adapter":"planning-wfs","contract":"sources/planning-wfs-contract.json","coverage":"not_checked"},
+    {"rank":6,"wave":"C","adapter":"state-statistics","contract":"sources/state-statistics-contract.json","coverage":"not_checked"},
+    {"rank":7,"wave":"C","adapter":"education","contract":"sources/education-contract.json","coverage":"not_checked"},
+    {"rank":8,"wave":"B","adapter":"funding-operations","contract":"sources/funding-operations-contract.json","coverage":"not_checked"},
+    {"rank":9,"wave":"B","adapter":"procurement","contract":"sources/procurement-contract.json","coverage":"not_checked"},
+    {"rank":10,"wave":"C","adapter":"energy-atlas","contract":"sources/energy-atlas-contract.json","coverage":"not_checked"},
+    {"rank":11,"wave":"C","adapter":"gauges","contract":"sources/gauges-contract.json","coverage":"not_checked"},
+    {"rank":12,"wave":"B","adapter":"council","contract":"sources/council-contract.json","coverage":"not_checked"},
+    {"rank":13,"wave":"B","adapter":"permit-notices","contract":"sources/permit-notices-contract.json","coverage":"not_checked"},
+    {"rank":14,"wave":"B","adapter":"municipal-finance","contract":"sources/municipal-finance-contract.json","coverage":"not_checked"},
+    {"rank":15,"wave":"B","adapter":"sector-plans","contract":"sources/sector-plans-contract.json","coverage":"not_checked"}
+  ],
+  "pilotAgs": ["12064472","12064227","12064428","01053100","01053090","01053116","13076090","13076108","13076060"],
+  "transfer": {"state":"not_run","established":false,"reason":"The separate six-town R4 transfer ring is not authorized by R1."}
+}

@@ -1,0 +1,30 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-v2-diagnostic-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-b-model-sonnet-2026-10-17 (#88) and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-17T02:24:56Z",
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-b-model-sonnet-2026-10-17.json",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "itemsSha256": "b1a49328f114349fd05828c0a53c18abc936ebdbee3b8035caf0b49a1452b4cc",
+   "maxModelCalls": 6,
+   "expiresAt": "2026-10-17T14:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true
+  }
+ },
+ "reason": "Measure whether projection-v2 items with Sonnet lane B reach supported outcomes on six retained items (one is pre-call held at the context cap) before the production cutover. Private diagnostics, never admissions; candidate image 4a98a78e, code 1d9736f."
+}

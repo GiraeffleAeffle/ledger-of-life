@@ -1,0 +1,129 @@
+{
+  "contractVersion": "planning-wfs-native-v1",
+  "adapterContract": "district-structured-v1",
+  "family": 5,
+  "wave": "A",
+  "module": "src/adapters/planning-wfs.ts",
+  "exports": ["planningWfsAdapter", "createPlanningWfsAdapter", "planningFeatureSchemas", "readPlanningXml", "planningXmlLocalName", "PLANNING_WFS_SOURCES", "PLANNING_WFS_VERSION"],
+  "execution": {
+    "collectionAuthorized": false,
+    "networkInsideDiscoverOrParse": false,
+    "paidOperationsPerformed": false,
+    "verificationRun": false,
+    "fixtureState": "written_not_run",
+    "defaultAdapter": "Capabilities metadata discovery only. Feature parsing requires admitted native XSD descriptors and snapshot-bound verified municipality joins. Initial GetFeature discovery additionally requires a verified EPSG:25832 municipality envelope.",
+    "configurationIdentity": "Factory makes a private canonical copy of schemas, joins, extents and pageSize; semanticHash(config) is part of adapter version and every locator mappingVersion. Duplicate/contradictory join/schema/extent keys fail closed.",
+    "parserIsolation": "No acquisition runtime import. Pure XML parsing consumes admitted bytes only; external XSD imports are never resolved. Execute through the shared credential-free parser sandbox, not an unsandboxed acquisition worker."
+  },
+  "sources": [
+    {
+      "id": "sh-plan-xplan-wfs",
+      "endpoint": "https://service.gdi-sh.de/WFS_SH_PLANUNG",
+      "namespace": "http://www.deegree.org/xplanung/1/0",
+      "featureTypes": ["xplan:BP_Plan", "xplan:FP_Plan", "xplan:LP_Plan", "xplan:RP_Plan", "xplan:SO_Plan"],
+      "rights": {"catalogueLicence": "dl-de/by-2-0", "attribution": "© GDI-SH", "capabilitiesLicenceObserved": true, "productionAdmission": "not_checked", "boundary": "Every snapshot still requires the existing policy/origin byte-bound admission receipt. Service licence does not license every linked planning document."},
+      "observedDocumentationOperations": [
+        {"operation": "GetCapabilities", "url": "https://service.gdi-sh.de/WFS_SH_PLANUNG?service=WFS&version=2.0.0&request=GetCapabilities", "result": "Native WFS 2.0 types, CRS, distribution licence and operations inspected as publisher metadata, not a feature collection."},
+        {"operation": "DescribeFeatureType", "url": "https://service.gdi-sh.de/WFS_SH_PLANUNG?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=xplan%3ABP_Plan", "result": "Publisher returns a complete 1,031,619-byte combined flattened XSD despite typeNames selector. Full metadata response inspected; inline BP/FP/LP/RP/SO plan declarations located.", "researchResponseSha256": "4ab6598d98ec3436444e86ec184a02fb7f7e7c534143368fd286e58fd4773702", "productionPolicyReceipt": null}
+      ],
+      "advertisedButUnexercisedOperations": ["GetFeature", "GetPropertyValue", "ListStoredQueries", "DescribeStoredQueries"],
+      "unverified": ["Individual pilot features", "Population completeness", "Municipal joins", "Feature-level update cadence", "Original versioned XPlanGML package downloads", "Linked-document origin/rights", "Legal amendment serialization and cross-plan identity"],
+      "defaultCrs": "EPSG:25832",
+      "paging": "Capabilities explicitly advertise ImplementsResultPaging=FALSE. Only an actual admitted publisher next link is followed; never fabricate a startIndex continuation or claim all plans from a count-limited response.",
+      "nativeSchema": {
+        "geometryField": "raeumlicherGeltungsbereich",
+        "identity": "gml:id scoped to publisher/source, not geometry overlap or label. Durable cross-source project equality is not asserted.",
+        "planFieldCountsObserved": {"BP_Plan": 92, "FP_Plan": 78, "LP_Plan": 77, "RP_Plan": 72, "SO_Plan": 55},
+        "fieldSemantics": {
+          "name": "Attributed plan label; includes full amendment label without splitting by name",
+          "nummer": "Exact string plan number including amendment suffix; not a cross-town identity",
+          "xpVersion": "XPlan schema version, not legal plan revision",
+          "xplanMgrPlanId": "Source manager ID retained as an attributed native field, not substituted for a verified enduring project ID",
+          "gemeinde": "Flattened string. Serialization not sampled in features; never infer AGS or municipality membership from substring/name",
+          "planaufstellendeGemeinde": "Issuing municipality role, not an automatic project-location join",
+          "aendertPlan": "Attributed amendment reference, exact serialization preserved; target identity not guessed",
+          "wurdeGeaendertVonPlan": "Attributed amended-by reference, exact serialization preserved",
+          "aendertPlanBereich": "Area-level amendment reference, not entire-plan equivalence",
+          "satzungsbeschlussDatum": "Plan-adoption resolution date; distinct from effective date and construction permit",
+          "inkrafttretensDatum": "BP legal effective date",
+          "wirksamkeitsDatum": "FP legal effective date",
+          "inkrafttretenDatum": "LP legal effective date",
+          "datumDesInkrafttretens": "RP legal effective date",
+          "genehmigungsDatum": "Plan approval, not building permit",
+          "untergangsDatum": "Legal end of plan; no inference from absence in a partial page",
+          "gueltigkeitBeginn": "Source valid-from timestamp; retained day plus original timestamp evidence, not retrieval time",
+          "gueltigkeitEnde": "Source valid-to timestamp; no inferred open-ended validity",
+          "veroeffentlichungsDatum": "LP publication date, not effective or adoption date",
+          "wmsSortDate": "Display/sort date kept raw; never an event, publication, reference or adoption date",
+          "technischerPlanersteller": "Source field, never automatically developer or operator",
+          "refRechtsplan": "Document reference; separate bytes/policy required",
+          "bezugshoehe": "Source string retained raw; units not guessed",
+          "staedtebaulicherVertrag": "Native boolean parsed exactly; does not establish contracting-party identity or completion"
+        }
+      },
+      "coverage": "not_checked"
+    },
+    {
+      "id": "mv-lup-bplan-wfs",
+      "endpoint": "https://geoportal.kreis-lup.de/ows/gdimrh/bebauungsplaene-lup",
+      "namespace": "http://mapserver.gis.umn.edu/mapserver",
+      "featureTypes": ["ms:Bauleitplaene"],
+      "rights": {"catalogueLicence": "dl-de/by-2-0", "attribution": "Landkreis Ludwigslust-Parchim", "capabilitiesLicenceObserved": true, "productionAdmission": "not_checked", "boundary": "Linked plan/PDF documents require their own policy/origin admission."},
+      "observedDocumentationOperations": [
+        {"operation": "GetCapabilities", "url": "https://geoportal.kreis-lup.de/ows/gdimrh/bebauungsplaene-lup?SERVICE=WFS&REQUEST=GetCapabilities", "result": "WFS 2.0, native type, distribution licence and supported CRS inspected as metadata."},
+        {"operation": "DescribeFeatureType", "url": "https://geoportal.kreis-lup.de/ows/gdimrh/bebauungsplaene-lup?SERVICE=WFS&VERSION=2.0.0&REQUEST=DescribeFeatureType&TYPENAMES=ms%3ABauleitplaene", "result": "Inline BauleitplaeneType schema inspected. No feature records downloaded."}
+      ],
+      "advertisedButUnexercisedOperations": ["GetFeature", "GetPropertyValue", "ListStoredQueries", "DescribeStoredQueries"],
+      "unverified": ["Pilot-feature population", "Native GML ID stability across revisions", "Source date-string format", "Municipal joins", "Linked-document rights", "Actual paging consistency"],
+      "defaultCrs": "urn:ogc:def:crs:EPSG::25832",
+      "paging": "ImplementsResultPaging=TRUE; PagingIsTransactionSafe=FALSE. Honor only admitted next link with unchanged query/geography, same endpoint and increasing startIndex. A multi-page read is not an atomic inventory snapshot.",
+      "publisherMetadata": {"inventory": "Explicitly incomplete", "sync": "Published daily decentralized municipal source synchronization", "metadataDate": "2026-06-18", "evidence": "https://www.geoportal-mv.de/portal/Geowebdienste/Metadatenviewer/f4308da8-1006-4b8b-b599-a9daad79360c"},
+      "nativeSchema": {
+        "geometryField": "msGeometry",
+        "fields": ["msGeometry", "Name", "Gemeinde", "Ortsteil", "Rechtsstand", "Inkrafttretensdatum", "Hauptplanart", "Planart", "Anzahl_Dokumente", "Dokumentart_1", "URL_1", "Dokumentbeschreibung_1", "Dokumentart_2", "URL_2", "Dokumentbeschreibung_2", "Dokumentart_3", "URL_3", "Dokumentbeschreibung_3", "Dokumentart_4", "URL_4", "Dokumentbeschreibung_4", "Dokumentart_5", "URL_5", "Dokumentbeschreibung_5"],
+        "fieldTypes": "msGeometry=gml:GeometryPropertyType; every other inspected native field is XSD string",
+        "fieldSemantics": {"Name": "Full attributed plan/amendment name", "Gemeinde": "Municipality label, no source AGS field observed", "Ortsteil": "Settlement subdivision, not municipality AGS", "Rechtsstand": "Attributed legal status; no automatic permit/implementation state", "Inkrafttretensdatum": "Legal effective date only; strict ISO date or calendar-valid DD.MM.YYYY fixture mapping retains original value", "URL_1..URL_5": "Explicit native document references; no inherited licence", "Anzahl_Dokumente": "Attributed document count; five URL slots are not evidence of a complete plan package"},
+        "xplanLimit": "This is a B-plan footprint/document service. Generic GML geometry is not full XPlan rule objects and does not cover every FNP."
+      },
+      "coverage": "not_checked"
+    },
+    {"id": "hoppegarten-fnp-wfs", "url": "https://www.geoportal-hoppegarten.de/isk/hopp_fp52?SERVICE=WFS&REQUEST=GetCapabilities", "coverage": "held_origin", "rights": "Unresolved. No restrictions/keine plus copyright is not a named open licence.", "limitations": ["Separate amendment services hopp_fp64/fp67/fp68 remain unadmitted", "No acquisition or feature processing in this implementation"]},
+    {"id": "hoppegarten-bplan-wfs", "url": "https://www.geoportal-hoppegarten.de/isk/hopp_bp42?SERVICE=WFS&REQUEST=GetCapabilities", "coverage": "held_origin", "rights": "Distribution rights unresolved", "limitations": ["No acquisition or feature processing in this implementation"]},
+    {"id": "ludwigslust-participation", "coverage": "not_checked", "integration": "existing_mv_route", "ags": "13076090", "ars": "130760090090"},
+    {"id": "parchim-participation", "coverage": "not_checked", "integration": "existing_mv_route", "ags": "13076108", "ars": "130760108108"},
+    {"id": "hagenow-participation", "coverage": "not_checked", "integration": "existing_mv_route", "ags": "13076060", "ars": "130760060060"}
+  ],
+  "existingMvIntegration": {
+    "implementation": "src/district-source-adapters.ts:crawlMvPlanningApi",
+    "registryDispatch": "src/district-crawl.ts source.api.format === mv-bauleitplan",
+    "reuse": "Existing acquisition route owns MV observed JSON protocol, tenant/AGS filter, durable offset frontier and document routing. No second MV JSON implementation or runtime import inside the pure planning parser.",
+    "nativeProtocol": {"envelope": "success,total,results[][]", "id": "_resourceLinkId", "municipalField": "x_GKZ[] exact eight-digit AGS", "documentField": "x_dokumentURL[]", "requestScope": "regionalschluessel is twelve-digit ARS, not eight-digit AGS"},
+    "rights": "Unknown distribution rights remain held until byte-bound existing policy/origin admission. Reuse is not a new collection authorization or readiness claim.",
+    "checksOwnedByExistingTests": "test/district-crawl.test.ts MV exact-AGS, durable-cursor and revalidation fixtures; not rerun here"
+  },
+  "pilotCoverage": [
+    {"municipality": "Strausberg", "ags": "12064472", "state": "not_applicable", "reason": "Outside licensed SH/LUP WFS footprint; no fabricated family-5 WFS source"},
+    {"municipality": "Hoppegarten", "ags": "12064227", "state": "held_origin", "reason": "Catalogued WFS rights unresolved"},
+    {"municipality": "Rüdersdorf bei Berlin", "ags": "12064428", "state": "not_applicable", "reason": "Outside licensed SH/LUP WFS footprint; no fabricated family-5 WFS source"},
+    {"municipality": "Ratzeburg", "ags": "01053100", "state": "not_checked", "reason": "Native feature population and snapshot-bound geography join unexercised"},
+    {"municipality": "Mölln", "ags": "01053090", "state": "not_checked", "reason": "Native feature population and snapshot-bound geography join unexercised"},
+    {"municipality": "Schwarzenbek", "ags": "01053116", "state": "not_checked", "reason": "Native feature population and snapshot-bound geography join unexercised"},
+    {"municipality": "Ludwigslust", "ags": "13076090", "state": "not_checked", "reason": "LUP inventory incomplete; native features/joins and existing MV route not collected"},
+    {"municipality": "Parchim", "ags": "13076108", "state": "not_checked", "reason": "LUP inventory incomplete; native features/joins and existing MV route not collected"},
+    {"municipality": "Hagenow", "ags": "13076060", "state": "not_checked", "reason": "LUP inventory incomplete; native features/joins and existing MV route not collected; council login/access limitations are separate"}
+  ],
+  "evidenceMapping": {
+    "geometry": "Original XML geometry property with explicit EPSG:25832/25833 metres or EPSG:4326 angular degrees. Preserve source axis order, rings, dimensions and CRS; no geometry overlap identity or invented transforms.",
+    "geography": "No AGS field observed in these flattened plan schemas. Exact feature-native-ID + source-response-SHA + AGS join requires a StructuredLocator proof supplied by the trusted integration layer. Bbox only limits search and never establishes membership. AGS preserves leading zeroes.",
+    "neighbouringFeatures": "A feature with a snapshot-bound verified join to another municipality is omitted and counted in coverage limitations without holding admitted in-scope observations. Only a missing/unresolved join creates held_quality for municipality assignment.",
+    "dates": "Event date roles are source-field-specific; legal end, approval, resolution, effective, consultation, technical preparation and publication remain distinct. Invalid calendar dates hold the page. Unknown dates stay null.",
+    "schemaChange": "Admitted XSD descriptor binds sourceSha256 + namespace + featureType + field types. Unexpected namespace/field/duplicate scalar, missing geometry/native ID or complex scalar changes hold; no silent empty inference.",
+    "withdrawals": "Preserve sourced legal-end dates and raw withdrawn/repealed status. Never emit inventory tombstones from a missing row or a partial/empty page.",
+    "amendments": "Full labels/numbers and explicit native amendment fields retained independently; no inferred merge from shared number, name or overlapping geometry.",
+    "locators": "Primary evidence contains only the exact parsed snapshot hash, native ID, XML path, raw field, native schema hash and configuration-bound mappingVersion. Cross-source municipality-join locators are separate supportingEvidence entries with role municipality_join, retaining their original boundary/source hashes. Date precision is derived by the shared observation helper. No invented prose/model/judge receipt."
+  },
+  "bounds": {"snapshotBytes": 4194304, "xmlTags": 100000, "xmlDepth": 64, "pageSizeDefault": 100, "pageSizeMaximum": 1000, "fieldCharacters": 1000000, "DTD": "rejected", "externalEntities": "rejected", "externalSchemaFetch": "never", "network": "never"},
+  "fixtures": {"path": "test/planning-wfs-adapter.test.ts", "origin": "Synthetic native WFS/GML/XSD examples based on inspected publisher schema; not normalized fake input feed or downloaded municipal records", "categories": ["positive", "empty", "paginated", "schema_change", "withdrawn", "blocked"], "additional": ["unknown_geometry_join", "missing_CRS", "invalid_calendar_date", "schema_version_not_legal_version", "boolean_semantics", "scope_preserving_cursor", "contradictory_configuration", "XML_DTD", "size", "malformed_XML", "source_hash_binding", "immutable_configuration", "MV_route_not_duplicated"], "executed": false},
+  "limitations": ["Code and fixtures do not establish operational population coverage", "No GetFeature collection, builds, tests, formatters, commits or package edits performed", "Admitted schema bytes, municipality boundary/feature join proofs and lawful feature snapshots remain integration prerequisites", "No operator, building permit, construction completion, actual expenditure or outcome assertions inferred from planning fields"],
+  "changelog": [{"date": "2026-10-11", "change": "Family 5 wave-A pure admitted-snapshot WFS metadata/discovery and native XSD/GML mapping added; SH/LUP licensed metadata documented, unresolved Hoppegarten held, existing MV acquisition routing reused outside parser sandbox."}]
+}

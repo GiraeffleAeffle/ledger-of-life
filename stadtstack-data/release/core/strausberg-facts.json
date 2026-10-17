@@ -1,0 +1,177 @@
+{
+  "schemaVersion": "stadtstack-core-facts-v1",
+  "cityId": "strausberg",
+  "version": "4de6e538c19be61e9014b782e2b5f75f9228c5794d340967e0ccc67c0e4d4d08",
+  "generatedAt": "2026-10-10T09:11:40.650Z",
+  "facts": [
+    {
+      "id": "lake:straussee-level-2026-09-14",
+      "version": "c0af066cab55be9c3d6bb05e2821e5a2aef1af26b1df7feb3308aa60d7111fcf",
+      "topic": "water",
+      "statement": "Am 14.09.2026 lag der Wasserstand des Straussees 1,61 m unter Normalstau (historische Messung).",
+      "assertion": {
+        "date": "2026-09-14",
+        "value": -1.61,
+        "unit": "m",
+        "reference": "Normalstau"
+      },
+      "source": {
+        "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf",
+        "sha256": "11b2d8b03c0d615e056e9aa399bb47ce1665b5f99ac9a79c41dae067e81214b4",
+        "retrievedAt": "2026-10-10T09:11:40.515Z",
+        "documentDate": "2026-10-05",
+        "locator": "PDF Seite 1, Zeile 14.09.2026; Defizit 161 cm; Normalstau 65,49 m DHHN 92",
+        "publisher": "Stadt Strausberg",
+        "title": "Monitoring des Wasserstandes im Straussee"
+      },
+      "verification": {
+        "status": "auto-verified",
+        "meaning": "Passed named automated gates; not human review or independent truth certification.",
+        "evidenceBasis": "single-primary-source; no independent corroboration",
+        "policy": {
+          "metric": "DeepEval FaithfulnessMetric",
+          "metricVersion": "3.9.9",
+          "penalizeAmbiguousClaims": true,
+          "threshold": 0.8,
+          "model": "codex:gpt-6-luna"
+        },
+        "extractorVersion": "strausberg-core-pdf-v1",
+        "assertionHash": "e426f721c889d830c10039014e563d41e74dd776e88577728d2f2bc1bebeba6a",
+        "sourceSha256": "11b2d8b03c0d615e056e9aa399bb47ce1665b5f99ac9a79c41dae067e81214b4",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            "document-date-2026-10-05",
+            "measurement-row-2026-09-14",
+            "reference-normalstau-65.49-m-DHHN92",
+            "deficit-161-cm-to-minus-1.61-m"
+          ]
+        },
+        "faithfulness": {
+          "score": 1,
+          "threshold": 0.8,
+          "reason": "The score is 1.00 because there are no contradictions, so the actual output aligns with the retrieval context.",
+          "evaluator": "DeepEval FaithfulnessMetric / llm / codex:gpt-6-luna",
+          "model": "codex:gpt-6-luna",
+          "actual": true,
+          "evaluatedAt": "2026-10-10T09:07:22.026Z",
+          "statementHash": "b02fe8e1492d60a87af72fe5469893cf95e5b9bb8f717d0573bc3d31e3dced31",
+          "contextHash": "dc913093ee8f7d58576d3c9f9237c889391b4fc25dccdba2c2a3c915a005dc5c",
+          "evidenceHash": "e8951e39cc35591fb15ad1be5672987a67a0a2f5436aa08f18b81175c944622b"
+        }
+      }
+    },
+    {
+      "id": "budget:investment-outlays-2025",
+      "version": "06beccf5c9cd824cca03ac5a8ee687eac6a7522d65fc90ce1715ecc23e89bb73",
+      "topic": "budget",
+      "statement": "Der Haushaltsplan der Stadt Strausberg setzt für 2025 geplante Auszahlungen aus Investitionstätigkeit von 17.941.270 EUR fest.",
+      "assertion": {
+        "year": 2025,
+        "value": 17941270,
+        "unit": "EUR"
+      },
+      "source": {
+        "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+        "sha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+        "retrievedAt": "2026-10-10T09:11:40.645Z",
+        "documentDate": "2024-11-07",
+        "locator": "PDF Seite 1, § 1, Zeile Auszahlungen aus Investitionstätigkeit, Spalte 2025",
+        "publisher": "Stadt Strausberg",
+        "title": "Haushaltssatzung 2025/2026"
+      },
+      "verification": {
+        "status": "auto-verified",
+        "meaning": "Passed named automated gates; not human review or independent truth certification.",
+        "evidenceBasis": "single-primary-source; no independent corroboration",
+        "policy": {
+          "metric": "DeepEval FaithfulnessMetric",
+          "metricVersion": "3.9.9",
+          "penalizeAmbiguousClaims": true,
+          "threshold": 0.8,
+          "model": "codex:gpt-6-luna"
+        },
+        "extractorVersion": "strausberg-core-pdf-v1",
+        "assertionHash": "800e464451a2bad68981c445de4262803b4fd905cf306250f2c7a038ab5abddc",
+        "sourceSha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            "document-date-2024-11-07",
+            "section-1-plan-not-actual",
+            "year-columns-2025-2026",
+            "investment-outlays-row-and-EUR"
+          ]
+        },
+        "faithfulness": {
+          "score": 1,
+          "threshold": 0.8,
+          "reason": "The score is 1.00 because there are no contradictions; the actual output faithfully matches the retrieval context.",
+          "evaluator": "DeepEval FaithfulnessMetric / llm / codex:gpt-6-luna",
+          "model": "codex:gpt-6-luna",
+          "actual": true,
+          "evaluatedAt": "2026-10-10T09:07:50.268Z",
+          "statementHash": "909cb13757bbaec04e02476738d4da7a445d3aa6cc10cf60c4ed270999ba8d69",
+          "contextHash": "64c008aaa16172758160e5178d32291a59fdc2e88253ecf901128137147fcf58",
+          "evidenceHash": "dd3f5c406a4681ceff21f548527f9c198a14e31fe6b4f3cd7b1d84122387f03f"
+        }
+      }
+    },
+    {
+      "id": "budget:investment-outlays-2026",
+      "version": "bd1bd7de3299334ac30625edb2b9379b18fb7a399398b8361cbfc7fd39ad3230",
+      "topic": "budget",
+      "statement": "Der Haushaltsplan der Stadt Strausberg setzt für 2026 geplante Auszahlungen aus Investitionstätigkeit von 12.609.320 EUR fest.",
+      "assertion": {
+        "year": 2026,
+        "value": 12609320,
+        "unit": "EUR"
+      },
+      "source": {
+        "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+        "sha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+        "retrievedAt": "2026-10-10T09:11:40.645Z",
+        "documentDate": "2024-11-07",
+        "locator": "PDF Seite 1, § 1, Zeile Auszahlungen aus Investitionstätigkeit, Spalte 2026",
+        "publisher": "Stadt Strausberg",
+        "title": "Haushaltssatzung 2025/2026"
+      },
+      "verification": {
+        "status": "auto-verified",
+        "meaning": "Passed named automated gates; not human review or independent truth certification.",
+        "evidenceBasis": "single-primary-source; no independent corroboration",
+        "policy": {
+          "metric": "DeepEval FaithfulnessMetric",
+          "metricVersion": "3.9.9",
+          "penalizeAmbiguousClaims": true,
+          "threshold": 0.8,
+          "model": "codex:gpt-6-luna"
+        },
+        "extractorVersion": "strausberg-core-pdf-v1",
+        "assertionHash": "cbd107971a2f12429f6e31d5745f464f0a83adc35730dc0c33e6d000474fdee8",
+        "sourceSha256": "721b47b826a1913cee55054d1251857b2c2a6cf4a7f7319a8124110d16332315",
+        "deterministic": {
+          "passed": true,
+          "checks": [
+            "document-date-2024-11-07",
+            "section-1-plan-not-actual",
+            "year-columns-2025-2026",
+            "investment-outlays-row-and-EUR"
+          ]
+        },
+        "faithfulness": {
+          "score": 1,
+          "threshold": 0.8,
+          "reason": "The score is 1.00 because no contradictions are listed, indicating the actual output aligns with the retrieval context.",
+          "evaluator": "DeepEval FaithfulnessMetric / llm / codex:gpt-6-luna",
+          "model": "codex:gpt-6-luna",
+          "actual": true,
+          "evaluatedAt": "2026-10-10T09:08:28.449Z",
+          "statementHash": "459ca2379446c3c70479a0fc47124a215a023fb499322409864ecb25c6124cc2",
+          "contextHash": "64c008aaa16172758160e5178d32291a59fdc2e88253ecf901128137147fcf58",
+          "evidenceHash": "628889f1aa4e4bdd2201d5eb0c77b1332755a3ea913cde10fd3b9cb451bb73c4"
+        }
+      }
+    }
+  ]
+}

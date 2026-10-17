@@ -1,0 +1,3904 @@
+{
+  "schemaVersion": "pilot-question-source-disposition-v1",
+  "immutable": true,
+  "frozenBeforeContextImports": true,
+  "questionBankSha256": "2e74ab25477c83ed58a34e1a57ae76c16ed7f524fe7e6865106bfcc32bad18cc",
+  "catalogSha256": "c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40",
+  "planSha256": "cec8d20a8f443db49744e1b8ce51be6283184526e0895aa0010abcf8b0c2bdf2",
+  "scope": "Original nine towns and unchanged 30 questions only; no paid APIs or excluded directories.",
+  "receiptUpdatePolicy": "Create a new immutable version referencing this byte hash; never rewrite questions or claim admission without a receipt.",
+  "rows": [
+    {
+      "questionId": "W01",
+      "question": "Welches Gremium hat in Strausberg wann welchen Schritt der kommunalen Wärmeplanung beschlossen, und ist damit schon ein Wärmeplan verabschiedet?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Gremium",
+        "Beschlussdatum",
+        "beschlossener Schritt",
+        "Planstatus"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-strausberg",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "W02",
+      "question": "Welche Einwände oder Bedingungen zur Wärmeplanung sind in Hoppegarten und Rüdersdorf dokumentiert und wie wurde darüber entschieden?",
+      "towns": [
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Einwand oder Bedingung",
+        "zuständige Stelle",
+        "Entscheidung",
+        "Datum"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-ruedersdorf-bei-berlin",
+        "hoppegarten-participation",
+        "ruedersdorf-bei-berlin-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "W03",
+      "question": "Nutzen Ratzeburg, Mölln und Schwarzenbek nachweislich dasselbe Förderprogramm für Wärmeplanung; welche bewilligten Beträge und Eigenanteile gehören zu welcher Kommune?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "eindeutige Programmidentität",
+        "explizite Förderbeziehung",
+        "Bewilligung statt Antrag",
+        "Beträge und Eigenanteile"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "council-schwarzenbek",
+        "funding-nki-kommunalrichtlinie-projects",
+        "funding-sh-efre-beneficiaries",
+        "funding-sh-esf-beneficiaries",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-nki-kommunalrichtlinie-projects",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-efre-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-esf-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "W04",
+      "question": "Welche Betreiber sind für Wärmenetze in Ludwigslust, Parchim und Hagenow ausdrücklich belegt; gibt es tatsächlich einen gemeinsamen Rechtsträger statt nur ähnlich benannter Stadtwerke?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Netz oder Projekt",
+        "expliziter Betreiber",
+        "Identitätsgrundlage",
+        "Betrieb statt Planung"
+      ],
+      "disposition": "unaddressed",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "hagenow-participation",
+        "ludwigslust-participation",
+        "parchim-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "No admitted actual heat-network operator/legal-identity route for Ludwigslust/Parchim/Hagenow. MaStR electricity operators and heat atlases are not substitutes; participation reports do not yet assert network operation.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "W05",
+      "question": "In welcher Pilotkommune ist eine Wärmemaßnahme tatsächlich umgesetzt und sind Verbrauch oder Emissionen vor und nach der Maßnahme vergleichbar gemessen worden?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Umsetzungsbeleg",
+        "Messgröße",
+        "Vorher-Nachher-Zeiträume",
+        "Grenzen der Wirkungszuordnung"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-participation",
+        "hoppegarten-participation",
+        "ludwigslust-participation",
+        "moelln-participation",
+        "parchim-participation",
+        "ratzeburg-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "schwarzenbek-participation",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "E01",
+      "question": "Welche kommunalen Solaranlagen wurden in Strausberg oder Hoppegarten von welchem Gremium wann beschlossen und welche sind nur vorgeschlagen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Anlage",
+        "Gremium",
+        "Beschlussdatum",
+        "Vorschlag oder Beschluss"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-strausberg",
+        "hoppegarten-finance-documents",
+        "hoppegarten-participation",
+        "strausberg-finance-documents",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "E02",
+      "question": "Welche konkreten Einwände und Auflagen zu Windenergievorhaben sind in Rüdersdorf oder Schwarzenbek belegt und welche Entscheidung folgte?",
+      "towns": [
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Vorhaben",
+        "Einwand oder Auflage",
+        "Entscheidung",
+        "zuständige Behörde"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "bimschg-bb",
+        "bimschg-sh",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "ruedersdorf-bei-berlin-participation",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation",
+        "uvp-bb",
+        "uvp-sh"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "bimschg-bb",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "bimschg-sh",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "uvp-bb",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "uvp-sh",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "E03",
+      "question": "Wer betreibt die dokumentierten Photovoltaikanlagen in Ratzeburg und Mölln; ist ein gemeinsamer Betreiber quellenbelegt oder nur namensähnlich?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Anlage",
+        "Betreiberbeziehung",
+        "Rechtsträgeridentität",
+        "Status"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "mastr",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "mastr",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "E04",
+      "question": "Welche Solarinvestitionen sind in Ludwigslust, Parchim und Hagenow veranschlagt, bewilligt und tatsächlich bezahlt; für welche Haushaltsjahre gelten die Beträge?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Projekt",
+        "Haushaltsjahr",
+        "Planansatz",
+        "Bewilligung",
+        "Ist-Auszahlung"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "hagenow-finance-documents",
+        "hagenow-participation",
+        "ludwigslust-finance-documents",
+        "ludwigslust-participation",
+        "parchim-finance-documents",
+        "parchim-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Same project/investment identifier, period and comparable scope must link plan/approval to actual expenditure; award is not payment.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "E05",
+      "question": "Welche kommunale Solaranlage ist nachweislich in Betrieb und welche gemessenen Stromerträge oder Einsparungen liegen vor, getrennt von Prognosen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Inbetriebnahme",
+        "Messzeitraum",
+        "gemessener Ertrag",
+        "Prognoseabgrenzung"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hagenow-participation",
+        "hoppegarten-finance-documents",
+        "hoppegarten-participation",
+        "ludwigslust-finance-documents",
+        "ludwigslust-participation",
+        "mastr",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "parchim-finance-documents",
+        "parchim-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation",
+        "strausberg-finance-documents",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "mastr",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "B01",
+      "question": "Welche Wohnbauplanung in Strausberg wurde wann durch welches Gremium beschlossen und handelt es sich um Aufstellung, Auslegung oder rechtskräftige Satzung?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Planbezeichnung",
+        "Gremium",
+        "Beschlussdatum",
+        "Verfahrensstufe"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-strausberg",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "B02",
+      "question": "Welche Einwendungen zu Wohnbauplänen in Hoppegarten und Rüdersdorf wurden abgewogen und welche Änderungen oder Auflagen wurden übernommen?",
+      "towns": [
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "konkreter Plan",
+        "Einwendung",
+        "Abwägungsentscheidung",
+        "Änderung oder Auflage"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-ruedersdorf-bei-berlin",
+        "hoppegarten-participation",
+        "ruedersdorf-bei-berlin-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "B03",
+      "question": "Welche Wohnbauprojekte in Ratzeburg, Mölln und Schwarzenbek verbindet ein ausdrücklich belegtes Förderprogramm oder ein identischer Bauträger?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Projekt",
+        "explizite Beziehung",
+        "Programm- oder Trägeridentität",
+        "Beziehungsstatus"
+      ],
+      "disposition": "unaddressed",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "council-schwarzenbek",
+        "funding-sh-efre-beneficiaries",
+        "funding-sh-esf-beneficiaries",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-efre-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-esf-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Housing-developer identity for Ratzeburg/Mölln/Schwarzenbek is unaddressed. Funding-programme branch remains conditional on explicit operation/programme-period links; planner/landowner/bidder/name similarity is not developer identity.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "B04",
+      "question": "Wie viele Wohnungen sind in Ludwigslust, Parchim und Hagenow jeweils nur geplant, genehmigt oder tatsächlich fertiggestellt und auf welchen Stichtag beziehen sich die Zahlen?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Projekt",
+        "Wohnungszahl",
+        "Status je Zahl",
+        "Stichtag"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "hagenow-participation",
+        "ludwigslust-participation",
+        "parchim-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "B05",
+      "question": "Gibt es für ein fertiggestelltes kommunales Wohnprojekt belastbare Daten zu Belegung oder bezahlbaren Mieten statt nur ein politisches Ziel?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Fertigstellung",
+        "Belegungs- oder Mietmessung",
+        "Zeitraum",
+        "Abgrenzung zum Ziel"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-participation",
+        "hoppegarten-participation",
+        "ludwigslust-participation",
+        "moelln-participation",
+        "parchim-participation",
+        "ratzeburg-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "schwarzenbek-participation",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "K01",
+      "question": "Wer hat wann welche Kitaerweiterung in Strausberg, Hoppegarten oder Rüdersdorf beschlossen, und wie viele zusätzliche Plätze waren dabei vorgesehen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Einrichtung",
+        "Gremium",
+        "Beschlussdatum",
+        "geplante zusätzliche Plätze"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-ruedersdorf-bei-berlin",
+        "council-strausberg",
+        "hoppegarten-finance-documents",
+        "hoppegarten-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "ruedersdorf-finance-documents",
+        "sep-lup",
+        "sep-mol",
+        "sep-rz-gap",
+        "strausberg-finance-documents",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-rz-gap",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "K02",
+      "question": "Welche Einwände oder Genehmigungsbedingungen zu Schulbauvorhaben in Ratzeburg, Mölln und Schwarzenbek sind dokumentiert und wurden sie erfüllt?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Vorhaben",
+        "Einwand oder Bedingung",
+        "zuständige Stelle",
+        "Erfüllungsbeleg"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "council-schwarzenbek",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation",
+        "sep-lup",
+        "sep-mol",
+        "sep-rz-gap"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-rz-gap",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "K03",
+      "question": "Betreibt derselbe eindeutig identifizierte Träger Kitas in mehreren der Städte Ludwigslust, Parchim und Hagenow und welche Einrichtungen sind belegt?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Einrichtung je Stadt",
+        "explizite Betreiberbeziehung",
+        "Trägeridentität",
+        "Betriebsstatus"
+      ],
+      "disposition": "unaddressed",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "hagenow-finance-documents",
+        "hagenow-participation",
+        "ludwigslust-finance-documents",
+        "ludwigslust-participation",
+        "parchim-finance-documents",
+        "parchim-participation",
+        "sep-lup",
+        "sep-mol",
+        "sep-rz-gap"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-rz-gap",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "No admitted MV Kita operator route for Ludwigslust/Parchim/Hagenow. BB lists and aggregates do not answer this question; paid MV directory excluded.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "K04",
+      "question": "Bei welchem Schulbauprojekt lassen sich ursprünglicher Kostenansatz, spätere Bewilligung und tatsächliche Ausgaben mit Haushaltsjahr auseinanderhalten?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Projekt",
+        "ursprünglicher Ansatz",
+        "Bewilligung",
+        "Ist-Ausgaben",
+        "Haushaltsjahr"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hagenow-participation",
+        "hoppegarten-finance-documents",
+        "hoppegarten-participation",
+        "ludwigslust-finance-documents",
+        "ludwigslust-participation",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "parchim-finance-documents",
+        "parchim-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation",
+        "sep-lup",
+        "sep-mol",
+        "sep-rz-gap",
+        "strausberg-finance-documents",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-rz-gap",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Same project/investment identifier, period and comparable scope must link plan/approval to actual expenditure; award is not payment.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "K05",
+      "question": "Welche Kitaerweiterung wurde tatsächlich eröffnet und welche Belegungs- oder Wartelistenzahlen belegen eine Verbesserung gegenüber vorher?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Eröffnung",
+        "realisierte Plätze",
+        "Vorher-Nachher-Zahlen",
+        "Messzeitraum"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hagenow-participation",
+        "hoppegarten-finance-documents",
+        "hoppegarten-participation",
+        "ludwigslust-finance-documents",
+        "ludwigslust-participation",
+        "moelln-finance-documents",
+        "moelln-participation",
+        "parchim-finance-documents",
+        "parchim-participation",
+        "ratzeburg-finance-documents",
+        "ratzeburg-participation",
+        "ruedersdorf-bei-berlin-participation",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "schwarzenbek-participation",
+        "sep-lup",
+        "sep-mol",
+        "sep-rz-gap",
+        "strausberg-finance-documents",
+        "strausberg-participation"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-bei-berlin-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "sep-rz-gap",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-participation",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "M01",
+      "question": "Welche Verkehrsmaßnahme haben Strausberg, Hoppegarten oder Rüdersdorf wann durch welches Gremium beschlossen, und welche Stelle darf sie umsetzen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Maßnahme",
+        "Gremium",
+        "Beschlussdatum",
+        "Umsetzungszuständigkeit"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-ruedersdorf-bei-berlin",
+        "council-strausberg",
+        "hoppegarten-finance-documents",
+        "nvp-mol",
+        "rnvp-lup",
+        "rnvp-rz",
+        "ruedersdorf-finance-documents",
+        "strausberg-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "nvp-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-rz",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "M02",
+      "question": "Welche Einwände oder Bedingungen zu Radverkehrsvorhaben in Ratzeburg, Mölln und Schwarzenbek sind mit einer konkreten Abwägungsentscheidung belegt?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Vorhaben",
+        "Einwand oder Bedingung",
+        "Abwägung",
+        "Datum"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "council-schwarzenbek",
+        "moelln-finance-documents",
+        "nvp-mol",
+        "ratzeburg-finance-documents",
+        "rnvp-lup",
+        "rnvp-rz",
+        "schwarzenbek-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "nvp-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-rz",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "M03",
+      "question": "Welche Mobilitätsprojekte in Ludwigslust, Parchim und Hagenow nutzen nachweislich dasselbe Förderprogramm und welche Institution ist jeweils Zuwendungsgeber?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Projekt",
+        "explizite Förderung",
+        "Programmidentität",
+        "Zuwendungsgeber"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "funding-mv-efre-beneficiaries",
+        "funding-mv-esf-beneficiaries",
+        "hagenow-finance-documents",
+        "ludwigslust-finance-documents",
+        "nvp-mol",
+        "parchim-finance-documents",
+        "rnvp-lup",
+        "rnvp-rz"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-mv-efre-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-mv-esf-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "nvp-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-rz",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "M04",
+      "question": "Bei welchem Straßen- oder Radwegeprojekt sind Planbudget und tatsächlich abgerechnete Kosten getrennt belegt und welche Abweichung lässt sich daraus berechnen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "identisches Projekt",
+        "Planbudget",
+        "abgerechnete Kosten",
+        "vergleichbarer Umfang und Zeitraum"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hoppegarten-finance-documents",
+        "ludwigslust-finance-documents",
+        "moelln-finance-documents",
+        "nvp-mol",
+        "parchim-finance-documents",
+        "ratzeburg-finance-documents",
+        "rnvp-lup",
+        "rnvp-rz",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "strausberg-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "nvp-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-rz",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Same project/investment identifier, period and comparable scope must link plan/approval to actual expenditure; award is not payment.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "M05",
+      "question": "Welche umgesetzte Verkehrsmaßnahme wurde mit Vorher-Nachher-Daten zu Reisezeit, Unfällen oder Nutzung evaluiert und was lässt sich daraus nicht kausal schließen?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Umsetzung",
+        "Messgröße",
+        "Vorher-Nachher-Zeiträume",
+        "Kausalitätsgrenze"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hoppegarten-finance-documents",
+        "ludwigslust-finance-documents",
+        "moelln-finance-documents",
+        "nvp-mol",
+        "parchim-finance-documents",
+        "ratzeburg-finance-documents",
+        "rnvp-lup",
+        "rnvp-rz",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "strausberg-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "nvp-mol",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-lup",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "rnvp-rz",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "H01",
+      "question": "Welche Investitionsauszahlungen und Investitionskredite sieht Strausbergs Haushalt 2025 vor; sind dies Planwerte oder schon ausgegebene beziehungsweise aufgenommene Beträge?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Haushaltsjahr 2025",
+        "Investitionsauszahlungen",
+        "Investitionskredite",
+        "Plan-Ist-Abgrenzung"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-strausberg",
+        "strausberg-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "H02",
+      "question": "Welche Behörde hat für die Haushalte von Hoppegarten und Rüdersdorf welche Genehmigung oder Auflage erteilt und wann galt diese?",
+      "towns": [
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Haushaltsjahr",
+        "zuständige Behörde",
+        "Genehmigung oder Auflage",
+        "Geltungsdatum"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hoppegarten",
+        "council-ruedersdorf-bei-berlin",
+        "hoppegarten-finance-documents",
+        "ruedersdorf-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "H03",
+      "question": "Welche Investitionsvorhaben in Ratzeburg, Mölln und Schwarzenbek hängen am selben Förderprogramm und sind die Zuschüsse beantragt, bewilligt oder ausgezahlt?",
+      "towns": [
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Vorhaben",
+        "Programmidentität",
+        "Förderbeziehung",
+        "Zahlungsstatus"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-moelln",
+        "council-ratzeburg",
+        "council-schwarzenbek",
+        "funding-sh-efre-beneficiaries",
+        "funding-sh-esf-beneficiaries",
+        "moelln-finance-documents",
+        "ratzeburg-finance-documents",
+        "schwarzenbek-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-efre-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "funding-sh-esf-beneficiaries",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "H04",
+      "question": "Welche Investitionsansätze in Ludwigslust, Parchim und Hagenow lassen sich einem Jahresabschluss mit Ist-Auszahlungen zuordnen; was bleibt nur Planung?",
+      "towns": [
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "identische Investition",
+        "Haushaltsjahr",
+        "Planansatz",
+        "Jahresabschluss",
+        "Ist-Auszahlung"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-ludwigslust",
+        "council-parchim",
+        "hagenow-finance-documents",
+        "ludwigslust-finance-documents",
+        "parchim-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Same project/investment identifier, period and comparable scope must link plan/approval to actual expenditure; award is not payment.",
+      "sourceCoverageCredit": false
+    },
+    {
+      "questionId": "H05",
+      "question": "Für welche abgeschlossene kommunale Investition sind neben Kosten auch gemessene Leistungen oder Wirkungen veröffentlicht, sodass sie mehr als ein unbelegtes Erfolgsbeispiel ist?",
+      "towns": [
+        {
+          "cityId": "strausberg",
+          "ags": "12064472"
+        },
+        {
+          "cityId": "hoppegarten",
+          "ags": "12064227"
+        },
+        {
+          "cityId": "ruedersdorf-bei-berlin",
+          "ags": "12064428"
+        },
+        {
+          "cityId": "ratzeburg",
+          "ags": "01053100"
+        },
+        {
+          "cityId": "moelln",
+          "ags": "01053090"
+        },
+        {
+          "cityId": "schwarzenbek",
+          "ags": "01053116"
+        },
+        {
+          "cityId": "ludwigslust",
+          "ags": "13076090"
+        },
+        {
+          "cityId": "parchim",
+          "ags": "13076108"
+        },
+        {
+          "cityId": "hagenow",
+          "ags": "13076060"
+        }
+      ],
+      "requiredEvidenceRoles": [
+        "Abschluss",
+        "Ist-Kosten",
+        "gemessene Leistung oder Wirkung",
+        "Messzeitraum",
+        "Wirkungsgrenze"
+      ],
+      "disposition": "partial_route",
+      "coverageState": "not_checked",
+      "catalogSourceIds": [
+        "council-hagenow",
+        "council-hoppegarten",
+        "council-ludwigslust",
+        "council-moelln",
+        "council-parchim",
+        "council-ratzeburg",
+        "council-ruedersdorf-bei-berlin",
+        "council-schwarzenbek",
+        "council-strausberg",
+        "hagenow-finance-documents",
+        "hoppegarten-finance-documents",
+        "ludwigslust-finance-documents",
+        "moelln-finance-documents",
+        "parchim-finance-documents",
+        "ratzeburg-finance-documents",
+        "ruedersdorf-finance-documents",
+        "schwarzenbek-finance-documents",
+        "strausberg-finance-documents"
+      ],
+      "sourceRoutes": [
+        {
+          "catalogSourceId": "council-hagenow",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "blocked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-hoppegarten",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ludwigslust",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-moelln",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-parchim",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ratzeburg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-ruedersdorf-bei-berlin",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-schwarzenbek",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "council-strausberg",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hagenow-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "hoppegarten-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ludwigslust-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "moelln-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "parchim-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ratzeburg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "ruedersdorf-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "schwarzenbek-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        },
+        {
+          "catalogSourceId": "strausberg-finance-documents",
+          "admissionReceiptSha256": null,
+          "rightsState": "document_specific_admission_required",
+          "accessState": "not_checked",
+          "sourceCoverageCredit": false
+        }
+      ],
+      "remainingGap": "Original evidence and document-specific rights admission required for every evidence role; no source capability establishes this question’s answer. Measured outcome chain is not established; context/modelled statistics cannot substitute for project-linked implementation and comparable measured results.",
+      "sourceCoverageCredit": false
+    }
+  ]
+}

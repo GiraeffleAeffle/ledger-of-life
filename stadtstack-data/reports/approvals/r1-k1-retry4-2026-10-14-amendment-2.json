@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-k1-retry4-2026-10-14-amendment-2",
+  "amends": {
+    "id": "r1-k1-retry4-2026-10-14-amendment-1",
+    "sha256": "4bd2978145f6d8d7cc3b8d1c3358a4c15555e74e21b644973d1f14909a5d242e"
+  },
+  "related": [
+    {
+      "id": "r1-k1-retry4b-stage-acquisition-2026-10-14",
+      "sha256": "8b237889489b28e956d9270f6adbb4e09f6a7f87c76d4843b5dbef1f93128331"
+    },
+    {
+      "id": "r1-k1-retry4b-stage-structured-parse-2026-10-14",
+      "sha256": "63a92e0a838d89f113900c8beb295f4147d8d6d59bb88541fdc18a0c9361cffc"
+    }
+  ],
+  "recordedAt": "2026-10-14T20:40:18.115Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, structured question (ask tool)",
+  "questionShownToOwner": "K1 worked: regionalstatistik answered within 120 s with real Strausberg data (population by sex and 17 age groups, 31.12.2024; e.g. under 3 years: 572). But our parser held it at 0 rows because the real file layout differs from our test samples. I am fixing the parser now (review + security re-check ~1 h). Then I need 1 more job to parse the data already fetched: no new request, ~60 s, within the K1 time budget (1,052 of 1,500 s used), before today 23:59. OK? Options: \"Yes, 1 parse job\" / \"No\". Recommended: Yes.",
+  "ownerStatementsVerbatim": [
+    "User selected: Yes, 1 parse job"
+  ],
+  "approved": {
+    "k1MaxJobs": 10,
+    "additionalJobs": [
+      "structured_parse of the already-fetched representation f25ca9d224b5c7ab9646b196fee0d93d4785f806681aa1c0fbe19517a6b069f1 (source f6e0004c…) after the reviewed datencsv layout fix"
+    ],
+    "newDataRequests": 0,
+    "wallSecondsUsedBefore": 1052,
+    "k1TotalSeconds": 1500,
+    "expiresAt": "2026-10-14T21:59:59Z"
+  }
+}

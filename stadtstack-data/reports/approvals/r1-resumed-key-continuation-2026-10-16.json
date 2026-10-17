@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+  "id": "r1-resumed-key-continuation-2026-10-16",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-16T16:24:42Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "autonomyApproval": {
+    "id": "r1-autonomy-and-release-2026-10-14",
+    "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+  },
+  "holdPolicy": {
+    "id": "r1-lead-hold-resume-policy-2026-10-15",
+    "sha256": "c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"
+  },
+  "holdPolicyAmendment": {
+    "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-1",
+    "sha256": "4ef8a73624eeb33672dc41b367f4c56c7ef9dcbd9df77bff30fffc9d5648befe"
+  },
+  "expiresAt": "2026-10-18T21:59:59Z",
+  "bounds": {
+    "maxExecutionsPerJobKey": 1,
+    "maxResumesPerJobKey": 2,
+    "maxModelCallsPerDocument": 48,
+    "paidMicroUsd": 0
+  },
+  "reason": "One bounded continuation of the exact remaining original selections after processing-code changes interrupted their admitted stages. Preserve original claims, records, receipts, clocks and resume ordinals. No new acquisition or automatic authority renewal; canonical authorize, current policy, cumulative parent accounting and provider settlement/usage gates remain mandatory. Any subsequent hold follows the unchanged lifetime hold-resume policy.",
+  "sources": [
+    {
+      "source": "ratzeburg-gazette",
+      "scope": {
+        "publisherId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette",
+        "municipalityId": "ratzeburg",
+        "ags": "01053100",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "step": "residual_prepare",
+      "claim": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/resume-epoch-ledger/epochs/63d060f6e51037d4ded13b8329f00614a100d3ba9a3a11a7b969b088342ded79.json",
+        "sha256": "f9d42e16abbc893e247768910bdc736e89dd280273358a3a78546ea6cb9f03ce",
+        "epoch": "63d060f6e51037d4ded13b8329f00614a100d3ba9a3a11a7b969b088342ded79"
+      },
+      "originalStageRecord": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/5dd6e368117578bdbb2e9e2e48c30ad2638651a6/prep.resume-63d060f6e51037d4ded13b8329f00614a100d3ba9a3a11a7b969b088342ded79.stage-record.json",
+        "sha256": "46fae7676cc2003ddad3545173288ee9be6117177bbaf48057540eb8e2ee837c"
+      },
+      "originalAuthorizationId": null,
+      "jobs": [
+        {
+          "jobKey": "20699dbc30cf13e873993532561c28b86bac8b66b309ff3b39af8b7681389053",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "2e439041dc23807437d2d6bfda1c037bd4a084233032da7b0887750b3151f895",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "4ade1d9b1710e78ac4df47dbe3f572c3f4dbf097192d16ef57ecc4d58a0bfc40",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "89643bf9da1e2e761802f1f0a3135aa7b7e41b9a3abbc89f64ee2b8cd33928d7",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "979e4ded0ffed16757216b78e244f45acc7df7c4ad71f74a173c76f5d67e8de8",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "9d22a1c8d7850cb78aaf2a8cdbbdead82f29b15439edb83201cc1f7fb7ac8bf3",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "d744dcdc57aff686cd32eff936273f0261b1568dc7c1f6c1361490e8071808f6",
+          "attempt": 1,
+          "priorReceiptId": "efd24ee3-f3ae-4f37-9afa-f560c2fc4a16",
+          "priorReceiptSha256": "08d2b30a20240ba24ceab1f55efc7e30bd57c3e68ff6553aa6106a142b2dfc41",
+          "resumeOrdinal": 1
+        },
+        {
+          "jobKey": "e001e9daf9e8b82a5ac745ef822ada69dd942aee621c664c93ec585815993b1d",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "f07cbdd1c923429e55e2fb592a3817bcb54de85a395666b2d307db124a58e0b1",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        }
+      ]
+    },
+    {
+      "source": "moelln-gazette",
+      "scope": {
+        "publisherId": "moelln",
+        "sourceId": "moelln-gazette",
+        "municipalityId": "moelln",
+        "ags": "01053090",
+        "tenant": null,
+        "observationWindow": "2026-10-13"
+      },
+      "step": "residual_extract",
+      "claim": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/resume-epoch-ledger/epochs/6919709c1fc9f483292735adcbedb8076827b04d4004d81787b9517054e6b687.json",
+        "sha256": "fc67fa4f69f7ace06965cb718761fbc00cb75da9ff90d38fd235f00bad1edb59",
+        "epoch": "6919709c1fc9f483292735adcbedb8076827b04d4004d81787b9517054e6b687"
+      },
+      "originalStageRecord": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/moelln-gazette/generations/f066c347dacc2d2f95cadf7ab5dd7f1faf27f73a/extract.resume-6919709c1fc9f483292735adcbedb8076827b04d4004d81787b9517054e6b687.stage-record.json",
+        "sha256": "5d3b526c4463b8e04d746cb18390e8960a43a5ac741b33a0a5273afca536c788"
+      },
+      "originalAuthorizationId": "2bdadb46-e91d-4bfb-9428-d2b5ab133858",
+      "jobs": [
+        {
+          "jobKey": "861436603a4dedd577aeb4ce3576a5e46bd10aa79dd81e0aea0f68b4e84525c3",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "b1f8d9b1a791cd1721d7476f6d0ccf3ce3eaba2f092af608e58e21a4da375414",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "d79d725f680f76eb0586d5d7ede92ff207f5a032fe00a07e957d915d71b76a33",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        },
+        {
+          "jobKey": "e1c3823aab5d5b8f5e2cdc3494695cafbfca3a8c4abfb4c68bdbcb40903592f8",
+          "attempt": 0,
+          "priorReceiptId": null,
+          "priorReceiptSha256": null,
+          "resumeOrdinal": 0
+        }
+      ]
+    }
+  ]
+}

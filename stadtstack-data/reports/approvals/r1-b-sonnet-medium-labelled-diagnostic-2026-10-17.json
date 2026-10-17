@@ -1,0 +1,53 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-medium-labelled-diagnostic-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-nine-town-models-2026-10-13 (#81) and r1-b-model-sonnet-2026-10-17 (#88) and the owner escalation statement; not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T14:35:26Z",
+ "fromProposal": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-b-escalation-diagnostic/authority.proposal.json",
+  "sha256": "56738db5aacfb4077ac17d1500b51c0dda16effaeb18bc1e8ec77378766e8b5f"
+ },
+ "ownerEscalationStatement": {
+  "id": "r1-owner-escalation-latitude-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-owner-escalation-latitude-2026-10-17.json",
+  "sha256": "57b65f432bacc055899f9d7c995202f9fcabb2f10d22c9921f464401bb6d7081"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "thinking": "medium",
+   "streamVersion": "omp-native-stream-v2",
+   "itemsSha256": "02014d405ed728b162931f2a1413423875f2cec2f1d95812e5a691bbfd9d1b08",
+   "maxModelCalls": 24,
+   "maxNewCallsPerItem": 1,
+   "expiresAt": "2026-10-17T20:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true
+  }
+ },
+ "executionRequirements": [
+  "No calls until window13 completes and Main explicitly gives GO; issue this draft as a genuine lead authority before execution.",
+  "BrokerReview must approve the native stream extension; freeze the exact candidate commit, image, entrypoint, runner/output/control/schema/harness hashes and unchanged queue0f8f before the first call.",
+  "Twenty fixed cases: fourteen source-adjudicated labels (eleven expected support, two expected hold, one ambiguous) plus six earlier leading-prose failures. Evaluation labels/reasons must never be sent to the provider.",
+  "At most one new invocation per selected item; the four unallocated calls are not retries and require a separate frozen selection amendment before use. No Opus arm or fresh thinking-off baseline.",
+  "Use the existing exclusive B-stage flock, verify zero leased B jobs and zero live omp-b containers, run serially with a twenty-minute lock-hold cap, and release immediately after cleanup.",
+  "Keep exact raw provider streams including thinking only in transient private diagnostic memory; retain closed counters and hashes only. The proposed production path retains raw streams in private managed source-bound CAS under existing custody semantics; thinking never enters assessment answers, receipts or notifications.",
+  "Only one final text block, after any permitted thinking blocks, enters the unchanged JSON/schema/checker. No code fence, prose extraction, model fallback or decoder relaxation; historical stream/rejection versions remain immutable and explicitly dispatched.",
+  "Stop on any usage limit, policy/custody failure, execution error or unconfirmed cleanup; no production admission/DB/CAS/installed-review modification."
+ ],
+ "startCondition": "No call before the lead's explicit GO after window 13 completes.",
+ "reason": "Determine whether medium adaptive thinking corrects eleven AI source-adjudicated over-conservative holds without supporting two genuine source gaps; measure invalid JSON/leading prose, final token counters and time. The ambiguous item is reported separately, and format/execution failures never count as correct substantive holds.",
+ "evidence": "BHoldAnalysis independent source adjudication of the 14 accepted-JSON B holds (11 Sonnet over-conservative, 2 genuine gaps, 1 ambiguous); control-only diagnostic f6a8976e left supported 0/12.",
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ }
+}

@@ -1,0 +1,73 @@
+{
+  "contractVersion": "energy-atlas-native-v1",
+  "familyRank": 10,
+  "codeOnly": true,
+  "collectionAuthorized": false,
+  "capabilityReceipt": {
+    "metadataInspectedAt": "2026-10-11",
+    "fixtureExecution": "not_run",
+    "liveFeatureCollection": "not_run",
+    "operationalSourceCount": 0,
+    "basis": "Catalog/CSV plus bounded primary GetCapabilities, DescribeFeatureType and MV layerdef metadata inspection; no feature acquisition or provider calls."
+  },
+  "pilotAgs": ["12064472", "12064227", "12064428", "01053100", "01053090", "01053116", "13076090", "13076108", "13076060"],
+  "coverage": {
+    "12064472": "held_origin", "12064227": "held_origin", "12064428": "held_origin",
+    "01053100": "not_checked", "01053090": "not_checked", "01053116": "not_checked",
+    "13076090": "held_origin", "13076108": "held_origin", "13076060": "held_origin"
+  },
+  "sources": [
+    {
+      "sourceId": "bb-heat-wfs",
+      "endpoint": "https://energieportal-brandenburg.de/geoserver/waermekataster/wfs?service=WFS&request=GetCapabilities",
+      "observed": {"wfsVersion": "2.0.0", "updateSequence": "7090", "featureTypes": ["waermekataster:einzelanlagen_abwaerme_industrie", "waermekataster:einzelanlagen_abwasser", "waermekataster:potenzial_flussthermie", "waermekataster:potenzial_gemarkungen_abwaerme", "waermekataster:potenzial_gemarkungen_abwasser", "waermekataster:potenzial_gemarkungen_biomasse", "waermekataster:potenzial_gemarkungen_flussthermie", "waermekataster:potenzial_gemarkungen_seethermie", "waermekataster:potenzial_gemarkungen_windflaeche", "waermekataster:potenzial_seethermie", "waermekataster:waermekataster_einzelgebaeude"]},
+      "layers": [{
+        "nativeLayerId": "waermekataster:potenzial_gemarkungen_abwasser",
+        "schemaEvidence": "https://energieportal-brandenburg.de/geoserver/waermekataster/wfs?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=waermekataster%3Apotenzial_gemarkungen_abwasser",
+        "observedNativeTypes": {"geom": "gml:MultiSurfacePropertyType", "art": "xsd:string", "potart": "xsd:string", "waermepot": "xsd:double", "nutzungpot": "xsd:double", "einheit": "xsd:string", "datenqualitaet": "xsd:string", "quelle": "xsd:string", "gemarkung_schluessel": "xsd:string", "gemarkung_name": "xsd:string", "gemeinde_schluessel": "xsd:string", "landkreis_name": "xsd:string"},
+        "mappedFields": ["waermepot", "nutzungpot"],
+        "unit": "Source field einheit; no assumed conversion",
+        "ags": "gemeinde_schluessel, native string; eight digits required before assignment",
+        "granularity": "Gemarkung, not a municipality total",
+        "referenceVintage": "2022 from official service-description/catalog, not observation date",
+        "method": "Potential model; field quelle/datenqualitaet available but substantive model validation unverified",
+        "license": {"state": "unknown", "admission": "held_origin"},
+        "featuresAndGeoJsonRepresentation": "unverified"
+      }],
+      "otherLayers": "Advertised DescribeFeatureType discovery only; no invented semantic mappings. Building-stock layer remains excluded from default mapped layers and requires separate municipal access admission."
+    },
+    {
+      "sourceId": "bb-energy-wfs",
+      "endpoint": "https://energieportal-brandenburg.de/geoserver/energieerzeugung/wfs?request=GetCapabilities&service=WFS",
+      "observed": {"wfsVersion": "2.0.0", "updateSequence": "7090"},
+      "layers": [{
+        "nativeLayerId": "energieerzeugung:energieerzeugung_einzelanlagen_solar",
+        "schemaEvidence": "https://energieportal-brandenburg.de/geoserver/energieerzeugung/wfs?service=WFS&version=2.0.0&request=DescribeFeatureType&typeNames=energieerzeugung%3Aenergieerzeugung_einzelanlagen_solar",
+        "observedMappedTypes": {"berichtsjahr": "xsd:int", "mastr_nr_der_einheit": "xsd:string", "bruttoleistung_der_einheit_kw": "xsd:decimal", "nettonennleistung_der_einheit_kw": "xsd:decimal", "gemeindeschluessel": "xsd:string", "geom": "gml:PointPropertyType"},
+        "unit": "kW, native capacity field names",
+        "granularity": "Plant, generally >=30kW per catalog service description; incomplete rooftop inventory",
+        "referenceVintage": "Native berichtsjahr retained separately; not the retrieval year",
+        "operator": "No operator relationship emitted; MaStR is the operator identity spine",
+        "license": {"state": "unknown", "admission": "held_origin"},
+        "featuresAndGeoJsonRepresentation": "unverified"
+      }]
+    },
+    {
+      "sourceId": "mv-energy-atlas",
+      "endpoint": "https://energieatlas-mv.de/layerdef.json",
+      "observed": "Native overlays array, GeoJSON type, params selector, infoAttribute, classItem, layerAttributes, actuality/actualityCircle and abstracts inspected",
+      "export": {"url": "https://energieatlas-mv.de/fis/index.php", "method": "POST (client-configured request, not documented public API)", "params": {"gast": 7, "go": "Daten_Export_Exportieren", "Stelle_ID": 7, "export_format": "GeoJSON", "epsg": 4326, "all": 1, "browserwidth": 800, "browserheight": 600}, "requestExecution": "not_run"},
+      "layers": [
+        {"nativeLayerId": "126", "label": "Windenergieanlagen Onshore", "nativeIdentityField": "einheitmastrnummer", "agsField": "ags8", "capacityFields": {"bruttoleistung": "kW", "nettonennleistung": "kW"}, "geometry": "Point", "referenceVintage": "01/2026", "update": "halbjährlich", "method": "MaStR-derived inventory", "license": {"state": "unknown", "admission": "held_origin"}, "exportPropertyTypes": "unverified; provisional string IDs and numeric capacities fail closed on incompatible native exports"},
+        {"nativeLayerId": "253", "label": "Energieverbrauch für Wärme 2023 [MWh]", "nativeIdentityField": "ags", "agsField": "ags", "classItem": "ags", "nativeFields": ["ags", "gemeindename", "summe_mwh", "geom"], "mappedField": "summe_mwh", "unit": "MWh", "geometry": "Polygon", "referenceVintage": "12/2023", "update": "jährlich", "method": "Heating/warm-water energy consumption based on INFAS 360 GmbH survey data", "granularity": "Municipality", "license": {"state": "unknown", "admission": "held_origin", "thirdPartyOrigin": "Alta4/INFAS360; official hosting does not establish rights"}, "exportPropertyTypes": "unverified; provisional string AGS and numeric summe_mwh fail closed on incompatible exports"}
+      ],
+      "smallPlantCaveat": "Catalog notes <=30kW plants may be aggregated at municipality centres: such points are not precise asset locations; those layers have no default mapping."
+    },
+    {"sourceId": "sh-heat-atlas", "endpoint": "https://danord.gdi-sh.de/viewer/resources/apps/Waerme/index.html?lang=de", "observed": "Catalog-backed HTML/JS viewer and 18 July 2025 announcement only", "structuredEndpoint": null, "coverage": "not_checked", "license": {"state": "unknown"}, "granularity": "Baublock / 100m raster / heat-line density per catalog; not a verified feature feed"}
+  ],
+  "parserContract": {"format": "Native GeoJSON FeatureCollection, finite scalar properties, source feature IDs, native geometries", "maxBytes": 8000000, "maxFeatures": 10000, "crs": "EPSG:4326; unsupported CRS extensions held", "evidence": "Source SHA256, native feature ID, original JSON property path/value, geometry JSON and mapped schema hash", "scope": "Explicit native eight-digit AGS only, leading zeroes preserved; geometry alone never assigns a municipality", "schema": "Reviewed mapped keys/type constraints; extra unmapped scalar properties do not become claims; nullable values remain null", "rights": "Layer-specific admitted receipt must match the snapshot policy receipt; defaults all held", "pagination": "Native next links reported, no hidden requests or completeness claim", "withdrawal": "Only explicit native status is attributed; no tombstone from absence"},
+  "fixtures": {"basis": "Handwritten bounded native-format fixtures, not observed production coverage", "cases": ["positive", "empty", "paginated", "schema-change", "withdrawn-native-status", "unknown-rights-blocked", "SH-viewer-only", "wrong-state", "hash-mismatch", "external-XML-entity", "cross-origin-next", "numeric-AGS"]},
+  "requestSelectorBinding": {"source": "AdmittedSnapshot.request.method/body/contentType preserved from authenticated acquisition representation", "mv": "Exact native application/x-www-form-urlencoded POST selected_layer_id; no URL mutation. Missing selector holds origin; duplicate/conflicting/unsupported selector encoding holds quality.", "legacyGet": "Original WFS typeNames/typeName query supported when request metadata omitted"},
+  "nonClaims": ["No heat-plan adoption", "No network/supply-area designation", "No connection commitment", "No inferred operator", "No measured project impact", "No complete source coverage", "No paid API access"],
+  "changelog": [{"date": "2026-10-11", "change": "Added native discovery/GeoJSON adapter with BB inspected schema mappings, MV observed config mappings and honest per-layer rights holds; SH remains viewer-only. Native MV form POST selectors bind through shared snapshot.request with no URL mutation. No tests or collection executed."}]
+}

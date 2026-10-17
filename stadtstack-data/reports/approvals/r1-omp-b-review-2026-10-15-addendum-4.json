@@ -1,0 +1,40 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15-addendum-4",
+ "amends": {"id": "r1-omp-b-review-2026-10-15", "path": "stadtstack-data/reports/approvals/r1-omp-b-review-2026-10-15.json"},
+ "follows": "r1-omp-b-review-2026-10-15-addendum-3",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81) and owner Sonnet decision r1-b-model-sonnet-2026-10-17 (#88); not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T13:20:00Z",
+ "reissues": [
+  {
+   "codeCommit": "7a7ec61ee153aabc05dc541907a4794914ca4532",
+   "window": "window 11",
+   "installedReviewSha256": "aa7b0307ffbbedd4acce529801b5ef63179e9edcf1eef6122f5ea0705b8dd105",
+   "runnerContractSha256": "8386fdba3f0e315ed59a9c451fcdc9644a9b0a3c221a7d40e45631e907653cfe",
+   "imageId": "sha256:4a98a78e7965cd1867863ed896e3d6b7859e490d8678183e2805c44afbbf75be",
+   "reviewedAt": "2026-10-17T06:01:43Z",
+   "change": "Native Sonnet lane B (receipt v2) on image 4a98a78e (FROM e61fc252, entry.sh model-entry translation only), broker renewable lease, hybrid provider encoding (v2 up to 22,000 B, compact v3 above), per-item holds",
+   "retainedCopy": "/home/max/.local/state/stadtstack-data/r1-window11/main-inputs/omp-b-review.json",
+   "planBinding": "/home/max/.local/state/stadtstack-data/r1-window11/operation-7a7ec61ee153aabc05dc541907a4794914ca4532/plan.json runtimeReviews.omp.sha256 and contracts.ompRunnerContract"
+  },
+  {
+   "codeCommit": "355691be56a5fcc5a76d4993955ba089bde4a494",
+   "window": "window 12",
+   "installedReviewSha256": "91fecdd8d7189f93f0c06c55db25e562c5013906c157deb57f3d6e6567bd6029",
+   "runnerContractSha256": "c49f84f0386f91ed73398b26fd15d57a17ed33847a4311a1a122c179b2374e99",
+   "imageId": "sha256:4a98a78e7965cd1867863ed896e3d6b7859e490d8678183e2805c44afbbf75be",
+   "reviewedAt": "2026-10-17T10:43:03Z",
+   "change": "A/C encoding note, B-only no-prose control line (4ab8320), inventory lock-race fixes (3d16c80, 864c762)",
+   "retainedCopy": "/home/max/.local/state/stadtstack-data/r1-window12/main-inputs/omp-b-review.json",
+   "planBinding": "/home/max/.local/state/stadtstack-data/r1-window12/r5/operation-355691be56a5fcc5a76d4993955ba089bde4a494/plan.json runtimeReviews.omp.sha256 and contracts.ompRunnerContract"
+  }
+ ],
+ "imageChange": "Addendum-3 recorded imageId sha256:e61fc252… as unchanged. From the window-11 reissue on, imageId is sha256:4a98a78e… (built FROM e61fc252, only entry.sh changed, for the Sonnet decision #88); ompBinarySha256, hostResolverBinarySha256/hostResolverVersion (omp/18.10.4), dockerDaemonId and dockerSocket remain as in addendum-3.",
+ "gap": "No retained copy exists for any installed-review reissue between 05d82c3 (addendum-3) and 7a7ec61; none is restated here.",
+ "installedReview": {
+  "path": "/etc/stadtstack/omp-b-review.json",
+  "owner": "root:root 0644",
+  "installMethod": "sudo -n install -o root -g root -m 0644",
+  "currentSha256AtIssue": "91fecdd8d7189f93f0c06c55db25e562c5013906c157deb57f3d6e6567bd6029"
+ }
+}

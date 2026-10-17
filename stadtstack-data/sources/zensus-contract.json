@@ -1,0 +1,58 @@
+{
+  "sourceId": "zensus2022-municipal-baseline",
+  "familyRank": 3,
+  "contractVersion": "zensus-native-v3",
+  "module": "src/adapters/zensus.ts",
+  "exports": ["createZensusAdapter", "zensusAdapter", "discover", "parse", "ZENSUS_REFERENCE_DATE", "ZENSUS_PILOT_AGS", "ZENSUS_SH_TITLES"],
+  "referenceDate": "2022-05-15",
+  "referenceDateRole": "census_reference",
+  "rights": {"state": "held_origin", "licence": null, "reason": "Free download is not distribution-specific reuse permission. Explicit URL/policy-receipt/licence/boundary-vintage admission required before parsing.", "liveCollectionAuthorized": false},
+  "capabilityReceipt": {
+    "basis": "Bounded primary-source schema research through reader-converted official XLSX and HTML; no corpus collection, provider calls, ingestion or execution verification.",
+    "observed": ["SH Gemeinden population 1.1.2, housing use 3.6.2 and energy carrier 3.5.2 headers and original Ratzeburg rows", "BB Demografie, Gebäude and Wohnungen matrix headers with census-date ARS and municipality/district level discriminator", "MV Hagenow Deckblatt ARS and tab_01_02 population-by-age/sex original table"],
+    "implemented": ["Offline bounded HTML distribution discovery with byte-bound pagination", "Shared bounded native OOXML decoding without network/subprocesses", "SH population, housing usage and heating-energy distributions", "BB demographic counts, building/dwelling totals, heating type, heating energy and housing usage counts", "MV population age/sex counts and original sex-specific percentages"],
+    "unverified": ["Original workbook execution through shared parser", "Per-distribution rights", "Current correction/version history", "Complete census characteristic coverage", "Ludwigslust/Parchim workbook schema equivalence to observed Hagenow", "MV housing/heating municipal distribution route; observed Gemeindeblätter are population-only", "National client-rendered database exports/API; no API path invented"],
+    "operational": false,
+    "verificationRun": false
+  },
+  "coverage": [
+    {"ags": "12064472", "state": "held_origin", "nativeMapping": "BB matrix; twelve-digit ARS first five plus last three, only Gemeinde/Stadt rows", "geography": "administrative_area"},
+    {"ags": "12064227", "state": "held_origin", "nativeMapping": "BB matrix; twelve-digit ARS first five plus last three, only Gemeinde/Stadt rows", "geography": "administrative_area"},
+    {"ags": "12064428", "state": "held_origin", "nativeMapping": "BB matrix; twelve-digit ARS first five plus last three, only Gemeinde/Stadt rows", "geography": "administrative_area"},
+    {"ags": "01053100", "state": "held_origin", "nativeArs": "010530100100", "observedRawNumericArs": "10530100100"},
+    {"ags": "01053090", "state": "held_origin", "nativeArs": "010530090090", "observedRawNumericArs": "10530090090"},
+    {"ags": "01053116", "state": "held_origin", "nativeArs": "010530116116", "observedRawNumericArs": "10530116116"},
+    {"ags": "13076060", "state": "held_origin", "nativeArs": "130760060060", "housingHeating": "not_checked"},
+    {"ags": "13076090", "state": "held_origin", "housingHeating": "not_checked", "schemaEquivalence": "unverified"},
+    {"ags": "13076108", "state": "held_origin", "housingHeating": "not_checked", "schemaEquivalence": "unverified"}
+  ],
+  "semantics": {
+    "units": ["persons", "buildings", "dwellings", "percent", "years"],
+    "denominators": "Original total cells travel as evidence. SH housing percentages use dwellings in buildings with residential space; heating preserves separate building and dwelling totals. MV sex-specific percentage denominators use male/female totals, not overall population.",
+    "percentageRepresentation": "Shared nativePercentValue applies exact x100 display scaling only to numeric source cells with an active OOXML percentage number-format section. General numerics, inline strings, quoted/escaped percent signs and disclosure markers remain unscaled. No <=1 heuristic or header-based scale inference. Original raw lexeme and original number-format metadata are separately evidenced.",
+    "evidenceRoles": "Primary evidence contains the original value cell only. ARS locators use municipality_join supporting evidence. Titles, denominator/header cells and actual OOXML number-format style paths use source_metadata supporting evidence. Style locators carry sheet:null,rowKey:null,cells:[] and the shared style mapping version.",
+    "numericFormatCompatibility": "Both SH numeric dimensions and BB/MV emission reject native date-typed cells, date-style serials and date-number-format metadata for all census numeric units; non-percent counts/years additionally reject percent-styled cells. Contradictions produce held_quality with zero observations, never relabeled counts/rates. Accepted count and rate cells preserve original raw value and all available number-format source_metadata locators.",
+    "confidentiality": "Cell-Key perturbation and source disclosure/quality markers retained verbatim. Parenthesized values and dash/slash/dot/blank markers are null, never coerced to zero or reconstructed. Percentages are not recomputed and totals are not forcibly reconciled.",
+    "populationTotals": "SH Insgesamt nachrichtlich and Insgesamta are separate source roles; source note reports incomplete processing in 163 municipalities nationally, without assuming any pilot affected.",
+    "heating": "Solar-/Geothermie, Wärmepumpen remains a grouped category, not a heat-pump-only count. Fernwärme is census-reported energy context, not operator, adoption or present supply evidence.",
+    "geography": "Native ARS remains exact raw cell evidence; AGS strings preserve leading zeros; district/state/grid values are not disaggregated.",
+    "withdrawal": "Missing links in a landing snapshot are not a tombstone. Discovery returns not_checked, never municipal empty or withdrawn claims.",
+    "notEvidenceOf": ["current occupancy", "current vacancy", "heat-plan adoption", "municipal heat supply promises", "project completion", "measured project impact"]
+  },
+  "fixtures": {"path": "test/zensus-adapter.test.ts", "cases": ["SH native population", "SH native housing positive/empty", "SH native energy carriers", "confidentiality markers", "changed schema/reference date", "withdrawn-looking incomplete landing without tombstone", "blocked access", "unknown-rights hold before decoding", "byte-bound discovery pagination", "BB native matrix shape with explicitly synthetic bounded numbers", "MV native population subset and Deckblatt ARS", "cross-state and byte-tamper rejection", "numeric OOXML percent scaling with original styles and lexemes", "above-one styled percent vs small general numeric vs literal quoted percent"], "status": "written_not_run", "fixtureBasis": "In-memory original-format OOXML subsets. SH/MV selected published values transcribed from reader research; BB and number-format structural fixture values intentionally synthetic, not municipal facts."},
+  "numericFormatRegressionFixtures": ["SH percent-style dwelling count", "SH date-style count", "SH date-style rate", "SH native ISO date count", "BB percent/date-style building count", "MV percent/date-style population count", "MV date-style rate", "MV native ISO date rate", "accepted general count raw/style evidence"],
+  "primaryReferences": [
+    "https://www.statistik-nord.de/zahlen-fakten/zensus/ergebnisse-zensus-2022/ergebnisse-fuer-schleswig-holstein",
+    "https://www.statistik-nord.de/fileadmin/Dokumente/Tabellen%2C_Tabellenb%C3%A4nde%2C_Brosch%C3%BCren/Zensus_2022/Schleswig-Holstein/Bev%C3%B6lkerung/Zensus2022_Bev%C3%B6lkerung_1.1_SH.xlsx",
+    "https://www.statistik-nord.de/fileadmin/Dokumente/Tabellen%2C_Tabellenb%C3%A4nde%2C_Brosch%C3%BCren/Zensus_2022/Schleswig-Holstein/Geb%C3%A4ude_und_Wohnungen/Zensus2022_GWZ_3.6_SH.xlsx",
+    "https://www.statistik-nord.de/fileadmin/Dokumente/Tabellen%2C_Tabellenb%C3%A4nde%2C_Brosch%C3%BCren/Zensus_2022/Schleswig-Holstein/Geb%C3%A4ude_und_Wohnungen/Zensus2022_GWZ_3.5_SH.xlsx",
+    "https://www.statistik-berlin-brandenburg.de/bevoelkerung/zensus/zensus2022",
+    "https://download.statistik-berlin-brandenburg.de/94ac67cbc06c2f2a/c4e20c8f78b5/Zensus2022_Basistabelle_Demografie_Brandenburg.xlsx",
+    "https://download.statistik-berlin-brandenburg.de/c49aec6b31f78518/4ccd2e04ec69/Zensus2022_Basistabelle_Gebaeude_Wohnungen_Brandenburg.xlsx",
+    "https://www.laiv-mv.de/Statistik/Zensus/Ergebnisse/",
+    "https://www.laiv-mv.de/static/LAIV/Statistik/Zensus/Dateien/Dokumente/Sonstiges/Gemeindebl%C3%A4tter/13076/Hagenow%2c%20Stadt.xlsx",
+    "https://www.destatis.de/DE/Themen/Gesellschaft-Umwelt/Bevoelkerung/Zensus2022/Methoden/geheimhaltung.html",
+    "https://ergebnisse.zensus2022.de/datenbank/online/statistic/1000A/table/1000A-0001"
+  ],
+  "changelog": [{"date": "2026-10-11", "change": "Added offline native census distribution adapter, typed cell evidence, nine-pilot rights-held coverage and bounded original-format fixtures. Preserved native OOXML percentage display semantics without guessing numeric scale. v3 rejects native date/count/rate and percentage/count style contradictions in SH and BB/MV conversion, retaining raw/style metadata for admitted numeric cells. No current/outcome interpretation or live collection."}]
+}

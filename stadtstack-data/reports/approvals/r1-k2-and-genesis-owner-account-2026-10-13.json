@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+  "related": [
+    {"id": "r1-first-live-batch-2026-10-12", "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-1", "sha256": "d49596ccea79f07ac420966d842c914589809a08c4406c19374a4d88af8b28dc"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-2", "sha256": "3a48409d4a11dc9c671b4ddfa78787ed6253d1f703d71f064e22148c9ead453d"}
+  ],
+  "recordedAt": "2026-10-13T10:30:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, answering two numbered questions (mirrors Vikunja task 79)",
+  "questionsAsked": [
+    "1. Policy: \"Yes, the pipeline may use my account for regionalstatistik.de only.\" Your earlier rules stay: facts with source attribution, no republishing whole tables.",
+    "2. K2 (#79): A, B or C. I recommend C: run the PEGELONLINE station list now as the first real live batch, then retry K1 (Strausberg, GENESIS) with your account once the code is reviewed. That retry needs one new data request; K1's single approved request has already been used."
+  ],
+  "ownerStatementsVerbatim": [
+    "Ok I created an account at regionalstatistik. How do I create an api key or is the access with the name and password the login for you?",
+    "Ok saved the credentials",
+    "1. yes 2. C"
+  ],
+  "approved": {
+    "k2": {
+      "source": "pegelonline (WSV PEGELONLINE REST API v2, station inventory)",
+      "request": "Exactly one GET https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json (plus the unauthenticated robots.txt/TDMRep policy requests the fetcher makes)",
+      "registryRoute": "pegelonline for hagenow (AGS 13076060), registry commit 96e34c49891d9be3762b5ae181df7c0a32682cc1, registry sha256 e471ba1fecc2be15f81e109dc8eb82360d85cebaa1a54ef1f3da3b1427399134",
+      "licenceAsDeclared": "dl-de/zero-2-0 (catalog/contract declaration; no licence-terms bytes verified)",
+      "permissionKind": "facts_with_attribution",
+      "mode": "bounded_unattended",
+      "maxJobs": 5,
+      "totalMaxElapsedMs": 1500000,
+      "expiresAt": "2026-10-16T21:59:59Z",
+      "category": "production",
+      "note": "Source/structure coverage only; a station inventory is not municipal coverage and answers none of the 30 value questions."
+    },
+    "genesisOwnerAccount": {
+      "policyDecision": "The pipeline may use the owner's own registered regionalstatistik.de account for www.regionalstatistik.de only (GENESIS REST data/table and tablefile). This is not a login bypass. Facts with source attribution only; no republication of whole tables or datasets.",
+      "credentials": "Owner-created file /home/max/.config/stadtstack/regionalstatistik/credentials.json (owner max, 0600, parent 0700); values never read into logs, chat, parser, CAS, receipts, observations or notifications.",
+      "k1Retry": "One new data/table POST for the originally approved K1 scope (table 12411-02-03, year 2024, Strausberg AGS 12064472), bounded_unattended, within the K1 limits (at most 5 jobs including the one already used, 25 min total), only after the owner-account code is reviewed and the full gate passes.",
+      "k1RetryExpiresAt": "2026-10-14T21:59:59Z",
+      "interpretation": "\"1. yes\" answers question 1 (policy decision as worded); \"2. C\" approves K2 now and the account-based K1 retry later. The K1 retry keeps the original K1 expiry; a later retry needs a new owner approval."
+    }
+  },
+  "notApproved": [
+    "Using the account on any other host or for any other route than regionalstatistik.de GENESIS data/table and tablefile",
+    "Any other source, the nine-town crawl, or model runs",
+    "Paid API execution or overage spending"
+  ]
+}

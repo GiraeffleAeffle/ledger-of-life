@@ -1,0 +1,104 @@
+{
+  "contractVersion": "district-structured-v1",
+  "mappingVersion": "gtfs-static-native-v1",
+  "familyRank": 4,
+  "wave": "C",
+  "module": "src/adapters/gtfs.ts",
+  "capabilityReceipt": {
+    "basis": "Approved plan and inspected source-catalog/CSV; code-authored native ZIP/CSV fixtures only",
+    "liveCollection": "not_run",
+    "livePayloadParsing": "unverified",
+    "fixtureExecution": "not_run",
+    "operationalCoverage": "not_established",
+    "noPaidApis": true,
+    "noHiddenNetwork": true,
+    "admission": "AdmittedSnapshot must carry the shared acquisition policy receipt for these exact bytes. Hash presence is not a second rights engine or permission to collect. Unknown rights stay held upstream; DELFI remains registration-held here."
+  },
+  "sources": [
+    {
+      "sourceId": "mobility-vbb-gtfs",
+      "landing": "https://unternehmen.vbb.de/digitale-services/datensaetze/",
+      "advertisedStaticDownload": "https://unternehmen.vbb.de/gtfs",
+      "observed": ["Official landing and static URL advertised in catalog", "Distribution-specific CC BY 4.0 reported by inspected catalog", "Static refresh twice weekly reported by publisher"],
+      "unverified": ["Original live ZIP layout/schema", "Pilot stop coverage", "Feed description and native version", "Redirect/admission of actual bytes"],
+      "rights": {"catalogLicense": "CC BY 4.0", "exactBytesReceipt": "required_before_parse", "osmSpecialAttribution": "Preserve dataset landing attribution requirements; not licensed by domain alone"},
+      "scopeAgs": ["12064472", "12064227", "12064428"],
+      "coverage": "not_checked",
+      "notMapped": ["GTFS realtime", "GTFS Flex location groups/areas", "Journey-planner API", "Stop accessibility dataset dated 2021"]
+    },
+    {
+      "sourceId": "mobility-nahsh-gtfs",
+      "landing": "https://opendata.schleswig-holstein.de/dataset/fahrplandaten",
+      "advertisedStaticDownload": "https://opendata.schleswig-holstein.de/dataset/5e0652d8-7f59-42fc-92ab-a6358f800e1d/resource/ef840a6f-1cc9-4836-89a9-eb5473de1d17/download/fahrplandaten",
+      "observed": ["Official landing/HTML/JSON-LD metadata inspected in catalog", "CC BY 4.0; attribution nah.sh", "Approximately 27.2 MB resource advertised; payload not downloaded"],
+      "unverified": ["Live ZIP/schema", "Municipality completeness", "HVV/Lauenburg overlap", "Numerical publication cadence"],
+      "rights": {"catalogLicense": "CC BY 4.0", "attribution": "nah.sh", "exactBytesReceipt": "required_before_parse"},
+      "scopeAgs": ["01053100", "01053090", "01053116"],
+      "coverage": "not_checked",
+      "limitations": ["No realtime information", "A stop may represent both directions", "NAH.SH alone does not establish full Lauenburg/HVV service coverage"]
+    },
+    {
+      "sourceId": "mobility-delfi-national-gtfs",
+      "landing": "https://www.opendata-oepnv.de/ht/de/organisation/delfi/startseite?tx_vrrkit_view%5Baction%5D=details&tx_vrrkit_view%5Bcontroller%5D=View&tx_vrrkit_view%5Bdataset_name%5D=deutschlandweite-sollfahrplandaten-gtfs&cHash=af4be4c0a9de59953fb9ee2325ef818f",
+      "observed": ["Publisher national scheduled feed listing", "Registration required", "Usually Mondays, next working day on Hessen legal holiday", "Creative Commons Attribution label; version unresolved"],
+      "unverified": ["Protected download URL", "License version", "Original payload", "Regional completeness limitations in feed documentation"],
+      "rights": {"catalogLicense": "CC BY version unknown", "disposition": "held_origin"},
+      "access": "blocked_access",
+      "coverage": "blocked_access",
+      "scopeAgs": ["12064472", "12064227", "12064428", "01053100", "01053090", "01053116", "13076090", "13076108", "13076060"],
+      "releaseCondition": "Separate registration/licence-resolution decision and exact download metadata admission; current adapter intentionally does not bypass this hold"
+    },
+    {
+      "sourceId": "mobility-vmv-official-discovery",
+      "landing": "https://mvfaehrtgut.de/fahrplanauskunft/",
+      "observed": ["Official passenger planner only; direct public VMV GTFS URL and licence not established"],
+      "rights": {"catalogLicense": "unknown", "disposition": "held_origin"},
+      "coverage": "not_checked",
+      "scopeAgs": ["13076090", "13076108", "13076060"],
+      "limitations": ["Do not fabricate an EFA/GTFS bulk endpoint", "DELFI is a distinct source, never relabelled VMV", "No claim that VMV has no feed anywhere"]
+    }
+  ],
+  "nativeFormat": {
+    "input": "Original admitted GTFS ZIP with root UTF-8 comma-separated text members; stored or deflated ZIP",
+    "members": ["agency.txt", "routes.txt", "trips.txt", "stops.txt", "stop_times.txt", "calendar.txt and/or calendar_dates.txt", "optional feed_info.txt"],
+    "identity": "Publisher + source/feed namespace + native table + native ID; service IDs shared across calendar/calendar_dates within that feed. Labels and downloaded byte hashes never replace feed-native IDs. Optional single agency without agency_id is an explicitly row-located source mention, not a fabricated agency identifier.",
+    "dates": "YYYYMMDD validated and mapped to ISO date, original lexeme retained. Service validity and exception dates are distinct from retrieval/publication. GTFS HH:MM:SS is a service-day time and may exceed 24 hours; timezone remains agency_timezone, not inferred UTC.",
+    "units": "Stop coordinates in WGS84 degrees; no observed performance metric. Route and exception codes are native codes, not measurements.",
+    "schemaChange": "Missing required columns, invalid dates, broken references or ambiguous keys produce atomic held_quality. Additional columns/members are recorded as unmapped limitations, not silently promoted to facts.",
+    "withdrawal": "calendar_dates exception_type 2 removes scheduled service on the sourced date; not actual service cancellation or trip/agency deletion. Missing landing links and header-only feeds are not tombstones.",
+    "relations": ["Trip on_route Route", "Trip scheduled_on service calendar", "Trip calls_at Stop via stop_times", "Route scheduled_serves Stop through trip/stop_times native references", "Route scheduled_agency Agency", "Stop located_in Municipality only from evidenced spatial join"],
+    "evidence": "Primary evidence retains the original ZIP SHA256, member/table, source row, raw field lexeme, native key, header schema hash and mapping version; no fabricated prose/model/judge receipts. Spatial joins bind separately admitted native GeoJSON bytes and feature locator in supportingEvidence with role municipality_join; external boundary hashes never enter primary GTFS evidence. Parent admission must additionally bind the original boundary policy/CAS proofs."
+  },
+  "geographicJoin": {
+    "requiredInput": "Optional separately admitted native RFC7946 FeatureCollection; Polygon/MultiPolygon features with string properties.ags and explicit properties.boundary_vintage",
+    "method": "WGS84 point-in-polygon with holes; exactly one matching polygon, excluding edges and overlap ambiguity",
+    "scope": "Only the requested pilot AGS can be assigned; all other records remain geographically unknown",
+    "neverJoinFrom": ["Requested AGS alone", "Stop name", "Postcode", "Tariff zone", "Agency seat", "District prefix"],
+    "withoutBoundaries": "Native stops retained, AGS null/basis unknown. No town service-completeness claim.",
+    "vintage": "Explicit source boundary_vintage preserved in evidence-backed join limitations; no fabricated boundary-currentness claim"
+  },
+  "bounds": {
+    "gtfsArchiveBytes": 67108864,
+    "gtfsExpandedBytes": 268435456,
+    "gtfsMembers": 64,
+    "gtfsTotalRows": 250000,
+    "gtfsMemberBytes": 67108864,
+    "gtfsExpansionRatio": 200,
+    "csvColumns": 256,
+    "csvCellsPerMember": 4000000,
+    "maxObservations": 500000,
+    "landingAndBoundaryBytes": 2097152,
+    "boundaryVertices": 100000,
+    "discoveryPageSize": 16,
+    "sharedNativeParser": "Reuses structured-tables.ts readZip/readCsv with explicit GTFS limits above (CSV row bound includes one header). Default workbook limits remain unchanged. Oversized original feeds hold_quality atomically rather than truncate or claim complete coverage.",
+    "rejections": ["Traversal/absolute/Windows paths", "Symlinks", "Duplicate names", "CRC mismatch", "Local/central mismatch", "Overlaps", "Encryption", "ZIP64/multidisk", "Unsupported compression", "Expansion ratio limits", "Unsupported GTFS Flex stop-location mapping"],
+    "execution": "Pure in-memory parser, no network/subprocess/filesystem extraction; shared isolated parser job boundary still required by executor"
+  },
+  "fixtures": {
+    "file": "test/gtfs-adapter.test.ts",
+    "basis": "Bounded synthetic original-format ZIP/CSV/HTML/GeoJSON bytes, not recorded live payloads",
+    "cases": ["positive stored/deflated archive", "empty header-only archive", "snapshot/scope-bound paginated landing", "changed-schema/invalid-date/broken-reference", "withdrawn scheduled calendar exception", "DELFI registration hold", "MV unresolved direct feed", "password blocked", "cross-feed IDs", "leading-zero AGS geometry join", "edge/overlap/hole unresolved geometry", "traversal/symlink/CRC/duplicate/expansion rejection", "out-of-pilot not-applicable"],
+    "execution": "not_run"
+  },
+  "changelog": [{"date": "2026-10-11", "change": "Added code-only bounded native static GTFS adapter and capability/rights/coverage contract. No collection, paid calls or measured-service/impact claims."}]
+}

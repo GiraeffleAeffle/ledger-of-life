@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-first-live-batch-2026-10-12-amendment-1",
+  "amends": {
+    "id": "r1-first-live-batch-2026-10-12",
+    "path": "stadtstack-data/reports/approvals/r1-first-live-batch-2026-10-12.json",
+    "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"
+  },
+  "recordedAt": "2026-10-13T06:00:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, answering Vikunja task 78 (options A/B/C)",
+  "context": "Measured shared-inventory cost (~93 s per source-scoped sandbox; acquisition ~380 s+, structured parse ~170 s+, plus 120 s cleanup reserve per run) makes the original 600000 ms batch budget very likely insufficient.",
+  "ownerStatementsVerbatim": [
+    "Which one of A B or C do you recommend?",
+    "Why do you need me on Wednesday? Then do A and C in parallel like you suggested or not?"
+  ],
+  "interpretation": "Option A approved for K1, with the option-C inventory performance work proceeding in parallel on a separate branch (not part of the K1 code). The second statement is phrased as a question; the lead confirmed this reading back to the owner in the same chat, and the owner may withdraw it before the run.",
+  "amendedBatchAuthorization": {
+    "totalMaxElapsedMs": 1500000,
+    "authorizations": [
+      {"stage": "acquire_representation", "maxElapsedMs": 900000, "osDeadlineSeconds": 900, "executorJobBudgetSeconds": 780},
+      {"stage": "structured_parse", "maxElapsedMs": 600000, "osDeadlineSeconds": 600, "executorJobBudgetSeconds": 480}
+    ],
+    "maxJobsTotal": 5,
+    "unchanged": "mode attended with the owner present; expiresAt 2026-10-14T21:59:59Z; category production; exactly one table/year (12411-02-03, 2024) and at most one data/table POST; permission facts_with_attribution; everything listed under notApproved in the original record"
+  },
+  "notApproved": [
+    "PEGELONLINE or any other source",
+    "bounded_unattended execution for this batch",
+    "paid API execution or overage spending",
+    "merging the inventory performance change into the K1 code before its own review and sentinel re-run"
+  ]
+}

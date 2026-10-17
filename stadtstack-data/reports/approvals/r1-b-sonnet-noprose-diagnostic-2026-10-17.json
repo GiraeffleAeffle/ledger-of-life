@@ -1,0 +1,30 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-noprose-diagnostic-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-b-model-sonnet-2026-10-17 (#88) and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-17T09:32:41Z",
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-b-model-sonnet-2026-10-17.json",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "itemsSha256": "2f04c4f2a3a7057189f874d919e8eeae1172d68ba9cbef810ed1018f37242832",
+   "maxModelCalls": 3,
+   "expiresAt": "2026-10-17T20:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true
+  }
+ },
+ "reason": "Confirm that the compact-reference no-prose control line (code 4ab8320) removes the leading-prose output on the three compact items that previously failed as invalid JSON. Private diagnostics, never admissions."
+}

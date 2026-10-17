@@ -27,6 +27,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Require the sealed public candidate
+        run: |
+          if [[ ! -f stadtstack-data/release/release-manifest.json ]]; then
+            echo "::error::The committed sealed public candidate release/release-manifest.json is required."
+            exit 1
+          fi
       - name: Validate the literal release version
         id: release
         run: |

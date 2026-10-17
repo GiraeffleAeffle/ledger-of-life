@@ -1,9 +1,6 @@
-import {readFile} from 'node:fs/promises';
-import {join} from 'node:path';
-import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
-import {cacheDir,hash} from './common.ts';
-import {coreBundleSchema,verificationSchema,faithfulnessGateSchema} from './core-schema.ts';
-import type {CoreFact,CoreBundle} from './core-schema.ts';
+import {hash} from './common.ts';
+import {coreBundleSchema,verificationSchema} from './core-schema.ts';
+import type {CoreFact} from './core-schema.ts';
 import type {FeatureCollection,Signal} from './schema.ts';
 export const extractorVersion='strausberg-core-pdf-v1';
 export const lakeUrl='https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf';
@@ -13,15 +10,6 @@ export const selected=[
  {id:'lake:straussee-level-2026-09-14',topic:'water' as const,assertion:{date:'2026-09-14',value:-1.61,unit:'m' as const,reference:'Normalstau'},statement:'Am 14.09.2026 lag der Wasserstand des Straussees 1,61 m unter Normalstau (historische Messung).',url:lakeUrl,documentDate:'2026-10-05',title:'Monitoring des Wasserstandes im Straussee',locator:'PDF Seite 1, Zeile 14.09.2026; Defizit 161 cm; Normalstau 65,49 m DHHN 92'},
  ...([2025,2026] as const).map((year,i)=>({id:`budget:investment-outlays-${year}`,topic:'budget' as const,assertion:{year,value:[17941270,12609320][i],unit:'EUR' as const},statement:`Der Haushaltsplan der Stadt Strausberg setzt für ${year} geplante Auszahlungen aus Investitionstätigkeit von ${['17.941.270','12.609.320'][i]} EUR fest.`,url:budgetUrl,documentDate:'2024-11-07',title:'Haushaltssatzung 2025/2026',locator:`PDF Seite 1, § 1, Zeile Auszahlungen aus Investitionstätigkeit, Spalte ${year}`}))
 ];
-export async function pageOne(bytes:Uint8Array){
- const task=getDocument({data:new Uint8Array(bytes),useSystemFonts:true});
- try{
-  const pdf=await task.promise,page=await pdf.getPage(1),content=await page.getTextContent();
-  const items=content.items.filter(item=>'str' in item);
-  items.sort((a,b)=>Math.abs(a.transform[5]-b.transform[5])>2?b.transform[5]-a.transform[5]:a.transform[4]-b.transform[4]);
-  return items.map(item=>item.str).join(' ').replace(/\s+/g,' ').trim();
- }finally{await task.destroy();}
-}
 export function deterministic(text:string,id:string){
  const normal=text.replace(/\s+/g,' ').trim();
  if(id===selected[0].id){
@@ -50,21 +38,6 @@ export function validateCore(input:unknown,collection:FeatureCollection){
  }
  if(bundle.version!==bundleVersion(bundle.facts))throw Error('Core bundle version mismatch');
  return bundle;
-}
-export async function validateCoreBytes(bundle:CoreBundle){
- const texts=new Map<string,string>();
- for(const fact of bundle.facts){
-  let text=texts.get(fact.source.sha256);
-  if(text===undefined){
-   const bytes=new Uint8Array(await readFile(join(cacheDir,'pdf',fact.source.sha256+'.pdf')));
-   if(hash(bytes)!==fact.source.sha256)throw Error(`Source bytes changed: ${fact.id}`);
-   text=await pageOne(bytes);texts.set(fact.source.sha256,text);
-  }
-  const checks=deterministic(text,fact.id);
-  if(JSON.stringify(checks)!==JSON.stringify(fact.verification.deterministic.checks)||hash(text)!==fact.verification.faithfulness.contextHash)throw Error(`Source gate stale: ${fact.id}`);
-  const evidence=JSON.parse(await readFile(join(cacheDir,'core-evidence',fact.verification.faithfulness.evidenceHash+'.json'),'utf8'));
-  if(JSON.stringify(faithfulnessGateSchema.parse(evidence))!==JSON.stringify(faithfulnessGateSchema.parse(fact.verification.faithfulness)))throw Error(`Judge evidence missing/changed: ${fact.id}`);
- }
 }
 export function coreSignal(f:CoreFact):Signal{
  const year=f.assertion.year,date=f.assertion.date;

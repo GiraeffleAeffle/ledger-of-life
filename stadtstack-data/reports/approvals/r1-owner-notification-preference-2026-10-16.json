@@ -1,0 +1,19 @@
+{
+ "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+ "id": "r1-owner-notification-preference-2026-10-16",
+ "recordedAt": "2026-10-16T01:50:00Z",
+ "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "approver": "Max (owner)",
+ "channel": "omp chat with the R1 session",
+ "ownerStatementsVerbatim": [
+  "You don't need to send an update on ntfy for each pipeline. Just keep the important notifications",
+  "What's the status? I said you should only send important updates and not these cryptic pipeline messages"
+ ],
+ "context": "About 146 automated messages in 24 h reached the ntfy topic `pipeline`: every bounded executor run posts a startup notification (its delivered acknowledgement is required before any job claim) and a disposition notification. Lead-sent ntfy messages on 2026-10-15 were four.",
+ "interpretation": "Notifications at normal priority only for decisions, blocking failures and milestones. Routine executor start/finish messages remain technically required for the startup acknowledgement but are sent at the lowest ntfy priority (silent). The topic, approval pipeline-notification-approval-v1 and destination are unchanged.",
+ "notChanged": [
+  "Startup acknowledgement before job claims",
+  "Notification approval and destination bindings",
+  "Hold, failure and decision notifications"
+ ]
+}

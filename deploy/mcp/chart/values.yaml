@@ -1,7 +1,7 @@
-# Governed wrapper creates namespace stadtstack-mcp and the Secret before install.
-# helm upgrade --install civic-mcp deploy/mcp/chart --namespace stadtstack-mcp \
-#   --set-string releaseVersion=0.3.1 \
-#   --set-string image.digest=sha256:<owner-approved digest from image workflow>
+# Governed dispatcher provisions namespace, token Secret and exact binaryData
+# revocation ConfigMap before applying its deterministic rendering of this chart.
+# Candidate releaseVersion: 0.3.2; image.digest is the owner-approved immutable
+# digest from the image workflow. Keep the live 0.3.1 deployment until accepted.
 # Tags never replace immutable digests. Version must match package, Git and image.
 releaseVersion: ""
 image:
@@ -16,6 +16,11 @@ secretName: civic-mcp-token-hashes
 # The governed wrapper hashes the validated configuration into this revision.
 # Server loads once at startup: projected Secret updates alone do not activate it.
 tokenSecretRevision: "1"
+# SHA-256 of the signed revocation artifact bytes, not reserialized JSON.
+# Changes force the release/revocation cohort to restart together.
+revocationArtifactSha256: ""
+# Exact public trust bytes are part of the same startup cohort.
+revocationTrustSha256: ""
 web:
   resources:
     requests:

@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry3-stage-structured-parse-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T12:44:34.679Z",
+  "parentApproval": {
+    "id": "r1-k1-retry3-2026-10-14-amendment-1",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry3-2026-10-14-amendment-1.json",
+    "sha256": "e725d6f1ba75b23033ef9d91c9f2da94bf4f55dd9935029fcdf51c9511e10bd2",
+    "clause": "approved.additionalJobs[1]"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k1-retry3-2026-10-14",
+      "sha256": "55a7713242aabe6c36cc6035ecd88fec4f27b21fd353ce8011c7416d209bea1b"
+    },
+    {
+      "id": "r1-k1-retry3-stage-offline-admission-2026-10-14",
+      "sha256": "47dfeea19a14270ddc24473628e23247dbbdd866d3a794d753eee639a0d708de"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 987167f",
+    "offlineAdmission": "run bdb941c2-e930-420f-8813-dfabd1fca96b succeeded (receipt 86c9771f-2b58-4626-a03a-2c281d8f06dc), representation fcf4884a89dd93bdee69b910b6f12f0af51a87f5a3b94f54c4ba5ecea91ca280, policy receipt 9f3f5ec3…",
+    "parserAuthorization": "image sha256:86620bfe…, contract 2fe659e6…; sentinels green"
+  },
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "genesis",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-987167f/operator-registry-config.json",
+      "sha256": "2312148973d9aafaa24c32ca3bca8a728020f4319586ee57592dec235da1ca14"
+    },
+    "jobKeys": [
+      "d5263bc54ade20781ac2386862bdf36b0b4df5b464dde93debb62b5f86c9596d"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 480000,
+    "osDeadlineSeconds": 600,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 0
+  },
+  "cumulativeWithinK1": {
+    "wallSecondsUsedBefore": 715,
+    "note": "666 s + 49 s offline admission run bdb941c2",
+    "jobsIncludingThis": 6,
+    "k1MaxJobs": 6,
+    "wallSecondsBoundIncludingThis": 1315,
+    "k1TotalSeconds": 1500
+  }
+}

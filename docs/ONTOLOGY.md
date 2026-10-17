@@ -34,7 +34,7 @@ Operation includes a durable sponsor reservation ledger: account rolling/global 
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
 | 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
-| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence |
+| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment |
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
 Financial custody still depends on identity, home and signed operations. The civic lens reuses the city Context and CitySignal rather than introducing a separate atlas or portfolio.
@@ -135,6 +135,80 @@ benefit indicators. Places opens the exact Münster case without altering chosen
 everyone can find the clearly dated historical example there.
 
 **Relation evidence.** Solid means evidence-backed observation/report with its original status; proposed links identify a plan and do not inherit delivered status. Dashed means a modeled causal assumption in a fictional **Scenario**. Its allocation conserves capital as wages + local suppliers + external purchases + reserve; wages divided by assumed cost per job-year yields job-years, not permanent hires. Municipal receipts, transfers and service costs are editable *independent* assumptions; no investment→tax conversion, permanent employment, municipal retention of all tax, housing growth or causal improvement is inferred. Switching to observed hides this loop. Neither simulation nor public signals enter the personal Position/net-worth model.
+
+**Civic assessment (source projection v2).** A governed private item separates actual
+source propositions from deterministically authenticated bookkeeping and explicit
+unset qualifications. A generated `source_document:<hash>`, scoped entity ID or
+record hash is not a municipal statement requiring a quotation. The complete
+private record and its hash remain lossless, but earlier model judgments stay
+outside blind A/B requests. Null dates, empty statuses, `unknown` stages and
+`precision:none` on unlocated geometry remain explicitly unset, not false source
+assertions, observations of zero, or grounds for inventing dates. Printed identifiers, positive case/type classifications,
+actual dates/statuses, entities and relations still require source evidence;
+unresolved classifications remain held. `caseQuote` grounds printed case
+identifiers/classifications, `stageQuote` grounds original status and stage, and
+date-role quotations remain distinct.
+Relation subject/object direction and modality remain source-assessed roles, with
+explicit endpoint labels. Local mention labels are context, not literal source
+quotations; only mechanical global IDs/identity derivations are graph bindings.
+The checker requires the matching typed subject/object/modality assertion even
+for noncritical relations, never just the names' co-occurrence.
+The frozen assessment wire uses a coarser modality vocabulary, explicitly encoded
+per relation: asserted/decided/implemented → `confirmed`, planned/proposed →
+`planned`; conditional, negated and historical retain their names. These are
+serialization categories: the original source modality remains unchanged and
+assessed, `confirmed` is not independent verification, and encoding cannot
+promote a proposed relation's graph/comparison eligibility.
+
+Blind A/B choose their shared provider representation **before inference** by
+canonical UTF-8 byte count: full source-proposition provider v2 at or below
+22,000 bytes; otherwise lossless compact provider v3 if it fits; otherwise an
+explicit pre-call context hold. This changes serialization, not the proposition
+set, quotation windows, source roles or eligibility. C inherits the recorded
+encoding and exact blind request hash, adding genuine reviews under its separate
+36,000-byte cap. New receipts bind `providerEncodingVersion` and request SHA-256;
+immutable older receipts without that field dispatch by their recorded request
+hash, never by today's default. Historical bytes are not rewritten or reusable
+as approval of a changed item/contract.
+
+**Known output-form limitation:** the authorized six-arm Sonnet comparison on
+17 October 2026 observed leading prose/non-JSON material before the object in all
+three compact-v3 outputs; the three full-v2 outputs decoded, including two
+supported judgments and one insufficient-evidence abstention. This small
+diagnostic is not a universal failure-rate estimate. Compact-only items remain
+at risk of an honest output-quality hold. No embedded-object salvage, decoder
+relaxation, output-dependent encoding switch, provider retry or model fallback
+is authorized by the hybrid selector.
+
+The B control explicitly requires silent compact-reference resolution and a
+single JSON object with no surrounding analysis, prose or fence. This is an
+output-encoding instruction, not a guarantee of model compliance or permission
+to salvage embedded JSON. A/C likewise encode the unchanged checker rules:
+full-day dates only (partial precision remains quoted with a null date), paired
+value/unit nullability without invented units, explicit null for absent review
+targets, zero usefulness for non-supported outcomes, and the exact frozen
+top-level keys. Neither these instructions nor historical role-specific prompt
+hash dispatch changes a source-bound verdict, rubric or deterministic check.
+
+Non-quantitative text propositions use assertion `value:null` and `unit:null`;
+their proposed wording is the claim payload, not a measurement. Typed critical
+quantities retain genuine source-attested value/unit and financial-role checks.
+Supported admission covers every real proposition, including those on a critical
+record, plus its critical claims. Changed items require fresh A/B/C receipts,
+without resetting lifetime call caps; historical v1 items/receipts remain history,
+not transferable approval of v2. Value-test answers assess their actual answers
+and cited evidence, never every metadata/null field in an MCP response.
+Read-only seal/export reconstruction rebuilds the exact persisted v1 or v2
+target and requires canonical equality plus committed preparation ancestry.
+New preparation cannot request the historical encoding.
+
+This implements the frozen rebuild plan's original-evidence and typed-role intent
+([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)
+and [§6](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#6-phases-effort-and-acceptance-gates)), not a relaxed output schema, score target or majority override.
+AI reconciliation remains provisional; owner exceptions/rights and sampled audit
+are separate. The v2 artifacts are implementation/prototype work, not evidence of
+a deployed or independently validated release.
+
 
 ## Money flow of one tenancy
 
