@@ -65,7 +65,7 @@ test('lock-free audit reads a stable epoch without acquiring an existing invento
  const before=await readFile(join(stateDir,'inventory.json')),members=await readdir(stateDir),audit=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));
  assert.equal((await audit.read(join(root,entry.relativePath),entry.contentSha256)).toString(),'Synthetic read-only audit');await audit.finish();
  assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);assert.deepEqual(await readdir(stateDir),members);assert.equal(await readFile(lock,'utf8'),'Synthetic deliberately held lock');
- await assert.rejects(audit.read(join(root,entry.relativePath)),/AUDIT_FINISHED/);
+ await assert.rejects(audit.read(join(root,entry.relativePath)),{code:'CIVIC_POLICY_AUDIT_FINISHED'});
 });
 
 test('lock-free audit rejects publication, same-byte inode replacement and objection epoch changes',async t=>{
@@ -75,7 +75,7 @@ test('lock-free audit rejects publication, same-byte inode replacement and objec
  await publish(root,rawEntry('Second synthetic member'),'Second synthetic member',stateDir);await assert.rejects(first.finish(),CivicPolicyStateError);
  const second=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));await second.read(path);
  const inventoryPath=join(stateDir,'inventory.json'),replacement=join(stateDir,'audit-epoch-replacement.json');await writeFile(replacement,await readFile(inventoryPath),{mode:0o600});await rename(replacement,inventoryPath);
- await assert.rejects(second.finish(),/AUDIT_EPOCH_CHANGED/);
+ await assert.rejects(second.finish(),{code:'CIVIC_POLICY_AUDIT_EPOCH_CHANGED'});
  const third=await createReadOnlyManagedSourceAudit(fixturePolicy(stateDir));await third.read(path);
  await recordHostOptOut({host:'council.test',reason:'municipality_objection'},fixturePolicy(stateDir));await assert.rejects(third.finish(),CivicPolicyStateError);
 });

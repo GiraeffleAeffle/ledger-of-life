@@ -38,7 +38,8 @@ const queueSchema=z.object({stepReceipts:z.array(z.object({spec:z.unknown(),rece
 interface AuditStep {spec:DistrictJobSpec;receipt:StepReceipt;sha256:string}
 /** Read-only adapter: inherited filesystem CAS initialization is never invoked. */
 class AuditCas extends DistrictCas {
- constructor(root:string,private readonly readExisting:(path:string,hash:string)=>Promise<Buffer>){super(root);}
+ private readonly readExisting:(path:string,hash:string)=>Promise<Buffer>;
+ constructor(root:string,readExisting:(path:string,hash:string)=>Promise<Buffer>){super(root);this.readExisting=readExisting;}
  override read(hash:string){HashSchema.parse(hash);return this.readExisting(join(this.root,'sha256',hash.slice(0,2),hash),hash);}
  override async put(_bytes:Uint8Array,_options:CasPutOptions):Promise<never>{throw Error('Step8 audit CAS is read-only');}
 }
@@ -148,7 +149,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
    const holdPins=queue.assessmentItemHolds.map(({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256})=>({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256}));requireThat(canonicalJson([...selected.assessmentItemHolds].sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256)))===canonicalJson(holdPins.sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256))),'Item hold selection differs from seal');
    for(const pin of holdPins){
     const preparation=steps.get(pin.preparationJobKey);requireThat(preparation?.receipt.outcome==='succeeded'&&preparation.receipt.outputHashes.includes(pin.itemBundleArtifactSha256)&&preparation.receipt.outputHashes.includes(pin.holdReceiptArtifactSha256),'Item hold preparation custody mismatch');
-    const bundle=AssessmentItemBundleSchema.parse(await json(pin.itemBundleArtifactSha256)),hold=AssessmentItemHoldReceiptSchema.parse(await json(pin.holdReceiptArtifactSha256)),selected=selector(preparation!),extraction=steps.get(selected.extraction.jobKey);
+    const bundle=AssessmentItemBundleSchema.parse(await json(pin.itemBundleArtifactSha256)),hold=AssessmentItemHoldReceiptSchema.parse(await json(pin.holdReceiptArtifactSha256)),selected=z.object({version:z.literal('r1-assessment-item-job-v1'),extraction:z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict(),extractionArtifactSha256:HashSchema}).strict().parse(preparation!.spec.selector),extraction=steps.get(selected.extraction.jobKey);
     requireThat(bundle.version==='r1-assessment-items-v2'&&bundle.heldItems.filter(entry=>entry.holdReceiptArtifactSha256===pin.holdReceiptArtifactSha256&&entry.recordArtifactSha256===hold.recordArtifactSha256&&entry.itemArtifactSha256===hold.itemArtifactSha256).length===1&&hold.preparationJobKey===pin.preparationJobKey&&!admitted.has(hold.recordId)&&hold.assessmentProviderCalls===0,'Item hold cannot admit or fabricate provider use');
     requireThat(preparation!.spec.semanticContractSha256===hold.assessmentQueueContractSha256&&preparation!.spec.policyProofSha256===hold.policyReceiptSha256&&extraction&&extraction.receipt.id===selected.extraction.receiptId&&extraction.sha256===selected.extraction.receiptSha256&&preparation!.receipt.dependencyReceiptIds.includes(extraction.receipt.id)&&selected.extractionArtifactSha256===hold.extractionArtifactSha256&&extraction.receipt.outputHashes.includes(hold.extractionArtifactSha256),'Item hold extraction ancestry mismatch');
     const result=ResidualExtractionSchema.parse(await json(hold.extractionArtifactSha256)),record=await json(hold.recordArtifactSha256),prepared=PreparedDocumentSchema.parse(await json(hold.preparedArtifactSha256));

@@ -20,12 +20,14 @@ export const STEP8_ALLOWANCE_READ_PLAN={
  bounds:{baseMaxCallsPerOriginal:48,maxExtraCallsPerOriginal:24,maxExtraCallsCohort:100,paidMicroUsd:0,stages:['assessment_a','assessment_c']},
  transitive:'Hash-pinned parent/delegation approvals, original/cohort/queue membership and committed stage authorizations; preserve migration-009 ordinals and all lifetime attempts without resets or refunds.',
 };
-const historicalSchema=CodexAssessmentAllowanceSchema.safeExtend({id:z.string(),assessment:CodexAssessmentAllowanceSchema.shape.assessment.extend({queueContractSha256:HashSchema})});
+type HistoricalAllowance=Omit<z.infer<typeof CodexAssessmentAllowanceSchema>,'id'>&{id:string};
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 export async function auditStep8Allowance(client:Pick<PoolClient,'query'>,originals:string[],readJson:(hash:string)=>Promise<unknown>){
- const pins: Array<{path:string;sha256:string;record:unknown}>=[],records=new Map<string,z.infer<typeof historicalSchema>>();
+ const pins: Array<{path:string;sha256:string;record:unknown}>=[],records=new Map<string,HistoricalAllowance>();
  const pinned=async(id:string,sha256:string)=>{const path=join(root,'reports/approvals',id+'.json'),bytes=await readFile(path);requireThat(digest(bytes)===sha256,'Allowance approval pin mismatch');const record=JSON.parse(bytes.toString('utf8'));pins.push({path,sha256,record});return record;};
- for(const [id,sha256] of approvals){const record=historicalSchema.parse(await pinned(id,sha256));requireThat(record.id===id,'Allowance approval identity mismatch');records.set(sha256,record);}
+ // Validate the independently pinned historical ID before using a current-ID
+ // validation view. Preserve the original approval ID and bytes in all evidence.
+ for(const [id,sha256] of approvals){const raw=await pinned(id,sha256);requireThat(raw.id===id,'Allowance approval identity mismatch');const record=CodexAssessmentAllowanceSchema.parse({...raw,id:approvals[4][0]});records.set(sha256,{...record,id});}
  const current=records.get(approvals[4][1])!,cohort=CohortSchema.parse(await pinned('r1-frozen-assessment-cohort-2026-10-17',current.cohort.sha256));
  for(const parent of [current.parentApproval,current.delegationApproval])await pinned(parent.id,parent.sha256);
  requireThat(cohort.documents.length===cohort.documentCount&&cohort.sources.length===cohort.sourceCount&&new Set(cohort.documents.map(row=>row.originalSha256)).size===cohort.uniqueOriginalCount,'Allowance cohort cardinality mismatch');
