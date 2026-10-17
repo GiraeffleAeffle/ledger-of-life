@@ -714,7 +714,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     const receipts=await pool.query("SELECT receipt->>'reasonCode' AS reason FROM district_pipeline.step_receipts WHERE run_id=$1",[result.runId]);assert.equal(receipts.rows[0].reason,result.reasonCode);
   });
 
-  await t.test('ntfy quiet presentation gets database source/step context without changing durable payloads or startup admission',async()=>{
+  await t.test('ntfy quiet presentation preserves durable payloads and startup admission even for held runs',async()=>{
     const identity={notificationApprovalSha256:pipelineNotificationConfig.notificationApprovalSha256,notificationDestinationSha256:pipelineNotificationConfig.destinationSha256,notificationProvider:'ntfy'};
     for(const held of [false,true]){
       const name=held?'quiet-held':'quiet-completed',key=await store.enqueue(jobSpec(name));
@@ -729,9 +729,9 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
         const durable=await pool.query<{payload:OwnerNotification;payload_sha256:string}>('SELECT payload,payload_sha256 FROM district_pipeline.owner_notifications WHERE id=$1',[notification.id]);
         assert.deepEqual(durable.rows[0].payload,notification);assert.equal(durable.rows[0].payload_sha256,digest(canonicalJson(notification)));
         return sendPipelineNotification(notification,{readToken:async()=> 'synthetic_fixture_publisher_token',send:async(_url,init)=>{
-          phases.push(notification.phase);const headers=new Headers(init?.headers),routine=notification.phase==='startup'||!held;
-          assert.equal(headers.get('Priority'),routine?'1':null);
-          assert.equal(headers.get('Title'),notification.phase==='startup'?'R1 run start (routine)':held?'R1 needs attention: synthetic-quiet-held / verify artifacts (execution_exception)':'R1 run complete (routine)');
+          phases.push(notification.phase);const headers=new Headers(init?.headers);
+          assert.equal(headers.get('Priority'),'1');
+          assert.equal(headers.get('Title'),'R1 Executor-Protokoll');
           return new Response(JSON.stringify({id:randomUUID(),event:'message',topic:'pipeline',message:String(init?.body),time:Math.floor(Date.now()/1000)}));
         }},signal,context);
       }});
