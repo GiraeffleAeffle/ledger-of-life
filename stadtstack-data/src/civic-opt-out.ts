@@ -360,23 +360,34 @@ async function atomicJson(path:string,value:unknown,exclusive=false,privateDirec
   const parent=await open(dirname(path),constants.O_RDONLY|constants.O_NOFOLLOW);try{await parent.sync();}finally{await parent.close();}
  }finally{try{await unlink(temporary);}catch(error){if(!missing(error))throw error;}}
 }
-async function requireInventoryEpoch(state:string,inventoryId:string):Promise<void>{
+async function requireInventoryEpoch(state:string,inventoryId:string,options:CivicPolicyOptions,retrySignal?:AbortSignal):Promise<void>{
  const expected=Buffer.from('{"schemaVersion":1,"inventoryId":'+JSON.stringify(inventoryId)+',');
- // A locked writer atomically replaces the inventory. An already-open old
- // inode can lose its final link before fstat; reopen the published name only.
- for(let attempt=0;attempt<8;attempt++){
+ let signal:AbortSignal|undefined,deadline:number|undefined;
+ // Only safe detached inodes are transient. Reopen the published name with
+ // bounded backoff; repeated atomic replacements are contention, not corruption.
+ for(;;){
+  // Stable epoch reads must remain available to an already-owned section
+  // draining after TERM. Cancellation applies to detached-inode retry waits.
+  if(deadline!==undefined){signal?.throwIfAborted();if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');}
   const handle=await open(join(state,'inventory.json'),constants.O_RDONLY|constants.O_NOFOLLOW|constants.O_NONBLOCK);
   try{
    const stat=await handle.stat();
-   if(stat.nlink===0)continue;
-   if(!stat.isFile()||stat.uid!==process.getuid?.()||(stat.mode&0o077)!==0||stat.nlink!==1||stat.size<expected.length||stat.size>MAX_STATE)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
-   const prefix=Buffer.allocUnsafe(expected.length);let offset=0;
-   while(offset<prefix.length){const {bytesRead}=await handle.read(prefix,offset,prefix.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
-   if(offset!==prefix.length||!prefix.equals(expected))throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
-   return;
+   if(!stat.isFile()||stat.uid!==process.getuid?.()||(stat.mode&0o077)!==0||stat.size<expected.length||stat.size>MAX_STATE)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+   if(stat.nlink!==0){
+    if(stat.nlink!==1)throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+    const prefix=Buffer.allocUnsafe(expected.length);let offset=0;
+    while(offset<prefix.length){const {bytesRead}=await handle.read(prefix,offset,prefix.length-offset,offset);if(!bytesRead)break;offset+=bytesRead;}
+    if(offset!==prefix.length||!prefix.equals(expected))throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
+    return;
+   }
   }finally{await handle.close();}
+  if(deadline===undefined){
+   const shutdown=inventoryLifetime?.controller.signal;
+   signal=retrySignal&&shutdown&&retrySignal!==shutdown?AbortSignal.any([retrySignal,shutdown]):retrySignal??shutdown;
+   deadline=performance.now()+inventoryLockWaitMs(options);
+  }
+  await waitForInventoryPoll(Math.min(5,Math.max(0,deadline-performance.now())),signal);
  }
- throw new CivicPolicyStateError('CIVIC_POLICY_INVENTORY_UNAVAILABLE');
 }
 interface AuthorityEnvironment {state:string;authorityId:string;mode:CivicPolicyAuthorityReceipt['mode'];machineSha256:string}
 async function authorityEnvironment(options:CivicPolicyOptions):Promise<AuthorityEnvironment>{
@@ -419,8 +430,9 @@ export async function provisionCivicPolicyAuthority(options:Pick<CivicPolicyOpti
   return assertCivicPolicyAuthority({...options,authorityId,authoritySha256:digest(JSON.stringify(value))});
  },true);
 }
-/** A copied directory or missing marker is NOT an empty authoritative list. */
-export async function assertCivicPolicyAuthority(options:CivicPolicyOptions={}):Promise<CivicPolicyAuthorityReceipt>{
+/** A copied directory or missing marker is NOT an empty authoritative list.
+ * retrySignal cancels only detached-epoch waiting, never a stable epoch read. */
+export async function assertCivicPolicyAuthority(options:CivicPolicyOptions={},retrySignal?:AbortSignal):Promise<CivicPolicyAuthorityReceipt>{
  try{
   const environment=await authorityEnvironment(options),{state,authorityId,mode,machineSha256}=environment;
   if(mode==='isolated-fixture'&&!options.authoritySha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_UNPINNED');
@@ -428,11 +440,11 @@ export async function assertCivicPolicyAuthority(options:CivicPolicyOptions={}):
   if(value.authorityId!==authorityId||value.mode!==mode)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_MISMATCH');
   if(value.stateId!==digest(state)||!sameIdentity(value.identity,stat)||value.machineSha256!==machineSha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
   if(!sameIdentity(value.hostsIdentity,await directory(join(state,'hosts'),false,true))||!sameIdentity(value.attemptsIdentity,await directory(join(state,'attempts'),false,true)))throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_FOREIGN');
-  await requireInventoryEpoch(state,value.inventoryId);
+  await requireInventoryEpoch(state,value.inventoryId,options,retrySignal);
   const authoritySha256=digest(JSON.stringify(value));
   if(options.authoritySha256!==undefined&&hex.parse(options.authoritySha256)!==authoritySha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUTHORITY_MISMATCH');
   return {schemaVersion:value.schemaVersion,authorityId:value.authorityId,authoritySha256,mode:value.mode,provisionedAt:value.provisionedAt};
- }catch(error){if(error instanceof CivicPolicyStateError)throw error;throw new CivicPolicyStateError(missing(error)?'CIVIC_POLICY_AUTHORITY_UNPROVISIONED':'CIVIC_POLICY_AUTHORITY_UNAVAILABLE');}
+ }catch(error){if(error instanceof CivicPolicyStateError||retrySignal?.aborted&&error===retrySignal.reason)throw error;throw new CivicPolicyStateError(missing(error)?'CIVIC_POLICY_AUTHORITY_UNPROVISIONED':'CIVIC_POLICY_AUTHORITY_UNAVAILABLE');}
 }
 function objectionPath(state:string,host:string){return join(state,'hosts',digest(host)+'.json');}
 async function readObjection(state:string,host:string):Promise<Objection|undefined>{
@@ -455,16 +467,16 @@ async function readObjection(state:string,host:string):Promise<Objection|undefin
  }catch{throw new CivicPolicyStateError();}
 }
 /** Read-only, uncached and fail-closed. Call at every request, cache and model boundary. */
-export async function assertHostNotOptedOut(url:string,options:CivicPolicyOptions={}):Promise<void>{
- await assertCivicPolicyAuthority(options);const host=hostFromUrl(url);if(await readObjection(statePath(options),host))throw new HostOptedOutError(host);await assertCivicPolicyAuthority(options);
+export async function assertHostNotOptedOut(url:string,options:CivicPolicyOptions={},retrySignal?:AbortSignal):Promise<void>{
+ await assertCivicPolicyAuthority(options,retrySignal);const host=hostFromUrl(url);if(await readObjection(statePath(options),host))throw new HostOptedOutError(host);await assertCivicPolicyAuthority(options,retrySignal);
 }
 /** One live boundary over many URL bindings. Validate every URL, but an
  * objection is host-wide: read each canonical host once in first-seen order.
  * The set is discarded on return; callers must recheck at their next boundary.
  */
-export async function assertSourceHostsNotOptedOut(urls:Iterable<string>,options:CivicPolicyOptions={}):Promise<void>{
+export async function assertSourceHostsNotOptedOut(urls:Iterable<string>,options:CivicPolicyOptions={},retrySignal?:AbortSignal):Promise<void>{
  const checked=new Set<string>();
- for(const url of urls){const host=hostFromUrl(url);if(!checked.has(host)){await assertHostNotOptedOut(url,options);checked.add(host);}}
+ for(const url of urls){const host=hostFromUrl(url);if(!checked.has(host)){await assertHostNotOptedOut(url,options,retrySignal);checked.add(host);}}
 }
 function snapshotStamp(stat:BigIntStats):string{
  return [stat.dev,stat.ino,stat.mode,stat.uid,stat.nlink,stat.size,stat.mtimeNs,stat.ctimeNs].join(':');
@@ -542,7 +554,9 @@ async function hasInventoryWaiters(state:string):Promise<boolean>{
   if(!/^inventory\.wait-[a-f0-9-]{36}$/.test(entry.name))throw new CivicPolicyStateError();
   try{
    const stat=await lstat(join(state,entry.name));
-   if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||stat.nlink!==1||(stat.mode&0o777)!==0o600||stat.size!==0)throw new CivicPolicyStateError();
+   if(!stat.isFile()||stat.isSymbolicLink()||stat.uid!==process.getuid?.()||(stat.mode&0o777)!==0o600||stat.size!==0)throw new CivicPolicyStateError();
+   if(stat.nlink===0)continue; // A waiter can remove its own marker during lstat.
+   if(stat.nlink!==1)throw new CivicPolicyStateError();
    return true;
   }catch(error){if(!missing(error))throw error;}
  }
@@ -700,7 +714,7 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
  };
  try{
   await waitForInventoryTurn(prior,signal);
-  if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options);
+  if(provisioning)await directory(state,true,true);else await assertCivicPolicyAuthority(options,signal);
   if(!provisioning&&!quiescent)await warmInventorySegments(state);
   // Resolve the immutable identity before acquiring the inventory lock.
   const identity=await(lockProcessIdentity??=Promise.all([linuxBootId(),linuxProcessStarttime(process.pid)]).then(([boot_id,starttime])=>({boot_id,starttime})));
@@ -710,13 +724,19 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   const deadline=performance.now()+waitMs;
   for(;;){
    signal?.throwIfAborted();
+   if(!quiescent&&performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
    try{handle=await open(path,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);break;}
    catch(error){
     if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;
     if(quiescent)throw new CivicPolicyStateError('CIVIC_POLICY_REPACK_QUIESCENCE_REQUIRED');
     if(performance.now()>=deadline)throw new CivicPolicyStateError('CIVIC_POLICY_BUSY');
     try{
-     const current=await lstat(path);if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||current.nlink!==1||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
+     const current=await lstat(path);
+     if(!current.isFile()||current.isSymbolicLink()||current.uid!==process.getuid?.()||(current.mode&0o077)!==0||current.size>8192)throw new CivicPolicyStateError();
+     // The holder may unlink during lstat. A safe detached inode is not a
+     // dead-holder proof: retry O_EXCL only, without recovery or path mutation.
+     if(current.nlink===0){await waitForInventoryPoll(Math.min(25,Math.max(0,deadline-performance.now())),signal);continue;}
+     if(current.nlink!==1)throw new CivicPolicyStateError();
      if(!provisioning&&(await recoverInventoryLock(state,false,signal)).status==='recovered')continue;
     }catch(inspectError){if(missing(inspectError))continue;throw inspectError;}
     if(!provisioning&&!waiting){waitingPath=join(state,'inventory.wait-'+randomUUID());waiting=await open(waitingPath,constants.O_WRONLY|constants.O_CREAT|constants.O_EXCL|constants.O_NOFOLLOW,0o600);waitingIdentity=await waiting.stat();}
@@ -728,7 +748,7 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
    await stopWaiting();
    signal?.throwIfAborted();
    await handle.writeFile(JSON.stringify({pid:process.pid,nonce:randomUUID(),...identity})+'\n');await handle.sync();
-   if(!provisioning)await assertCivicPolicyAuthority(options);
+   if(!provisioning)await assertCivicPolicyAuthority(options,signal);
    signal?.throwIfAborted();
    return await work();
   }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
@@ -1309,7 +1329,7 @@ const SCRATCH_PROCESS_GATE=`process.umask(0o077);const net=require('node:net'),c
  * The inventory lock is held only for lease/child registration and cleanup.
  */
 export async function withManagedSourceScratch<T>(input:string,bindings:ManagedScratchBinding[],work:(scope:ManagedSourceScratch)=>Promise<T>,options:ManagedAcquisitionLaneOptions&{purpose:ScratchLease['purpose'];signal?:AbortSignal}):Promise<T>{
- const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
+ const authority=await assertCivicPolicyAuthority(options,options.signal),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  if(!bindings.length)throw new CivicPolicyStateError('SCRATCH_PROVENANCE_MISSING');
  const sources=bindings.map(binding=>{
   const base={host:hostFromUrl(binding.url),urlSha256:urlHash(binding.url)};
@@ -1317,7 +1337,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
   if(['authenticated_git_snapshot','operator_registry_config'].includes(binding.kind)&&options.purpose!=='artifact')throw new CivicPolicyStateError('NON_SOURCE_PROVENANCE_ADMISSION_DENIED');
   return scratchSourceSchema.parse({...base,...sourceProvenance(binding)});
  });
- await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);
+ await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy,options.signal);
  if(options.decisionId!==CIVIC_ACQUISITION_DECISION_ID)throw new CivicPolicyStateError('ACQUISITION_DECISION_REQUIRED');
  const lanePath=managedRootPath(path,state),kind=kindSchema.parse(options.kind??'artifacts');
  const id=randomUUID(),controller=new AbortController(),signal=options.signal?AbortSignal.any([controller.signal,options.signal]):controller.signal;
@@ -1339,7 +1359,7 @@ export async function withManagedSourceScratch<T>(input:string,bindings:ManagedS
  const stopChildren=()=>{for(const item of children)if(!item.closed&&item.child.pid)try{process.kill(-item.child.pid,'SIGKILL');}catch{/* The owned child may already have exited. */}};
  const assertActive=async()=>{
   signal.throwIfAborted();if(finished)throw new CivicPolicyStateError('SCRATCH_CLOSED');
-  try{await assertCivicPolicyAuthority(policy);await verifyRoot(root);if(!sameIdentity(lease.identity!,await directory(scratchDirectory,false,true)))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);}
+  try{await assertCivicPolicyAuthority(policy,signal);await verifyRoot(root);if(!sameIdentity(lease.identity!,await directory(scratchDirectory,false,true)))throw new CivicPolicyStateError('SCRATCH_IDENTITY_MISMATCH');await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy,signal);}
   catch(error){controller.abort(error);throw error;}
  };
  activeScratch.set(id,controller);signal.addEventListener('abort',stopChildren);
