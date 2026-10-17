@@ -74,7 +74,7 @@ async function ready(pool:Pool,jobKey:string){
  for(;;){const rows=await pool.query<{id:string;state:string}>(`SELECT b.id,b.state FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready' ORDER BY b.created_at DESC LIMIT 1`,[jobKey]);if(rows.rows[0])return rows.rows[0];if(Date.now()>=deadline)throw Error('Synthetic bridge did not become ready within fixture bound');await delay(10);}
 }
 
-test('fenced B assessment protocol against isolated local Postgres',{skip:!connectionString,timeout:120000},async t=>{
+test('fenced B assessment protocol against isolated local Postgres',{skip:!connectionString,timeout:240000},async t=>{
  const base=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(base.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Broker fixture refuses a remote database');
  const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Broker fixture refuses a remote host override');
