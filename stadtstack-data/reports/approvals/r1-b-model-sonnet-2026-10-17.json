@@ -1,0 +1,31 @@
+{
+ "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+ "id": "r1-b-model-sonnet-2026-10-17",
+ "recordedAt": "2026-10-17T00:14:34Z",
+ "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "approver": "Max (owner)",
+ "channel": "omp chat with the R1 session, answering Vikunja task 88 (options 1 stay on Haiku, 2 Sonnet for lane B, 3 ten-item Sonnet diagnostic first; shown via ntfy and Vikunja comments 69-71)",
+ "questionShownToOwner": "#88 Lane B (Haiku) runs technically correctly but holds about 70% of source items, mostly through output non-compliance (omitted claims, field encoding) and nondeterministic verdicts on the same item; three runs with clearer instructions brought no gain. The frozen value test also runs its 37 assessments through lane B, and any held assessment makes it incomplete, so with Haiku it is very likely not passable. Options: 1 stay on Haiku (default), 2 Sonnet via the owner's Claude Max subscription for lane B, 3 first 10 held items diagnostically with Sonnet, then decide by numbers.",
+ "ownerStatementsVerbatim": [
+  "Then use sonnet if haiku doesn't work properly please. Take the decisions yourself to solve it. And like I said don't post this cryptic updated about the pipelines all the time"
+ ],
+ "leadFindingForCondition": "Haiku does not work properly for lane B: production snapshot 2026-10-16T14:27:39Z 11 succeeded / 23 held of 34 (4 pure value/unit encoding, 6 missing claim coverage, 4 schema rejections, 9 model judgments); three lead-authorized confirmation calls with a further encoding clarification brought no admission gain and showed verdict changes on the same item.",
+ "approved": {
+  "assessmentB": {
+   "model": "anthropic/claude-sonnet-5-5",
+   "route": "stock omp 18.9.2 in a newly reviewed omp-b container image, owner's Claude Max subscription (same single OAuth account as before)",
+   "rules": "Vikunja #74 unchanged: normal subscription usage only, no extra usage; usage-limit errors hold; no wait-for-reset, no retry on another transport, no model fallback",
+   "scope": "Lane-B assessments of source records and of the step-9 value answers; the lead decides cohorts, diagnostics and cutover sequencing",
+   "concurrency": "1/1 unchanged"
+  },
+  "unchanged": "All other bounds of r1-nine-town-models-2026-10-13 (#81): extraction route and 48 calls/document, paid 0, max 500 documents, expiry 2026-10-25T21:59:59Z; historical Haiku receipts and proofs stay valid as history",
+  "leadAutonomy": "Owner delegates the technical decisions needed to solve lane B to the R1 lead",
+  "notifications": "Reaffirms r1-owner-notification-preference-2026-10-16: no routine or cryptic pipeline messages; only plain-language decisions, blockers and milestones"
+ },
+ "notApproved": [
+  "Paid API execution, API keys or extra/overage usage",
+  "Models other than anthropic/claude-sonnet-5-5 for lane B, or any runtime fallback between models",
+  "Relaxing the strict output schema, deterministic checker or decoder security checks",
+  "Publication or release outside the step 8/9 gates"
+ ]
+}
