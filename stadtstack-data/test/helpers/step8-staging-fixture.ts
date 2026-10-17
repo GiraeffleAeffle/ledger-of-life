@@ -40,6 +40,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  await assert.rejects(assembleStep8Staging({...request,retainedPlan:{path:badDeclarationsPath,sha256:badDeclarationsSha256}}),/complete authentic/);
  const result=await assembleStep8Staging(request);
  assert.equal(result.importedMembers,19);
+ assert.equal(result.schemaVersion,'stadtstack-r1-step8-staging-result-v2');assert.equal(result.publicationExecuted,false);
  const provenance=await authenticatePublicationProvenance(result.inputs.privateProvenance.path,result.inputs.privateProvenance.sha256,manifest.policy);
  assert.deepEqual(await provenance.read(result.inputs.campaign.path),await readFile(manifest.campaign.path));
  const actual=Step8InputSchema.parse({...manifest,...result.inputs});

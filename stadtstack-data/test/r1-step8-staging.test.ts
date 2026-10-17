@@ -4,12 +4,17 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
-import {root} from '../src/common.ts';
+import {root,cacheDir} from '../src/common.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import {readCommittedReleaseFile} from '../src/district-publication-predecessor.ts';
 import {RetainedPublicationImportPlanSchema,retainedPublicationSources,RETAINED_PUBLICATION_ROOT} from '../src/district-retained-import.ts';
 import {STEP8_PRIOR_RELEASE} from '../src/r1-step8-current-policy.ts';
 import {requiredReplayStaging} from '../src/replay-pipeline.ts';
+import {readFile,mkdir,lstat,rm} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {initializeManagedAcquisitionLane,readCivicPolicyInventory,markManagedCacheInventoryComplete,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
+import {assembleStep8Staging} from '../src/r1-step8-staging.ts';
 
 const execute=promisify(execFile);
 test('offline retained-plan CLI derives every authentic 0.3.2 non-knowledge member and embedded declaration',async()=>{
@@ -25,6 +30,24 @@ test('offline retained-plan CLI derives every authentic 0.3.2 non-knowledge memb
   assert.deepEqual(member.declaredSources,retainedPublicationSources(JSON.parse(body.toString('utf8'))));
   assert.equal(member.manifestSha256,STEP8_PRIOR_RELEASE.manifestSha256);assert.equal(member.releaseId,STEP8_PRIOR_RELEASE.releaseId);
  }
+});
+test('staging rejects enrolled-root overlap before creating directory or claim debris',async t=>{
+ const fixture=await createCivicPolicyTestContext(t),ancestor=join(cacheDir,'step8-overlap-fixture-'+randomUUID()),output=join(ancestor,'blocked');
+ await mkdir(cacheDir,{recursive:true});
+ t.after(async()=>{await rm(ancestor,{recursive:true,force:true});});
+ await initializeManagedAcquisitionLane(ancestor,{...fixture.policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+ const before=await readCivicPolicyInventory(fixture.policy),inventoryBytes=await readFile(join(fixture.policy.stateDir!,'inventory.json'));
+ assert.equal(before.roots.find(root=>root.path===ancestor)?.complete,true);
+ // These controls are deliberately unreachable: overlap refusal must precede
+ // even plan reads, not merely fail later when its first managed write enrolls.
+ const pin={path:join(fixture.root,'unreachable.json'),sha256:'a'.repeat(64)};
+ await assert.rejects(assembleStep8Staging({schemaVersion:'stadtstack-r1-step8-staging-assembly-v1',retainedPlan:pin,provenances:[pin],campaign:pin,registry:pin,managedRoot:output,policy:fixture.policy}),/overlaps enrolled managed root/);
+ await assert.rejects(lstat(output),{code:'ENOENT'});
+ await assert.rejects(lstat(output+'.claim'),{code:'ENOENT'});
+ assert.deepEqual(await readFile(join(fixture.policy.stateDir!,'inventory.json')),inventoryBytes);
+ assert.deepEqual(await readCivicPolicyInventory(fixture.policy),before);
+ await markManagedCacheInventoryComplete(ancestor,fixture.policy);
+ assert.equal((await readCivicPolicyInventory(fixture.policy)).roots.find(root=>root.path===ancestor)?.complete,true,'ancestor remains complete after canonical reconciliation');
 });
 test('real retained 0.3.2 members collect and assemble through offline Step8 plan and read-only audit',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:910000},async()=>{
  const {NODE_TEST_CONTEXT:_parent,...env}=process.env;

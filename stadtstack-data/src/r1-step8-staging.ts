@@ -6,7 +6,7 @@ import {digest,canonicalJson,HashSchema} from './district-adapter-contract.ts';
 import {dataReleaseId,dataReleaseSchema} from './data-release.ts';
 import {readCommittedReleaseFile,loadPriorPublicationRelease} from './district-publication-predecessor.ts';
 import {RETAINED_PUBLICATION_ROOT,RetainedPublicationImportPlanSchema,retainedPublicationSources,readAuthenticatedRetainedPublicationMember} from './district-retained-import.ts';
-import {assertCivicPolicyAuthority,assertManagedSourceBindings,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceBindings,readCivicPolicyInventory,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {readPinnedJson,writeManagedSourceArtifact,type SourceArtifactBinding} from './district-private-io.ts';
 import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,type PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import {authenticateStep8Campaign,reserveStep8Generation} from './r1-step8-governance.ts';
@@ -26,6 +26,11 @@ const encoded=(value:unknown)=>Buffer.from(canonicalJson(value));
 const same=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const uniqueBindings=(bindings:SourceArtifactBinding[])=>[...new Map(bindings.map(binding=>[canonicalJson(binding),binding])).values()];
 
+async function assertStagingRootsDisjoint(output:string,policy:CivicPolicyOptions){
+ const inventory=await readCivicPolicyInventory(policy);
+ const contains=(parent:string,child:string)=>{const path=relative(parent,child);return !path||path!=='..'&&!path.startsWith('../')&&!isAbsolute(path);};
+ for(const candidate of [output,output+'.claim'])for(const root of inventory.roots)if(contains(root.path,candidate)||contains(candidate,root.path))throw Error('Staging control root or claim overlaps enrolled managed root');
+}
 /** No policy reader, inventory lock, DB, managed writes, or source acquisition. */
 export async function buildStep8RetainedPlan(publicationRoot:string,managedRoot=RETAINED_PUBLICATION_ROOT){
  if(!isAbsolute(publicationRoot)||!isAbsolute(managedRoot))throw Error('Absolute retained roots required');
@@ -60,6 +65,7 @@ export async function assembleStep8Staging(raw:unknown){
  if(!relativeOutput||relativeOutput.startsWith('..')||isAbsolute(relativeOutput)||relativeOutput.split('/').some(part=>part==='out'||part==='release'))throw Error('Fresh staging control root beneath package cache required');
  try{await lstat(output);throw Error('Staging control root already exists');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  if(await realpath(dirname(output))!==dirname(output))throw Error('Staging control parent alias rejected');
+ await assertStagingRootsDisjoint(output,policy);
  const plan=RetainedPublicationImportPlanSchema.parse(await readPinnedJson(input.retainedPlan.path,input.retainedPlan.sha256));
  if(authority.mode!=='isolated-fixture'&&resolve(plan.managedRoot)!==RETAINED_PUBLICATION_ROOT)throw Error('Production staging requires the governed retained-publication root');
  // Rebuild the exact approved plan, rejecting changed sets, declarations, roots,
@@ -101,6 +107,7 @@ export async function assembleStep8Staging(raw:unknown){
  }
  // Do not upgrade derivative custody into independent original-source rights.
  const bindings=uniqueBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
+ await assertStagingRootsDisjoint(output,policy);
  const claim=await reserveStep8Generation(output);
  const write=async(name:string,bytes:Buffer,contributors=bindings)=>{
   await claim.assertOwned();
@@ -119,5 +126,5 @@ export async function assembleStep8Staging(raw:unknown){
  for(const pin of provenance.inputs)await authenticated.read(pin.path);
  const component={campaign:campaignPin,registry:input.registry,privateProvenance,staging,...(input.identityAssessments?{identityAssessments:input.identityAssessments}:{}),...(input.criticalAssessments?{criticalAssessments:input.criticalAssessments}:{}),...(input.regionalPolicyReceipts?{regionalPolicyReceipts:input.regionalPolicyReceipts}:{})};
  const componentPin=await write('staging-component.json',encoded(component));
- return {schemaVersion:'stadtstack-r1-step8-staging-result-v1',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:staging.length,publicationExecuted:false,valueAccepted:false,hostedReleaseAuthorized:false};
+ return {schemaVersion:'stadtstack-r1-step8-staging-result-v2',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:staging.length,publicationExecuted:false,valueAccepted:false,hostedReleaseAuthorized:false};
 }

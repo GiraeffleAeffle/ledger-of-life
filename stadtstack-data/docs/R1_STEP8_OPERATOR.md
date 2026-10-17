@@ -733,6 +733,10 @@ campaign. Retained copies are checked against both authentic member bytes and
 their actual retained-publication inventory bindings.
 
 The assembly root must be fresh beneath this package's real cache directory.
+Both the root and its claim must be disjoint from all enrolled managed roots;
+the existing read-only inventory API checks this before any reservation and again
+immediately before claim creation. Refusal leaves no nested directory/claim
+debris and preserves ancestor inventory completeness.
 Atomic generation reservation plus sibling `.claim` fencing prevents concurrent
 assemblers mixing outputs. Assembly writes only `campaign.json`,
 `private-publication-provenance.json` and `staging-component.json` in that new
@@ -742,6 +746,9 @@ pins. Merge those **input fields**, not the result envelope, into the complete
 Step8 input, recompute its independent digest, then run plan → discover → audit
 → execute as above. Revalidate all dependencies after assembly; a changed or
 revoked file fails closed. Existing/partial roots are never repaired or reused.
+The result envelope is `stadtstack-r1-step8-staging-result-v2`, whose
+`publicationExecuted:false` distinguishes staging writes from candidate
+publication. No v1 result compatibility shim is retained.
 
 `test/r1-step8-staging.test.ts` includes the real operator retained-plan CLI and
 an opt-in disposable-PG topology child. The latter imports all 19 actual released
@@ -761,5 +768,14 @@ fixture-only strict-pin projection error, fixed before this passing run.
 All fourteen actual exported processing-contract calculations still equal
 `b32bc96` (zero differences). The disposable cluster stopped cleanly and was
 removed. No full gate, production import/assembly, publication or value test ran.
+
+After the managed-root-overlap review correction, the same focused suite passed
+**13/13**, zero failed/cancelled/skipped, exit 0. The new refusal regression
+asserts absent output directory and claim, byte-identical inventory, and complete
+ancestor state even after canonical reconciliation. The real-member child also
+asserts the v2 envelope and `publicationExecuted:false`. All fourteen actual
+processing contract results again had zero differences from `b32bc96`.
+Disposable PG stopped with exit 0 and its directory was removed; no production
+write or full gate was performed.
 
 
