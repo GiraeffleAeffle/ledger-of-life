@@ -311,7 +311,9 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     duplicateRun.queue.terminalDocumentExceptions[0].canonical.sourceSha256='f'.repeat(64);const tamperedBytes=Buffer.from(canonicalJson(duplicateRun)),tamperedHash=digest(tamperedBytes),contribution=duplicateComposition.contributions[0];
     await assert.rejects(exportQueueTextContribution(pool,cas,duplicateInput.jobKeys,{...contribution,runId:tamperedHash,artifacts:{...contribution.artifacts,extractionRun:{bytes:tamperedBytes,sha256:tamperedHash}}}),/seal differs/);
     const itemSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[duplicateItems])).rows[0].spec;
-    const heldPreparation=await store.enqueue({...itemSpec,lane:'assessment-item-hold-fixture'},{dependencies:[{jobKey:duplicateExtraction,expectedReceiptSha256:itemSpec.selector.extraction.receiptSha256}]});
+    // Lane is not job identity. Pin the already committed native candidate as
+    // an additional real input to distinguish this independent preparation.
+    const heldPreparation=await store.enqueue({...itemSpec,inputArtifactHashes:[...itemSpec.inputArtifactHashes,semanticHash(duplicateOutput.result.records[0])]},{dependencies:[{jobKey:duplicateExtraction,expectedReceiptSha256:itemSpec.selector.extraction.receiptSha256}]});
     const callsBeforeHold=modelCalls;forceDuplicateItemHold=true;
     try{await run(heldPreparation,assessmentHandlers);}finally{forceDuplicateItemHold=false;}
     assert.equal(modelCalls,callsBeforeHold,'Item hold consumes no provider calls');
