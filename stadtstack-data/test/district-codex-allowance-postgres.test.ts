@@ -45,7 +45,7 @@ async function fixture(t:TestContext,bodyCount=1,repeatedOriginal=false){
   return {id:row.id,jobKey,pin:{jobKey,receiptId:row.receipt_id,receiptSha256:row.receipt_sha256},runId:result.runId};
  }
  async function document(index=0,changes:{legacy?:boolean;value?:boolean;original?:string;maxCalls?:number}={}){
-  const extractionArtifact=await cas.put(Buffer.from('synthetic extraction '+nonce+' '+index),{kind:'derived'}),itemArtifact=await cas.put(Buffer.from('synthetic v2 item '+nonce+' '+index),{kind:'derived'}),recordArtifact=await cas.put(Buffer.from('synthetic full record '+nonce+' '+index),{kind:'derived'});
+  const extractionArtifact=await cas.put(Buffer.from('synthetic extraction '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'}),itemArtifact=await cas.put(Buffer.from('synthetic v2 item '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'}),recordArtifact=await cas.put(Buffer.from('synthetic full record '+nonce+' '+index),{kind:'derived',mimeType:'text/plain'});
   const extractionSpec=spec('residual_extract',{documentId:'synthetic-document-'+index,corpusSha256:corpus,policyReceiptSha256:policySha,corpusObservations:[{sourceSha256:changes.original??originals[index]}]});
   const extraction=await complete(extractionSpec,[extractionArtifact]);
   const prepareSpec=spec('assessment_prepare',{version:changes.value?'r1-value-assessment-item-job-v1':'r1-assessment-item-job-v1',extraction:extraction.pin,extractionArtifactSha256:extractionArtifact.sha256},[extractionArtifact.sha256]);if(changes.legacy)prepareSpec.semanticContractSha256=digest('synthetic historical projection-v1');
@@ -89,7 +89,7 @@ test('pinned Codex assessment allowance against disposable PostgreSQL',{skip:!co
   await assert.rejects(f.pool.query('DELETE FROM district_pipeline.r1_codex_allowance_intents'),/Immutable/);
  });
  await t.test('cohort100 is lifetime across bodies; concurrent final cohort slot has one winner',async t=>{
-  const f=await fixture(t,6),documents=[];for(let index=0;index<6;index++){const d=await f.document(index);await f.seed(d.original,d.extraction);documents.push(d);}
+  const f=await fixture(t,6),documents:Awaited<ReturnType<typeof f.document>>[]=[];for(let index=0;index<6;index++){const d=await f.document(index);await f.seed(d.original,d.extraction);documents.push(d);}
   for(let index=0;index<4;index++){const d=documents[index];assert.equal((await f.invoke(d,async job=>{for(let call=0;call<24;call++)await f.reserve(job,d.original);})).state,'completed');}
   assert.equal((await f.invoke(documents[4],async job=>{for(let call=0;call<3;call++)await f.reserve(job,documents[4].original);})).state,'completed');
   const last=documents[5];assert.equal((await f.invoke(last,async job=>{
