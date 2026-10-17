@@ -35,14 +35,6 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   return typeof bytes==='string'?bytes+suffix:Buffer.concat([bytes,Buffer.from(suffix)]);
  }) as typeof readFile;
  t.mock.module('node:fs/promises',{namedExports:{...filesystem,readFile:contractReadFile}});
- let forceDuplicateItemHold=false;
- const contextModule=await import('../../src/district-assessment-context.ts');
- // Exercise a genuine producer-owned, pre-effect child hold. The held record
- // shares its ID with the canonical admission but belongs to another extraction.
- t.mock.module(new URL('../../src/district-assessment-context.ts',import.meta.url),{namedExports:{...contextModule,buildPreparedAssessmentContext:(...args:Parameters<typeof contextModule.buildPreparedAssessmentContext>)=>{
-  if(forceDuplicateItemHold)throw new contextModule.AssessmentContextHold('assessment_context_exceeded');
-  return contextModule.buildPreparedAssessmentContext(...args);
- }}});
  const claimsModule=await import('../../src/district-claims.ts');
  let chunkFailure:'oversized'|'unexpected'|undefined;
  // Deterministic chunk-boundary seam, after genuine predecessor admission:
@@ -107,6 +99,14 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    },{...usage.sourceContext,purpose:'openai'});
   },
  }});
+ let forceDuplicateItemHold=false;
+ const contextModule=await import('../../src/district-assessment-context.ts');
+ // Exercise a genuine producer-owned, pre-effect child hold. The held record
+ // shares its ID with the canonical admission but belongs to another extraction.
+ t.mock.module(new URL('../../src/district-assessment-context.ts',import.meta.url),{namedExports:{...contextModule,buildPreparedAssessmentContext:(...args:Parameters<typeof contextModule.buildPreparedAssessmentContext>)=>{
+  if(forceDuplicateItemHold)throw new contextModule.AssessmentContextHold('assessment_context_exceeded');
+  return contextModule.buildPreparedAssessmentContext(...args);
+ }}});
  const {DistrictCas}=await import('../../src/district-cas.ts');
  const {DistrictJobStore,migrateDistrictJobs,runDistrictJobs}=await import('../../src/district-jobs.ts');
  const {poolShutdownBarrier}=await import('../helpers/postgres-pool.ts');
