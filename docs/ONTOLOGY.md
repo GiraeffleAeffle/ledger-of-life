@@ -180,6 +180,16 @@ at risk of an honest output-quality hold. No embedded-object salvage, decoder
 relaxation, output-dependent encoding switch, provider retry or model fallback
 is authorized by the hybrid selector.
 
+The B control explicitly requires silent compact-reference resolution and a
+single JSON object with no surrounding analysis, prose or fence. This is an
+output-encoding instruction, not a guarantee of model compliance or permission
+to salvage embedded JSON. A/C likewise encode the unchanged checker rules:
+full-day dates only (partial precision remains quoted with a null date), paired
+value/unit nullability without invented units, explicit null for absent review
+targets, zero usefulness for non-supported outcomes, and the exact frozen
+top-level keys. Neither these instructions nor historical role-specific prompt
+hash dispatch changes a source-bound verdict, rubric or deterministic check.
+
 Non-quantitative text propositions use assertion `value:null` and `unit:null`;
 their proposed wording is the claim payload, not a measurement. Typed critical
 quantities retain genuine source-attested value/unit and financial-role checks.

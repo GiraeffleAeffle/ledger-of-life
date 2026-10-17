@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { assessmentItemSchema, assessmentOutputSchema, AssessmentSourceContextSchema, assessmentEvidenceContext, originalEvidence, assessmentProviderInput, buildAssessmentPassInput, createAssessmentReceipt, deterministicChecks, mismatchReport,
+import { PROMPTS, assessmentItemSchema, assessmentOutputSchema, AssessmentSourceContextSchema, assessmentEvidenceContext, originalEvidence, assessmentProviderInput, buildAssessmentPassInput, createAssessmentReceipt, deterministicChecks, mismatchReport,
   canonical, reconcile, validateReceipt, verifyPinnedAssessment, writeImmutable, ownerAudit, recordOwnerAudit,
   type AssessmentOutput } from '../src/district-assessment.ts';
 import { admittedAssessmentFixture, syntheticAssessmentReceipt as receipt } from './district-assessment.fixture.ts';
@@ -13,6 +13,8 @@ import { recordHostOptOut, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-op
 import { symlink, unlink } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import {z} from 'zod';
+import {R1_ASSESSMENT_RUBRIC} from '../src/district-assessment-jobs.ts';
 const hash = (s: string) => createHash('sha256').update(s).digest('hex');
 const pinned = 'a'.repeat(64);
 const quote = 'Plan 2025: 100 EUR. Beschluss am 28.02.2025.';
@@ -29,6 +31,51 @@ async function fixture() {
     claimIds: ['claim1'], entityIds: ['town', 'project'], constraints: [assertion], criticalKinds: ['finance'] });
   return { ...admitted, item };
 }
+test('Codex A/C encode the frozen checker rules without changing B, rubric or schema',()=>{
+ const keys=Object.keys(assessmentOutputSchema.shape).join(', ');
+ for(const role of ['A','C'] as const){
+  for(const rule of ['Output encoding only','exact top-level keys are: '+keys,'explicit null','real calendar day encoded exactly YYYY-MM-DD','Never invent a day for month/year/period precision','keep date null','value and unit must be both null or both non-null','never invent a unit','scores.usefulness must be 0'])assert.ok(PROMPTS[role].includes(rule),role+': '+rule);
+  assert.equal(hash(PROMPTS[role].slice(0,PROMPTS[role].indexOf('\n\nOutput encoding only'))),role==='A'?'c9294042fc59f4618ef403e4c0def5521e2c4cc0b4eb3715968774b4c538b09d':'7b0204658c11581c84d779278ae3b58df21d52bb8f7796b975fe0a7b43c6d14b');
+ }
+ assert.equal(hash(PROMPTS.B),'432f5650c85afc771f39d4b60aedf38eee6eea8fb774249d5bea3088dfb44aed');
+ assert.equal(hash(R1_ASSESSMENT_RUBRIC),'9e27d0c28624dff6866c0114b203e5cdeea3811a9d5d46114b914ae2362a77ed');
+ assert.equal(hash(JSON.stringify(z.toJSONSchema(assessmentOutputSchema))),'376dbb45457ea614336fe3dd1c2cbdc3d85923db60b3a097ae41204fe7496ba8');
+});
+test('partial-date encoding remains invalid; null preserves precision without changing the verdict or quote',async()=>{
+ const f=await fixture();
+ try{
+  const item={...f.item,constraints:[]},evidence=await originalEvidence(item,f.context);
+  for(const date of ['2025','2025-02','2025-02/2025-03']){
+   const partial={...output,assertions:[{...assertion,date}]};
+   assert.deepEqual(deterministicChecks(item,evidence,partial),['calendar_date_role:claim1']);
+   const encoded={...partial,assertions:[{...partial.assertions[0],date:null}]};
+   assert.equal(encoded.outcome,partial.outcome);assert.equal(encoded.assertions[0].quote,partial.assertions[0].quote);
+   assert.equal(encoded.assertions[0].dateRole,partial.assertions[0].dateRole);
+   assert.deepEqual(deterministicChecks(item,evidence,encoded),[]);
+  }
+ }finally{await rm(f.directory,{recursive:true,force:true});}
+});
+test('recorded pre-encoding-note A/C prompt hashes authenticate immutable reconciliation history only',async()=>{
+ const f=await fixture();
+ try{
+  const evidence=await originalEvidence(f.item,f.context),input=buildAssessmentPassInput(f.item,evidence,'A');
+  const historical=(role:'A'|'C',request:unknown,dependencies:string[]=[])=>{
+   const fresh=receipt(f.item,role,output,request,dependencies);assert.equal(fresh.promptSha256,hash(PROMPTS[role]));
+   const {receiptSha256:_hash,...body}=fresh;
+   body.promptSha256=role==='A'?'c9294042fc59f4618ef403e4c0def5521e2c4cc0b4eb3715968774b4c538b09d':'7b0204658c11581c84d779278ae3b58df21d52bb8f7796b975fe0a7b43c6d14b';
+   const old={...body,receiptSha256:hash(canonical(body))};assert.notEqual(old.promptSha256,fresh.promptSha256);
+   assert.deepEqual(validateReceipt(old,f.item,role),old);
+   const forged={...body,promptSha256:hash('unrecognized historical prompt')};
+   assert.throws(()=>validateReceipt({...forged,receiptSha256:hash(canonical(forged))},f.item,role),/binding/);
+   const crossRole={...body,promptSha256:role==='A'?'7b0204658c11581c84d779278ae3b58df21d52bb8f7796b975fe0a7b43c6d14b':'c9294042fc59f4618ef403e4c0def5521e2c4cc0b4eb3715968774b4c538b09d'};
+   assert.throws(()=>validateReceipt({...crossRole,receiptSha256:hash(canonical(crossRole))},f.item,role),/binding/);
+   return old;
+  };
+  const A=historical('A',input.data),B=receipt(f.item,'B',output,input.data);
+  const cInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B}),C=historical('C',cInput.data,cInput.dependencies);
+  assert.equal((await reconcile(f.item,{A,B,C},f.context)).disposition,'ai_reconciled');
+ }finally{await rm(f.directory,{recursive:true,force:true});}
+});
 test('original bytes, text, rubric and exact UTF-16 locator are mandatory', async () => {
   const { directory, item, context, originalObjectPath, authority, policy } = await fixture();
   try {
@@ -135,6 +182,7 @@ test('broker pass and receipt helpers preserve validated answer provenance/clock
     usage: { topLevel: { inputTokens: 17, outputTokens: 23 }, perModel: {}, cliEstimatedApiCostUsd: null } };
   const clocks = { startedAt: '2026-10-11T03:04:05.123Z', finishedAt: '2026-10-11T03:04:06.456Z' };
   const B = createAssessmentReceipt(item, 'B', answer, clocks, evidence);
+  assert.equal(createAssessmentReceipt(item,'A',answer,clocks,evidence).promptSha256,hash(PROMPTS.A));
   assert.equal(B.startedAt, clocks.startedAt); assert.equal(B.finishedAt, clocks.finishedAt);
   assert.equal(B.responseSha256, answer.responseSha256); assert.deepEqual(B.usage, answer.usage);
   assert.equal(B.actualBilledUsd, null); assert.equal(B.estimatedApiUsd, null);
@@ -142,6 +190,7 @@ test('broker pass and receipt helpers preserve validated answer provenance/clock
   const thirdInput = buildAssessmentPassInput(item, evidence, 'C', { A, B });
   assert.deepEqual(thirdInput.dependencies, [A.receiptSha256, B.receiptSha256]);
   const C = createAssessmentReceipt(item, 'C', answer, clocks, evidence, thirdInput);
+  assert.equal(C.promptSha256,hash(PROMPTS.C));assert.notEqual(C.promptSha256,'7b0204658c11581c84d779278ae3b58df21d52bb8f7796b975fe0a7b43c6d14b');
   assert.deepEqual(C.dependencies, thirdInput.dependencies);
   assert.equal(B.providerEncodingVersion,input.providerEncodingVersion);assert.equal(C.providerEncodingVersion,thirdInput.providerEncodingVersion);
   assert.throws(() => buildAssessmentPassInput(item, evidence, 'A', { A, B }), /Blind passes/);

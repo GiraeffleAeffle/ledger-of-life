@@ -603,6 +603,7 @@ test('delivered source-free control contains the exact serialized output schema 
  assert.equal(bundle.outputSchemaSha256,assessmentDigest(schema));assert.equal(bundle.systemPromptSha256,digest(control));
  assert.ok(control.startsWith(PROMPTS.B));assert.equal(control.includes('synthetic source, never an operational observation'),false);
  for(const rule of ['If outcome is abstain OR unresolved, scores.usefulness must be 0','value and unit must be both null or both non-null','Never invent a day for month/year/period precision','When date is null, dateRole may retain an attested role','Always include valueReview and criticalReview','every input claimId exactly once','data_missing must equal (missing.length > 0)','each criticalTarget claim exactly once'])assert.ok(control.includes(rule),rule);
+ for(const rule of ['For compact r1-provider-propositions-v3 input','resolve $quote and other supplied references silently','no analysis, reference-resolution explanation, or other text before or after it, and no code fence'])assert.ok(control.includes(rule),rule);
  assert.ok(Buffer.byteLength(control)<=65536,'Reviewed control bind remains within its independent bound');
 });
 test('B encoding clarifications preserve unresolved judgment while satisfying the unchanged deterministic checker',()=>{
