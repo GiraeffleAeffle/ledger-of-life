@@ -525,8 +525,10 @@ requires its complete gate and fresh security reviews.
 Production discovery was exercised again read-only on 2026-10-17 using the
 documented `discover` command. All five exact selected native runs still had one
 committed receipt each. The driver tree now contained historical/repeated seal
-generations, including some `355691be` results; discovery still reported the
-complete 27-source selection unavailable. Its `wouldRead` list named the actual
+generations, including some `355691be` results. Those paths are only discovery
+candidates, not a complete explicitly approved selection. The discovery contract
+now says `selectionValidated: false` regardless of raw file count: 27 copied or
+historical files do not prove 27 current source generations. Its `wouldRead` list named the actual
 driver catalogue, CAS/operator roots, authentic released predecessor, staging and
 policy/identity/critical provenance, Git predecessor members and canonical DB
 custody. It returned `writes: []`, `network: false`, `providers: false` and did
