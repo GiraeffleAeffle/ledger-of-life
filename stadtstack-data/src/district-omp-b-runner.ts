@@ -23,6 +23,8 @@ export const OMP_HOST_BINARY='/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4';
 export const OMP_HOST_VERSION='omp/18.10.4';
 export const OMP_REVIEW_PATH='/etc/stadtstack/omp-b-review.json';
 export const OMP_RUNNER_VERSION='district-omp-b-runner-v1';
+export const OMP_NATIVE_STREAM_VERSION='omp-native-stream-v2';
+export type OmpStreamVersion='omp-native-stream-v1'|typeof OMP_NATIVE_STREAM_VERSION;
 export const OMP_LIMITS=Object.freeze({walltimeMs:240_000,modelMaxTimeSeconds:OMP_B_MODEL_MAX_TIME_SECONDS,inputBytes:512*1024,outputBytes:2*1024*1024,stderrBytes:16*1024,tokenBytes:16*1024});
 const hash=z.string().regex(/^[a-f0-9]{64}$/),image=z.string().regex(/^sha256:[a-f0-9]{64}$/);
 export const OmpReviewSchema=z.object({version:z.literal(OMP_RUNNER_VERSION),imageId:image,runnerContractSha256:hash,ompBinarySha256:hash,hostResolverBinarySha256:hash,hostResolverVersion:z.literal(OMP_HOST_VERSION),dockerDaemonId:z.string().regex(/^[A-Za-z0-9:_-]{1,256}$/),securityReviewId:z.string().min(1).max(200),reviewedBy:z.string().min(1).max(200),reviewedAt:z.iso.datetime(),dockerSocket:z.string().regex(/^\/run\/(?:[a-zA-Z0-9._-]+\/)*[a-zA-Z0-9._-]+\.sock$/)}).strict();
@@ -58,6 +60,13 @@ const OmpTextUpdateSchema=z.discriminatedUnion('type',[
  z.object({type:z.literal('text_end'),contentIndex:z.number().int().nonnegative(),content:z.string()}).strict(),
  z.object({type:z.literal('done'),reason:z.literal('stop')}).strict(),
 ]);
+const OmpNativeUpdateSchema=z.discriminatedUnion('type',[
+ ...OmpTextUpdateSchema.options,
+ z.object({type:z.literal('thinking_start'),contentIndex:z.number().int().nonnegative()}).strict(),
+ z.object({type:z.literal('thinking_delta'),contentIndex:z.number().int().nonnegative(),delta:z.string()}).strict(),
+ z.object({type:z.literal('thinking_end'),contentIndex:z.number().int().nonnegative(),content:z.string()}).strict(),
+]);
+const OmpThinkingBlockSchema=z.object({type:z.literal('thinking'),thinking:z.string(),thinkingSignature:z.string().optional(),summary:z.boolean().optional()}).strict();
 // Only frozen-schema paths enter diagnostics; record keys/indices become wildcards.
 const outputJsonSchema=object(z.toJSONSchema(assessmentOutputSchema));
 const approvedOutputPaths=new Set<string>();
@@ -97,7 +106,8 @@ const OmpV2OutputRejectionSchema=z.object({
  outputNormalization:OmpOutputNormalizationSchema.optional(),
 }).strict();
 const OmpV3OutputRejectionSchema=OmpV2OutputRejectionSchema.extend({version:z.literal('omp-output-rejection-v3'),structure:OmpOutputStructureSchema}).strict();
-export const OmpOutputRejectionSchema=z.discriminatedUnion('version',[OmpV1OutputRejectionSchema,OmpV2OutputRejectionSchema,OmpV3OutputRejectionSchema])
+const OmpV4OutputRejectionSchema=OmpV3OutputRejectionSchema.omit({outputNormalization:true}).extend({version:z.literal('omp-output-rejection-v4'),streamVersion:z.literal(OMP_NATIVE_STREAM_VERSION)}).strict();
+export const OmpOutputRejectionSchema=z.discriminatedUnion('version',[OmpV1OutputRejectionSchema,OmpV2OutputRejectionSchema,OmpV3OutputRejectionSchema,OmpV4OutputRejectionSchema])
  .refine(value=>value.issues.length===Math.min(value.issueCount,32));
 export type OmpOutputRejection=z.infer<typeof OmpOutputRejectionSchema>;
 export class OmpAssessmentOutputRejected extends OmpRunnerHold{
@@ -108,13 +118,14 @@ export class OmpAssessmentOutputRejected extends OmpRunnerHold{
 export function ompOutputRejectionVersions(input:OmpOutputRejection):Record<string,string>{
  const proof=OmpOutputRejectionSchema.parse(input);
  const versions:Record<string,string>={ompOutputRejectionVersion:proof.version,ompDecodeCheck:proof.check,ompOutputStreamSha256:proof.streamSha256,ompOutputSha256:proof.outputSha256,ompOutputIssueCount:String(proof.issueCount)};
- if(proof.version!=='omp-output-rejection-v1'&&proof.outputNormalization)versions.ompOutputNormalization=proof.outputNormalization;
- if(proof.version==='omp-output-rejection-v3')Object.assign(versions,ompOutputStructureVersions(proof.structure));
+ if('outputNormalization' in proof&&proof.outputNormalization)versions.ompOutputNormalization=proof.outputNormalization;
+ if('structure' in proof)Object.assign(versions,ompOutputStructureVersions(proof.structure));
+ if(proof.version==='omp-output-rejection-v4')versions.ompNativeStreamVersion=proof.streamVersion;
  proof.issues.forEach((issue,index)=>{versions['ompOutputIssue'+index]=canonicalJson(issue);});
  return versions;
 }
 export function ompOutputRejectionFromVersions(versions:Record<string,string>):OmpOutputRejection|null{
- if(!['omp-output-rejection-v1','omp-output-rejection-v2','omp-output-rejection-v3'].includes(versions.ompOutputRejectionVersion??''))return null;
+ if(!['omp-output-rejection-v1','omp-output-rejection-v2','omp-output-rejection-v3','omp-output-rejection-v4'].includes(versions.ompOutputRejectionVersion??''))return null;
  const count=Number(versions.ompOutputIssueCount);
  if(!Number.isSafeInteger(count)||count<1||String(count)!==versions.ompOutputIssueCount)return null;
  const length=Math.min(count,32),issues:unknown[]=[];
@@ -125,7 +136,7 @@ export function ompOutputRejectionFromVersions(versions:Record<string,string>):O
   const encoded=versions['ompOutputIssue'+index];if(typeof encoded!=='string'||Buffer.byteLength(encoded)>256)return null;
   try{issues.push(JSON.parse(encoded));}catch{return null;}
  }
- const proof=OmpOutputRejectionSchema.safeParse({version:versions.ompOutputRejectionVersion,check:versions.ompDecodeCheck,streamSha256:versions.ompOutputStreamSha256,outputSha256:versions.ompOutputSha256,issueCount:count,issues,...versions.ompOutputRejectionVersion!=='omp-output-rejection-v1'&&versions.ompOutputNormalization!==undefined?{outputNormalization:versions.ompOutputNormalization}:{},...versions.ompOutputRejectionVersion==='omp-output-rejection-v3'?{structure:ompOutputStructureFromVersions(versions)}:{}});
+ const proof=OmpOutputRejectionSchema.safeParse({version:versions.ompOutputRejectionVersion,check:versions.ompDecodeCheck,streamSha256:versions.ompOutputStreamSha256,outputSha256:versions.ompOutputSha256,issueCount:count,issues,...versions.ompOutputRejectionVersion!=='omp-output-rejection-v1'&&versions.ompOutputNormalization!==undefined?{outputNormalization:versions.ompOutputNormalization}:{},...['omp-output-rejection-v3','omp-output-rejection-v4'].includes(versions.ompOutputRejectionVersion)?{structure:ompOutputStructureFromVersions(versions)}:{},...versions.ompOutputRejectionVersion==='omp-output-rejection-v4'?{streamVersion:versions.ompNativeStreamVersion}:{}});
  return proof.success?proof.data:null;
 }
 function outputIssuePath(parts:readonly PropertyKey[]):string{
@@ -138,7 +149,7 @@ function outputIssuePath(parts:readonly PropertyKey[]):string{
  }
  return path;
 }
-function outputRejection(stdout:string,text:string,structure:OmpOutputStructure,check:OmpOutputRejection['check'],issues?:readonly z.core.$ZodIssue[],outputNormalization?:OmpOutputNormalization):OmpAssessmentOutputRejected{
+function outputRejection(stdout:string,text:string,structure:OmpOutputStructure,check:OmpOutputRejection['check'],issues?:readonly z.core.$ZodIssue[],outputNormalization?:OmpOutputNormalization,streamVersion:OmpStreamVersion='omp-native-stream-v1'):OmpAssessmentOutputRejected{
  const diagnostics:z.infer<typeof OmpV2OutputIssueSchema>[]=[];let issueCount=0;
  function collect(found:readonly z.core.$ZodIssue[]):void{
   for(const issue of found){
@@ -150,7 +161,8 @@ function outputRejection(stdout:string,text:string,structure:OmpOutputStructure,
   }
  }
  if(issues)collect(issues);else{issueCount=1;diagnostics.push({code:'invalid_json',path:'$'});}
- return new OmpAssessmentOutputRejected({version:'omp-output-rejection-v3',check,streamSha256:sha(stdout),outputSha256:sha(text),issueCount,issues:diagnostics,structure,...outputNormalization?{outputNormalization}:{}});
+ const common={check,streamSha256:sha(stdout),outputSha256:sha(text),issueCount,issues:diagnostics,structure};
+ return new OmpAssessmentOutputRejected(streamVersion===OMP_NATIVE_STREAM_VERSION?{...common,version:'omp-output-rejection-v4',streamVersion}:{...common,version:'omp-output-rejection-v3',...outputNormalization?{outputNormalization}:{}});
 }
 export interface OmpAssessmentControl {prompt:string;systemPromptSha256:string;outputSchemaSha256:string}
 /** Delivered control bytes, separate from the historical source request hash. */
@@ -160,7 +172,7 @@ export function ompAssessmentControl():OmpAssessmentControl{
   +'\n\nAllowed output property names per object (repeated paths are alternative key sets):\n'+keys
   +'\n\nReturn exactly one JSON object. Its first character must be { and its last character must be }. No Markdown, code fences, commentary, or surrounding text. Use ONLY the listed property names at every object level. For alternative key sets select one complete schema branch; never combine branches. Do not add input metadata or JSON-Schema keywords as output properties. Required fields, values and nullability must match the frozen schema exactly.\n'
   +'\nFor compact r1-provider-propositions-v3 input, resolve $quote and other supplied references silently. Your entire response is exactly one JSON object: no analysis, reference-resolution explanation, or other text before or after it, and no code fence. Do not restate or expand the input outside the output object.\n'
-  +'\nFor source-record propositions, assess each proposition independently against the supplied original evidence. A normalized classification such as caseType, stage or modality need not appear verbatim: a complete supplied locator quote may establish that label semantically. The supplied label, metadata or a null projection quote is not itself source evidence; inspect the supplied quotes and assert a classification only when their meaning actually establishes it. Never invent or upgrade a classification, stage or modality. Preserve assertions for supported propositions even when another required proposition is unresolved. For source-record items without valueTarget, supported still requires every input claimId to be supported; otherwise preserve applicable holdReasons and a non-supported outcome rather than suppressing independently supported assertions or admitting an unsupported classification.\n'
+  +'\nFor source-record propositions, assess each proposition independently against the supplied original evidence. A null or absent suggested projection quote means only that no quote was pre-associated with that property; it is never by itself a reason to leave the proposition unasserted. Do not require a quote dedicated to its selector or the normalized label to occur literally. For every proposition, inspect ALL supplied original locators. If any complete exact locator quote establishes the claim meaning, assert its original claimId using that locatorId and its entire quote verbatim, even when the locator was associated with a different property, such as the title, or also supports another proposition. Bind each assertion to the strongest supplied locator whose quoted words themselves establish that specific claim, never an unrelated nearby quote, identifier or citation. Normalized caseType, stage and modality are established when the quoted words entail them. For example, a locator naming a "Bebauungsplan" establishes caseType=planning; it does not alone establish adoption, implementation or any date, and an unrelated DS reference is not the supporting locator. Labels and metadata are not themselves evidence; the supporting original locator quote is. Leave a claim unasserted only when no supplied locator establishes it. Never invent or upgrade a classification, stage, date or status beyond the source meaning. Preserve assertions for supported propositions even when another required proposition is unresolved. For source-record items without valueTarget, supported still requires every input claimId to be supported; otherwise preserve applicable holdReasons and a non-supported outcome rather than suppressing independently supported assertions or admitting an unsupported classification.\n'
   +'\nOutput encoding rules only: do not change a source-bound judgment, erase uncertainty, or remove applicable holdReasons to satisfy formatting.\n'
   +'- Copy itemId exactly. Every assertion claimId must belong to input claimIds and occur at most once. If outcome is supported and valueTarget is absent, include every input claimId exactly once. Supported output requires an assertion unless valueReview.kind is abstention.\n'
   +'- If outcome is abstain OR unresolved, scores.usefulness must be 0. This also applies to any valueReview.kind of abstention. It is an encoding rule, not a direction to choose any outcome.\n'
@@ -239,9 +251,11 @@ function ompProviderFailure(stdout:string):OmpFailureKind|undefined {
 function ompProviderHold(stdout:string,fallback:OmpFailureKind,exitCode:number):OmpRunnerHold {
  return new OmpRunnerHold('provider_failed',undefined,ompProviderFailure(stdout)??fallback,exitCode);
 }
-export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutputDelivery,expectedModel:typeof NATIVE_B_MODEL|'claude-haiku-5-5'=NATIVE_B_MODEL){
+export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutputDelivery,expectedModel:typeof NATIVE_B_MODEL|'claude-haiku-5-5'=NATIVE_B_MODEL,streamVersion:OmpStreamVersion='omp-native-stream-v1'){
  if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero',exitCode);
  function fail(check:OmpDecodeCheck):never{throw new OmpRunnerHold('event_stream',undefined,undefined,exitCode,check);}
+ if(streamVersion!=='omp-native-stream-v1'&&streamVersion!==OMP_NATIVE_STREAM_VERSION)fail('event_envelope');
+ const native=streamVersion===OMP_NATIVE_STREAM_VERSION;
  if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes)fail('stream_size');
  if(!stdout.length)fail('empty_stream');
  if(!stdout.endsWith('\n'))fail('final_newline');
@@ -249,7 +263,8 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
  let final:Record<string,unknown>|undefined,finalLine='',turns=0,assistantStarts=0,agentStarted=false,assistantEnded=false,turnEnded=false,agentEnded=false;
  let openMessage:'user'|'assistant'|undefined;
  const assistantMessages=new Map<string,string>();
- const textUpdates=new Map<number,{deltas:string[];text?:string}>();
+ const contentUpdates=new Map<number,{type:'text'|'thinking';deltas:string[]|null;text?:string}>();
+ let nextContentIndex=0,openContentIndex:number|undefined,textStarted=false;
  const rejectAssistant=(message:Record<string,unknown>)=>{
   if(message.role!=='assistant')return;
   const reason=String(message.stopReason??'');
@@ -265,7 +280,10 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
   if(previous!==undefined&&previous!==encoded)fail('assistant_copy_mismatch');
   assistantMessages.set(identity,encoded);if(assistantMessages.size>1)fail('multiple_assistant_messages');
   const content=Array.isArray(message.content)?message.content:[];
-  if(content.some(block=>object(block).type!=='text'||typeof object(block).text!=='string'))fail('assistant_content');
+  if(native){
+   if(!content.length||object(content[content.length-1]).type!=='text'||typeof object(content[content.length-1]).text!=='string')fail('final_content');
+   for(let index=0;index<content.length-1;index++)if(!OmpThinkingBlockSchema.safeParse(content[index]).success)fail('assistant_content');
+  }else if(content.some(block=>object(block).type!=='text'||typeof object(block).text!=='string'))fail('assistant_content');
  };
  for(let i=0;i<lines.length;i++){
   const line=lines[i]!;let event:Record<string,unknown>;try{event=object(JSON.parse(line));}catch{fail('event_json');}
@@ -291,22 +309,32 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
    if(update.type==='error')throw ompProviderHold(stdout,'stream_update_error',exitCode);
    if(update.type==='done'&&update.reason!=='stop')throw ompProviderHold(stdout,update.reason==='length'?'stop_length':update.reason==='error'?'stop_error':'stop_other',exitCode);
    if(typeof update.type==='string'&&update.type.startsWith('toolcall_'))fail('tool_update');
-   const checkedUpdate=OmpTextUpdateSchema.safeParse(update);
+   const checkedUpdate=(native?OmpNativeUpdateSchema:OmpTextUpdateSchema).safeParse(update);
    if(!checkedUpdate.success)fail('text_update_schema');
    if(openMessage!=='assistant'||assistantStarts!==1||assistantEnded||turnEnded)fail('event_order');
    const textUpdate=checkedUpdate.data;
-   if(textUpdate.type==='text_start'){
-    if(textUpdates.has(textUpdate.contentIndex))fail('text_update_order');
-    textUpdates.set(textUpdate.contentIndex,{deltas:[]});
-   }else if(textUpdate.type==='text_delta'||textUpdate.type==='text_end'){
-    const block=textUpdates.get(textUpdate.contentIndex);
-    if(!block||block.text!==undefined)fail('text_update_order');
-    if(textUpdate.type==='text_delta')block.deltas.push(textUpdate.delta);
-    else{
-     if(block.deltas.join('')!==textUpdate.content)fail('text_update_mismatch');
-     block.text=textUpdate.content;block.deltas.length=0;
+   const thinking=textUpdate.type==='thinking_start'||textUpdate.type==='thinking_delta'||textUpdate.type==='thinking_end';
+   const type=thinking?'thinking':'text';
+   if(textUpdate.type==='text_start'||textUpdate.type==='thinking_start'){
+    if(native){
+     if(openContentIndex!==undefined||textUpdate.contentIndex!==nextContentIndex||textStarted)fail('text_update_order');
+     openContentIndex=nextContentIndex++;
+     if(!thinking)textStarted=true;
     }
-   }
+    if(contentUpdates.has(textUpdate.contentIndex))fail('text_update_order');
+    contentUpdates.set(textUpdate.contentIndex,{type,deltas:thinking?null:[]});
+   }else if(textUpdate.type==='text_delta'||textUpdate.type==='text_end'||textUpdate.type==='thinking_delta'||textUpdate.type==='thinking_end'){
+    const block=contentUpdates.get(textUpdate.contentIndex);
+    if(!block||block.type!==type||block.text!==undefined||native&&openContentIndex!==textUpdate.contentIndex)fail('text_update_order');
+    if(textUpdate.type==='text_delta'||textUpdate.type==='thinking_delta'){if(block.deltas)block.deltas.push(textUpdate.delta);}
+    else{
+     // Pinned Anthropic finalization may unwrap thinking before thinking_end.
+     // Thinking deltas are deliberately ignored; final text remains exact.
+     if(block.deltas&&block.deltas.join('')!==textUpdate.content)fail('text_update_mismatch');
+     block.text=textUpdate.content;if(block.deltas)block.deltas.length=0;
+     if(native)openContentIndex=undefined;
+    }
+   }else if(native&&textUpdate.type==='done'&&openContentIndex!==undefined)fail('text_update_order');
   }
   if(event.type==='turn_end'){
    if(event.reason&&event.reason!=='stop')throw ompProviderHold(stdout,'turn_reason',exitCode);
@@ -333,29 +361,30 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
    if(message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!==expectedModel||message.stopReason!=='stop')throw new OmpRunnerHold('model_identity_mismatch');
    if(message.upstreamModel!==undefined&&message.upstreamModel!==expectedModel)throw new OmpRunnerHold('model_identity_mismatch');
    const content=Array.isArray(message.content)?message.content:[];
-   if(!content.length||content.some(block=>object(block).type!=='text'))fail('final_content');
+   if(!content.length||!native&&content.some(block=>object(block).type!=='text'))fail('final_content');
    if(!final){final=message;finalLine=line;}
   }
  }
  if(!final)fail('missing_final_assistant');
- if(textUpdates.size){
+ if(contentUpdates.size){
   const content=final.content as Array<Record<string,unknown>>;
-  if(textUpdates.size!==content.length)fail('text_update_mismatch');
+  if(contentUpdates.size!==content.length)fail('text_update_mismatch');
   for(let index=0;index<content.length;index++){
-   const block=textUpdates.get(index);
-   if(!block)fail('text_update_mismatch');
+   const thinking=content[index]!.type==='thinking',block=contentUpdates.get(index);
+   if(!block||block.type!==content[index]!.type)fail('text_update_mismatch');
    if(block.text===undefined)fail('text_update_order');
-   if(block.text!==content[index]!.text)fail('text_update_mismatch');
+   if(block.text!==content[index]![thinking?'thinking':'text'])fail('text_update_mismatch');
   }
  }
  if(!agentStarted||turns!==1||assistantStarts!==1||!assistantEnded||!turnEnded||!agentEnded)fail('incomplete_lifecycle');
- const text=(final.content as Array<Record<string,unknown>>).map(block=>String(block.text)).join('');
+ const finalContent=final.content as Array<Record<string,unknown>>,text=native?String(finalContent[finalContent.length-1]!.text):finalContent.map(block=>String(block.text)).join('');
  if(Buffer.byteLength(text)>96*1024)throw new OmpRunnerHold('resource_limit');
  const outputStructure=describeOmpOutput(text,delivery,object(final.usage).output),fence=exactOmpJsonFence(text);
+ if(native&&fence!==undefined)throw outputRejection(stdout,text,outputStructure,'output_json',undefined,undefined,streamVersion);
  const outputNormalization=fence!==undefined?'single-json-fence-v1' as const:undefined;
  const jsonText=fence??text;
- let raw:unknown;try{raw=JSON.parse(jsonText);}catch{throw outputRejection(stdout,text,outputStructure,'output_json',undefined,outputNormalization);}
- const decoded=assessmentOutputSchema.safeParse(raw);if(!decoded.success)throw outputRejection(stdout,text,outputStructure,'output_schema',decoded.error.issues,outputNormalization);
+ let raw:unknown;try{raw=JSON.parse(jsonText);}catch{throw outputRejection(stdout,text,outputStructure,'output_json',undefined,outputNormalization,streamVersion);}
+ const decoded=assessmentOutputSchema.safeParse(raw);if(!decoded.success)throw outputRejection(stdout,text,outputStructure,'output_schema',decoded.error.issues,outputNormalization,streamVersion);
  const value=decoded.data;
  const usageRaw=object(final.usage),finalUsage=counts(usageRaw);
  const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
@@ -384,10 +413,10 @@ function unavailableOmpSystemPrompt(stdout:string,stderr:string):boolean{
 }
 /** Prompt-control failures preempt quality settlement even for a normal exit.
  * Preserve governed usage holds without granting no-output retry certification. */
-export function inspectOmpAssessmentCompletion(stdout:string,stderr:string,exitCode:number,delivery:OmpOutputDelivery,observedAt:string,controlMode?:'0444'):OmpParsedEvents{
+export function inspectOmpAssessmentCompletion(stdout:string,stderr:string,exitCode:number,delivery:OmpOutputDelivery,observedAt:string,controlMode?:'0444',streamVersion:OmpStreamVersion=OMP_NATIVE_STREAM_VERSION):OmpParsedEvents{
  try{
   if(unavailableOmpSystemPrompt(stdout,stderr))throw new OmpRunnerHold('request_rejected',undefined,undefined,exitCode,'control_prompt_unavailable',controlMode);
-  return inspectOmpEvents(stdout,exitCode,delivery);
+  return inspectOmpEvents(stdout,exitCode,delivery,NATIVE_B_MODEL,streamVersion);
  }catch(error){
   if(error instanceof OmpAssessmentOutputRejected)throw new OmpAssessmentOutputRejected(error.rejection,controlMode);
   throw inspectOmpLimitFailure(stdout,stderr,observedAt,exitCode,error,NATIVE_B_MODEL)??error;
@@ -472,7 +501,7 @@ export async function resolveOmpCredential(spawn:OmpSpawn,binary:string,jobRoot:
  * completed. This is not the Mac client's stronger file-write-denial assertion. */
 export const OmpNativeCleanupSchema=z.object({version:z.literal('omp-native-cleanup-v1'),requestSha256:hash,responseSha256:hash,runnerContractSha256:hash,imageId:image,scratchId:z.uuid(),containerId:hash,containerRemoved:z.literal(true),managedScratchClosed:z.literal(true),completedAt:z.iso.datetime()}).strict();
 export type OmpNativeCleanup=z.infer<typeof OmpNativeCleanupSchema>;
-export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;controlMode:'0444';accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization;cleanup:OmpNativeCleanup}
+export interface OmpRunnerResult {answer:ModelAnswer;stdout:string;startedAt:string;finishedAt:string;imageId:string;settingsSha256:string;systemPromptSha256:string;outputSchemaSha256:string;controlMode:'0444';accountLabelSha256:string;runnerContractSha256:string;toolVersion:string;nativeStreamVersion:typeof OMP_NATIVE_STREAM_VERSION;thinking:'medium';outputStructure:OmpOutputStructure;outputNormalization?:OmpOutputNormalization;cleanup:OmpNativeCleanup}
 /** A failed control/provider lease must not quarantine the shared evidence CAS.
  * The sibling is separately enrolled with the same authority/source bindings. */
 export function ompAssessmentScratchRoot(root:string):string{
@@ -598,7 +627,7 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const {outputNormalization,outputStructure,...modelResult}=parsed;
     const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:NATIVE_B_MODEL,runtimeWarnings:[]};assertNativeBResponseIdentity(answer);
-    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{},scratchId:basename(scope.directory),containerId:container.id};
+    return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',outputStructure,...outputNormalization?{outputNormalization}:{},scratchId:basename(scope.directory),containerId:container.id} as const;
    }finally{
     scope.signal.removeEventListener('abort',onAbort);
     // Removal is independently supervised by the canonical authority. An
