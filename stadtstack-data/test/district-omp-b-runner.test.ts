@@ -604,6 +604,7 @@ test('delivered source-free control contains the exact serialized output schema 
  assert.ok(control.startsWith(PROMPTS.B));assert.equal(control.includes('synthetic source, never an operational observation'),false);
  for(const rule of ['If outcome is abstain OR unresolved, scores.usefulness must be 0','value and unit must be both null or both non-null','Never invent a day for month/year/period precision','When date is null, dateRole may retain an attested role','Always include valueReview and criticalReview','every input claimId exactly once','data_missing must equal (missing.length > 0)','each criticalTarget claim exactly once'])assert.ok(control.includes(rule),rule);
  for(const rule of ['For compact r1-provider-propositions-v3 input','resolve $quote and other supplied references silently','no analysis, reference-resolution explanation, or other text before or after it, and no code fence'])assert.ok(control.includes(rule),rule);
+ for(const rule of ['assess each proposition independently','a complete supplied locator quote may establish that label semantically','assert a classification only when their meaning actually establishes it','Never invent or upgrade a classification, stage or modality','Preserve assertions for supported propositions even when another required proposition is unresolved','supported still requires every input claimId to be supported'])assert.ok(control.includes(rule),rule);
  assert.ok(Buffer.byteLength(control)<=65536,'Reviewed control bind remains within its independent bound');
 });
 test('B encoding clarifications preserve unresolved judgment while satisfying the unchanged deterministic checker',()=>{
@@ -618,6 +619,21 @@ test('B encoding clarifications preserve unresolved judgment while satisfying th
  assert.equal(encoded.outcome,'unresolved');assert.equal(encoded.assertions[0].dateRole,'source_reference');assert.equal('quote' in encoded.assertions[0]&&encoded.assertions[0].quote,quote);
  const held=assessmentOutputSchema.parse({...encoded,holdReasons:['insufficient_evidence','critical_unsupported']});
  assert.deepEqual(deterministicChecks(item,evidence,held),['hold:critical_unsupported','hold:insufficient_evidence'],'Encoding never suppresses substantive holds');
+});
+test('independent classification encoding retains supported assertions but never admits uncovered claims',()=>{
+ const quote='Public consultation on the draft development plan begins in October.',hash=digest(quote),rubric='Synthetic independent proposition fixture';
+ assert.equal(quote.includes('development_plan'),false,'A normalized label is not necessarily literal source wording');
+ const locator={id:'span',page:null,table:null,start:0,end:quote.length,quote};
+ const evidence:OriginalEvidence=[{sourceId:'source',admittedSourceId:'source',url:'https://example.org/synthetic',originalSha256:hash,textSha256:hash,parserVersion:'synthetic',parserReceiptSha256:hash,admissionReceiptSha256:hash,ocrSuspected:false,text:quote,locators:[locator]}];
+ const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:'synthetic-classification',question:'Independently assess the source propositions',claim:'Normalized caseType development_plan',rubric,rubricSha256:digest(rubric),sources:[{sourceId:'source',originalSha256:hash,textSha256:hash,parserVersion:'synthetic',parserReceiptSha256:hash,admissionReceiptSha256:hash,ocrSuspected:false,locators:[{id:locator.id,page:null,table:null,start:0,end:quote.length}]}],claimIds:['classification'],entityIds:[],constraints:[],criticalKinds:[]});
+ const supported=assessmentOutputSchema.parse({itemId:item.itemId,outcome:'supported',assertions:[{claimId:'classification',sourceId:'source',locatorId:'span',quote,subjectId:null,objectId:null,value:null,unit:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'}],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'Synthetic encoding fixture, not a model observation.',valueReview:null,criticalReview:null});
+ assert.deepEqual(deterministicChecks(item,evidence,supported),[]);
+ const mixed=assessmentItemSchema.parse({...item,claimIds:['classification','approval']});
+ const unresolved=assessmentOutputSchema.parse({...supported,outcome:'unresolved',scores:{...supported.scores,usefulness:0},holdReasons:['insufficient_evidence']});
+ assert.deepEqual(deterministicChecks(mixed,evidence,unresolved),['hold:insufficient_evidence']);
+ assert.equal(unresolved.assertions[0].claimId,'classification','Unresolved classification coverage does not erase other assertions');
+ assert.deepEqual(deterministicChecks(mixed,evidence,supported),['missing_claim:approval'],'Partial assertions cannot become a supported item');
+ assert.deepEqual(deterministicChecks(item,evidence,{...supported,assertions:[{...supported.assertions[0],quote:'A paraphrase is not an exact locator quote.'}]}),['quote_locator:classification']);
 });
 
 for(const failure of ['credential','unsafe-output'] as const)test('parallel A evidence reads survive B '+failure+' in its disjoint enrolled lane',async t=>{

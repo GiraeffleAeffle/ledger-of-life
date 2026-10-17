@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID,createHash} from 'node:crypto';
-import {mkdtemp,realpath,rm,unlink} from 'node:fs/promises';
+import {mkdtemp,realpath,rm,unlink,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setTimeout as delay} from 'node:timers/promises';
@@ -16,9 +16,10 @@ import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {inspectOmpEvents,inspectOmpAssessmentCompletion,OmpAssessmentOutputRejected,ompAssessmentControl,ompRunnerContractSha256,OmpNativeCleanupSchema,type runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,inspectOmpAssessmentCompletion,OmpAssessmentOutputRejected,OmpRunnerHold,ompAssessmentControl,ompRunnerContractSha256,OmpNativeCleanupSchema,type runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {ompOutputStructureFromVersions} from '../src/district-omp-output-diagnostics.ts';
 import {modelIdentitySha256} from '../src/district-model-contract.ts';
+import {recordBSubscriptionHold} from '../src/district-subscription-usage.ts';
 
 // Opt-in isolated LOCAL Postgres only; synthetic sources/CLI event fixtures.
 // Nothing invokes SSH, provider binaries, external sources or notification networks.
@@ -73,7 +74,7 @@ async function ready(pool:Pool,jobKey:string){
  for(;;){const rows=await pool.query<{id:string;state:string}>(`SELECT b.id,b.state FROM district_pipeline.assessment_bridge_leases b JOIN district_pipeline.jobs j ON j.id=b.job_id WHERE j.job_key=$1 AND b.state='ready' ORDER BY b.created_at DESC LIMIT 1`,[jobKey]);if(rows.rows[0])return rows.rows[0];if(Date.now()>=deadline)throw Error('Synthetic bridge did not become ready within fixture bound');await delay(10);}
 }
 
-test('fenced B assessment protocol against isolated local Postgres',{skip:!connectionString,timeout:120000},async t=>{
+test('fenced B assessment protocol against isolated local Postgres',{skip:!connectionString,timeout:240000},async t=>{
  const base=new URL(connectionString!);
  if(!['postgres:','postgresql:'].includes(base.protocol)||!['localhost','127.0.0.1','[::1]',''].includes(base.hostname))throw Error('Broker fixture refuses a remote database');
  const host=base.searchParams.get('host');if(host&&!host.startsWith('/')&&!['localhost','127.0.0.1','::1'].includes(host))throw Error('Broker fixture refuses a remote host override');
@@ -157,7 +158,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[nativeKey])).rowCount,0);
  });
 
- const nativeModes=['accepted','quality','rejected','historical_model','slow_staging','expired_staging','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const;
+ const nativeModes=['accepted','quality','rejected','historical_model','slow_staging','expired_staging','batch_tampered','batch_failure','batch_policy_change','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const;
  const nativeTest=(mode:typeof nativeModes[number]|'usage_limit')=>t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
   let calls=0,stderr='';
   st.mock.method(process.stderr,'write',((chunk:unknown)=>{stderr+=String(chunk);return true;}) as typeof process.stderr.write);
@@ -184,10 +185,29 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const nativePool=mode==='slow_staging'?new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:400}):db;
   if(nativePool!==db)st.after(poolShutdownBarrier(nativePool));
   const f=await fixture(nativePool,'native-'+mode,runner,mode==='slow_staging'||mode==='expired_staging'?{leaseMs:1800,heartbeatMs:200}:undefined);directories.push(f.directory);
+  const written:{sha256:string;storageKey:string}[]=[],declaredBatches:string[][]=[];
+  const put=f.cas.put.bind(f.cas);
+  st.mock.method(f.cas,'put',async(...args:Parameters<typeof put>)=>{
+   if(calls>0){
+    // The existing governed API must inventory ALL five bindings before the
+    // first byte write, not merely collect five independent write results.
+    const inventory=JSON.parse(await readFile(join(f.policyOptions.stateDir,'inventory.json'),'utf8'));
+    const entries=inventory.entries.filter((entry:{kind:string;observationId:string})=>entry.kind==='prepared_source'&&entry.observationId!==key);
+    assert.ok(entries.every((entry:{sourceSha256:string;receiptSha256:string;host:string})=>entry.sourceSha256===f.proof.receipt.source.sha256&&entry.receiptSha256===f.proof.receiptSha256&&entry.host==='example.org'));
+    declaredBatches.push(entries.map((entry:{relativePath:string})=>entry.relativePath).sort());
+    if(mode==='batch_failure'&&written.length===2)throw Error('Synthetic interrupted batch');
+   }
+   const artifact=await put(...args);
+   if(calls>0){
+    written.push(artifact);
+    if(mode==='batch_tampered'&&written.length===3)await writeFile(join(f.cas.root,written[0].storageKey),'Synthetic altered bytes');
+   }
+   return artifact;
+  });
   let verifiedRenewals=0;
   if(mode==='slow_staging'){
-   const hooks=f.broker as unknown as {persist(...args:unknown[]):Promise<unknown>},persist=hooks.persist.bind(f.broker);
-   st.mock.method(hooks,'persist',async(...args:unknown[])=>{
+   const hooks=f.broker as unknown as {persistBatch(...args:unknown[]):Promise<unknown>},persist=hooks.persistBatch.bind(f.broker);
+   st.mock.method(hooks,'persistBatch',async(...args:unknown[])=>{
     if(calls>0){
      const before=(await db.query('SELECT l.expires_at,j.lease_expires_at FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id WHERE l.requested_model=$1 AND j.job_key=$2',['claude-sonnet-5-5',key])).rows[0];
      await delay(900);
@@ -200,13 +220,21 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    });
   }
   if(mode==='expired_staging'){
-   const hooks=f.broker as unknown as {persist(...args:unknown[]):Promise<unknown>},persist=hooks.persist.bind(f.broker);
-   st.mock.method(hooks,'persist',async(...args:unknown[])=>{
+   const hooks=f.broker as unknown as {persistBatch(...args:unknown[]):Promise<unknown>},persist=hooks.persistBatch.bind(f.broker);
+   st.mock.method(hooks,'persistBatch',async(...args:unknown[])=>{
     if(calls>0&&verifiedRenewals++===0){
      await db.query("UPDATE district_pipeline.assessment_bridge_leases SET expires_at=clock_timestamp()-interval '1 millisecond' WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)",[key]);
      await delay(450);
     }
     return persist(...args);
+   });
+  }
+  if(mode==='batch_policy_change'){
+   const hooks=f.broker as unknown as {persistBatch(...args:unknown[]):Promise<unknown>},persist=hooks.persistBatch.bind(f.broker);
+   st.mock.method(hooks,'persistBatch',async(...args:unknown[])=>{
+    const artifacts=await persist(...args);
+    if(calls>0)await db.query("UPDATE district_pipeline.policy_decisions SET state='excluded' WHERE proof_sha256=$1",[f.proof.receiptSha256]);
+    return artifacts;
    });
   }
   assert.throws(()=>new DistrictAssessmentBroker(db,f.cas,{policyOptions:f.policyOptions,fixtureOmpRunner:runner}),{name:'DistrictExecutionHold',message:'authorization_revoked'});
@@ -220,7 +248,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:mode==='slow_staging'?1800:30000});
   assert.equal(calls,1);
   const accepted=mode==='accepted'||mode==='quality'||mode==='slow_staging';
-  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'max_jobs_reached'):mode==='rejected'?'quality_failed':mode==='usage_limit'?'budget_paused':mode==='historical_model'?'omp_model_identity_mismatch':mode==='expired_staging'?'lease_expired':'execution_exception');
+  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'max_jobs_reached'):mode==='rejected'?'quality_failed':mode==='usage_limit'?'budget_paused':mode==='historical_model'?'omp_model_identity_mismatch':mode==='expired_staging'?'lease_expired':mode==='batch_policy_change'?'policy_excluded':'execution_exception');
   assert.equal(result.state,mode==='accepted'||mode==='slow_staging'?'completed':'held');
   const lease=(await db.query(`SELECT l.id,l.input_sha256,l.state,l.receipt_sha256,l.purge_ack_sha256,s.state AS submission_state FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id LEFT JOIN district_pipeline.assessment_bridge_submissions s ON s.lease_id=l.id WHERE j.job_key=$1`,[key])).rows[0];
   if(mode==='rejected'){assert.equal(lease.state,'held');assert.equal(lease.submission_state,'rejected');assert.deepEqual(await settledOmpOutputRejectionLeases(db,key),[lease.id]);assert.doesNotMatch(stderr,/PRIVATE_INVALID_OUTPUT/);return;}
@@ -240,7 +268,11 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal(lease.state,'submitted');assert.equal(lease.submission_state,'accepted');assert.match(lease.receipt_sha256,/^[a-f0-9]{64}$/);assert.match(lease.purge_ack_sha256,/^[a-f0-9]{64}$/);
   const nativeReceipt=JSON.parse((await f.cas.read(lease.receipt_sha256)).toString('utf8'));
   assert.equal(nativeReceipt.version,'assessment-receipt-v2');assert.equal(nativeReceipt.requestedModel,'claude-sonnet-5-5');
-  if(mode==='slow_staging')assert.equal(verifiedRenewals,5);
+  if(mode==='slow_staging')assert.equal(verifiedRenewals,1,'One five-member staging scope still renews both live leases');
+  assert.equal(written.length,5);assert.equal(declaredBatches.length,5);
+  const expectedPaths=written.map(artifact=>artifact.storageKey).sort();
+  for(const declared of declaredBatches)assert.deepEqual(declared,expectedPaths,'Every output binding precedes the first write');
+  for(const artifact of written)assert.equal(digest(await f.cas.read(artifact.sha256)),artifact.sha256);
   const ackBytes=await f.cas.read(lease.purge_ack_sha256),ack=JSON.parse(ackBytes.toString('utf8'));
   assert.equal(digest(ackBytes),lease.purge_ack_sha256);assert.equal(ack.version,'assessment-vm-omp-purge-ack-v1');assert.equal(ack.leaseId,lease.id);assert.equal(ack.inputSha256,lease.input_sha256);OmpNativeCleanupSchema.parse(ack.cleanup);
   assert.equal('modelFileWritesDenied' in ack,false,'Native cleanup never fabricates the Mac denial claim');
@@ -521,6 +553,39 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    }
   }
  });
+ await t.test('a provider-wide usage hold committed after preparation blocks native source handoff',async()=>{
+  // Independent database: the committed hold is immutable and must not be
+  // deleted or bypassed merely to allow later fixture scenarios to execute.
+  const usageDatabase='district_bridge_handoff_'+randomUUID().replaceAll('-','');
+  await admin.query('CREATE DATABASE "'+usageDatabase+'"');
+  const usageUrl=new URL(base);usageUrl.pathname='/'+usageDatabase;
+  const usagePool=new Pool({connectionString:usageUrl.href,max:8,connectionTimeoutMillis:5000,statement_timeout:10000});
+  const closeUsagePool=poolShutdownBarrier(usagePool);let handedOff=0;
+  try{
+   await migrateDistrictJobs(usagePool);
+   const runner:typeof runVmOmpAssessment=async(data,_context,_signal,deps)=>{
+    const active=(await usagePool.query('SELECT l.id,j.id AS job_id,r.authorization_id FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id JOIN district_pipeline.executor_runs r ON r.id=l.run_id WHERE j.job_key=$1',[key])).rows[0];
+    const message={role:'assistant',responseId:'synthetic-native-limit',timestamp:Date.now(),provider:'anthropic',api:'anthropic-messages',model:'claude-sonnet-5-5',stopReason:'error',content:[],usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{total:0}},errorMessage:'429 '+JSON.stringify({type:'rate_limit_error',reset_at:new Date(Date.now()+3600000).toISOString()})};
+    const stdout=[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(event=>JSON.stringify(event)).join('\n')+'\n';
+    const request=Buffer.from(canonicalJson(data)),control=ompAssessmentControl();
+    let failure:OmpRunnerHold|undefined;
+    try{inspectOmpAssessmentCompletion(stdout,'',0,{requestSha256:digest(request),systemPromptSha256:control.systemPromptSha256,stdin:{intendedBytes:request.length,deliveredBytes:request.length,deliveredSha256:digest(request),frameBytes:request.length+25}},new Date().toISOString(),'0444');}catch(error){assert.ok(error instanceof OmpRunnerHold);failure=error;}
+    assert.ok(failure?.subscriptionLimit);assert.ok(failure.failureProof);
+    const client=await usagePool.connect();
+    try{await recordBSubscriptionHold(client,active.authorization_id,active.job_id,active.id,failure.subscriptionLimit,failure.noOutput,failure.failureProof);}finally{client.release();}
+    await deps?.beforeHandoff?.();
+    handedOff++;throw Error('Native handoff must remain blocked');
+   };
+   const f=await fixture(usagePool,'usage-after-prepare',runner);directories.push(f.directory);
+   const key=await enqueueAssessmentB(f.broker,{itemArtifactSha256:f.itemArtifact.sha256,sourceScope:f.proof.receipt.scope,policyProofSha256:f.proof.receiptSha256,transport:'vm-omp'});
+   const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
+   const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+   assert.equal(result.state,'held');assert.equal(result.reasonCode,'budget_paused');assert.equal(handedOff,0);
+   assert.equal((await usagePool.query('SELECT count(*) AS count FROM district_pipeline.r1_subscription_usage_holds')).rows[0].count,'1');
+   assert.equal((await usagePool.query('SELECT count(*) AS count FROM district_pipeline.assessment_bridge_submissions')).rows[0].count,'0');
+  }finally{await closeUsagePool();await admin.query('DROP DATABASE "'+usageDatabase+'"');}
+ });
+
  // A genuine quota hold stops all B execution until governed resume. Keep it last:
  // later synthetic scenarios must not bypass that correct global stop.
  await nativeTest('usage_limit');
