@@ -6,15 +6,14 @@ import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contrac
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {modelIdentitySha256} from '../src/district-model-contract.ts';
 import {normalizeGraphClaims} from '../src/district-graph-claims.ts';
-import {residualAssessmentItem,residualRecordPropositions} from '../src/district-assessment-jobs.ts';
-import {assessmentBlindProjection,assessmentItemSchema,assessmentOutputSchema,assertSourceRecordProjection,assessmentProviderInput,buildAssessmentPassInput,createAssessmentReceipt,validateReceipt,deterministicChecks} from '../src/district-assessment.ts';
+import {residualAssessmentItem,residualRecordPropositions,reconstructResidualAssessmentItem} from '../src/district-assessment-jobs.ts';
+import {assessmentBlindProjection,assessmentItemSchema,assessmentOutputSchema,assertSourceRecordProjection,assessmentProviderInput,buildAssessmentPassInput,createAssessmentReceipt,validateReceipt,deterministicChecks,runAssessmentPass} from '../src/district-assessment.ts';
 import type {OriginalEvidence} from '../src/district-assessment.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
 import {NATIVE_B_MODEL} from '../src/district-b-native-model.ts';
-import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
+import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt,historicalResidualAssessmentItem} from './district-assessment.fixture.ts';
 
-async function fixture(t:TestContext){
- const text='Strausberg prüft den Entwurf. Beschlussvorlage 123 vom 17.10.2026.';
+async function fixture(t:TestContext,text='Strausberg prüft den Entwurf. Beschlussvorlage 123 vom 17.10.2026.'){
  const f=await admittedAssessmentFixture(text);t.after(()=>rm(f.directory,{recursive:true,force:true}));
  const record=recordFor(f,text);record.documentDateReason='PRIVATE_GENERATED_ABSENCE_REASON';record.verification.evidenceHash=knowledgeEvidenceHash(record);
  const prepared:PreparedDocument={version:'district-prepared-v2',municipalityId:record.municipalityId,sourceSha256:f.source.originalSha256,sourceBytes:Buffer.byteLength(text),mimeType:'text/plain',references:record.sources,extractorSha256:digest('synthetic parser'),toolVersions:{fixture:'synthetic'},text,textSha256:f.source.textSha256,offsetUnit:'utf16_code_units',textLength:text.length,method:'text',ocrUsed:false,limitations:[],receiptSha256:digest('synthetic prepared receipt')};
@@ -76,11 +75,49 @@ test('nested generated graph identities and unlocated geometry remain authentica
  const item=residualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256),projection=assertSourceRecordProjection(item)!;
  const entity=projection.propositions.find(value=>value.selector==='/entities/0')!;
  assert.deepEqual(entity.asserted,{name:'Strausberg',type:'municipality',quote:'Strausberg'});
- for(const key of ['mentionId','entityId','identityBasis'])assert.ok(projection.bindings.some(value=>value.selector==='/entities/0/'+key&&value.valueSha256===semanticHash(value.value)));
+ for(const key of ['entityId','identityBasis'])assert.ok(projection.bindings.some(value=>value.selector==='/entities/0/'+key&&value.valueSha256===semanticHash(value.value)));
+ assert.ok(projection.context.some(value=>value.selector==='/entities/0/mentionId'&&value.value==='town'));
  const location=projection.propositions.find(value=>value.selector==='/locations/0')!;
  assert.deepEqual(location.asserted,{label:'Strausberg',quote:'Strausberg'});
  for(const key of ['geometry','precision'])assert.ok(projection.qualifications.some(value=>value.selector==='/locations/0/'+key));
  assert.deepEqual(item.sourceRecord?.record,record);assert.ok(item.entityIds.includes(graph.entities[0].entityId));
+});
+test('ordinary relation propositions preserve source direction, not just endpoint co-occurrence',async t=>{
+ const text='Stadtwerk betreibt das Museum in Strausberg.',f=await fixture(t,text),record=structuredClone(f.record);
+ const entities=[{mentionId:'operator',name:'Stadtwerk',type:'organization' as const,quote:text,identifiers:[]},{mentionId:'facility',name:'Museum',type:'facility' as const,quote:text,identifiers:[]}];
+ const relations=[{fromMention:'operator',toMention:'facility',type:'operates' as const,quote:text,predicateQuote:'betreibt',modality:'asserted' as const,time:null,conditions:null}];
+ const graph=normalizeGraphClaims({entities,relations},{municipalityId:record.municipalityId,sourceSha256:record.extraction.inputSha256,ags:record.ags});
+ record.entities=graph.entities;record.relations=graph.relations;record.verification.evidenceHash=knowledgeEvidenceHash(record);
+ const item=residualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256),projection=assertSourceRecordProjection(item)!;
+ assert.equal(item.criticalTarget,undefined,'operates/asserted is an ordinary source relation, not a critical-only escape hatch');
+ const proposition=projection.propositions.find(value=>value.selector==='/relations/0')!,asserted=proposition.asserted as Record<string,unknown>;
+ assert.equal(asserted.fromMention,'operator');assert.equal(asserted.toMention,'facility');
+ assert.deepEqual(asserted.subject,{mentionId:'operator',name:'Stadtwerk',type:'organization'});assert.deepEqual(asserted.object,{mentionId:'facility',name:'Museum',type:'facility'});
+ for(const key of ['fromMention','toMention'])assert.equal(projection.bindings.some(value=>value.selector==='/relations/0/'+key),false);
+ const reversed=structuredClone(record);Object.assign(reversed.relations[0],{fromMention:'facility',toMention:'operator',fromId:graph.entities[1].entityId,toId:graph.entities[0].entityId});reversed.verification.evidenceHash=knowledgeEvidenceHash(reversed);
+ const reverseProposition=residualRecordPropositions(reversed).propositions.find(value=>value.selector==='/relations/0')!;
+ assert.notEqual(reverseProposition.claimId,proposition.claimId);assert.notDeepEqual(reverseProposition.asserted,proposition.asserted);
+ const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(item,f.evidence,'A')).value);
+ assert.deepEqual(deterministicChecks(item,f.evidence,output),[]);
+ const wrong=structuredClone(output),relation=wrong.assertions.find(value=>value.claimId===proposition.claimId)!;
+ [relation.subjectId,relation.objectId]=[relation.objectId,relation.subjectId];
+ assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_direction:'+proposition.claimId));
+ relation.subjectId=null;relation.objectId=null;relation.modality='unknown';
+ assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_direction:'+proposition.claimId));
+ assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_modality:'+proposition.claimId));
+});
+test('historical reconstruction authenticates the persisted version while new preparation remains v2 only',async t=>{
+ const f=await fixture(t);
+ for(const critical of [false,true]){
+  const record=structuredClone(f.record);if(critical)Object.assign(record,{stage:'draft',stageQuote:'prüft den Entwurf',originalStatus:'Entwurf'});
+  record.verification.evidenceHash=knowledgeEvidenceHash(record);
+  const current=residualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256),legacy=historicalResidualAssessmentItem(record,current);
+  assert.equal(legacy.sourceRecord,undefined);assert.ok(current.sourceRecord);
+  assert.deepEqual(reconstructResidualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256,legacy),legacy);
+  assert.deepEqual(reconstructResidualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256,current),current);
+  const tampered=structuredClone(legacy);tampered.question+=' forged history';assert.throws(()=>reconstructResidualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256,tampered));
+  const downgrade=structuredClone(current);delete downgrade.sourceRecord;assert.throws(()=>reconstructResidualAssessmentItem(record,f.prepared,digest('synthetic prepared artifact'),f.policyArtifact.sha256,downgrade));
+ }
 });
 test('legacy projection and v1 receipts remain readable; native Sonnet B alone uses receipt v2',async t=>{
  const f=await fixture(t),projection=residualRecordPropositions(f.record),{sourceRecord:ignored,...base}=f.item;
@@ -100,4 +137,9 @@ test('legacy projection and v1 receipts remain readable; native Sonnet B alone u
  const downgraded={...receipt,version:'assessment-receipt-v1'};assert.throws(()=>validateReceipt(downgraded,f.item,'B'));
  const wrongTool={...native,evidence:{...native.evidence,tool:'claude-cli' as const}};
  assert.throws(()=>createAssessmentReceipt(f.item,'B',wrongTool,clocks,f.evidence));
+});
+test('standalone assessment cannot route B through VM Codex',async t=>{
+ const f=await fixture(t);
+ await assert.rejects(runAssessmentPass(f.item,'B','openai-subscription',{ledgerPath:'not-created-by-guard',pausePath:'not-created-by-guard'},undefined,f.context),/B requires the reviewed VM omp runner/);
+ await assert.rejects(runAssessmentPass(f.item,'B','anthropic-subscription',{ledgerPath:'not-created-by-guard',pausePath:'not-created-by-guard'},undefined,f.context),/B requires the reviewed VM omp runner/);
 });

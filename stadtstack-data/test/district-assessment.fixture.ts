@@ -4,16 +4,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DistrictCas, type CasPutOptions } from '../src/district-cas.ts';
 import { createPolicyReceipt } from '../src/district-policy-receipt.ts';
-import { canonicalJson, digest } from '../src/district-adapter-contract.ts';
+import { canonicalJson, digest, semanticHash } from '../src/district-adapter-contract.ts';
 import { encodeStepReceipt, unknownReceiptCounts, type StepReceipt } from '../src/district-step-receipt.ts';
 import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-opt-out.ts';
 import { z } from 'zod';
-import { assessmentOutputSchema, PROMPTS, digest as assessmentDigest, originalEvidence, buildAssessmentPassInput,
+import { assessmentBlindProjection, assessmentItemSchema, assessmentOutputSchema, PROMPTS, digest as assessmentDigest, originalEvidence, buildAssessmentPassInput,
   type AssessmentEvidenceContext, type AssessmentItem, type AssessmentOutput, type AssessmentReceipt, type AssessmentPassInput } from '../src/district-assessment.ts';
 import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {GRAPH_DETERMINISTIC_CHECKS} from '../src/district-graph-claims.ts';
 import {PROVIDER_CONFIGS,EMPTY_USAGE,type ModelAnswer} from '../src/district-model-contract.ts';
 import type {PolicyReceipt} from '../src/district-policy-receipt.ts';
+import {prepareCriticalAssessment} from '../src/district-critical-assessment.ts';
+import {criticalKnowledgeTarget} from '../src/district-critical-assessment-public.ts';
+import type {DistrictKnowledgeRecord} from '../src/district-schema.ts';
 
 // Synthetic licensed bytes and explicit parser receipts; never source data or provider calls.
 export async function admittedAssessmentFixture(text: string, managed = false) {
@@ -91,10 +94,42 @@ export function recordFor(f:{source:AssessmentItem['sources'][number];policy:Pol
  record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
 }
 export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
- const data=input.data as {itemId:string;claimIds:string[];evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;asserted?:unknown}[];bindings?:{selector:string;value:unknown}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
  const source=data.evidence[0],locator=source.locators[0];
- const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions:unresolved?[]:data.claimIds.map(claimId=>({claimId,sourceId:source.sourceId,locatorId:locator.id,quote:locator.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none' as const,stage:null,modality:'unknown' as const})),scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
+ const assertions:AssessmentOutput['assertions']=unresolved?[]:data.claimIds.map(claimId=>{
+  const proposition=data.claim?.propositions?.find(proposition=>proposition.claimId===claimId),selected=source.locators.find(candidate=>candidate.quote===proposition?.quote)??locator;
+  const assertion:AssessmentOutput['assertions'][number]={claimId,sourceId:source.sourceId,locatorId:selected.id,quote:selected.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'};
+  if(proposition?.selector.startsWith('/relations/')){
+   const binding=(field:string)=>data.claim?.bindings?.find(binding=>binding.selector===proposition.selector+'/'+field)?.value;
+   const subject=binding('fromId'),object=binding('toId');
+   assertion.subjectId=typeof subject==='string'?subject:null;assertion.objectId=typeof object==='string'?object:null;
+   assertion.modality=(proposition.asserted as {modality:typeof assertion.modality}).modality;
+  }
+  return assertion;
+ });
+ const output:AssessmentOutput={itemId:data.itemId,outcome:unresolved?'unresolved':'supported',assertions,scores:{correctness:2,sources:2,usefulness:unresolved?0:1},holdReasons:[],rationale:'Synthetic provider fixture; never a civic assessment.'};
  const config=PROVIDER_CONFIGS['openai-subscription'];
  const identity={provider:'openai-subscription' as const,tool:config.tool,toolVersion:'0.0.0-synthetic-test-only',model:config.model,modelIdentityBasis:config.modelIdentityBasis};
  return {value:output,responseSha256:digest(canonicalJson(output)),evidence:{...identity,modelIdentitySha256:digest(JSON.stringify(identity))},requestedModel:config.model,returnedModel:null,reportedModels:[],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};
+}
+/** Literal pre-v2 target encoding for authenticated historical queue fixtures.
+ * This is not an alternate production preparation route. */
+export function historicalResidualAssessmentItem(record:DistrictKnowledgeRecord,current:AssessmentItem):AssessmentItem{
+ const {extraction:_generation,verification:_judgment,sources,...claims}=record;
+ const sourceProjection=sources.map(({id,url,sha256})=>({id,url,sha256}));
+ const projection=z.record(z.string(),z.unknown()).parse(assessmentBlindProjection({...claims,sources:sourceProjection}));
+ const metadata=new Set(['id','kind','municipalityId','ags','districtId','sources']);
+ const propositions=Object.entries(projection).sort(([a],[b])=>a<b?-1:a>b?1:0).filter(([field])=>!metadata.has(field)&&!field.endsWith('Quote')).flatMap(([field,value])=>{
+  const claim=(selector:string,member:unknown)=>{
+   const quote=member&&typeof member==='object'&&'quote' in member?member.quote:projection[field+'Quote']??null;
+   const body={selector,value:member,quote,sources:sourceProjection};
+   return {...body,claimId:'proposition:'+semanticHash({recordId:record.id,...body})};
+  };
+  return Array.isArray(value)?value.map((member,index)=>claim('/'+field+'/'+index,member)):[claim('/'+field,value)];
+ });
+ const {sourceRecord:_sourceRecord,criticalTarget:_criticalTarget,...rest}=current;
+ const base=assessmentItemSchema.parse({...rest,question:'Independently verify every source-bound proposition in the supplied record projection. Return supported only with an evidence assertion for every claimId; otherwise abstain or mark unresolved.',
+  claim:canonicalJson({version:'r1-record-propositions-v1',recordId:record.id,projectionSha256:semanticHash(projection),sources:sourceProjection,propositions}),
+  claimIds:propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:current.sources.some(source=>source.ocrSuspected)?['ocr']:[]});
+ return criticalKnowledgeTarget(record)?prepareCriticalAssessment(record,base):base;
 }

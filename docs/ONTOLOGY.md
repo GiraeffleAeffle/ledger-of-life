@@ -148,6 +148,11 @@ actual dates/statuses, entities and relations still require source evidence;
 unresolved classifications remain held. `caseQuote` grounds printed case
 identifiers/classifications, `stageQuote` grounds original status and stage, and
 date-role quotations remain distinct.
+Relation subject/object direction and modality remain source-assessed roles, with
+explicit endpoint labels. Local mention labels are context, not literal source
+quotations; only mechanical global IDs/identity derivations are graph bindings.
+The checker requires the matching typed subject/object/modality assertion even
+for noncritical relations, never just the names' co-occurrence.
 
 Non-quantitative text propositions use assertion `value:null` and `unit:null`;
 their proposed wording is the claim payload, not a measurement. Typed critical
@@ -157,6 +162,9 @@ record, plus its critical claims. Changed items require fresh A/B/C receipts,
 without resetting lifetime call caps; historical v1 items/receipts remain history,
 not transferable approval of v2. Value-test answers assess their actual answers
 and cited evidence, never every metadata/null field in an MCP response.
+Read-only seal/export reconstruction rebuilds the exact persisted v1 or v2
+target and requires canonical equality plus committed preparation ancestry.
+New preparation cannot request the historical encoding.
 
 This implements the frozen rebuild plan's original-evidence and typed-role intent
 ([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)

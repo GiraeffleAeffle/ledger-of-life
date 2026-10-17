@@ -63,8 +63,25 @@ async function persist(store:DistrictJobStore,cas:DistrictCas,item:AssessmentIte
 export function residualRecordPropositions(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number]){
  return sourceRecordPropositions(record,assessmentBlindProjection);
 }
+/** Exact historical encoding: read-only reconstruction, never new preparation. */
+function historicalRecordPropositions(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number]){
+ const {extraction:_generation,verification:_judgment,sources,...claims}=record;
+ const sourceProjection=sources.map(source=>({id:source.id,url:source.url,sha256:source.sha256}));
+ const projection=z.record(z.string(),z.unknown()).parse(assessmentBlindProjection({...claims,sources:sourceProjection}));
+ const metadata=new Set(['id','kind','municipalityId','ags','districtId','sources']);
+ const propositions=Object.entries(projection).sort(([left],[right])=>left<right?-1:left>right?1:0).filter(([field])=>!metadata.has(field)&&!field.endsWith('Quote')).flatMap(([field,value])=>{
+  const claim=(selector:string,member:unknown)=>{
+   const quote=member&&typeof member==='object'&&'quote' in member?member.quote:projection[field+'Quote']??null;
+   const body={selector,value:member,quote,sources:sourceProjection};
+   return {...body,claimId:'proposition:'+semanticHash({recordId:record.id,...body})};
+  };
+  return Array.isArray(value)?value.map((member,index)=>claim('/'+field+'/'+index,member)):[claim('/'+field,value)];
+ });
+ if(!propositions.length)throw new DistrictExecutionHold('quality_failed');
+ return {version:'r1-record-propositions-v1',recordId:record.id,projectionSha256:semanticHash(projection),sources:sourceProjection,propositions};
+}
 /** Quotes are reopened in the actual UTF-16 prepared text; model semantics are never constraints. */
-export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string):AssessmentItem{
+function buildResidualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string,historical:boolean):AssessmentItem{
  assertPreparedReferenceMembership(record.sources,prepared.references);
  if(record.sources.length!==1||record.sources[0].sha256!==prepared.sourceSha256||record.municipalityId!==prepared.municipalityId)throw new DistrictExecutionHold('quality_failed');
  if(record.extraction.textSha256!==prepared.textSha256)throw new AssessmentContextHold();
@@ -74,7 +91,7 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  const visit=(value:unknown):void=>{if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')for(const [key,member] of Object.entries(value)){if((key==='quote'||key.endsWith('Quote'))&&typeof member==='string'&&member.length)quotes.add(member);else visit(member);}};
  // Complete blind claim projection includes nested predicate, location and
  // identifier quotes, but excludes previous judgment and extraction metadata.
- const projection=residualRecordPropositions(record);visit(projection);
+ const projection=historical?historicalRecordPropositions(record):residualRecordPropositions(record);visit(projection);
  // These extraction quote fields bind case/municipality identity even though
  // those metadata selectors do not become independent assessed propositions.
  for(const quote of [record.titleQuote,record.summaryQuote,record.municipalityQuote,record.caseQuote,record.documentDateQuote,record.stageDateQuote,record.stageQuote])if(quote)quotes.add(quote);
@@ -88,10 +105,22 @@ export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionS
  const unique=[...new Map(locators.map(locator=>[locator.id,locator])).values()].sort((a,b)=>a.start-b.start||a.end-b.end);
  const assessmentContext=buildPreparedAssessmentContext(prepared.text,prepared.textSha256,cited,record.sources.map(source=>source.locator),unique);
  const base=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,
-  sourceRecord:{version:'assessment-source-record-v2',recordSha256:semanticHash(record),record},
-  question:'Independently verify every actual source proposition and positive classification in propositions. Bindings are authenticated retained bookkeeping, not municipal statements; qualifications explicitly record unset values, never affirmative facts. Return supported only with an evidence assertion for every claimId. asserted is the proposed claim payload, not assertion.value: for these non-quantitative text propositions use value:null and unit:null. Quantitative critical claims have separate claimIds and require genuine source-attested quantities/units. Missing evidence or unresolved classification stays abstain/unresolved.',
+  ...(historical?{}:{sourceRecord:{version:'assessment-source-record-v2',recordSha256:semanticHash(record),record}}),
+  question:historical?'Independently verify every source-bound proposition in the supplied record projection. Return supported only with an evidence assertion for every claimId; otherwise abstain or mark unresolved.':'Independently verify every actual source proposition and positive classification in propositions. Bindings are authenticated retained bookkeeping, not municipal statements; qualifications explicitly record unset values, never affirmative facts. Relation subject/object direction is a source assertion, not mere co-occurrence: emit its subjectId, objectId and modality. Local mention labels link these roles and are not source quotations. Return supported only with an evidence assertion for every claimId. asserted is the proposed claim payload, not assertion.value: for these non-quantitative text propositions use value:null and unit:null. Quantitative critical claims have separate claimIds and require genuine source-attested quantities/units. Missing evidence or unresolved classification stays abstain/unresolved.',
   claim:canonicalJson(projection),rubric:R1_ASSESSMENT_RUBRIC,rubricSha256:digest(R1_ASSESSMENT_RUBRIC),sources:[{sourceId:prepared.references[0].id,mcpSourceId:record.sources[0].id,originalSha256:prepared.sourceSha256,textSha256:prepared.textSha256,parserVersion:prepared.extractorSha256,parserReceiptSha256:preparedArtifactSha256,admissionReceiptSha256:policyReceiptSha256,ocrSuspected:prepared.ocrUsed,locators:unique,assessmentContext}],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[...new Set([record.id,...record.entities.map(entity=>entity.entityId)])],constraints:[],criticalKinds:prepared.ocrUsed?['ocr']:[]});
  return target?prepareCriticalAssessment(record,base):base;
+}
+/** The preparation/producer API always builds the current source target. */
+export function residualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string):AssessmentItem{
+ return buildResidualAssessmentItem(record,prepared,preparedArtifactSha256,policyReceiptSha256,false);
+}
+/** Rebuild the exact authenticated persisted version for seal/export history.
+ * The caller must still authenticate committed preparation and receipt ancestry. */
+export function reconstructResidualAssessmentItem(record:z.infer<typeof ResidualExtractionSchema>['result']['records'][number],prepared:PreparedDocument,preparedArtifactSha256:string,policyReceiptSha256:string,persisted:AssessmentItem):AssessmentItem{
+ if(persisted.valueTarget)throw new DistrictExecutionHold('quality_failed');
+ const expected=buildResidualAssessmentItem(record,prepared,preparedArtifactSha256,policyReceiptSha256,!persisted.sourceRecord);
+ if(canonicalJson(expected)!==canonicalJson(persisted))throw new DistrictExecutionHold('quality_failed');
+ return expected;
 }
 export async function enqueueResidualAssessmentItems(pool:Pool,store:DistrictJobStore,cas:DistrictCas,extractionJobKey:string){
  const row=await committed(pool,extractionJobKey,'residual_extract');if(row.receipt.outputHashes.length!==1)throw new DistrictExecutionHold('quality_failed');

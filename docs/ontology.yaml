@@ -150,10 +150,12 @@ concepts:
     invariants:
       - Source-record projection v2 requires assertions for every real proposition, including positive classifications; unresolved classifications remain held.
       - Generated identifiers and hashes are deterministically authenticated against the retained record and source bindings, not quoted as municipal statements.
+      - Relation subject and object direction and modality are source-assessed roles, including noncritical relations; local mention labels are context and mechanical global IDs remain bindings.
       - Null, empty and unknown roles, including precision none for unlocated geometry, remain explicit unset qualifications, never affirmative source propositions or zero observations.
       - The full private record and hash remain lossless; prior model judgments are never supplied to blind assessors.
       - Non-quantitative assertion value and unit are both null; genuine typed quantities and critical financial roles retain exact source grounding.
       - A changed assessment target needs fresh A/B/C receipts; historical v1 artifacts retain their original version and meaning, with no call-cap reset or inferred support.
+      - Read-only seal/export reconstructs and authenticates the exact persisted v1 or v2 target and committed preparation ancestry; new preparation emits v2 only.
     code: [stadtstack-data/src/district-assessment-projection.ts, stadtstack-data/src/district-assessment.ts, stadtstack-data/src/district-assessment-jobs.ts]
 
   Organization:

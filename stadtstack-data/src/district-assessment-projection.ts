@@ -19,7 +19,7 @@ export const SourcePropositionProjectionSchema=z.object({
 export type SourcePropositionProjection=z.infer<typeof SourcePropositionProjectionSchema>;
 const pointer=(key:string)=>key.replaceAll('~','~0').replaceAll('/','~1');
 const metadata=new Set(['id','kind','municipalityId','ags','districtId']);
-const graphMetadata=new Set(['mentionId','entityId','identityBasis','fromMention','toMention','fromId','toId']);
+const graphMetadata=new Set(['entityId','identityBasis','fromId','toId']);
 const quoteFields:Record<string,string>={title:'titleQuote',summary:'summaryQuote',caseKey:'caseQuote',caseKeyType:'caseQuote',
  caseType:'caseQuote',documentDate:'documentDateQuote',stage:'stageQuote',originalStatus:'stageQuote',stageDate:'stageDateQuote'};
 /** No classifier outcome or unknown placeholder is silently converted to fact.
@@ -36,6 +36,7 @@ export function sourceRecordPropositions(record:DistrictKnowledgeRecord,blind:(v
   if(Array.isArray(value))return value.map((member,index)=>clean(member,selector+'/'+index));
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).flatMap(([key,member])=>{
    const path=selector+'/'+pointer(key),reason=unset(member,key);
+   if(key==='mentionId'){context.push(retain(path,member));return [];}
    if(graphMetadata.has(key)){bindings.push({...retain(path,member),basis:'graph_identity'});return [];}
    if(reason){qualifications.push({...retain(path,member),reason});return [];}
    return [[key,clean(member,path)]];
@@ -53,7 +54,13 @@ export function sourceRecordPropositions(record:DistrictKnowledgeRecord,blind:(v
   if(reason){qualifications.push({...retain(selector,value),reason});continue;}
   if(field.endsWith('Quote')){context.push(retain(selector,value));continue;}
   const add=(member:unknown,path:string)=>{
-   const asserted=clean(member,path),associated=member&&typeof member==='object'&&'quote' in member?member.quote:projection[quoteFields[field]??field+'Quote'];
+   let asserted=clean(member,path);
+   if(field==='relations'&&member&&typeof member==='object'&&'fromMention' in member&&'toMention' in member){
+    const from=record.entities.find(entity=>entity.mentionId===member.fromMention),to=record.entities.find(entity=>entity.mentionId===member.toMention);
+    if(!from||!to)throw Error('Source relation has an unknown directional endpoint');
+    asserted={...asserted as Record<string,unknown>,subject:{mentionId:from.mentionId,name:from.name,type:from.type},object:{mentionId:to.mentionId,name:to.name,type:to.type}};
+   }
+   const associated=member&&typeof member==='object'&&'quote' in member?member.quote:projection[quoteFields[field]??field+'Quote'];
    const quote=typeof associated==='string'&&associated.length?associated:null;
    const body={selector:path,asserted,quote,assertionEncoding:{value:null,unit:null}};
    propositions.push({...body,claimId:'proposition:'+semanticHash({version:'r1-record-propositions-v2',recordId:record.id,...body})});

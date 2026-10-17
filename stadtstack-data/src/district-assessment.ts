@@ -41,7 +41,7 @@ export function assessmentEvidenceContext(options: { casRoot?: string; policySta
     policyOptions, currentAdmissionReceipts, sourceContext };
 }
 
-// Private, exchangeable artifacts permit Codex on its VM and Haiku on the Mac.
+// Private, exchangeable artifacts retain historical identities and the reviewed VM lanes.
 // No extraction summaries, predictions, target scores, API routes or model fallbacks.
 export function canonical(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -360,7 +360,13 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
       if (!match || !Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== a.date || a.dateRole === null) issues.push('calendar_date_role:' + a.claimId);
     }
     if ((a.value === null) !== (a.unit === null)) issues.push('value_unit:' + a.claimId);
-    if(sourceProjection?.propositions.some(proposition=>proposition.claimId===a.claimId)&&(a.value!==null||a.unit!==null))issues.push('non_quantitative_value:'+a.claimId);
+    const proposition=sourceProjection?.propositions.find(proposition=>proposition.claimId===a.claimId);
+    if(proposition&&(a.value!==null||a.unit!==null))issues.push('non_quantitative_value:'+a.claimId);
+    if(proposition?.selector.startsWith('/relations/')){
+      const relation=item.sourceRecord!.record.relations[Number(proposition.selector.slice('/relations/'.length))];
+      if(!relation||a.subjectId!==relation.fromId||a.objectId!==relation.toId)issues.push('relation_direction:'+a.claimId);
+      if(!relation||a.modality!==relation.modality)issues.push('relation_modality:'+a.claimId);
+    }
     const constraint = item.constraints.find(c => c.claimId === a.claimId);
     if (constraint && canonical(constraint) !== canonical(a)) issues.push('source_constraint:' + a.claimId);
   }
@@ -514,7 +520,7 @@ export async function writeImmutable(path: string, value: unknown): Promise<void
 }
 export async function runAssessmentPass(item: AssessmentItem, role: typeof roles[number], provider: ExtractorProvider,
   paths: { ledgerPath: string; pausePath: string; signal?: AbortSignal }, previous?: { A: AssessmentReceipt; B: AssessmentReceipt }, context: AssessmentEvidenceContext = configuredEvidence): Promise<AssessmentReceipt> {
-  if (provider !== 'openai-subscription' || process.platform !== 'linux') throw Error('Native assessment is VM Codex-only; Haiku requires the approved RAM bridge');
+  if (role==='B' || provider !== 'openai-subscription' || process.platform !== 'linux') throw Error('A/C require VM Codex; B requires the reviewed VM omp runner');
   const evidence = await originalEvidence(item, context);
   const sourceContext = AssessmentSourceContextSchema.parse(context.sourceContext);
   if (evidence.some(source => !sourceContext.bindings.some(binding =>
