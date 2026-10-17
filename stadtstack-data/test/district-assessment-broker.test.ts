@@ -2,9 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,randomUUID} from 'node:crypto';
 import {assessmentItemSchema,assessmentProviderInput,validateReceipt,type OriginalEvidence,type AssessmentOutput} from '../src/district-assessment.ts';
-import {assessmentBridgeReceipt,AssessmentBSelectorSchema,assessmentEvidenceArtifactHashes} from '../src/district-assessment-broker.ts';
-import {ASSESSMENT_BRIDGE_VERSION,BridgeAnswerSchema,BridgeRequestSchema,BridgeLeaseSchema,bridgeInputHash} from '../src/district-assessment-bridge-contract.ts';
-import {canonicalJson,digest} from '../src/district-adapter-contract.ts';
+import {assessmentBridgeReceipt,AssessmentBSelectorSchema,assessmentEvidenceArtifactHashes,assessmentBIntentHash} from '../src/district-assessment-broker.ts';
+import {ASSESSMENT_BRIDGE_VERSION,NATIVE_B_BRIDGE_VERSION,BridgeAnswerSchema,BridgeRequestSchema,BridgeLeaseSchema,bridgeInputHash,nativeBInputHash} from '../src/district-assessment-bridge-contract.ts';
+import {canonicalJson,digest,semanticHash} from '../src/district-adapter-contract.ts';
 
 // Synthetic immutable source and actual-format CLI events only. No providers,
 // network, databases, source collection, sandbox process or credentials involved.
@@ -82,4 +82,17 @@ test('strict bridge requests bind exact input, pinned B route and actual purge a
  assert.throws(()=>AssessmentBSelectorSchema.parse({version:ASSESSMENT_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-haiku-5-5',itemArtifactSha256:hash,runnerOutputContractSha256:'c'.repeat(64),clientContractSha256:hash}));
  assert.deepEqual(assessmentEvidenceArtifactHashes(item),[digest(text),hash,'b'.repeat(64)].sort());
  assert.equal(canonicalJson(request).includes('DATABASE_URL'),false);
+});
+
+test('native Sonnet selectors and intents are versioned while historical Haiku hashes remain exact',()=>{
+ const selector={version:NATIVE_B_BRIDGE_VERSION,transport:'vm-omp',role:'B',provider:'anthropic-subscription',requestedModel:'claude-sonnet-5-5',itemArtifactSha256:hash,runnerOutputContractSha256:'c'.repeat(64)};
+ assert.deepEqual(AssessmentBSelectorSchema.parse(selector),selector);
+ assert.throws(()=>AssessmentBSelectorSchema.parse({...selector,requestedModel:'claude-haiku-5-5'}));
+ assert.throws(()=>AssessmentBSelectorSchema.parse({...selector,version:ASSESSMENT_BRIDGE_VERSION}));
+ const binding={leaseId:randomUUID(),jobKey:hash,runId:randomUUID(),fencingToken:'1',inputSha256:hash,clientId:'vm-omp-docker'};
+ assert.equal(assessmentBIntentHash(binding,'claude-haiku-5-5'),semanticHash({version:ASSESSMENT_BRIDGE_VERSION,...binding,provider:'anthropic-subscription',model:'claude-haiku-5-5'}));
+ assert.equal(assessmentBIntentHash(binding,'claude-sonnet-5-5'),semanticHash({version:NATIVE_B_BRIDGE_VERSION,...binding,provider:'anthropic-subscription',model:'claude-sonnet-5-5'}));
+ assert.notEqual(assessmentBIntentHash(binding,'claude-sonnet-5-5'),assessmentBIntentHash(binding,'claude-haiku-5-5'));
+ const input={jobKey:hash,authorityId:randomUUID(),authoritySha256:hash,policySnapshotSha256:hash,role:'B' as const,provider:'anthropic-subscription' as const,system:'synthetic',data:{},outputSchema:{},clientContractSha256:hash};
+ assert.notEqual(nativeBInputHash({...input,requestedModel:'claude-sonnet-5-5'}),bridgeInputHash({...input,requestedModel:'claude-haiku-5-5'}));
 });

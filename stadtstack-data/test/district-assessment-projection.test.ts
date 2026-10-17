@@ -98,6 +98,7 @@ test('ordinary relation propositions preserve source direction, not just endpoin
  const reverseProposition=residualRecordPropositions(reversed).propositions.find(value=>value.selector==='/relations/0')!;
  assert.notEqual(reverseProposition.claimId,proposition.claimId);assert.notDeepEqual(reverseProposition.asserted,proposition.asserted);
  assert.equal((proposition.asserted as {modality:string}).modality,'asserted');assert.equal(proposition.assertionEncoding.modality,'confirmed');
+ assert.equal(proposition.assertionEncoding.subjectId,graph.relations[0].fromId);assert.equal(proposition.assertionEncoding.objectId,graph.relations[0].toId);
  const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(item,f.evidence,'A')).value);
  for(const [raw,wire] of [['asserted','confirmed'],['decided','confirmed'],['implemented','confirmed'],['planned','planned'],['proposed','planned'],['conditional','conditional'],['negated','negated'],['historical','historical']] as const){
   const variant=structuredClone(record);variant.relations[0].modality=raw;variant.verification.evidenceHash=knowledgeEvidenceHash(variant);

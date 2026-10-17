@@ -14,6 +14,7 @@ import {assessmentBJobContract} from '../src/district-assessment-broker.ts';
 import {policyRefreshContract} from '../src/district-policy-refresh.ts';
 import {ompRunnerContractSha256} from '../src/district-omp-b-runner.ts';
 import {parserIsolationContractSha256,parserOutputContractSha256} from '../src/district-parser-isolation.ts';
+import {acquisitionContract} from '../src/district-r1.ts';
 const a=digest('synthetic original'),b=digest('synthetic policy'),scope={publisherId:'synthetic',sourceId:'website',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'synthetic terminal fixture'};
 const spec:DistrictJobSpec={step:'residual_prepare',lane:'residual_preparation',semanticContractSha256:digest('synthetic semantic contract'),inputArtifactHashes:[a,b],sourceScope:scope,selector:{synthetic:true},policyProofSha256:b},jobKey=canonicalJobIdentity(spec).jobKey;
 function row(attempt=1){
@@ -39,13 +40,14 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
  for(const value of [{jobKeys:[],reconciliationJobKeys:[]},{jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[exception,exception]},{jobKeys:[jobKey],reconciliationJobKeys:[],terminalDocumentExceptions:[exception]}])assert.equal(QueueTextSealInputSchema.safeParse(value).success,false);
  assert.equal(TerminalAssessmentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,true);assert.equal(TerminalDocumentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,false);
 });
-// The four non-B scoped contracts remain at the running campaign's 93b967d
-// cutover. B/runner pins advance for native diagnostics, unlocked evidence,
-// immutable native image addons, settled decoder rejection and physical inventory repacking;
-// terminal sealing adds no semantic change.
-test('terminal sealing preserves four scoped contracts and parser security through the B acceptance cutover',async()=>{
+// Acquisition, preparation/extraction/residual, policy-refresh and parser identities
+// retain the authenticated campaign baseline. Source-proposition v2, native Sonnet
+// and bounded renewable ownership advance assessment queue/B/runner pins only;
+// terminal sealing itself adds no semantic change.
+test('terminal sealing preserves acquisition and upstream identities while assessment contracts advance',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'9b8c4cf4534a32bc98190310d591935cbf515a0cb8aed12ba9efeb4b5bbd56de');assert.equal(await assessmentBJobContract(),'1567626ec1a53c259c547b86c121d94095c6c258557c57fbcd1aa16a461161c8');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'5a525867c0b2d025358fdeaf4b50fea84c871246848737f0bbb0a7f52c912475');
+ assert.equal(await assessmentQueueContract(),'253c32cf907b21d6381834db397768075facfb60bbd5df81ef2a5ab9d406d438');assert.equal(await assessmentBJobContract(),'3830c3c8a8c6b3b2c867f31a7ca87d258f7c86389809d2c9cf37848a8c5e24a9');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'c621854662f43c1f51694ecb65181b6d626eda643b5bd65f5550a85b32511ada');
  assert.equal(await parserIsolationContractSha256(),'2917aca62d207e39159e3191c7ea51125aea24dd1fd37339f424111c03b25764');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
+ assert.equal(await acquisitionContract(),'ff1980b18c6c22def8f2ed8572957c355562d4814d1e9a3bbbc5125ad5f0bbcb');
 });

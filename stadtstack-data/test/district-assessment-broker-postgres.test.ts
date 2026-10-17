@@ -16,7 +16,7 @@ import {createPolicyReceipt} from '../src/district-policy-receipt.ts';
 import {encodeStepReceipt,unknownReceiptCounts,type StepReceipt} from '../src/district-step-receipt.ts';
 import {provisionCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recordHostOptOut,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError} from '../src/civic-opt-out.ts';
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
-import {inspectOmpEvents,OmpAssessmentOutputRejected,ompAssessmentControl,ompRunnerContractSha256,OmpNativeCleanupSchema,type runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
+import {inspectOmpEvents,inspectOmpAssessmentCompletion,OmpAssessmentOutputRejected,ompAssessmentControl,ompRunnerContractSha256,OmpNativeCleanupSchema,type runVmOmpAssessment} from '../src/district-omp-b-runner.ts';
 import {ompOutputStructureFromVersions} from '../src/district-omp-output-diagnostics.ts';
 import {modelIdentitySha256} from '../src/district-model-contract.ts';
 
@@ -40,7 +40,7 @@ function submitFor(lease:BridgeLease){
  return {operation:'submit' as const,leaseId:lease.leaseId,inputSha256:lease.inputSha256,purgeAck:{sourceFiles:0 as const,responseFiles:0 as const,modelFileWritesDenied:true as const,completedAt:new Date().toISOString()},answer};
 }
 
-async function fixture(pool:Pool,name:string,fixtureOmpRunner?:typeof runVmOmpAssessment){
+async function fixture(pool:Pool,name:string,fixtureOmpRunner?:typeof runVmOmpAssessment,fixtureNativeLifecycle?:{leaseMs:number;heartbeatMs:number}){
  const directory=await mkdtemp(join(await realpath(tmpdir()),'assessment-broker-test-'));
  const stateDir=join(directory,'policy');
  // Explicit isolated TEST owner provisioning, never broker auto-provisioning.
@@ -48,7 +48,7 @@ async function fixture(pool:Pool,name:string,fixtureOmpRunner?:typeof runVmOmpAs
  const policyOptions={stateDir,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  const cas=new DistrictCas(join(directory,'cas'),{maxBytes:1024*1024});
  await initializeManagedAcquisitionLane(cas.root,{...policyOptions,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
- const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions,fixtureProtocol:true,...fixtureOmpRunner?{fixtureOmpRunner}:{}});
+ const store=new DistrictJobStore(pool),broker=new DistrictAssessmentBroker(pool,cas,{policyOptions,fixtureProtocol:true,...fixtureOmpRunner?{fixtureOmpRunner}:{},...fixtureNativeLifecycle?{fixtureNativeLifecycle}:{}});
  const text='Synthetic original evidence '+name+' '+randomUUID()+'.',sourceSha256=digest(text),sourceId='source-'+randomUUID(),url='https://example.org/'+sourceId+'.txt';
  const scope={publisherId:'synthetic-test',sourceId,municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'2026-10-11'};
  const now=Date.now(),checkedAt=new Date(now-1000).toISOString(),expiresAt=new Date(now+120000).toISOString();
@@ -110,7 +110,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   const handler:JobHandler=async({job,signal})=>{
    const leaseId=await f.broker.prepare(job,signal);await proceed.promise;
    const request=(await db.query<{request_sha256:string;request_artifact_sha256:string}>('SELECT request_sha256,request_artifact_sha256 FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0]!,requestBytes=(await f.cas.read(request.request_artifact_sha256)).length;
-   try{inspectOmpEvents(stream,0,{requestSha256:request.request_sha256,systemPromptSha256:ompAssessmentControl().systemPromptSha256,stdin:{intendedBytes:requestBytes,deliveredBytes:requestBytes,deliveredSha256:request.request_sha256,frameBytes:requestBytes+25}});assert.fail('Synthetic output must be rejected');}catch(error){assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;}
+   try{inspectOmpEvents(stream,0,{requestSha256:request.request_sha256,systemPromptSha256:ompAssessmentControl().systemPromptSha256,stdin:{intendedBytes:requestBytes,deliveredBytes:requestBytes,deliveredSha256:request.request_sha256,frameBytes:requestBytes+25}},'claude-haiku-5-5');assert.fail('Synthetic output must be rejected');}catch(error){assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;}
    // Historical versions are literal immutable evidence, not regenerated v3.
    if(mode==='legacy_v1')rejected=new OmpAssessmentOutputRejected({version:'omp-output-rejection-v1',check:'output_schema',streamSha256:digest(stream),outputSha256:digest(content),issueCount:1,issues:[{code:'unrecognized_keys',path:'$'}]});
    if(mode==='legacy_v2')rejected=new OmpAssessmentOutputRejected({version:'omp-output-rejection-v2',check:'output_schema',streamSha256:digest(stream),outputSha256:digest(content),issueCount:1,issues:[{code:'unrecognized_keys',path:'$',keyCount:1}]});
@@ -157,7 +157,7 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
   assert.equal((await db.query('SELECT id FROM district_pipeline.assessment_bridge_leases WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)',[nativeKey])).rowCount,0);
  });
 
- for(const mode of ['accepted','quality','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const)await t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
+ for(const mode of ['accepted','quality','rejected','usage_limit','historical_model','slow_staging','expired_staging','cleanup_request','cleanup_incomplete','cleanup_failure','commit_failure'] as const)await t.test('native accepted path through waitForVmOmpAssessment: '+mode,async st=>{
   let calls=0,stderr='';
   st.mock.method(process.stderr,'write',((chunk:unknown)=>{stderr+=String(chunk);return true;}) as typeof process.stderr.write);
   st.after(()=>st.mock.restoreAll());
@@ -166,17 +166,48 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    if(mode==='cleanup_failure')throw new CivicPolicyStateError('SCRATCH_CLEANUP_INCOMPLETE');
    const startedAt=new Date().toISOString(),control=ompAssessmentControl(),request=Buffer.from(canonicalJson(data));
    const output=outputFor(data);if(mode==='quality'){output.outcome='unresolved';output.scores.usefulness=0;}
-   const message={role:'assistant',responseId:'synthetic-native-response',timestamp:Date.now(),provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:canonicalJson(output)}],usage:{input:11,output:7,cacheRead:0,cacheWrite:0,totalTokens:18,cost:{total:0.003}}};
+   const message={role:'assistant',responseId:'synthetic-native-response',timestamp:Date.now(),provider:'anthropic',api:'anthropic-messages',model:mode==='historical_model'?'claude-haiku-5-5':'claude-sonnet-5-5',stopReason:mode==='usage_limit'?'error':'stop',content:mode==='usage_limit'?[]:[{type:'text',text:mode==='rejected'?'PRIVATE_INVALID_OUTPUT':canonicalJson(output)}],usage:{input:mode==='usage_limit'?0:11,output:mode==='usage_limit'?0:7,cacheRead:0,cacheWrite:0,totalTokens:mode==='usage_limit'?0:18,cost:{total:mode==='usage_limit'?0:0.003}},...mode==='usage_limit'?{errorMessage:'429 '+JSON.stringify({type:'rate_limit_error',reset_at:new Date(Date.now()+3600000).toISOString()})}:{}};
    const stdout=[{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(event=>JSON.stringify(event)).join('\n')+'\n';
+   if(mode==='usage_limit'){
+    inspectOmpAssessmentCompletion(stdout,'',0,{requestSha256:digest(request),systemPromptSha256:control.systemPromptSha256,stdin:{intendedBytes:request.length,deliveredBytes:request.length,deliveredSha256:digest(request),frameBytes:request.length+25}},new Date().toISOString(),'0444');
+    assert.fail('Native usage-limit fixture must stop before successful decoding');
+   }
    const {outputStructure,outputNormalization,...parsed}=inspectOmpEvents(stdout,0,{requestSha256:digest(request),systemPromptSha256:control.systemPromptSha256,stdin:{intendedBytes:request.length,deliveredBytes:request.length,deliveredSha256:digest(request),frameBytes:request.length+25}});
-   const nativeIdentity={...identity,tool:'omp-cli' as const,toolVersion:'omp/18.9.2 sha256:'+digest('synthetic binary')},modelEvidence={...nativeIdentity,modelIdentitySha256:modelIdentitySha256(nativeIdentity)};
+   const nativeIdentity={...identity,tool:'omp-cli' as const,model:'claude-sonnet-5-5',toolVersion:'omp/18.9.2 sha256:'+digest('synthetic binary')},modelEvidence={...nativeIdentity,modelIdentitySha256:modelIdentitySha256(nativeIdentity)};
    const finishedAt=new Date().toISOString(),imageId='sha256:'+digest('synthetic image'),runnerContractSha256=await ompRunnerContractSha256();
    const cleanup=OmpNativeCleanupSchema.parse({version:'omp-native-cleanup-v1',requestSha256:digest(request),responseSha256:parsed.responseSha256,runnerContractSha256,imageId,scratchId:randomUUID(),containerId:digest('synthetic container'),containerRemoved:true,managedScratchClosed:true,completedAt:new Date().toISOString()});
    if(mode==='cleanup_request')cleanup.requestSha256=digest('wrong request');
    if(mode==='cleanup_incomplete')Object.assign(cleanup,{managedScratchClosed:false});
-   return {answer:{...parsed,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]},stdout,startedAt,finishedAt,imageId,settingsSha256:digest('synthetic settings'),systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,controlMode:'0444',accountLabelSha256:digest('synthetic account'),runnerContractSha256,toolVersion:nativeIdentity.toolVersion,outputStructure,...outputNormalization?{outputNormalization}:{},cleanup};
+   return {answer:{...parsed,evidence:modelEvidence,requestedModel:'claude-sonnet-5-5',runtimeWarnings:[]},stdout,startedAt,finishedAt,imageId,settingsSha256:digest('synthetic settings'),systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,controlMode:'0444',accountLabelSha256:digest('synthetic account'),runnerContractSha256,toolVersion:nativeIdentity.toolVersion,outputStructure,...outputNormalization?{outputNormalization}:{},cleanup};
   };
-  const f=await fixture(db,'native-'+mode,runner);directories.push(f.directory);
+  const nativePool=mode==='slow_staging'?new Pool({connectionString:isolated.href,max:8,connectionTimeoutMillis:5000,statement_timeout:400}):db;
+  if(nativePool!==db)st.after(poolShutdownBarrier(nativePool));
+  const f=await fixture(nativePool,'native-'+mode,runner,mode==='slow_staging'||mode==='expired_staging'?{leaseMs:1800,heartbeatMs:200}:undefined);directories.push(f.directory);
+  let verifiedRenewals=0;
+  if(mode==='slow_staging'){
+   const hooks=f.broker as unknown as {persist(...args:unknown[]):Promise<unknown>},persist=hooks.persist.bind(f.broker);
+   st.mock.method(hooks,'persist',async(...args:unknown[])=>{
+    if(calls>0){
+     const before=(await db.query('SELECT l.expires_at,j.lease_expires_at FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id WHERE l.requested_model=$1 AND j.job_key=$2',['claude-sonnet-5-5',key])).rows[0];
+     await delay(900);
+     const after=(await db.query('SELECT l.expires_at,j.lease_expires_at FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id WHERE j.job_key=$1',[key])).rows[0];
+     assert.ok(after.expires_at>before.expires_at,'Native ownership renews during managed staging longer than SQL timeout');
+     assert.ok(after.lease_expires_at>before.lease_expires_at,'Executor heartbeat remains unblocked during staging');
+     verifiedRenewals++;
+    }
+    return persist(...args);
+   });
+  }
+  if(mode==='expired_staging'){
+   const hooks=f.broker as unknown as {persist(...args:unknown[]):Promise<unknown>},persist=hooks.persist.bind(f.broker);
+   st.mock.method(hooks,'persist',async(...args:unknown[])=>{
+    if(calls>0&&verifiedRenewals++===0){
+     await db.query("UPDATE district_pipeline.assessment_bridge_leases SET expires_at=clock_timestamp()-interval '1 millisecond' WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1)",[key]);
+     await delay(450);
+    }
+    return persist(...args);
+   });
+  }
   assert.throws(()=>new DistrictAssessmentBroker(db,f.cas,{policyOptions:f.policyOptions,fixtureOmpRunner:runner}),{name:'DistrictExecutionHold',message:'authorization_revoked'});
   const key=await enqueueAssessmentB(f.broker,{itemArtifactSha256:f.itemArtifact.sha256,sourceScope:f.proof.receipt.scope,policyProofSha256:f.proof.receiptSha256,transport:'vm-omp'});
   if(mode==='commit_failure'){
@@ -185,24 +216,35 @@ test('fenced B assessment protocol against isolated local Postgres',{skip:!conne
    st.after(async()=>{await db.query('ALTER TABLE district_pipeline.assessment_bridge_leases DROP CONSTRAINT synthetic_native_commit');});
   }
   const authorizationId=await f.store.authorize({approvalSha256:digest(randomUUID()),approvedBy:'synthetic-test-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[key],ags:['12064472'],maxJobs:1,maxElapsedMs:60000,category:'development',mode:'attended'});
-  const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:30000});
+  const result=await runDistrictJobs({store:f.store,cas:f.cas,handlers:{assessment_b:assessmentBJobHandler(f.broker)},authorizationId,maxJobs:1,maxElapsedMs:60000,ownerPresent:true,leaseMs:mode==='slow_staging'?1800:30000});
   assert.equal(calls,1);
-  const accepted=mode==='accepted'||mode==='quality';
-  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'max_jobs_reached'):'execution_exception');
-  assert.equal(result.state,mode==='accepted'?'completed':'held');
+  const accepted=mode==='accepted'||mode==='quality'||mode==='slow_staging';
+  assert.equal(result.reasonCode,accepted?(mode==='quality'?'quality_failed':'max_jobs_reached'):mode==='rejected'?'quality_failed':mode==='usage_limit'?'budget_paused':mode==='historical_model'?'omp_model_identity_mismatch':mode==='expired_staging'?'lease_expired':'execution_exception');
+  assert.equal(result.state,mode==='accepted'||mode==='slow_staging'?'completed':'held');
   const lease=(await db.query(`SELECT l.id,l.input_sha256,l.state,l.receipt_sha256,l.purge_ack_sha256,s.state AS submission_state FROM district_pipeline.assessment_bridge_leases l JOIN district_pipeline.jobs j ON j.id=l.job_id LEFT JOIN district_pipeline.assessment_bridge_submissions s ON s.lease_id=l.id WHERE j.job_key=$1`,[key])).rows[0];
+  if(mode==='rejected'){assert.equal(lease.state,'held');assert.equal(lease.submission_state,'rejected');assert.deepEqual(await settledOmpOutputRejectionLeases(db,key),[lease.id]);assert.doesNotMatch(stderr,/PRIVATE_INVALID_OUTPUT/);return;}
   if(!accepted){
-   assert.equal(lease.state,'held');assert.equal(lease.submission_state,null);assert.equal(lease.receipt_sha256,null);assert.equal(lease.purge_ack_sha256,null);
+   assert.equal(lease.state,mode==='expired_staging'?'expired':'held');assert.equal(lease.submission_state,null);assert.equal(lease.receipt_sha256,null);assert.equal(lease.purge_ack_sha256,null);
    if(mode==='commit_failure')assert.match(stderr,/R1_EXCEPTION job=[a-f0-9]{12} step=assessment_b class=DatabaseError code=23514 at=src\/district-assessment-broker\.ts:[0-9]+\n/);
    if(mode==='cleanup_failure')assert.match(stderr,/class=CivicPolicyStateError code=SCRATCH_CLEANUP_INCOMPLETE/);
+   if(mode==='usage_limit'){
+    const hold=await db.query(`SELECT h.provider,h.limit_kind,h.no_output,h.failure_proof->>'version' AS proof_version,l.requested_model FROM district_pipeline.r1_subscription_usage_holds h JOIN district_pipeline.assessment_bridge_leases l ON l.id=h.bridge_lease_id WHERE h.bridge_lease_id=$1`,[lease.id]);
+    assert.deepEqual(hold.rows,[{provider:'anthropic-subscription',limit_kind:'rate_limit',no_output:true,proof_version:'omp-provider-limit-failure-v1',requested_model:'claude-sonnet-5-5'}]);
+    const receipt=(await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[key])).rows[0]!.receipt;
+    assert.equal(receipt.outcome,'held_execution');assert.equal(receipt.reasonCode,'budget_paused');assert.equal(receipt.versions.subscriptionLimitNoOutput,'true');
+    assert.equal((await db.query('SELECT count(*) AS count FROM district_pipeline.assessment_bridge_submission_intents WHERE lease_id=$1',[lease.id])).rows[0].count,'1');
+   }
    assert.doesNotMatch(stderr,/kind=output_accepted/);return;
   }
   assert.equal(lease.state,'submitted');assert.equal(lease.submission_state,'accepted');assert.match(lease.receipt_sha256,/^[a-f0-9]{64}$/);assert.match(lease.purge_ack_sha256,/^[a-f0-9]{64}$/);
+  const nativeReceipt=JSON.parse((await f.cas.read(lease.receipt_sha256)).toString('utf8'));
+  assert.equal(nativeReceipt.version,'assessment-receipt-v2');assert.equal(nativeReceipt.requestedModel,'claude-sonnet-5-5');
+  if(mode==='slow_staging')assert.equal(verifiedRenewals,5);
   const ackBytes=await f.cas.read(lease.purge_ack_sha256),ack=JSON.parse(ackBytes.toString('utf8'));
   assert.equal(digest(ackBytes),lease.purge_ack_sha256);assert.equal(ack.version,'assessment-vm-omp-purge-ack-v1');assert.equal(ack.leaseId,lease.id);assert.equal(ack.inputSha256,lease.input_sha256);OmpNativeCleanupSchema.parse(ack.cleanup);
   assert.equal('modelFileWritesDenied' in ack,false,'Native cleanup never fabricates the Mac denial claim');
   const receipt=(await db.query<{receipt:StepReceipt}>('SELECT r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE j.job_key=$1',[key])).rows[0]!.receipt;
-  assert.equal(receipt.outcome,mode==='accepted'?'succeeded':'held_quality');assert.equal(receipt.reasonCode,mode==='accepted'?'completed':'quality_failed');
+  assert.equal(receipt.outcome,mode==='quality'?'held_quality':'succeeded');assert.equal(receipt.reasonCode,mode==='quality'?'quality_failed':'completed');
   assert.ok(receipt.outputHashes.includes(lease.purge_ack_sha256));assert.equal(receipt.versions.ompPurgeAckSha256,lease.purge_ack_sha256);assert.equal(receipt.provider?.tokens.output,7);assert.equal(receipt.provider?.reservedMicroUsd,0);assert.match(stderr,/kind=output_accepted/);
  });
 

@@ -69,7 +69,7 @@ test('durable R1 queue against isolated local Postgres', {skip:!connectionString
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=1',[original.rows[0].sha256]);
     const migrations=await pool.query<{version:number;sha256:string}>('SELECT version,sha256 FROM district_pipeline.schema_migrations ORDER BY version');
-    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5,6,7]);
+    assert.deepEqual(migrations.rows.map(row=>row.version),[1,2,3,4,5,6,7,8]);
     await pool.query('UPDATE district_pipeline.schema_migrations SET sha256=$1 WHERE version=2',[digest('wrong-002')]);
     await assert.rejects(migrateDistrictJobs(pool),/byte hash/);
     assert.equal((await pool.query<{sha256:string}>('SELECT sha256 FROM district_pipeline.schema_migrations WHERE version=1')).rows[0].sha256,original.rows[0].sha256);

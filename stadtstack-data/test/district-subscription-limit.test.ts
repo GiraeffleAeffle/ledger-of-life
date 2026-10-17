@@ -45,14 +45,22 @@ test('missing, conflicting, local/relative reset clocks and generic 429s never a
 });
 test('omp accepts only typed empty limit failures with normal exit and complete terminal framing',()=>{
  const error={type:'rate_limit_error',reset_at:resetAt,message:'PRIVATE_PROVIDER_ERROR'};
- const stream=(content:unknown[]=[])=>{
-  const message={role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',timestamp:1,stopReason:'error',content,errorMessage:'429 '+JSON.stringify(error)};
+ const stream=(content:unknown[]=[],model='claude-haiku-5-5')=>{
+  const message={role:'assistant',provider:'anthropic',api:'anthropic-messages',model,timestamp:1,stopReason:'error',content,errorMessage:'429 '+JSON.stringify(error)};
   return events([{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{...message,stopReason:undefined,errorMessage:undefined}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}]);
  };
  const proof=ompSubscriptionLimit(stream(),'',observedAt,0);assert.ok(proof);assert.equal(proof.noOutput,true);assert.equal(proof.limit.resetAt,resetAt);
  assert.equal(proof.failureProof.terminalFrame,'assistant_turn_agent_error');
  assert.equal(assessmentBridgeHoldReason(new OmpRunnerHold('provider_failed',proof)),'budget_paused');
  assert.equal(JSON.stringify(proof).includes('PRIVATE_PROVIDER_ERROR'),false);
+ const sonnet=stream([],'claude-sonnet-5-5');
+ assert.equal(ompSubscriptionLimit(sonnet,'',observedAt,0),null,'Historical default never guesses the native model');
+ assert.equal(ompSubscriptionLimit(stream(),'',observedAt,0,'claude-sonnet-5-5'),null,'Native parsing cannot certify a historical model');
+ const native=ompSubscriptionLimit(sonnet,'',observedAt,0,'claude-sonnet-5-5');assert.ok(native);assert.equal(native.noOutput,true);
+ assert.deepEqual(native.limit,proof.limit);assert.equal(native.failureProof.version,'omp-provider-limit-failure-v1');
+ assert.notEqual(native.failureProof.terminalMessageSha256,proof.failureProof.terminalMessageSha256,'Exact terminal hashes retain the actual model');
+ const nativeHold=inspectOmpLimitFailure(sonnet,'',observedAt,0,new OmpRunnerHold('provider_failed'),'claude-sonnet-5-5');
+ assert.ok(nativeHold);assert.equal(nativeHold.noOutput,true);assert.equal(assessmentBridgeHoldReason(nativeHold),'budget_paused');
  assert.throws(()=>inspectOmpEvents(stream(),0,{requestSha256:'a'.repeat(64),systemPromptSha256:'b'.repeat(64),stdin:{intendedBytes:2,deliveredBytes:2,deliveredSha256:'a'.repeat(64),frameBytes:27}}),(error:unknown)=>error instanceof OmpRunnerHold&&error.reason==='provider_failed');
  assert.equal(inspectOmpLimitFailure(stream(),'',observedAt,0,new OmpRunnerHold('provider_failed'))?.noOutput,true);
  const classified=new OmpRunnerHold('provider_failed',undefined,'provider_error_rate_limit'),limited=inspectOmpLimitFailure(stream(),'',observedAt,0,classified);

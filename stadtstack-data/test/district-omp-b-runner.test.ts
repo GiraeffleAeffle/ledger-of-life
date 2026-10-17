@@ -12,7 +12,7 @@ import type {ChildProcess,SpawnOptions} from 'node:child_process';
 import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions,OmpNativeCleanupSchema} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
-import {AssessmentBEnqueueManifestSchema} from '../src/district-r1.ts';
+import {NativeAssessmentBEnqueueManifestSchema as AssessmentBEnqueueManifestSchema} from '../src/district-r1-assessment-cli.ts';
 import {assessmentOutputSchema,assessmentItemSchema,deterministicChecks,PROMPTS,digest as assessmentDigest,type OriginalEvidence} from '../src/district-assessment.ts';
 import {z} from 'zod';
 import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,assertManagedSourceReadable,readCivicPolicyInventory,CivicPolicyStateError} from '../src/civic-opt-out.ts';
@@ -25,7 +25,7 @@ import {OmpFailureKindSchema,OmpDecodeCheckSchema} from '../src/district-excepti
 const syntheticDelivery={requestSha256:digest('Synthetic native request'),systemPromptSha256:ompAssessmentControl().systemPromptSha256,stdin:{intendedBytes:24,deliveredBytes:24,deliveredSha256:digest('Synthetic native request'),frameBytes:49}};
 const inspectOmpEvents=(stdout:string,exitCode:number)=>inspectBoundOmpEvents(stdout,exitCode,syntheticDelivery);
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'synthetic',valueReview:null};
-function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
+function message(overrides:Record<string,unknown>={}){return {responseId:'msg-one',timestamp:1791800000000,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-sonnet-5-5',stopReason:'stop',content:[{type:'text',text:JSON.stringify(answer)}],usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{input:0.01,output:0.02,cacheRead:0.03,cacheWrite:0.04,total:0.1}},...overrides};}
 function eventStream(events:Record<string,unknown>[]=[{type:'message_end',message:message()}]){
  const final=events.find(event=>event.type==='message_end'&&(event.message as {role?:string})?.role==='assistant')?.message;
  const suffix:Record<string,unknown>[]=[];
@@ -37,9 +37,14 @@ function eventStream(events:Record<string,unknown>[]=[{type:'message_end',messag
 test('omp event inspection accepts a completed text-only message and repeated copies',()=>{
  const original=message(),final={...original,completedAt:1791800000100};
  const inspected=inspectOmpEvents(eventStream([{type:'message_end',message:final},{type:'turn_end',message:original,toolResults:[],reason:'stop'},{type:'agent_end',messages:[original],reason:'stop'}]),0);
- assert.equal(inspected.returnedModel,'claude-haiku-5-5');assert.deepEqual(inspected.usage.topLevel,{inputTokens:7,outputTokens:3,cacheReadTokens:5,cacheCreationTokens:2});
+ assert.equal(inspected.returnedModel,'claude-sonnet-5-5');assert.deepEqual(inspected.usage.topLevel,{inputTokens:7,outputTokens:3,cacheReadTokens:5,cacheCreationTokens:2});
  assert.equal(inspected.usage.cliEstimatedApiCostUsd,0.1);
- assert.equal(inspected.usage.perModel['claude-haiku-5-5']!.cliEstimatedApiCostUsd,0.1);
+ assert.equal(inspected.usage.perModel['claude-sonnet-5-5']!.cliEstimatedApiCostUsd,0.1);
+});
+test('native decoder never falls back to Haiku; retained Haiku streams require explicit history dispatch',()=>{
+ const stream=eventStream([{type:'message_end',message:message({model:'claude-haiku-5-5'})}]);
+ assert.throws(()=>inspectOmpEvents(stream,0),{reason:'model_identity_mismatch'});
+ assert.equal(inspectBoundOmpEvents(stream,0,syntheticDelivery,'claude-haiku-5-5').returnedModel,'claude-haiku-5-5');
 });
 test('native cleanup acknowledgement requires complete typed absence evidence and never accepts Mac denial claims',()=>{
  const cleanup={version:'omp-native-cleanup-v1',requestSha256:digest('request'),responseSha256:digest('response'),runnerContractSha256:digest('runner'),imageId:'sha256:'+digest('image'),scratchId:'00000000-0000-4000-8000-000000000001',containerId:digest('container'),containerRemoved:true,managedScratchClosed:true,completedAt:'2026-10-16T12:00:00.000Z'};
@@ -429,7 +434,7 @@ test('credential resolver holds for zero or multiple accounts, wrong version, no
 }));
 
 test('omp runner fingerprint includes the canonical authority, lifecycle and every reviewed image profile file',async()=>{
- const files=['district-omp-b-runner.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-b-native-model.ts','district-assessment-projection.ts','district-schema.ts','district-graph-claims.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  const expected=semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:digest(await readFile(new URL('../src/'+file,import.meta.url)))})))});
  assert.equal(await ompRunnerContractSha256(),expected);
@@ -443,7 +448,20 @@ test('omp image uses the pinned parser runtime without inherited environment and
  assert.deepEqual(JSON.parse(entrypoint),OMP_PROCESS.Entrypoint);
  const environment=dockerfile.match(/^ENV ([\s\S]*?)^USER /m)?.[1];assert.ok(environment);
  assert.deepEqual(environment.replace(/\\\n\s*/g,' ').trim().split(/\s+/),OMP_CONTAINER_ENVIRONMENT);
- assert.equal(await readFile(new URL('../docker/omp-b/entry.sh',import.meta.url),'utf8'),'#!/bin/sh\nset -eu\nIFS= read -r token || exit 126\n[ -n \"$token\" ] || exit 126\nexport ANTHROPIC_OAUTH_TOKEN=\"$token\"\nunset token\nexec omp \"$@\"\n');
+ assert.equal(await readFile(new URL('../docker/omp-b/entry.sh',import.meta.url),'utf8'),String.raw`#!/bin/sh
+set -eu
+# The host's frozen custody profile pins this bootstrap argv. Only this reviewed
+# image translates its model; no alternate selector or fallback is accepted.
+[ "$#" -ge 5 ] && [ "$1" = --print ] && [ "$2" = --mode ] \
+  && [ "$3" = json ] && [ "$4" = --model ] \
+  && [ "$5" = anthropic/claude-haiku-5-5 ] || exit 126
+shift 5
+IFS= read -r token || exit 126
+[ -n "$token" ] || exit 126
+export ANTHROPIC_OAUTH_TOKEN="$token"
+unset token
+exec omp --print --mode json --model anthropic/claude-sonnet-5-5 "$@"
+`);
 });
 
 test('settings overlay contains only the reviewed registered paths and correctly typed scalar values',async()=>{
@@ -506,11 +524,11 @@ contextFiles:
  assert.equal(await readFile(new URL('../docker/omp-b/settings.yml',import.meta.url),'utf8'),expected);
 });
 
-test('CLI assessment manifest parses both explicit transports and rejects ambiguous or mixed contracts',()=>{
+test('CLI assessment manifest permits only the native transport and rejects historical or mixed contracts',()=>{
  const common={itemArtifactSha256:'a'.repeat(64),policyProofSha256:'b'.repeat(64),sourceScope:{publisherId:'fixture-publisher',sourceId:'fixture-source',municipalityId:'ratzeburg',ags:'01053100',tenant:null,observationWindow:'2026-10-11'}};
  const vm={...common,transport:'vm-omp'},mac={...common,transport:'mac-bridge',clientContractSha256:'c'.repeat(64)};
- assert.deepEqual(AssessmentBEnqueueManifestSchema.parse({jobs:[vm,mac]}).jobs,[vm,mac]);
- for(const job of [common,{...common,transport:'mac-bridge'},{...vm,clientContractSha256:'c'.repeat(64)},{...mac,runnerContractSha256:'d'.repeat(64)},{...vm,transport:'unknown'}])assert.throws(()=>AssessmentBEnqueueManifestSchema.parse({jobs:[job]}));
+ assert.deepEqual(AssessmentBEnqueueManifestSchema.parse({jobs:[vm]}).jobs,[vm]);
+ for(const job of [common,mac,{...common,transport:'mac-bridge'},{...vm,clientContractSha256:'c'.repeat(64)},{...mac,runnerContractSha256:'d'.repeat(64)},{...vm,transport:'unknown'}])assert.throws(()=>AssessmentBEnqueueManifestSchema.parse({jobs:[job]}));
  assert.throws(()=>AssessmentBEnqueueManifestSchema.parse({jobs:[]}));
 });
 
@@ -552,7 +570,7 @@ test('usage keeps normalized token buckets and only valid final-attempt cost est
  assert.equal(inspectOmpEvents(eventStream([{type:'message_end',message:message({usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{total:0}}})}]),0).usage.cliEstimatedApiCostUsd,0);
  for(const total of [-1,null,'0.1']){
   const inspected=inspectOmpEvents(eventStream([{type:'message_end',message:message({usage:{input:7,output:3,cacheRead:5,cacheWrite:2,totalTokens:17,cost:{total}}})}]),0);
-  assert.equal(inspected.usage.cliEstimatedApiCostUsd,null);assert.equal(inspected.usage.perModel['claude-haiku-5-5']!.cliEstimatedApiCostUsd,undefined);
+  assert.equal(inspected.usage.cliEstimatedApiCostUsd,null);assert.equal(inspected.usage.perModel['claude-sonnet-5-5']!.cliEstimatedApiCostUsd,undefined);
   assert.deepEqual(inspected.usage.topLevel,{inputTokens:7,outputTokens:3,cacheReadTokens:5,cacheCreationTokens:2});
  }
 });

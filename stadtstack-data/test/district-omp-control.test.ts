@@ -15,7 +15,7 @@ const prompt=Buffer.from('Synthetic source-free assessment rubric.\n');
 const delivery={requestSha256:digest('Synthetic request'),systemPromptSha256:digest(prompt),stdin:{intendedBytes:17,deliveredBytes:17,deliveredSha256:digest('Synthetic request'),frameBytes:42}};
 const answer={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'Synthetic assessment.',valueReview:null};
 function stream(text=JSON.stringify(answer),overrides:Record<string,unknown>={}){
- const message={responseId:'synthetic-response',timestamp:1,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',content:[{type:'text',text}],usage:{input:1,output:17},...overrides};
+ const message={responseId:'synthetic-response',timestamp:1,role:'assistant',provider:'anthropic',api:'anthropic-messages',model:'claude-sonnet-5-5',stopReason:'stop',content:[{type:'text',text}],usage:{input:1,output:17},...overrides};
  return [{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(value=>JSON.stringify(value)).join('\n')+'\n';
 }
 async function fixture(work:(directory:string,identity:OmpControlFileIdentity)=>Promise<void>){

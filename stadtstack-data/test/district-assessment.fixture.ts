@@ -94,15 +94,13 @@ export function recordFor(f:{source:AssessmentItem['sources'][number];policy:Pol
  record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
 }
 export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
- const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;assertionEncoding?:{modality?:AssessmentOutput['assertions'][number]['modality']}}[];bindings?:{selector:string;value:unknown}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;assertionEncoding?:{modality?:AssessmentOutput['assertions'][number]['modality'];subjectId?:string|null;objectId?:string|null}}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
  const source=data.evidence[0],locator=source.locators[0];
  const assertions:AssessmentOutput['assertions']=unresolved?[]:data.claimIds.map(claimId=>{
   const proposition=data.claim?.propositions?.find(proposition=>proposition.claimId===claimId),selected=source.locators.find(candidate=>candidate.quote===proposition?.quote)??locator;
   const assertion:AssessmentOutput['assertions'][number]={claimId,sourceId:source.sourceId,locatorId:selected.id,quote:selected.quote,subjectId:null,objectId:null,unit:null,value:null,date:null,dateRole:null,financialRole:'none',stage:null,modality:'unknown'};
   if(proposition?.selector.startsWith('/relations/')){
-   const binding=(field:string)=>data.claim?.bindings?.find(binding=>binding.selector===proposition.selector+'/'+field)?.value;
-   const subject=binding('fromId'),object=binding('toId');
-   assertion.subjectId=typeof subject==='string'?subject:null;assertion.objectId=typeof object==='string'?object:null;
+   assertion.subjectId=proposition.assertionEncoding?.subjectId??null;assertion.objectId=proposition.assertionEncoding?.objectId??null;
    assertion.modality=proposition.assertionEncoding?.modality??'unknown';
   }
   return assertion;

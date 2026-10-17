@@ -10,8 +10,9 @@ import {OMP_B_MODEL_MAX_TIME_SECONDS} from './district-execution-profile.ts';
 import {canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
 import {withManagedSourceScratch,type ManagedSourceContext,type ManagedDockerContainer} from './civic-opt-out.ts';
 import {assessmentOutputSchema,PROMPTS} from './district-assessment.ts';
-import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts,assertModelResponseIdentity} from './district-model-contract.ts';
+import {modelIdentitySha256,type ModelAnswer,type ReportedUsage,type TokenCounts} from './district-model-contract.ts';
 import {assertAssessmentContextBound} from './district-assessment-context.ts';
+import {NATIVE_B_MODEL,assertNativeBResponseIdentity} from './district-b-native-model.ts';
 import {ompSubscriptionLimit,type SubscriptionLimit,type OmpLimitFailureProof} from './district-subscription-limit.ts';
 import {OmpContainerExitCodeSchema,OmpDecodeCheckSchema,type OmpDecodeCheck,type OmpFailureKind} from './district-exception-diagnostics.ts';
 import {describeOmpOutput,exactOmpJsonFence,OmpOutputStructureSchema,ompOutputStructureVersions,ompOutputStructureFromVersions,type OmpOutputStructure,type OmpOutputDelivery,type OmpStdinDelivery} from './district-omp-output-diagnostics.ts';
@@ -236,7 +237,7 @@ function ompProviderFailure(stdout:string):OmpFailureKind|undefined {
 function ompProviderHold(stdout:string,fallback:OmpFailureKind,exitCode:number):OmpRunnerHold {
  return new OmpRunnerHold('provider_failed',undefined,ompProviderFailure(stdout)??fallback,exitCode);
 }
-export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutputDelivery){
+export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutputDelivery,expectedModel:typeof NATIVE_B_MODEL|'claude-haiku-5-5'=NATIVE_B_MODEL){
  if(exitCode!==0)throw ompProviderHold(stdout,'exit_nonzero',exitCode);
  function fail(check:OmpDecodeCheck):never{throw new OmpRunnerHold('event_stream',undefined,undefined,exitCode,check);}
  if(Buffer.byteLength(stdout)>OMP_LIMITS.outputBytes)fail('stream_size');
@@ -327,8 +328,8 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
    const message=object(event.message);if(message.role!=='assistant')continue;
    rejectAssistant(message);
    if(assistantStarts!==1||assistantEnded)fail('event_order');assistantEnded=true;
-   if(message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!=='claude-haiku-5-5'||message.stopReason!=='stop')throw new OmpRunnerHold('model_identity_mismatch');
-   if(message.upstreamModel!==undefined&&message.upstreamModel!=='claude-haiku-5-5')throw new OmpRunnerHold('model_identity_mismatch');
+   if(message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!==expectedModel||message.stopReason!=='stop')throw new OmpRunnerHold('model_identity_mismatch');
+   if(message.upstreamModel!==undefined&&message.upstreamModel!==expectedModel)throw new OmpRunnerHold('model_identity_mismatch');
    const content=Array.isArray(message.content)?message.content:[];
    if(!content.length||content.some(block=>object(block).type!=='text'))fail('final_content');
    if(!final){final=message;finalLine=line;}
@@ -356,13 +357,13 @@ export function inspectOmpEvents(stdout:string,exitCode:number,delivery:OmpOutpu
  const value=decoded.data;
  const usageRaw=object(final.usage),finalUsage=counts(usageRaw);
  const cost=object(usageRaw.cost).total,estimatedCost=typeof cost==='number'&&Number.isFinite(cost)&&cost>=0?cost:null;
- const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{'claude-haiku-5-5':{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
- return {value,responseSha256:sha(finalLine),returnedModel:'claude-haiku-5-5',reportedModels:['claude-haiku-5-5'],usage,outputStructure,...outputNormalization?{outputNormalization}:{}};
+ const usage:ReportedUsage={topLevel:Object.keys(finalUsage).length?finalUsage:null,perModel:{[expectedModel]:{...finalUsage,...(estimatedCost===null?{}:{cliEstimatedApiCostUsd:estimatedCost})}},cliEstimatedApiCostUsd:estimatedCost};
+ return {value,responseSha256:sha(finalLine),returnedModel:String(final.model),reportedModels:[String(final.model)],usage,outputStructure,...outputNormalization?{outputNormalization}:{}};
 }
 /** Preserve limit metadata on failure, but certify retry only for the normal,
  * completely framed provider-failure path rejected by the successful decoder. */
-export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:string,exitCode:number,error:unknown):OmpRunnerHold|null{
- const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode);
+export function inspectOmpLimitFailure(stdout:string,stderr:string,observedAt:string,exitCode:number,error:unknown,expectedModel:typeof NATIVE_B_MODEL|'claude-haiku-5-5'='claude-haiku-5-5'):OmpRunnerHold|null{
+ const evidence=ompSubscriptionLimit(stdout,stderr,observedAt,exitCode,expectedModel);
  if(!evidence)return null;
  if(!(error instanceof OmpRunnerHold)||error.reason!=='provider_failed')evidence.noOutput=false;
  return new OmpRunnerHold('provider_failed',evidence,error instanceof OmpRunnerHold?error.failureKind:undefined,exitCode,error instanceof OmpRunnerHold?error.decodeCheck:undefined,error instanceof OmpRunnerHold?error.controlMode:undefined);
@@ -387,7 +388,7 @@ export function inspectOmpAssessmentCompletion(stdout:string,stderr:string,exitC
   return inspectOmpEvents(stdout,exitCode,delivery);
  }catch(error){
   if(error instanceof OmpAssessmentOutputRejected)throw new OmpAssessmentOutputRejected(error.rejection,controlMode);
-  throw inspectOmpLimitFailure(stdout,stderr,observedAt,exitCode,error)??error;
+  throw inspectOmpLimitFailure(stdout,stderr,observedAt,exitCode,error,NATIVE_B_MODEL)??error;
  }
 }
 async function reviewFile(path:string,contract:string):Promise<OmpReview>{
@@ -397,8 +398,12 @@ async function reviewFile(path:string,contract:string):Promise<OmpReview>{
   if(value.runnerContractSha256!==contract||Date.parse(value.reviewedAt)>Date.now())throw new OmpRunnerHold('security_review_required');return value;
  }catch(e){if(e instanceof OmpRunnerHold)throw e;throw new OmpRunnerHold('security_review_required');}
 }
+/** Read-only reviewed image metadata for the guarded installer; no credential or Docker access. */
+export async function readOmpRunnerReview():Promise<OmpReview>{
+ return reviewFile(OMP_REVIEW_PATH,await ompRunnerContractSha256());
+}
 export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-b-native-model.ts','district-assessment-projection.ts','district-schema.ts','district-graph-claims.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','civic-docker.ts','civic-opt-out.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -406,7 +411,7 @@ export async function ompRunnerContractSha256(hash?:(file:string)=>Promise<strin
  * The mixed runner remains semantic for model framing, event decoding and CLI
  * arguments. runVmOmpAssessment still validates the live security contract. */
 export async function ompRunnerOutputContractSha256(hash?:(file:string)=>Promise<string>):Promise<string>{
- const files=['district-omp-b-runner.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
+ const files=['district-omp-b-runner.ts','district-b-native-model.ts','district-assessment-projection.ts','district-schema.ts','district-graph-claims.ts','district-omp-output-diagnostics.ts','district-subscription-limit.ts','district-execution-profile.ts','district-assessment.ts','district-assessment-context.ts','district-claims.ts','../docker/omp-b/Dockerfile','../docker/omp-b/settings.yml','../docker/omp-b/entry.sh','../docker/omp-b/natives.sha256','../scripts/build-omp-b-image.sh'];
  const control=ompAssessmentControl();
  return semanticHash({version:OMP_RUNNER_VERSION,systemPromptSha256:control.systemPromptSha256,outputSchemaSha256:control.outputSchemaSha256,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))})))});
 }
@@ -587,10 +592,10 @@ export async function runVmOmpAssessment(data:Record<string,unknown>,context:Man
     const stderrBytes=Buffer.concat(errors,errorBytes);
     let parsed:OmpParsedEvents;
     try{parsed=inspectOmpAssessmentCompletion(stdout,stderrBytes.toString('utf8'),result.exitCode,{...delivery,stdin:stdinDelivery},finishedAt,controlIdentity.mode);}finally{stderrBytes.fill(0);}
-    const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:'claude-haiku-5-5',toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
+    const modelEvidence={provider:'anthropic-subscription' as const,tool:'omp-cli' as const,model:NATIVE_B_MODEL,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,modelIdentitySha256:'',modelIdentityBasis:'reported-cli-model-and-tool-version' as const};
     modelEvidence.modelIdentitySha256=modelIdentitySha256(modelEvidence);
     const {outputNormalization,outputStructure,...modelResult}=parsed;
-    const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:'claude-haiku-5-5',runtimeWarnings:[]};assertModelResponseIdentity(answer);
+    const answer:ModelAnswer={...modelResult,evidence:modelEvidence,requestedModel:NATIVE_B_MODEL,runtimeWarnings:[]};assertNativeBResponseIdentity(answer);
     return {answer,stdout,startedAt,finishedAt,imageId:review.imageId,settingsSha256:sha(settings),systemPromptSha256:controlContract.systemPromptSha256,outputSchemaSha256:controlContract.outputSchemaSha256,controlMode:controlIdentity.mode,accountLabelSha256:auth.accountLabelSha256,runnerContractSha256:contract,toolVersion:OMP_VERSION+' sha256:'+review.ompBinarySha256,outputStructure,...outputNormalization?{outputNormalization}:{},scratchId:basename(scope.directory),containerId:container.id};
    }finally{
     scope.signal.removeEventListener('abort',onAbort);

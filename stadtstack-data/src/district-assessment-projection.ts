@@ -22,7 +22,7 @@ export const SourcePropositionProjectionSchema=z.object({
  qualifications:z.array(retained.extend({reason:z.enum(['null','empty_string','empty_array','unknown'])}).strict()),
  context:z.array(retained),
  propositions:z.array(z.object({selector:z.string(),asserted:z.unknown(),quote:z.string().nullable(),
-  assertionEncoding:z.object({value:z.null(),unit:z.null(),modality:assertionModality.optional()}).strict(),claimId:z.string()}).strict()).min(1),
+  assertionEncoding:z.object({value:z.null(),unit:z.null(),modality:assertionModality.optional(),subjectId:z.string().nullable().optional(),objectId:z.string().nullable().optional()}).strict(),claimId:z.string()}).strict()).min(1),
 }).strict();
 export type SourcePropositionProjection=z.infer<typeof SourcePropositionProjectionSchema>;
 const pointer=(key:string)=>key.replaceAll('~','~0').replaceAll('/','~1');
@@ -72,7 +72,10 @@ export function sourceRecordPropositions(record:DistrictKnowledgeRecord,blind:(v
    const quote=typeof associated==='string'&&associated.length?associated:null;
    const relation=field==='relations'?record.relations[Number(path.slice('/relations/'.length))]:undefined;
    const assertionEncoding:SourcePropositionProjection['propositions'][number]['assertionEncoding']={value:null,unit:null};
-   if(relation)assertionEncoding.modality=relationModalityEncoding[relation.modality];
+   if(relation){
+    assertionEncoding.modality=relationModalityEncoding[relation.modality];
+    assertionEncoding.subjectId=relation.fromId;assertionEncoding.objectId=relation.toId;
+   }
    const body={selector:path,asserted,quote,assertionEncoding};
    propositions.push({...body,claimId:'proposition:'+semanticHash({version:'r1-record-propositions-v2',recordId:record.id,...body})});
   };

@@ -87,13 +87,14 @@ export function retryableOmpFailureProof(value:unknown):boolean{
 }
 /** An omp failure is retryable only when the COMPLETE bounded stream proves no
  * model content/tool output was produced. Unknown/truncated events fail closed. */
-export function ompSubscriptionLimit(stdout:string,stderr:string,observedAt:string,exitCode:number):{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}|null{
+export function ompSubscriptionLimit(stdout:string,stderr:string,observedAt:string,exitCode:number,expectedModel:'claude-haiku-5-5'|'claude-sonnet-5-5'='claude-haiku-5-5'):{limit:SubscriptionLimit;noOutput:boolean;failureProof:OmpLimitFailureProof}|null{
+ if(expectedModel!=='claude-haiku-5-5'&&expectedModel!=='claude-sonnet-5-5')return null;
  if(!stdout.endsWith('\n'))return null;
  const limits:SubscriptionLimit[]=[];let noOutput=true,session=false;
  let stage:'session'|'agent'|'turn'|'message'|'message_end'|'turn_end'|'agent_end'='session',framing=true,terminalMessage:string|null=null;
  const terminal=(raw:unknown):string|null=>{
   const message=object(raw),{completedAt:_completedAt,...body}=message;
-  if(message.role!=='assistant'||message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!=='claude-haiku-5-5'||message.stopReason!=='error'||!Array.isArray(message.content)||message.content.length!==0)return null;
+  if(message.role!=='assistant'||message.provider!=='anthropic'||message.api!=='anthropic-messages'||message.model!==expectedModel||message.stopReason!=='error'||!Array.isArray(message.content)||message.content.length!==0)return null;
   if(!(typeof message.responseId==='string'&&message.responseId.length>0)&&!(typeof message.timestamp==='number'&&Number.isSafeInteger(message.timestamp)&&message.timestamp>=0))return null;
   let error:unknown;try{error=JSON.parse(String(message.errorMessage).replace(/^429\s+(?=\{)/,''));}catch{return null;}
   return errorLimit('anthropic-subscription',error,observedAt)?canonicalJson(body):null;
@@ -126,7 +127,7 @@ export function ompSubscriptionLimit(stdout:string,stderr:string,observedAt:stri
   const messages=[event.message,...(Array.isArray(event.messages)?event.messages:[])].map(object);
   for(const message of messages){
    if(message.role&&message.role!=='assistant')return null;
-   if(message.provider!==undefined&&message.provider!=='anthropic'||message.model!==undefined&&message.model!=='claude-haiku-5-5')return null;
+   if(message.provider!==undefined&&message.provider!=='anthropic'||message.model!==undefined&&message.model!==expectedModel)return null;
    if(message.content!==undefined&&(!Array.isArray(message.content)||message.content.length!==0))noOutput=false;
    const usage=object(message.usage);if(Object.values(usage).some(value=>typeof value==='number'&&value>0))noOutput=false;
    if(message.errorMessage){let raw:unknown;try{raw=JSON.parse(String(message.errorMessage).replace(/^429\s+(?=\{)/,''));}catch{raw=null;}

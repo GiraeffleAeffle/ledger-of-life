@@ -8,7 +8,7 @@ import type {DistrictCas} from './district-cas.ts';
 import {loadCommittedResidualOutputs,loadResidualSource,ResidualInputSchema,residualJobContract,exportResidualTextContribution} from './district-residual-jobs.ts';
 import {PreparedDocumentSchema,verifyPreparedDocument} from './district-prepared-document.ts';
 import {assessmentItemSchema,validateReceipt,verifyPinnedAssessment} from './district-assessment.ts';
-import {residualAssessmentItem} from './district-assessment-jobs.ts';
+import {reconstructResidualAssessmentItem} from './district-assessment-jobs.ts';
 import {CriticalAssessmentInventorySchema,CriticalAdmissionsSchema,CRITICAL_ADMISSIONS_VERSION,type CriticalAssessmentInventory} from './district-critical-assessment-contract.ts';
 import {admitCriticalKnowledge} from './district-critical-assessment.ts';
 import {criticalKnowledgeTarget} from './district-critical-assessment-public.ts';
@@ -142,7 +142,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   if(!candidate||canonicalJson(record)!==canonicalJson(candidate.record)||assessed.has(record.id))throw Error('Queue seal assessment record membership mismatch');assessed.add(record.id);
   const residual=committed.results[candidate.index],original=committed.sources[candidate.index];
   if(entry.spec.policyProofSha256!==residual.policyReceiptSha256||canonicalJson(entry.spec.sourceScope)!==canonicalJson(original.receipt.scope))throw Error('Queue seal assessment source scope mismatch');
-  const item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),expected=residualAssessmentItem(candidate.record,prepared.get(residual.result.taskId)!,residual.preparedArtifactSha256,residual.policyReceiptSha256);
+  const item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),expected=reconstructResidualAssessmentItem(candidate.record,prepared.get(residual.result.taskId)!,residual.preparedArtifactSha256,residual.policyReceiptSha256,item);
   if(canonicalJson(item)!==canonicalJson(expected))throw Error('Queue seal assessment item differs from original record/prepared evidence');
   // The item must have been actually emitted by this extraction's committed queue preparation.
   const itemPreparation=[...steps.values()].find(step=>step.spec.step==='assessment_prepare'&&step.receipt.outputHashes.includes(selector.itemArtifactSha256)&&step.receipt.outputHashes.includes(selector.recordArtifactSha256));
@@ -157,7 +157,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
    if(!entry.receipt.dependencyReceiptIds.includes(pass.receipt.id)||pass.receipt.outcome!=='succeeded')throw Error('Queue seal assessment pass is not committed');
    const matches:string[]=[];
    // The committed B outputs also contain original JSONL stdout, not another JSON receipt.
-   for(const hash of pass.receipt.outputHashes){let value;try{value=await json(hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}if(value.version==='assessment-receipt-v1'){
+   for(const hash of pass.receipt.outputHashes){let value;try{value=await json(hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}if(value.version==='assessment-receipt-v1'||value.version==='assessment-receipt-v2'){
     const receipt=validateReceipt(value,item,role);if(receipt.provider!==(role==='B'?'anthropic-subscription':'openai-subscription'))throw Error('Queue seal assessment provider mismatch');matches.push(hash);
     if(role!=='B')callRequirements.push({originalSha256:residual.result.sourceSha256,requestSha256:receipt.requestSha256,jobKey:pass.receipt.jobKey,runId:pass.receipt.runId});
    }}
@@ -185,7 +185,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
    recordIds=result.result.records.map(record=>record.id);
   }else{
    const selector=z.object({itemArtifactSha256:HashSchema}).passthrough().parse(entry.spec.selector),item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),record=result.result.records.find(record=>record.id===item.itemId);
-   if(!record||!entry.spec.inputArtifactHashes.includes(selector.itemArtifactSha256)||canonicalJson(item)!==canonicalJson(residualAssessmentItem(record,prepared.get(result.result.taskId)!,result.preparedArtifactSha256,result.policyReceiptSha256)))throw Error('Terminal assessment item differs from extracted original');
+   if(!record||!entry.spec.inputArtifactHashes.includes(selector.itemArtifactSha256)||canonicalJson(item)!==canonicalJson(reconstructResidualAssessmentItem(record,prepared.get(result.result.taskId)!,result.preparedArtifactSha256,result.policyReceiptSha256,item)))throw Error('Terminal assessment item differs from extracted original');
    const emitted=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.step='assessment_prepare' AND r.outcome='succeeded' AND r.receipt->'outputHashes' ? $1 AND r.receipt->'dependencyReceiptIds' ? $2`,[selector.itemArtifactSha256,extraction.receipt.id]);
    if(emitted.rows.length!==1)throw Error('Terminal assessment item lacks unique committed preparation ancestry');
    const preparation=remember(emitted.rows[0]);await closeDependencies(preparation);

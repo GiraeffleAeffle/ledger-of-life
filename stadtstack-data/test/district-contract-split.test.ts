@@ -84,6 +84,12 @@ test('host resolver and native image cutovers change only B contracts among the 
   assert.equal(await parserOutputContractSha256(change(file)),await parserOutputContractSha256(hash));
  }
 });
+test('source projection and native B admission are assessment-only semantic dependencies',async()=>{
+ for(const file of ['district-assessment-projection.ts','district-b-native-model.ts']){
+  for(const compute of [assessmentQueueContract,assessmentBJobContract,ompRunnerOutputContractSha256,ompRunnerContractSha256])assert.notDeepEqual(await compute(change(file)),await compute(hash),file);
+  for(const compute of [residualPreparationContract,residualJobContract,policyRefreshContract,parserOutputContractSha256,parserIsolationContractSha256])assert.deepEqual(await compute(change(file)),await compute(hash),file);
+ }
+});
 test('preparation jobs are independent of extraction prompts/model/decoding/chunking and output assembly',async()=>{
  const preparation=await residualPreparationContract(hash),extraction=await residualJobContract(hash);
  assert.deepEqual(Object.keys(preparation),['preparationSha256']);
@@ -128,4 +134,8 @@ test('complete host-code manifest records actual per-file bytes and a canonical 
  const modified=manifest.map(entry=>entry.file==='src/civic-opt-out.ts'?{...entry,sha256:digest('Synthetic alternate host bytes')}:entry);
  assert.notEqual(semanticHash(modified),versions.hostCodeManifestSha256);
  assert.equal('hostCodeManifestSha256' in spec(await residualJobContract(hash)),false);
+});
+
+test('native assessment operator entrypoint cannot invalidate acquisition observation identity',async()=>{
+ assert.equal(await acquisitionContract(change('district-r1-assessment-cli.ts')),await acquisitionContract(hash));
 });

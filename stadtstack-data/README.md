@@ -25,7 +25,7 @@ npm run mcp                           # stdio
 npm run mcp:http                      # Streamable HTTP http://127.0.0.1:4318/mcp
 ```
 
-District text acquisition, preparation and extraction run on the authoritative **codex-workstation VM**, with native Codex **gpt-6.1-sol** only. R1 Haiku assessment has its separately approved `omp-b` Docker transport and custody gates; generic `subscriptionChat` does not enable Anthropic execution. Hosted Jev/TypeSafe evaluation and the former `evaluate`, `evaluate:core`, `weekend` and implicit `all` chains remain retired. Historical model/experiment receipts keep their actual identities and clocks, without implying a new execution.
+District text acquisition, preparation and extraction run on the authoritative **codex-workstation VM**, with native Codex **gpt-6.1-sol** only. Current lane B uses **anthropic/claude-sonnet-5-5** on Claude Max through its separately reviewed `omp-b` Docker image, uniformly for source records and value answers (owner decision `r1-b-model-sonnet-2026-10-17`). Generic `subscriptionChat` does not enable Anthropic execution. Hosted Jev/TypeSafe evaluation and the former `evaluate`, `evaluate:core`, `weekend` and implicit `all` chains remain retired. Historical model/experiment receipts retain their actual identities and clocks; they authorize no new execution.
 The ignored `cache/` contains explicitly governed source bytes, prepared text, model responses, task results and private artifacts. No generic last-good HTTP fallback, mirror retry, raw CCF checkout import or unscoped geocoding remains. Pure feed/geodata/OSM/Atlas parsers and static validators remain available for already-authorized inputs. Existing city facts, including CCF-derived facts, enter the acquisition lane only through an authenticated retained-publication import with their original provenance and clocks; no new HTTP observation is invented.
 
 `collect` requires a pinned import plan and never fetches. Sealed publication members authenticate the original manifest identity and exact member bytes. Private pre-cleanup Git snapshots use a separate authenticated commit/tree/blob proof solely for historical change reconstruction; only identifiers, versions and source hashes reach change feeds. Current operator registry configuration has its own Git-authenticated, closed metadata role and explicit owner approval, not a borrowed source receipt. Old `out/` remains read-only in this lane; publication writes the managed `cache/publication/owner-policy-2026-10-11/release/` candidate. Promotion, endpoint checks and release claims require the parent integration process.
@@ -307,6 +307,8 @@ After that stage commits, `enqueue-assessment-a` and `enqueue-prepared-assessmen
 Each residual item carries `assessmentContext` (`assessment-prepared-context-v1`): extraction-cited chunk metadata with stable `chunk:<index>:<start>:<end>` ids, and **byte-exact quotation windows** with UTF-16 start/end offsets, UTF-8 excerpt SHA-256 and authenticated prepared-text SHA-256. Each exact quote receives a fixed ±256-code-unit neighbour window, clipped to its cited chunk; overlapping/touching windows merge, and Unicode scalar boundaries remain intact. Chunk/count and source `text-sha256:…;chars:…` locators must match deterministic chunking. Every item quote, including nested predicate/identifier/location quotes, must have an exact locator inside supplied windows. Repeated quotations elsewhere cannot expand the item. No generated summary, document-wide fallback, adaptive shrinking to fit, or silent quote truncation is permitted.
 
 A/B receive identical evidence and role data, capped at **22,000 canonical UTF-8 bytes**, including rubric, proposition projection and locators: 2,000 bytes below B's existing 24,000-byte evidence ceiling. `r1-provider-propositions-v2` carries the same proposition partition and complete shared source-attribution table without JSON-escaping the claim string. The `asserted` payload is not assertion `value`: these text propositions explicitly encode `value:null,unit:null`; genuine typed quantitative critical claims retain their separate source-attested quantities/units. All original record values and hashes remain lossless in the private item. Historical v1 items/receipts retain their original projection and validator, not a shim or transplanted approval. C receives exactly the same evidence plus genuine immutable A/B reviews and mismatch report, with a separate **36,000-byte Codex request cap** (4,000 below its 40,000-byte data ceiling; source-free prompt/schema are separate, with 32,768-token context and 30,000-token compaction). Oversized complete requests hold before effects or reservations, never truncate. Missing semantic relationships, unsupported positive classifications or any unsupported real proposition still require abstention/escalation.
+
+Relation propositions retain directed local source mentions and the raw graph modality in `asserted`. Their `assertionEncoding` explicitly supplies authenticated `subjectId`/`objectId` bindings and the frozen wire modality: asserted/decided/implemented encode as confirmed, planned/proposed as planned, and conditional/negated/historical retain their categories. This is output encoding, never promotion to an independently verified fact or replacement of the raw modality being assessed.
 
 Every A/B/C read, reconciliation and final/seal verification reopens the authenticated prepared text, re-derives excerpts/offsets and verifies quote coverage, while retaining current source policy, original-byte/parser bindings and managed custody gates. Private originals remain in CAS, not provider prompts. Projection v2 changes the assessment queue and B/omp contracts and needs fresh assessment preparation and A/B/C/reconciliation jobs; old A/B/C receipts cannot be transplanted. Preparation, residual extraction, refresh and parser contracts must stay unchanged, with cumulative lifetime accounting and the 48-call/original cap intact. Shared verifier prompts and output/checker strictness are not relaxed; source-target semantics live in the versioned item. This matches frozen `docs/CIVIC_PIPELINE_REBUILD.md` §4.1's original-evidence/typed-role protocol and §6's honest missing-evidence/value gates; that plan remains byte-frozen. Step-9 answers already use answer/citation rather than all-record-field coverage; their v2 claim instructions explicitly distinguish context bookkeeping/unset roles and non-quantitative assertions without changing the frozen questions/rubric.
 
@@ -748,7 +750,7 @@ Native acceptance preserves the database's existing submitted-lease invariant: b
 
 Previously the native accepted path staged valid answer/receipt/reconciliation artifacts but attempted `submitted` with a null purge hash, violating `assessment_bridge_leases_check4` (`23514`) and rolling the final transaction back. This is an execution failure, not evidence that the model answer failed its frozen schema. Original exceptions now survive the B execution wrapper as a non-persisted cause: the single existing post-commit `R1_EXCEPTION` path emits the original closed class/code and first admitted in-repository frame, never exception prose, SQL detail, source text or credentials. Real-PostgreSQL regressions exercise `waitForVmOmpAssessment` acceptance, content-quality holding, missing/mismatched cleanup and final-commit rollback with diagnostic provenance. Synthetic native runners require the explicit isolated, pinned fixture protocol; production cannot inject one, and a fixture without one cannot reach a provider. This changes only B/omp fingerprints and requires renewed runner review and new-contract B jobs; historical v1/v2/v3 rejection proofs remain unchanged.
 
-B-only `ompAssessmentControl` now makes the unchanged deterministic **encoding** requirements explicit without choosing or upgrading a verdict. Their source is `district-assessment.ts`: exact item/claim IDs and unique/complete claim coverage (316, 318, 322, 342–343); zero usefulness for every non-supported outcome, including `unresolved` (317); original locator/native evidence and entity-ID binding (324–332); real full-day `YYYY-MM-DD` plus a non-null role for non-null dates (333–336); paired value/unit nullability (338); matching value-review scores, abstention usefulness and missing-role flags (349–353); exact citation attribution/evidence (355–379); and complete hash-bound critical-review coverage/conditional outcome consistency (390–395). Partial month/year/period precision stays in the exact claim quote with `date:null`; an attested role may remain because the checker imposes no null-role requirement when date is null. Units must never be invented or quantities erased to satisfy a pair. Absent review targets require explicit null fields under the existing instructions at line 121. Applicable hold reasons are preserved (398), not formatted away. The shared `PROMPTS.B`, assessment module, output schema and checker are byte-identical across this clarification; only B's delivered source-free control and B/omp contracts change.
+The historical B-only `ompAssessmentControl` clarification made the deterministic **encoding** requirements explicit without choosing or upgrading a verdict. The current checks in `district-assessment.ts` are: exact item/claim IDs and unique/complete claim coverage (340, 342, 346, 373–374); zero usefulness for every non-supported outcome, including `unresolved` (341); original locator/native evidence and entity-ID binding (348–356); real full-day `YYYY-MM-DD` plus a non-null role for non-null dates (357–360); paired value/unit nullability (362); matching value-review scores, abstention usefulness and missing-role flags (380–384); exact citation attribution/evidence (386–413); and complete hash-bound critical-review coverage/conditional outcome consistency (421–426). Partial month/year/period precision stays in the exact claim quote with `date:null`; an attested role may remain because the checker imposes no null-role requirement when date is null. Units must never be invented or quantities erased to satisfy a pair. Absent review targets require explicit null fields under the existing instructions at line 124. Applicable hold reasons are preserved (429), not formatted away. That earlier control-only clarification left `PROMPTS.B`, the assessment module, output schema and checker byte-identical. The separate source-proposition-v2 encoding/directional guards (364–368) are stated in governed proposition/question data shared by A/B/C; quantitative critical targets keep their dedicated encoding.
 
 Static production/replay comparison: the broker passes `prepared.checked.data`, binds its canonical request hash to the retained request, and rechecks policy/fencing immediately before handoff. The private replay used that retained canonical request, the same control assembly/file path, entrypoint, frozen argv/environment/profile/image, credential resolver, Docker create/attach/start/wait/remove transport and 240-second outer / 150-second model bounds. Its **11,755.75 ms** timer starts immediately before token write, **after credential resolution and Docker create/attach/start**, and stops after container exit plus attachment EOF, **before removal**; the assistant separately reported **6,803.54 ms**. Production's roughly 47-second **job receipt** additionally includes credential resolution, Docker setup/removal, executor input-CAS verification/resource-slot admission, repeated authenticated evidence/policy reads, enrolled scratch/control/resource inventory writes, managed per-write authority checks, and rejected-output settlement (two more current-evidence reads, three envelope persists, short fenced commits and executor output verification). The replay omits those authority/inventory/settlement paths, and its timer excludes its own credential/setup/removal work. Their exact share was not measured; the elapsed difference does not prove longer inference or truncation. Private scratch identities/host mount paths and live clock/provider state also differ; container cwd/control paths are fixed. No other static request/control-byte transformation was found.
 
@@ -756,7 +758,7 @@ Private terminal tooling may use the exported read-only `settledOmpOutputRejecti
 
 Historical **v1 and v2** rejection proofs remain immutable evidence. Readers explicitly dispatch on the version: v1 keeps its original strict fields and canonical hashes; v2 validates its normalization flag and required unknown-key counts; v3 additionally requires the bounded structure and delivered-request binding. Unknown versions fail closed. Terminal settlement verification and later sealed-evidence/export reauthentication must not rewrite historical proofs or require fields that did not exist in their version.
 
-This decoder cutover changes B's job and omp security/output fingerprints and requires a newly reviewed runner contract and new B job identity. The existing native-complete image, process profile, settings, binary/host-resolver pins and review JSON schema remain unchanged; no image rebuild is needed. Residual preparation/extraction, assessment queue (A/C), policy-refresh and parser-output contracts remain unchanged. Existing ambiguous attempts must not be automatically retried.
+That historical decoder-only cutover changed B's job and omp security/output fingerprints and required a newly reviewed runner contract and new B job identity. At that cutover the native-complete image, process profile, settings, binary/host-resolver pins and review JSON schema remained unchanged; no image rebuild was needed. Residual preparation/extraction, assessment queue (A/C), policy-refresh and parser-output contracts remained unchanged. Existing ambiguous attempts must not be automatically retried.
 
 
 Static B incident analysis (lead-reported receipt `0bafd47c-7de8-4980-bd99-59604eac62bf`, 2026-10-15 12:17:45Z, `omp_provider_failed`; no typed usage hold) does **not** establish an authentication, quota or model-access cause retrospectively:
@@ -766,7 +768,7 @@ Static B incident analysis (lead-reported receipt `0bafd47c-7de8-4980-bd99-59604
 - The fixed inference argv selects `anthropic/claude-haiku-5-5` with thinking off. The settings overlay does not override that model and continues to disable client/model/server-side fallback, usage-reset waiting and compaction. The old tag already [seeds this model](https://github.com/can1357/oh-my-pi/blob/v18.9.2/packages/catalog/src/compat/rules/providers/anthropic.kdl), [omits its unsupported sampling parameters and models explicit disabled thinking](https://github.com/can1357/oh-my-pi/blob/v18.9.2/packages/catalog/src/compat/rules/classes/anthropic.kdl), and has a [thinking-off request regression](https://github.com/can1357/oh-my-pi/blob/v18.9.2/packages/ai/test/anthropic-haiku-thinking-off.test.ts). Anthropic's current [model overview](https://platform.claude.com/docs/en/models/haiku-5-5/overview) and [migration guide](https://platform.claude.com/docs/en/models/haiku-5-5/migration-guide#use-the-claude-haiku-5-5-model-id) explicitly specify the fixed `claude-haiku-5-5` ID. This rules out an unrecognized spelling in these sources, not account-specific availability.
 - Upstream [print mode](https://github.com/can1357/oh-my-pi/blob/v18.9.2/packages/coding-agent/src/modes/print-mode.ts#L75-L103) strips the error payload from `message_update`, but preserves final assistant copies. The provider populates their typed `errorStatus`/`errorId`; the former local decoder stopped at the stripped update or nonzero process exit, hiding that distinction. Existing receipts therefore cannot distinguish provider authorization/account policy, invalid request, overload/rate limiting, transport failure, length stops or another CLI exception. **[INFERENCE]** Provider-side authorization/entitlement or request rejection and transient provider/transport failure remain plausible; none is proven by the generic hold or by the absence of a typed usage-limit row. A reviewed, owner-authorized future attempt can distinguish these classes with the new labels, without retaining error bodies or probing a model here.
 
-This change updates B's job/output fingerprints and the **omp-b runner review hash**; the privileged lead must reissue the review and enqueue fresh B jobs. It does not rebuild the image, replace either pinned binary, change a prompt/output schema, parser contract, residual preparation/extraction contract, A/C assessment-queue contract or policy-refresh contract. No credentials, production authority/CAS/DB, Docker daemon or model calls are used by the static analysis or synthetic tests.
+The historical typed-failure decoder change updated B's job/output fingerprints and the **omp-b runner review hash**, requiring a reissued review and fresh B jobs. It did not rebuild the image, replace either pinned binary, change a prompt/output schema, parser contract, residual preparation/extraction contract, A/C assessment-queue contract or policy-refresh contract. Those static analyses and synthetic tests used no credentials, production authority/CAS/DB, Docker daemon or model calls.
 
 **B broker heartbeat safety:** authenticated evidence reads, managed-CAS writes,
 and submitted receipt reads run **outside** authority-row-lock transactions.
@@ -778,8 +780,65 @@ and the fresh authority/opt-out snapshot against the authenticated evidence pins
 Source bindings and managed readability are not bypassed; staged bytes remain in
 the governed CAS, and a changed fence/policy cannot admit their metadata or an
 accepted submission. Submission intent still commits before any evidence handoff.
-There is no lost-ownership retry, timeout/lease extension, history reset, provider
-fallback or change to subscription accounting/usage-limit holds.
+Expired ownership is never revived; there is no lost-ownership retry, authority
+deadline extension, history reset, provider fallback or change to subscription
+accounting/usage-limit holds.
+
+**Native Sonnet B cutover:** new native selectors, input hashes and submission
+intents use `district-assessment-native-b-v2`; new native Sonnet B assessments
+use `assessment-receipt-v2`. A/C and historical Haiku/Mac receipts retain v1
+identity validation. The B-owned native admission module accepts only Sonnet,
+role B, `omp-cli`, and the actual matching reported model and identity digest.
+The native-only operator entrypoint accepts only `vm-omp`; legacy Mac execution
+is available only inside the explicitly isolated historical-protocol test fixture,
+never production.
+Historical Haiku selectors, intents and v1/v2/v3 rejection evidence remain
+authenticated by their explicit historical version/model, without rewriting.
+
+Invoke `node src/district-r1-assessment-cli.ts enqueue-assessment-b --registry-config PATH --registry-descriptor PATH`
+with the existing bounded JSON `{jobs:[{transport:"vm-omp",itemArtifactSha256,sourceScope,policyProofSha256}]}` on stdin;
+stdout remains `{jobKeys}`. It reuses the same admitted registry, scope, managed
+read/binding and content-free failure gates. No model override is accepted.
+`district-r1.ts` remains byte-identical to `a4782c4`, preserving acquisition
+fingerprint `ff1980b18c6c22def8f2ed8572957c355562d4814d1e9a3bbbc5125ad5f0bbcb`
+and authenticated imported-observation reuse. Existing prepared-item/value-answer
+enqueue commands stay on that unchanged CLI and use the current Sonnet broker.
+
+The immutable host process/custody profile still supplies its exact Haiku
+**bootstrap selector**. The newly reviewed image entrypoint accepts only that
+fixed bootstrap and translates it to effective `anthropic/claude-sonnet-5-5`;
+it rejects alternate selectors and never falls back. The response decoder and
+receipt admission require actual Sonnet output. Transport artifacts disclose
+both bootstrap and effective selectors. Rebuild the image and reissue the
+runner review; `readOmpRunnerReview()` exposes only authenticated read-only
+review metadata for the guarded installer, without credential or Docker access.
+
+Native broker ownership lasts 120 seconds and renews every 10 seconds through
+short authority/policy/hash-fenced transactions while provider and managed-CAS
+work remain unlocked. Its immutable lifecycle deadline is at most 20 minutes
+from ready creation, additionally bounded by the original run, authorization and
+policy deadlines. Renewal never revives expiry, extends those hard deadlines,
+retries a lost owner or submits another intent. Provider execution retains the
+existing 240-second outer / 150-second model limits. Slow post-call staging
+therefore does not expire merely because the old fixed five-minute bridge
+deadline elapsed. Any lost fence, expiry or policy change still holds honestly.
+Migration `008_native_b_sonnet.sql` widens only the retained requested-model
+constraint; it rewrites no historical row and is never applied by runtime DDL.
+
+Projection-v2 source items require fresh A/B/C requests and receipts; reuse only
+authenticated preparation/extraction, not old A judgments. Lifetime per-original
+48-call accounting, paid zero, usage-limit stops, mandatory C and unresolved
+owner escalation are unchanged. This cutover changes assessment queue/B/omp
+contracts, not residual preparation/extraction, parser/security, execution-profile,
+model-contract or canonical custody bytes. Historical incident descriptions below
+retain the actual models, contracts and observations of their original cutovers.
+
+Native completion classifies typed subscription limits against the expected
+Sonnet model and retains the same stop/no-output-proof gates. Historical Haiku
+limit readers retain their original model dispatch and immutable
+`omp-provider-limit-failure-v1` framing/hashes. A prompt-read failure still
+prevents no-output retry certification even when a genuine quota hold is present.
+
 
 The production `bc6c6b45-7a21-426a-9b5c-c93b7d7777ae` B job had three
 `lease_lost` receipts at approximately 20 seconds and no bridge lease/intents.
@@ -883,7 +942,7 @@ Publication requires an explicit graph `--as-of`, quality/manifest clocks, and `
 
 **Serving configuration:** stdio and hosted MCP require the absolute `STADTSTACK_MCP_RELEASE_DIR` naming an immutable, complete governed live release. Historical tracked `out` and its descendants are protected, with no implicit fallback or v2 conversion. Startup authenticates the exact manifest/cohort; every request retains the same admitted release instance and rechecks current source authority/opt-out. This configuration contract is not a deployment claim.
 
-**Model custody:** `modelReadiness` is production-authority VM-only and receives policy explicitly. Generic `subscriptionChat` is VM Codex-only and requires a current `ManagedSourceContext` scratch. R1's separate role-B Haiku assessment runner uses the reviewed `omp-b` Docker profile (`district-omp-b-runner.ts`): immutable image/runner/binary/daemon pins, current source custody, canonical Docker lifecycle, bounded input/output/time and exact response identity/event checks. Missing review or custody holds instead of selecting another executor. Original `claude-cli` and current `omp-cli` receipts retain their actual tool/model hashes; neither is relabelled into the other. The source-free readiness protocol and legacy bridge do not grant generic Mac source processing or a policy replica.
+**Model custody:** `modelReadiness` is production-authority VM-only and receives policy explicitly. Generic `subscriptionChat` is VM Codex-only and requires a current `ManagedSourceContext` scratch. R1's separate role-B Sonnet assessment runner uses the newly reviewed `omp-b` image and unchanged Docker custody profile (`district-omp-b-runner.ts`): immutable image/runner/binary/daemon pins, current source custody, canonical Docker lifecycle, bounded input/output/time and exact response identity/event checks. Missing review or custody holds instead of selecting another executor. Historical `claude-cli`/Haiku and native `omp-cli` receipts keep their actual versioned tool/model hashes; they are never relabelled. The source-free readiness protocol and legacy bridge do not grant generic Mac source processing or a policy replica.
 
 
 Kair/Braid is a possible **later inbound authorized-bundle source**, not an outbound handover target or a connector in this release. No private bundle/API contract or permission is inferred from its public website.
@@ -1046,10 +1105,10 @@ parser, provider, authorization or owner-check receipts.
    answer evidence; actual answer sources still obey the question's town filter.
    The default ceiling is 2 total Codex calls (A+C; allowed
    2–48) per answer-unit SHA(bank, release, question, lane); evidence changes do
-   not reset it. B uses the separately authorized Haiku Max lane.
+   not reset it. B uses the separately authorized Sonnet Max lane.
    The atomic enqueue produces thirty
    without-graph units plus seven graph units and their A/B job keys.
-   Execute separately authorized bounded A (Codex) and blind B (VM-OMP Haiku)
+   Execute separately authorized bounded A (Codex) and blind B (VM-OMP Sonnet)
    stages using the existing preauthorize/run workflow. Enqueue C with
    `enqueue-assessment-c` stdin `{jobs:[{AJobKey,BJobKey}]}`, run genuine C,
    then enqueue/run `enqueue-assessment-reconciliation` with

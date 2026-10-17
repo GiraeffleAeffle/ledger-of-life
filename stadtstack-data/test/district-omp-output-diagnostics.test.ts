@@ -12,7 +12,7 @@ const request=Buffer.from('Synthetic delivered request bytes');
 const delivery={requestSha256:digest(request),systemPromptSha256:digest('Synthetic delivered control bytes'),stdin:{intendedBytes:request.length,deliveredBytes:request.length,deliveredSha256:digest(request),frameBytes:request.length+25}};
 const valid={itemId:'synthetic',outcome:'supported',assertions:[],scores:{correctness:1,sources:1,usefulness:1},holdReasons:[],rationale:'Synthetic result',valueReview:null};
 function stream(text:string){
- const message={role:'assistant',responseId:'synthetic',timestamp:1,provider:'anthropic',api:'anthropic-messages',model:'claude-haiku-5-5',stopReason:'stop',usage:{output:17},content:[{type:'text',text}]};
+ const message={role:'assistant',responseId:'synthetic',timestamp:1,provider:'anthropic',api:'anthropic-messages',model:'claude-sonnet-5-5',stopReason:'stop',usage:{output:17},content:[{type:'text',text}]};
  return [{type:'session'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},{type:'message_end',message},{type:'turn_end',message,toolResults:[]},{type:'agent_end',messages:[message]}].map(value=>JSON.stringify(value)).join('\n')+'\n';
 }
 
