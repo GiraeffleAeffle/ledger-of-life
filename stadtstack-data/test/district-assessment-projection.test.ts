@@ -97,7 +97,18 @@ test('ordinary relation propositions preserve source direction, not just endpoin
  const reversed=structuredClone(record);Object.assign(reversed.relations[0],{fromMention:'facility',toMention:'operator',fromId:graph.entities[1].entityId,toId:graph.entities[0].entityId});reversed.verification.evidenceHash=knowledgeEvidenceHash(reversed);
  const reverseProposition=residualRecordPropositions(reversed).propositions.find(value=>value.selector==='/relations/0')!;
  assert.notEqual(reverseProposition.claimId,proposition.claimId);assert.notDeepEqual(reverseProposition.asserted,proposition.asserted);
+ assert.equal((proposition.asserted as {modality:string}).modality,'asserted');assert.equal(proposition.assertionEncoding.modality,'confirmed');
  const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(item,f.evidence,'A')).value);
+ for(const [raw,wire] of [['asserted','confirmed'],['decided','confirmed'],['implemented','confirmed'],['planned','planned'],['proposed','planned'],['conditional','conditional'],['negated','negated'],['historical','historical']] as const){
+  const variant=structuredClone(record);variant.relations[0].modality=raw;variant.verification.evidenceHash=knowledgeEvidenceHash(variant);
+  const encoded=residualRecordPropositions(variant).propositions.find(value=>value.selector==='/relations/0')!;
+  assert.equal((encoded.asserted as {modality:string}).modality,raw,'wire encoding cannot rewrite the source modality');
+  assert.equal(encoded.assertionEncoding.modality,wire);
+  // Codec coverage is not a claim that these altered modalities are supported
+  // by this source, nor a substitute for their separate critical review.
+  const response=structuredClone(output);response.assertions.find(value=>value.claimId===proposition.claimId)!.modality=wire;
+  assert.doesNotThrow(()=>assessmentOutputSchema.parse(response));
+ }
  assert.deepEqual(deterministicChecks(item,f.evidence,output),[]);
  const wrong=structuredClone(output),relation=wrong.assertions.find(value=>value.claimId===proposition.claimId)!;
  [relation.subjectId,relation.objectId]=[relation.objectId,relation.subjectId];

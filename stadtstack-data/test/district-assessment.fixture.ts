@@ -94,7 +94,7 @@ export function recordFor(f:{source:AssessmentItem['sources'][number];policy:Pol
  record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
 }
 export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
- const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;asserted?:unknown}[];bindings?:{selector:string;value:unknown}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;assertionEncoding?:{modality?:AssessmentOutput['assertions'][number]['modality']}}[];bindings?:{selector:string;value:unknown}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
  const source=data.evidence[0],locator=source.locators[0];
  const assertions:AssessmentOutput['assertions']=unresolved?[]:data.claimIds.map(claimId=>{
   const proposition=data.claim?.propositions?.find(proposition=>proposition.claimId===claimId),selected=source.locators.find(candidate=>candidate.quote===proposition?.quote)??locator;
@@ -103,7 +103,7 @@ export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
    const binding=(field:string)=>data.claim?.bindings?.find(binding=>binding.selector===proposition.selector+'/'+field)?.value;
    const subject=binding('fromId'),object=binding('toId');
    assertion.subjectId=typeof subject==='string'?subject:null;assertion.objectId=typeof object==='string'?object:null;
-   assertion.modality=(proposition.asserted as {modality:typeof assertion.modality}).modality;
+   assertion.modality=proposition.assertionEncoding?.modality??'unknown';
   }
   return assertion;
  });

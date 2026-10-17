@@ -365,7 +365,7 @@ export function deterministicChecks(item: AssessmentItem, evidence: OriginalEvid
     if(proposition?.selector.startsWith('/relations/')){
       const relation=item.sourceRecord!.record.relations[Number(proposition.selector.slice('/relations/'.length))];
       if(!relation||a.subjectId!==relation.fromId||a.objectId!==relation.toId)issues.push('relation_direction:'+a.claimId);
-      if(!relation||a.modality!==relation.modality)issues.push('relation_modality:'+a.claimId);
+      if(!relation||a.modality!==proposition.assertionEncoding.modality)issues.push('relation_modality:'+a.claimId);
     }
     const constraint = item.constraints.find(c => c.claimId === a.claimId);
     if (constraint && canonical(constraint) !== canonical(a)) issues.push('source_constraint:' + a.claimId);

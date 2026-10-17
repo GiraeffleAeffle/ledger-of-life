@@ -1,12 +1,20 @@
 import {z} from 'zod';
 import {HashSchema,semanticHash} from './district-adapter-contract.ts';
 import {DistrictKnowledgeRecordSchema,type DistrictKnowledgeRecord} from './district-schema.ts';
+import type {GraphClaims} from './district-graph-claims.ts';
 
 // The full private snapshot is never provider data. It preserves even prior model
 // metadata while the blind, source-assertion partition is independently rebuilt.
 export const SourceRecordBindingSchema=z.object({version:z.literal('assessment-source-record-v2'),recordSha256:HashSchema,record:DistrictKnowledgeRecordSchema}).strict();
 const source=z.object({id:z.string(),url:z.string(),sha256:HashSchema}).strict();
 const retained=z.object({selector:z.string(),value:z.unknown(),valueSha256:HashSchema}).strict();
+const assertionModality=z.enum(['confirmed','planned','conditional','negated','historical','unknown']);
+// The assessment wire is deliberately coarser than the retained graph claim.
+// These are encoding categories, not promotion to an independently verified fact.
+const relationModalityEncoding={
+ asserted:'confirmed',decided:'confirmed',implemented:'confirmed',planned:'planned',proposed:'planned',
+ conditional:'conditional',negated:'negated',historical:'historical',
+} as const satisfies Record<GraphClaims['relations'][number]['modality'],z.infer<typeof assertionModality>>;
 export const SourcePropositionProjectionSchema=z.object({
  version:z.literal('r1-record-propositions-v2'),recordId:z.string(),recordSha256:HashSchema,projectionSha256:HashSchema,
  sources:z.array(source),
@@ -14,7 +22,7 @@ export const SourcePropositionProjectionSchema=z.object({
  qualifications:z.array(retained.extend({reason:z.enum(['null','empty_string','empty_array','unknown'])}).strict()),
  context:z.array(retained),
  propositions:z.array(z.object({selector:z.string(),asserted:z.unknown(),quote:z.string().nullable(),
-  assertionEncoding:z.object({value:z.null(),unit:z.null()}).strict(),claimId:z.string()}).strict()).min(1),
+  assertionEncoding:z.object({value:z.null(),unit:z.null(),modality:assertionModality.optional()}).strict(),claimId:z.string()}).strict()).min(1),
 }).strict();
 export type SourcePropositionProjection=z.infer<typeof SourcePropositionProjectionSchema>;
 const pointer=(key:string)=>key.replaceAll('~','~0').replaceAll('/','~1');
@@ -62,7 +70,10 @@ export function sourceRecordPropositions(record:DistrictKnowledgeRecord,blind:(v
    }
    const associated=member&&typeof member==='object'&&'quote' in member?member.quote:projection[quoteFields[field]??field+'Quote'];
    const quote=typeof associated==='string'&&associated.length?associated:null;
-   const body={selector:path,asserted,quote,assertionEncoding:{value:null,unit:null}};
+   const relation=field==='relations'?record.relations[Number(path.slice('/relations/'.length))]:undefined;
+   const assertionEncoding:SourcePropositionProjection['propositions'][number]['assertionEncoding']={value:null,unit:null};
+   if(relation)assertionEncoding.modality=relationModalityEncoding[relation.modality];
+   const body={selector:path,asserted,quote,assertionEncoding};
    propositions.push({...body,claimId:'proposition:'+semanticHash({version:'r1-record-propositions-v2',recordId:record.id,...body})});
   };
   if(Array.isArray(value))value.forEach((member,index)=>add(member,selector+'/'+index));else add(value,selector);

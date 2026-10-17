@@ -153,6 +153,12 @@ explicit endpoint labels. Local mention labels are context, not literal source
 quotations; only mechanical global IDs/identity derivations are graph bindings.
 The checker requires the matching typed subject/object/modality assertion even
 for noncritical relations, never just the names' co-occurrence.
+The frozen assessment wire uses a coarser modality vocabulary, explicitly encoded
+per relation: asserted/decided/implemented → `confirmed`, planned/proposed →
+`planned`; conditional, negated and historical retain their names. These are
+serialization categories: the original source modality remains unchanged and
+assessed, `confirmed` is not independent verification, and encoding cannot
+promote a proposed relation's graph/comparison eligibility.
 
 Non-quantitative text propositions use assertion `value:null` and `unit:null`;
 their proposed wording is the claim payload, not a measurement. Typed critical
