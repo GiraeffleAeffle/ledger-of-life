@@ -1,0 +1,38 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15-addendum-5",
+ "amends": {
+  "id": "r1-omp-b-review-2026-10-15",
+  "path": "stadtstack-data/reports/approvals/r1-omp-b-review-2026-10-15.json"
+ },
+ "follows": "r1-omp-b-review-2026-10-15-addendum-4",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals #81 and #88 and the owner escalation statement; not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T16:20:00Z",
+ "reissues": [
+  {
+   "codeCommit": "8cc863a01809fb4a45958bf7bdc8b893e37a7327",
+   "window": "window 13",
+   "installedReviewSha256": "87d75737bd3164b3885b00f531a5253cdd82c7be727b75a13a6c494ea1f9b57e",
+   "runnerContractSha256": "74dc8b1f7d0ca538eae6c6f281f6937d501f0b7b37ea63054b39021963a4d66e",
+   "imageId": "sha256:4a98a78e7965cd1867863ed896e3d6b7859e490d8678183e2805c44afbbf75be",
+   "reviewedAt": "2026-10-17T14:49:22Z",
+   "change": "B post-call managed-write batching (ac0f23d, be8754d), B-owned classification control clarification (12d92f2), quiet executor notifications (0e7d710), seal diagnostic (02bfe2a)",
+   "reviews": "BrokerReview clean (batching; control); DispositionReview clean (seal diagnostic); FullRunToolingReview clean (plan 8a4d72f3…)",
+   "retainedCopy": "/home/max/.local/state/stadtstack-data/r1-window13/main-inputs/omp-b-review.json",
+   "validation": "readOmpRunnerReview of the 8cc863a checkout returned runner 74dc8b1f… equal to ompRunnerContractSha256()"
+  },
+  {
+   "codeCommit": "b32bc962e617c876763f34c9734908f59116a00a",
+   "window": "window 14",
+   "installedReviewSha256": "7379a1b5cf77d066e4cee5b79e65516a2e4c5dcecf10783e878c98ef9ef0ef15",
+   "runnerContractSha256": "95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2",
+   "imageId": "sha256:dd69ecb7b015c572b66453b6dc8c3e1b513b97455c7edd73842d6a2b44cb2b81",
+   "reviewedAt": "2026-10-17T16:18:46Z",
+   "change": "Sonnet medium thinking: native stream v2 admits thinking blocks only before one final text block (acc63a3, 282f3a7); cross-property locator directive (e483592); image FROM e61fc252 with only entry.sh replaced (sha e4d1cbae…)",
+   "reviews": "BrokerReview clean (12d92f2..acc63a3, 282f3a7..e483592); BrokerReview image inspection clean (parent e61fc252, one entry.sh layer, config identical to 4a98a78e)",
+   "retainedCopy": "/home/max/.local/state/stadtstack-data/r1-window14/main-inputs/omp-b-review.json",
+   "validation": "readOmpRunnerReview of the b32bc96 checkout returned runner 95265109… and image dd69ecb7…"
+  }
+ ],
+ "unchangedFields": "ompBinarySha256 647237…, hostResolverBinarySha256/hostResolverVersion (omp/18.10.4), dockerDaemonId, dockerSocket"
+}
