@@ -6,14 +6,15 @@ import {CODEX_ASSESSMENT_ALLOWANCE_PIN,CodexAssessmentAllowanceSchema,CohortSche
 import {assessmentQueueContract} from '../src/district-assessment-jobs.ts';
 
 const approvals=new URL('../reports/approvals/',import.meta.url);
-test('committed r4 lead allowance authenticates the current queue, both owner records and frozen membership',async()=>{
+test('committed r5 lead allowance authenticates the current queue, both owner records and frozen membership',async()=>{
  const bytes=await readFile(new URL(CODEX_ASSESSMENT_ALLOWANCE_PIN.id+'.json',approvals));assert.equal(digest(bytes),CODEX_ASSESSMENT_ALLOWANCE_PIN.sha256);
  const record=CodexAssessmentAllowanceSchema.parse(JSON.parse(bytes.toString('utf8')));assert.equal(record.id,CODEX_ASSESSMENT_ALLOWANCE_PIN.id);assert.equal(record.expiresAt,'2026-10-25T21:59:59Z');
  assert.equal(record.assessment.queueContractSha256,await assessmentQueueContract());
  for(const [id,sha256] of [
   ['r1-codex-assessment-allowance-2026-10-17','fe20dffb70f1521b90deca2b5070fcf37a3c468fbad386820b12a6e040a6055a'],
   ['r1-codex-assessment-allowance-2026-10-17-r2','8e246c5736c0a556b7d27f87e72e38ece1fe946e66a5fef13023e36cae0fef8d'],
-  ['r1-codex-assessment-allowance-2026-10-17-r3','2e38add3bff06319566fdfcdf21cda85566deda77e07f5c8a7984e74fa9fea2d']
+  ['r1-codex-assessment-allowance-2026-10-17-r3','2e38add3bff06319566fdfcdf21cda85566deda77e07f5c8a7984e74fa9fea2d'],
+  ['r1-codex-assessment-allowance-2026-10-17-r4','2d468d0967b122cf2c679586a37016bedb8d5a5f05220b5f47935557168110fd']
  ]){
   const historicalBytes=await readFile(new URL(id+'.json',approvals));assert.equal(digest(historicalBytes),sha256);
   const historicalRecord=JSON.parse(historicalBytes.toString('utf8'));assert.equal(CodexAssessmentAllowanceSchema.safeParse(historicalRecord).success,false);
