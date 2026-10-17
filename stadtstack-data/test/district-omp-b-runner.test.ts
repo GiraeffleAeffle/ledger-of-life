@@ -440,14 +440,12 @@ test('omp runner fingerprint includes the canonical authority, lifecycle and eve
  assert.equal(await ompRunnerContractSha256(),expected);
 });
 
-test('omp image uses the pinned parser runtime without inherited environment and a POSIX first-line token entrypoint',async()=>{
- const dockerfile=await readFile(new URL('../docker/omp-b/Dockerfile',import.meta.url),'utf8'),parser=await readFile(new URL('../Dockerfile.parser',import.meta.url),'utf8');
- const base=parser.match(/^FROM (.+)$/m)?.[1];assert.ok(base);assert.ok(dockerfile.includes('FROM '+base+' AS runtime'));
- assert.match(dockerfile,/^FROM scratch$/m);assert.match(dockerfile,/^COPY --from=runtime \/ \/$/m);assert.match(dockerfile,/^USER 65534:65534$/m);
- const entrypoint=dockerfile.match(/^ENTRYPOINT (.+)$/m)?.[1];assert.ok(entrypoint);
- assert.deepEqual(JSON.parse(entrypoint),OMP_PROCESS.Entrypoint);
- const environment=dockerfile.match(/^ENV ([\s\S]*?)^USER /m)?.[1];assert.ok(environment);
- assert.deepEqual(environment.replace(/\\\n\s*/g,' ').trim().split(/\s+/),OMP_CONTAINER_ENVIRONMENT);
+test('omp image inherits the reviewed runtime with only the POSIX token entrypoint replaced',async()=>{
+ const dockerfile=await readFile(new URL('../docker/omp-b/Dockerfile',import.meta.url),'utf8');
+ assert.deepEqual(dockerfile.split('\n').filter(line=>line&&!line.startsWith('#')),[
+  'FROM sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169',
+  'COPY entry.sh /opt/stadtstack/entry.sh',
+ ]);
  assert.equal(await readFile(new URL('../docker/omp-b/entry.sh',import.meta.url),'utf8'),String.raw`#!/bin/sh
 set -eu
 # The host's frozen custody profile pins this bootstrap argv. Only this reviewed
@@ -679,20 +677,29 @@ test('review requires explicit current host resolver fields and keeps the contai
  assert.equal(OMP_HOST_BINARY,'/usr/local/lib/stadtstack/omp-b/omp-host-18.10.4');assert.equal(OMP_HOST_VERSION,'omp/18.10.4');assert.equal(OMP_VERSION,'omp/18.9.2');
 });
 
-test('image builder derives pinned native addons from the reviewed image without host credentials',async()=>{
+test('image builder derives an offline entry-only candidate from hash-authenticated reviewed runtime content',async()=>{
  const script=await readFile(new URL('../scripts/build-omp-b-image.sh',import.meta.url),'utf8');
- assert.match(script,/SOURCE_IMAGE=sha256:91c2c2c451fbc0273b97d25523bab3308b7077edca33efaaf26af923209711df/);
+ assert.match(script,/SOURCE_IMAGE=sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169/);
  assert.match(script,/EXPECTED=647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
- assert.match(script,/docker_local cp "\$SOURCE_NAME:\/usr\/local\/bin\/omp" "\$TMP\/omp"/);
+ assert.match(script,/EXPECTED_ENTRY=417a59923ed3aef9e51ebdbdb7bfab19968122ad5a8a2281fa95d2ac77d30171/);
+ assert.match(script,/EXPECTED_SETTINGS=a6211ded7fb160dccb61e0f27dd80ab7e2a31c747e6661f54f4841c13f22ae0a/);
+ assert.match(script,/EXPECTED_MANIFEST=e87e2ef469b318547b324a7f4a8a93621012f39024cb0a0e06c61fbc557c4d27/);
  assert.match(script,/--config "\$TMP\/docker-config" --host unix:\/\/\/run\/docker.sock/);
- assert.match(script,/-i HOME=\/extract-home PATH=\/usr\/local\/bin:\/usr\/bin:\/bin/);
- assert.match(script,/--name "\$EXTRACT_NAME" --network none --read-only/);
- assert.match(script,/sha256sum --strict --check natives.sha256/);
+ assert.match(script,/-i HOME=\/home\/omp PATH=\/usr\/local\/bin:\/usr\/bin:\/bin/);
+ assert.match(script,/--name "\$VERIFY_NAME" --network none --read-only/);
+ assert.match(script,/\/bin\/sh -ec '/);
+ assert.match(script,/sha256sum --strict --check -/);
+ assert.match(script,/DOCKER_BUILDKIT=0 docker_local build --pull=false --network none/);
+ assert.match(script,/verify_image "\$SOURCE_IMAGE"/);
+ assert.match(script,/verify_image "\$IMAGE_ID"/);
+ assert.match(script,/assert.deepEqual\(config\(candidate.Config\),config\(base.Config\)\)/);
+ assert.match(script,/assert.equal\(candidate.Config.User,"65534:65534"\)/);
+ assert.match(script,/assert.deepEqual\(candidate.RootFS.Layers.slice\(0,-1\),base.RootFS.Layers\)/);
  assert.doesNotMatch(script,/OMP_IMAGE_BINARY|\/home\/max\/\.local\/bin\/omp|omp-host-18\.10\.4/);
  const argv=script.match(/^set -- (.+)$/m)?.[1];assert.ok(argv);
  assert.deepEqual(argv.split(' '),OMP_EXECUTION_ARGS);
  const readiness=script.slice(script.indexOf('docker_local run --pull=never --name "$READY_NAME"'));
- for(const flags of ['--interactive --network bridge --ipc none --read-only','--cap-drop ALL --security-opt no-new-privileges:true --user 65534:65534 --workdir /work --stop-timeout 1','--memory 536870912 --memory-swap 536870912 --cpus 1 --pids-limit 32','--ulimit nofile=64:64 --ulimit nproc=32:32 --ulimit fsize=33554432:33554432 --ulimit core=0:0 --log-driver none'])assert.ok(readiness.includes(flags),flags);
+ for(const flags of ['--interactive --network none --ipc none --read-only','--cap-drop ALL --security-opt no-new-privileges:true --user 65534:65534 --workdir /work --stop-timeout 1','--memory 536870912 --memory-swap 536870912 --cpus 1 --pids-limit 32','--ulimit nofile=64:64 --ulimit nproc=32:32 --ulimit fsize=33554432:33554432 --ulimit core=0:0 --log-driver none'])assert.ok(readiness.includes(flags),flags);
  for(const path of ['/home/omp','/tmp','/work'])assert.ok(readiness.includes('--tmpfs '+path+':rw,noexec,nosuid,nodev,size=67108864,uid=65534,gid=65534,mode=0700'));
  assert.ok(readiness.includes('"$IMAGE_ID" "$@" --help'));
  assert.doesNotMatch(readiness,/--version|rw,exec/);
@@ -706,7 +713,10 @@ test('native image addons have explicit binary-derived hashes and immutable chec
   'a5c48a5718258a55be65410ae036fafb7af8bdf4643f44c83379af5d7a6cf584  pi_natives.linux-x64-baseline.node',
   'fa537a8c0765dc76e5199aae9dadb99cec9d69d41b3d36a47a032452196cb078  pi_natives.linux-x64-modern.node',
  ]);
- const dockerfile=await readFile(new URL('../docker/omp-b/Dockerfile',import.meta.url),'utf8');
- assert.match(dockerfile,/COPY --chmod=0444 pi_natives.linux-x64-baseline.node pi_natives.linux-x64-modern.node \/usr\/local\/bin\//);
- assert.match(dockerfile,/sha256sum --strict --check \/opt\/stadtstack\/omp-b-natives.sha256/);
+ const script=await readFile(new URL('../scripts/build-omp-b-image.sh',import.meta.url),'utf8');
+ for(const line of manifest.split('\n').filter(line=>line&&!line.startsWith('#'))){
+  const [hash,file]=line.split('  ');assert.ok(script.includes(hash+' /usr/local/bin/'+file));
+ }
+ assert.match(script,/for file in \/usr\/local\/bin\/pi_natives/);
+ assert.match(script,/\[ "\$\(stat -c %a "\$file"\)" = 444 \] \|\| exit 2/);
 });
