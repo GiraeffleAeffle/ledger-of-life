@@ -28,7 +28,7 @@ async function record(){
  return {pid:process.pid,nonce:randomUUID(),boot_id:(await readFile('/proc/sys/kernel/random/boot_id','utf8')).trim(),starttime:text.slice(text.lastIndexOf(')')+2).split(/\s+/)[19]!};
 }
 function child(t:TestContext,body:string,args:string[]=[]){
- const processChild=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {assertCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,recoverCivicPolicyLock,withCivicPolicyShutdown,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};${body}`,...args],{stdio:['pipe','pipe','pipe']});
+ const processChild=spawn(process.execPath,['--experimental-strip-types','--input-type=module','-e',`import assert from 'node:assert/strict';import {promises as fs} from 'node:fs';import {syncBuiltinESMExports} from 'node:module';import {join} from 'node:path';import {assertCivicPolicyAuthority,initializeManagedAcquisitionLane,withManagedSourceWrite,withManagedSourceScratch,recoverCivicPolicyLock,withCivicPolicyShutdown,CIVIC_ACQUISITION_DECISION_ID} from ${JSON.stringify(moduleUrl)};${body}`,...args],{stdio:['pipe','pipe','pipe']});
  const closed=Promise.withResolvers<number|null>();let stdout='',stderr='';
  processChild.stdout.on('data',chunk=>{stdout+=chunk;});processChild.stderr.on('data',chunk=>{stderr+=chunk;});
  processChild.once('error',closed.reject);processChild.once('close',closed.resolve);
@@ -265,4 +265,36 @@ test('shutdown during a detached lock retry preserves the replacement holder and
  `,[JSON.stringify(policy),other]);
  assert.equal(await worker.closed,0,worker.stderr());assert.match(worker.stdout(),/cancelled/);assert.equal(await readFile(lock,'utf8'),contents);
  await assert.rejects(lstat(other),{code:'ENOENT'});assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')||name.startsWith('inventory.lock.quarantine-')),false);
+});
+
+for(const stage of [1,2,3,4,5,'active'] as const)test('caller abort cancels detached epoch waiting without cancelling owned cleanup: '+stage,{timeout:15000},async t=>{
+ const {base,policy,stateDir}=await fixture(t),root=join(base,'caller-cancelled'),before=await readFile(join(stateDir,'inventory.json'));
+ const worker=child(t,`
+  // Watchers remain real; inject active turnover only into the explicit read,
+  // not their independently scheduled background authority checks.
+  const {AsyncLocalStorage}=await import('node:async_hooks'),activeEpoch=new AsyncLocalStorage();
+  const [policyText,root,stageText]=process.argv.slice(1),policy=JSON.parse(policyText),stage=stageText==='active'?'active':Number(stageText),path=join(policy.stateDir,'inventory.json'),open=fs.open,stop=new AbortController(),reason=Error('Synthetic caller cancellation'),handles=[];let bytes=await fs.readFile(path),reads=0,detachments=0,enabled=stage!=='active',called=false;
+  fs.open=async(...args)=>{
+   const handle=await open(...args);
+   if(enabled&&(stage!=='active'||activeEpoch.getStore()===true)&&String(args[0])===path&&new Error().stack?.includes('requireInventoryEpoch')&&++reads>=(stage==='active'?1:stage)){
+    handles.push(handle);await fs.writeFile(path+'.replacement',bytes,{mode:0o600});await fs.rename(path+'.replacement',path);
+    if(++detachments===2)stop.abort(reason);
+   }
+   return handle;
+  };syncBuiltinESMExports();
+  await withCivicPolicyShutdown(async processSignal=>{
+   const operation=withManagedSourceScratch(root,[{phase:'pre-admission',url:'https://council.test/caller-abort',sourceSha256:'a'.repeat(64)}],async scope=>{
+    called=true;assert.equal(stage,'active');bytes=await fs.readFile(path);enabled=true;
+    try{await activeEpoch.run(true,()=>scope.assertActive());}finally{enabled=false;}
+   },{...policy,kind:'artifacts',purpose:'classification',decisionId:CIVIC_ACQUISITION_DECISION_ID,signal:stop.signal,lockWaitMs:1000});
+   await assert.rejects(operation,error=>error===reason);assert.equal(processSignal.aborted,false);
+  });
+  assert.equal(called,stage==='active');assert.equal(detachments,2);assert.ok(handles.every(handle=>handle.fd===-1));await assert.rejects(fs.lstat(join(policy.stateDir,'inventory.lock')),{code:'ENOENT'});process.stdout.write('caller-cancelled\\n');
+ `,[JSON.stringify(policy),root,String(stage)]);
+ assert.equal(await worker.closed,0,worker.stderr());assert.match(worker.stdout(),/caller-cancelled/);
+ const after=await readFile(join(stateDir,'inventory.json'));
+ if(stage==='active'){
+  const inventory=JSON.parse(after.toString('utf8'));assert.equal(inventory.scratch.length,1);assert.equal(inventory.scratch[0].state,'closed');await assert.rejects(lstat(join(root,inventory.scratch[0].directory)),{code:'ENOENT'});
+ }else{assert.deepEqual(after,before);await assert.rejects(lstat(root),{code:'ENOENT'});}
+ assert.equal((await readdir(stateDir)).some(name=>name.startsWith('inventory.wait-')||name.startsWith('inventory.lock.quarantine-')),false);
 });
