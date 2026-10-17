@@ -59,7 +59,7 @@ test('native stream v2 authenticates thinking before one final text without proj
 
 test('native thinking deltas are ignored while provider-finalized thinking_end still binds the final block',()=>{
  const events=nativeEvents(),delta=events.find(event=>objectUpdate(event).type==='thinking_delta')!;
- objectUpdate(delta).delta='<think>PRIVATE_THINKING_CONTENT</think>';
+ objectUpdate(delta).delta='<thinking>PRIVATE_THINKING_CONTENT</thinking>';
  const parsed=inspectNative(eventStream(events));assert.deepEqual(parsed.value,assessmentOutputSchema.parse(answer));assert.doesNotMatch(JSON.stringify(parsed),/PRIVATE_THINKING/);
 });
 
