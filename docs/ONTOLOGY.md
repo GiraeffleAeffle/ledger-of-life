@@ -34,7 +34,7 @@ Operation includes a durable sponsor reservation ledger: account rolling/global 
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
 | 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
-| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment |
+| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment, DocumentDisposition |
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
 Financial custody still depends on identity, home and signed operations. The civic lens reuses the city Context and CitySignal rather than introducing a separate atlas or portfolio.
@@ -201,6 +201,15 @@ and cited evidence, never every metadata/null field in an MCP response.
 Read-only seal/export reconstruction rebuilds the exact persisted v1 or v2
 target and requires canonical equality plus committed preparation ancestry.
 New preparation cannot request the historical encoding.
+
+**Source document disposition (R1 step 8).** Within one municipality/sourceId/sourceSha256
+scope, byte-identical campaign documents use the smallest `documentId` as the canonical
+record carrier. Each other member receives a terminal `duplicate_source_content`
+disposition pinned to that canonical document and its own extraction receipt/output.
+These members remain accounted for but are never admitted or merged; the disposition
+does not claim that they are the same legal instrument or case. In the recorded
+coverage snapshot, 208 documents formed 207 byte-identity groups. This is
+implementation/prototype tooling, not a published release assertion.
 
 This implements the frozen rebuild plan's original-evidence and typed-role intent
 ([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)
