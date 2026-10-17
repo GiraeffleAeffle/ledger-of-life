@@ -611,6 +611,13 @@ digests. Finalization reopens and validates every captured segment inside the
 manifest/objection fence. Epoch hashing streams through a 64-KiB buffer rather
 than retaining a second inventory-sized buffer. No writing lock API is called.
 
+The decoded `publication`, `snapshot`, `code` and `approval` proof objects use
+the public codec's parsed values, not raw wire objects. This mirrors the private
+inventory decoder's nested key ordering before its JSON-stringification-sensitive
+entry-ID check: reordered wire keys with the original canonical ID remain valid,
+but an ID recomputed from raw nested key order fails closed. Validation does not
+rewrite the source inventory or sealed segment bytes.
+
 Using the actual fourteen exported functions (the same set as the processing
 cutover comparison), archived `b32bc96` and `ce69f9e` bytes were supplied through
 their supported hash callbacks; the restored runtime used normal filesystem
@@ -632,3 +639,14 @@ TypeScript exit 0; 190 tests, 190 passed, 0 failed/cancelled/skipped; test exit 
 This includes all ten captured-segment finalization regressions and the full
 guarded candidate/exact-replay fixture using the standalone reader.
 No full gate or production publication was run.
+
+The nested-proof normalization correction was verified with the same focused
+CPU 6–7 command. Receipt
+`/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T165726Z.tap`:
+TypeScript exit 0; 198 tests, 198 passed, 0 failed/cancelled/skipped; test exit 0.
+Eight added oracle-conformance cases cover `publication`, `snapshot`, `code`
+and `approval` in both hot inventories and sealed segments. Each accepts reordered
+wire keys with the writer's original canonical ID in both readers, then rejects
+an ID forged from raw nested key order in both readers. The audit leaves the
+forged inventory bytes untouched. Recomputing all fourteen exported runtime
+contracts after this correction again found no differences from `b32bc96`.

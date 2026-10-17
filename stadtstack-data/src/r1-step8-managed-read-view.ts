@@ -30,7 +30,14 @@ function proofShape(value:z.infer<typeof sourceWire>,ctx:z.RefinementCtx){
    if(value.sourceSha256!==null)ctx.addIssue({code:'custom',message:'Invalid registry provenance'});
    delete proof.sourceSha256;
   }
-  if(!ManagedSourceBindingSchema.safeParse(proof).success)ctx.addIssue({code:'custom',message:'Invalid managed source provenance'});
+  const parsed=ManagedSourceBindingSchema.safeParse(proof);
+  if(!parsed.success)ctx.addIssue({code:'custom',message:'Invalid managed source provenance'});
+  else{
+   // Zod owns this parsed wire copy. Match the private inventory decoder's
+   // nested-key normalization before JSON.stringify-sensitive entry ID checks.
+   const normalized:Record<string,unknown>=parsed.data;
+   for(const key of ['publication','snapshot','code','approval'] as const)if(key in normalized)value[key]=normalized[key];
+  }
  }
 }
 const sourceSchema=sourceWire.superRefine(proofShape);
