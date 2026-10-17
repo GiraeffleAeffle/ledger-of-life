@@ -490,3 +490,45 @@ above. Receipt `tests-20261015T120425Z.tap`: TypeScript exit 0; 1,899 tests,
 1,851 passed, 0 failed, 0 cancelled, 48 skipped; test exit 0. This includes the
 held-quality serialization regression and all six frozen running-campaign
 contract assertions. No production seal was exported or rewritten by this test.
+
+## Current-generation audit verification
+
+Post-fix verification on `r1-step8-current` used the disposable-PG harness and
+the following explicitly targeted command, as authorized by the integration owner:
+
+```sh
+umask 022
+PYTHONDONTWRITEBYTECODE=1 \
+PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH \
+R1_VERIFY_CPUS=6-7 taskset -c 6-7 nice -n 10 ./scripts/r1-verify.sh all \
+  --test-name-pattern='^(lock-free audit|pinned Codex assessment allowance|real residual queue handlers|operator plan|offline bootstrap|authentic live 0.3.2|acceptance requires)'
+```
+
+Receipt `tests-20261017T140812Z.tap`: TypeScript exit 0; 186 reported tests,
+186 passed, 0 failed/cancelled/skipped; test exit 0. This includes the real-PG
+production-topology fixture's complete guarded source export → preparation →
+publication → exact replay → candidate gate, genuine committed historical
+Haiku-admission rejection before candidate writes, and retained terminal history.
+Native Sonnet event bytes are explicitly synthetic fixture inputs; the receipt,
+lease, purge acknowledgment and accounting custody are exercised through real
+queue handlers and isolated authority, without invoking any real provider.
+The read-only preflight asserts unchanged inventory bytes and DB row counts.
+All ten entry/scratch segment finalization regressions pass, alongside stable
+epoch/no-lock/no-write checks and real-PG allowance accounting rejection cases.
+
+The earlier unfiltered `tests-20261017T132331Z.tap` was not green: it exposed
+the now-fixed strip-only runtime/type/error-matcher issues and the separate
+120-second B-broker aggregate fixture timeout. This targeted receipt is not
+represented as a passing unfiltered full gate. The final integrated HEAD still
+requires its complete gate and fresh security reviews.
+
+Production discovery was exercised again read-only on 2026-10-17 using the
+documented `discover` command. All five exact selected native runs still had one
+committed receipt each. The driver tree now contained historical/repeated seal
+generations, including some `355691be` results; discovery still reported the
+complete 27-source selection unavailable. Its `wouldRead` list named the actual
+driver catalogue, CAS/operator roots, authentic released predecessor, staging and
+policy/identity/critical provenance, Git predecessor members and canonical DB
+custody. It returned `writes: []`, `network: false`, `providers: false` and did
+not publish or replay. These historical candidates are not an approved selection
+and are not a successful production generation audit.
