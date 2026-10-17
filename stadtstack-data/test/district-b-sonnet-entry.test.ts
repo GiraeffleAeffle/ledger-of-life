@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {OMP_EXECUTION_ARGS} from '../src/district-execution-profile.ts';
 
-test('reviewed image translates only the frozen bootstrap to effective Sonnet, preserving payload',async()=>{
+test('reviewed image translates only the frozen bootstrap to effective Sonnet with medium thinking, preserving payload',async()=>{
  const directory=await mkdtemp(join(tmpdir(),'synthetic-sonnet-entry-'));
  try{
   await writeFile(join(directory,'omp'),'#!/bin/sh\n[ "$ANTHROPIC_OAUTH_TOKEN" = synthetic-test-only ] || exit 125\nprintf "%s\\n" "$@"\nprintf "%s\\n" ---payload---\ncat\n',{mode:0o700});
@@ -16,9 +16,11 @@ test('reviewed image translates only the frozen bootstrap to effective Sonnet, p
    let out='',error='';child.stdout.on('data',bytes=>out+=String(bytes));child.stderr.on('data',bytes=>error+=String(bytes));child.on('error',reject);child.on('close',code=>resolve({code,out,error}));child.stdin.on('error',()=>{});child.stdin.end('synthetic-test-only\n{"synthetic":"payload"}');
   });
   const result=await run([...OMP_EXECUTION_ARGS]);assert.equal(result.code,0);assert.equal(result.error,'');
-  assert.equal(result.out,[...OMP_EXECUTION_ARGS.slice(0,4),'anthropic/claude-sonnet-5-5',...OMP_EXECUTION_ARGS.slice(5),'---payload---','{"synthetic":"payload"}'].join('\n'));
+  assert.deepEqual(OMP_EXECUTION_ARGS.slice(5,7),['--thinking','off']);
+  assert.equal(result.out,[...OMP_EXECUTION_ARGS.slice(0,4),'anthropic/claude-sonnet-5-5','--thinking','medium',...OMP_EXECUTION_ARGS.slice(7),'---payload---','{"synthetic":"payload"}'].join('\n'));
   for(const selector of ['anthropic/claude-sonnet-5-5','anthropic/claude-haiku-latest']){
    const args=[...OMP_EXECUTION_ARGS];args[4]=selector;const rejected=await run(args);assert.equal(rejected.code,126);assert.equal(rejected.out,'');
   }
+  const unfrozen=[...OMP_EXECUTION_ARGS];unfrozen[6]='medium';const rejectedThinking=await run(unfrozen);assert.equal(rejectedThinking.code,126);assert.equal(rejectedThinking.out,'');
  }finally{await rm(directory,{recursive:true,force:true});}
 });
