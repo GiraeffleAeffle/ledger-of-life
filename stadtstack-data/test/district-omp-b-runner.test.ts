@@ -8,8 +8,8 @@ import {syncBuiltinESMExports} from 'node:module';
 import {createHash} from 'node:crypto';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import type {ChildProcess,SpawnOptions} from 'node:child_process';
-import {inspectOmpEvents as inspectBoundOmpEvents,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions,OmpNativeCleanupSchema} from '../src/district-omp-b-runner.ts';
+import {spawnSync,type ChildProcess,type SpawnOptions} from 'node:child_process';
+import {inspectOmpEvents as inspectBoundOmpEvents,inspectOmpAssessmentCompletion,resolveOmpCredential,ompAssessmentControl,ompRunnerContractSha256,ompAssessmentScratchRoot,OMP_RUNNER_VERSION,OMP_NATIVE_STREAM_VERSION,OMP_VERSION,OMP_HOST_VERSION,OMP_HOST_BINARY,OmpReviewSchema,OmpRunnerHold,OmpAssessmentOutputRejected,OmpOutputRejectionSchema,ompOutputRejectionFromVersions,ompOutputRejectionVersions,OmpNativeCleanupSchema} from '../src/district-omp-b-runner.ts';
 import {OMP_CONTAINER_ENVIRONMENT,OMP_EXECUTION_ARGS,OMP_PROCESS} from '../src/district-execution-profile.ts';
 import {semanticHash,digest,canonicalJson} from '../src/district-adapter-contract.ts';
 import {NativeAssessmentBEnqueueManifestSchema as AssessmentBEnqueueManifestSchema} from '../src/district-r1-assessment-cli.ts';
@@ -33,6 +33,116 @@ function eventStream(events:Record<string,unknown>[]=[{type:'message_end',messag
  if(final&&!events.some(event=>event.type==='agent_end'))suffix.push({type:'agent_end',messages:[final],reason:'stop'});
  return [{type:'session',id:'session-one'},{type:'agent_start'},{type:'turn_start'},{type:'message_start',message:{role:'assistant'}},...events,...suffix].map(event=>JSON.stringify(event)).join('\n')+'\n';
 }
+
+function nativeEvents(text=JSON.stringify(answer),thoughts=['PRIVATE_THINKING_CONTENT']):Record<string,unknown>[]{
+ const events:Record<string,unknown>[]=[{type:'message_update',assistantMessageEvent:{type:'start'}}],content:Record<string,unknown>[]=[];
+ for(const [contentIndex,thinking] of thoughts.entries()){
+  content.push({type:'thinking',thinking,thinkingSignature:'PRIVATE_THINKING_SIGNATURE',summary:true});
+  for(const update of [{type:'thinking_start',contentIndex},{type:'thinking_delta',contentIndex,delta:thinking},{type:'thinking_end',contentIndex,content:thinking}])events.push({type:'message_update',assistantMessageEvent:update});
+ }
+ const contentIndex=content.length;content.push({type:'text',text});
+ for(const update of [{type:'text_start',contentIndex},{type:'text_delta',contentIndex,delta:text},{type:'text_end',contentIndex,content:text},{type:'done',reason:'stop'}])events.push({type:'message_update',assistantMessageEvent:update});
+ events.push({type:'message_end',message:message({content})});return events;
+}
+const inspectNative=(stdout:string)=>inspectBoundOmpEvents(stdout,0,syntheticDelivery,'claude-sonnet-5-5',OMP_NATIVE_STREAM_VERSION);
+
+test('native stream v2 authenticates thinking before one final text without projecting thinking into the answer',()=>{
+ for(const thoughts of [[],['PRIVATE_THINKING_CONTENT'],['PRIVATE_THINKING_ONE','PRIVATE_THINKING_TWO']]){
+  const events=nativeEvents(JSON.stringify(answer),thoughts),stdout=eventStream(events),parsed=inspectNative(stdout);
+  assert.deepEqual(parsed.value,assessmentOutputSchema.parse(answer));assert.doesNotMatch(JSON.stringify(parsed),/PRIVATE_THINKING/);
+  const finalLine=stdout.split('\n').find(line=>JSON.parse(line||'{}').type==='message_end')!;
+  assert.equal(parsed.responseSha256,digest(finalLine),'hash authenticates the original message, including thinking and signature');
+  assert.deepEqual(inspectOmpAssessmentCompletion(stdout,'',0,syntheticDelivery,'2026-10-17T14:00:00Z','0444'),parsed);
+ }
+ assert.throws(()=>inspectOmpEvents(eventStream(nativeEvents()),0),error=>error instanceof OmpRunnerHold&&error.decodeCheck==='text_update_schema','v1 history remains text-only');
+});
+
+test('native thinking deltas are ignored while provider-finalized thinking_end still binds the final block',()=>{
+ const events=nativeEvents(),delta=events.find(event=>objectUpdate(event).type==='thinking_delta')!;
+ objectUpdate(delta).delta='<think>PRIVATE_THINKING_CONTENT</think>';
+ const parsed=inspectNative(eventStream(events));assert.deepEqual(parsed.value,assessmentOutputSchema.parse(answer));assert.doesNotMatch(JSON.stringify(parsed),/PRIVATE_THINKING/);
+});
+
+test('a usage stop after thinking stays typed and cannot certify a no-output retry',()=>{
+ const observedAt='2026-10-17T14:00:00Z',failure=message({stopReason:'error',content:[],usage:{input:0,output:0,cacheRead:0,cacheWrite:0,totalTokens:0,cost:{total:0}},errorMessage:'429 '+JSON.stringify({type:'rate_limit_error',reset_at:'2026-10-17T15:00:00Z'})});
+ for(const thinking of [false,true]){
+  const prefix=thinking?nativeEvents().filter(event=>String(objectUpdate(event).type).startsWith('thinking_')):[];
+  const stdout=eventStream([...prefix,{type:'message_end',message:failure},{type:'turn_end',message:failure,toolResults:[],reason:'error'},{type:'agent_end',messages:[failure],reason:'error'}]);
+  assert.throws(()=>inspectOmpAssessmentCompletion(stdout,'',0,syntheticDelivery,observedAt,'0444'),error=>{
+   assert.ok(error instanceof OmpRunnerHold);assert.ok(error.subscriptionLimit);assert.equal(error.noOutput,!thinking);
+   assert.equal(assessmentBridgeHoldReason(error),'budget_paused');assert.doesNotMatch(JSON.stringify(assessmentBridgeFailureVersions('synthetic',error)),/PRIVATE_THINKING/);return true;
+  });
+ }
+});
+
+test('native stream v2 rejects thinking after text, multiple final texts and every other non-text block',()=>{
+ const text={type:'text',text:JSON.stringify(answer)},thinking={type:'thinking',thinking:'PRIVATE_THINKING_CONTENT',thinkingSignature:'PRIVATE_THINKING_SIGNATURE'};
+ for(const content of [
+  [text,thinking],[thinking,text,text],[thinking],[{type:'redactedThinking',data:'PRIVATE_THINKING_CONTENT'},text],
+  [{type:'image',data:'PRIVATE_CONTENT'},text],[{type:'toolCall',id:'one',name:'shell',arguments:{}},text],
+  [{...thinking,thinking:1},text],[{...thinking,thinkingSignature:1},text],[{...thinking,PRIVATE_FIELD:true},text],
+ ]){
+  assert.throws(()=>inspectNative(eventStream([{type:'message_end',message:message({content})}])),error=>error instanceof OmpRunnerHold&&!(error instanceof OmpAssessmentOutputRejected));
+ }
+ const events=nativeEvents(),afterText=events.findIndex(event=>objectUpdate(event).type==='text_end')+1;
+ events.splice(afterText,0,{type:'message_update',assistantMessageEvent:{type:'thinking_start',contentIndex:2}});
+ assert.throws(()=>inspectNative(eventStream(events)),error=>error instanceof OmpRunnerHold&&error.decodeCheck==='text_update_order');
+});
+
+function objectUpdate(event:Record<string,unknown>):Record<string,unknown>{return (event.assistantMessageEvent??{}) as Record<string,unknown>;}
+test('native stream v2 requires ordered typed thinking updates and one closed content block at a time',()=>{
+ const mutations:Array<(events:Record<string,unknown>[])=>void>=[
+  events=>{events.splice(1,1);},
+  events=>{events.splice(3,1);},
+  events=>{objectUpdate(events[1]!).contentIndex=1;},
+  events=>{objectUpdate(events[2]!).delta=7;},
+  events=>{objectUpdate(events[3]!).content='PRIVATE_DIFFERENT_CONTENT';},
+  events=>{events.splice(2,0,{type:'message_update',assistantMessageEvent:{type:'thinking_start',contentIndex:1}});},
+  events=>{events.splice(2,0,{type:'message_update',assistantMessageEvent:{type:'thinking_signature',contentIndex:0,signature:'PRIVATE_SIGNATURE'}});},
+  events=>{objectUpdate(events[1]!).PRIVATE_FIELD=true;},
+  events=>{objectUpdate(events[1]!).contentIndex=-1;},
+ ];
+ for(const mutate of mutations){
+  const events=nativeEvents();mutate(events);
+  assert.throws(()=>inspectNative(eventStream(events)),error=>error instanceof OmpRunnerHold&&!(error instanceof OmpAssessmentOutputRejected));
+ }
+ for(const assistantMessageEvent of [{type:'toolcall_start',contentIndex:0},{type:'image_end',contentIndex:0,content:{}},{type:'unknown'}]){
+  assert.throws(()=>inspectNative(eventStream([{type:'message_update',assistantMessageEvent},{type:'message_end',message:message()}])));
+ }
+});
+
+test('native stream v2 compares unstripped thinking and signatures across all response copies',()=>{
+ const events=nativeEvents(),original=events[events.length-1]!.message as ReturnType<typeof message>,final={...original,completedAt:1791800000100};
+ for(const field of ['thinking','thinkingSignature']){
+  const content=structuredClone(original.content) as Array<Record<string,unknown>>;content[0]![field]='PRIVATE_DIFFERENT_CONTENT';
+  const stdout=eventStream([...events.slice(0,-1),{type:'message_end',message:final},{type:'turn_end',message:{...original,content},toolResults:[]}]);
+  assert.throws(()=>inspectNative(stdout),error=>error instanceof OmpRunnerHold&&error.decodeCheck==='assistant_copy_mismatch');
+ }
+});
+
+test('native stream v2 retains strict bare-object framing and emits content-free v4 rejection proofs',()=>{
+ for(const text of ['PRIVATE_LEADING_PROSE\n'+JSON.stringify(answer),'```json\n'+JSON.stringify(answer)+'\n```','PRIVATE_INVALID_JSON',JSON.stringify({...answer,scores:{correctness:'PRIVATE_VALUE',sources:1,usefulness:1}})]){
+  const stdout=eventStream(nativeEvents(text));let rejected:OmpAssessmentOutputRejected|undefined;
+  assert.throws(()=>inspectNative(stdout),error=>{assert.ok(error instanceof OmpAssessmentOutputRejected);rejected=error;return true;});
+  assert.ok(rejected);assert.equal(rejected.rejection.version,'omp-output-rejection-v4');
+  const proof=rejected.rejection;assert.ok(proof.version==='omp-output-rejection-v4');
+  assert.equal(proof.streamVersion,OMP_NATIVE_STREAM_VERSION);assert.equal(proof.streamSha256,digest(stdout));assert.equal(proof.outputSha256,digest(text));
+  const versions=ompOutputRejectionVersions(proof);
+  assert.equal(versions.ompNativeStreamVersion,OMP_NATIVE_STREAM_VERSION);assert.equal(versions.ompOutputNormalization,undefined);
+  assert.doesNotMatch(JSON.stringify(proof)+JSON.stringify(versions),/PRIVATE_|thinkingSignature/);
+  assert.deepEqual(ompOutputRejectionFromVersions(versions),proof);StepReceiptSchema.shape.versions.parse(versions);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompNativeStreamVersion:'omp-native-stream-v1'}),null);
+  assert.equal(ompOutputRejectionFromVersions({...versions,ompOutputNormalization:'single-json-fence-v1'}),null);
+  const historical=ompOutputRejectionFromVersions({...versions,ompOutputRejectionVersion:'omp-output-rejection-v3'});
+  assert.notEqual(digest(canonicalJson(historical)),digest(canonicalJson(proof)),'changing the version changes the artifact identity authenticated by the broker');
+ }
+});
+
+test('immutable v2 proofs keep their exact framed-text normalization after the native stream cutover',()=>{
+ const legacy={version:'omp-output-rejection-v2' as const,check:'output_schema' as const,streamSha256:digest('Synthetic v2 stream'),outputSha256:digest('Synthetic v2 text'),issueCount:1,issues:[{code:'unrecognized_keys' as const,path:'$',keyCount:1}],outputNormalization:'single-json-fence-v1' as const};
+ const before=canonicalJson(legacy),versions=ompOutputRejectionVersions(legacy),decoded=ompOutputRejectionFromVersions(versions);
+ assert.equal(canonicalJson(decoded),before);assert.equal(digest(canonicalJson(decoded)),digest(before));assert.equal(versions.ompNativeStreamVersion,undefined);
+});
 
 test('omp event inspection accepts a completed text-only message and repeated copies',()=>{
  const original=message(),final={...original,completedAt:1791800000100};
@@ -449,17 +559,32 @@ test('omp image inherits the reviewed runtime with only the POSIX token entrypoi
  assert.equal(await readFile(new URL('../docker/omp-b/entry.sh',import.meta.url),'utf8'),String.raw`#!/bin/sh
 set -eu
 # The host's frozen custody profile pins this bootstrap argv. Only this reviewed
-# image translates its model; no alternate selector or fallback is accepted.
-[ "$#" -ge 5 ] && [ "$1" = --print ] && [ "$2" = --mode ] \
+# image translates model and thinking; no alternate bootstrap or fallback exists.
+[ "$#" -ge 7 ] && [ "$1" = --print ] && [ "$2" = --mode ] \
   && [ "$3" = json ] && [ "$4" = --model ] \
-  && [ "$5" = anthropic/claude-haiku-5-5 ] || exit 126
-shift 5
+  && [ "$5" = anthropic/claude-haiku-5-5 ] && [ "$6" = --thinking ] \
+  && [ "$7" = off ] || exit 126
+shift 7
 IFS= read -r token || exit 126
 [ -n "$token" ] || exit 126
 export ANTHROPIC_OAUTH_TOKEN="$token"
 unset token
-exec omp --print --mode json --model anthropic/claude-sonnet-5-5 "$@"
+exec omp --print --mode json --model anthropic/claude-sonnet-5-5 --thinking medium "$@"
 `);
+});
+
+test('entry translates only the frozen bootstrap to Sonnet medium and preserves framed stdin',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'omp-medium-entry-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ await writeFile(join(root,'omp'),'#!/bin/sh\n[ "${ANTHROPIC_OAUTH_TOKEN:+present}" = present ] || exit 129\nprintf "%s\\n" "$@"\nexec cat\n',{mode:0o555});
+ const entry=new URL('../docker/omp-b/entry.sh',import.meta.url).pathname,body='Synthetic source-free payload\n';
+ const invoke=(args:readonly string[])=>spawnSync('/bin/sh',[entry,...args],{cwd:root,env:{PATH:root+':/usr/bin:/bin',HOME:root},input:'synthetic-token\n'+body,encoding:'utf8'});
+ const result=invoke(OMP_EXECUTION_ARGS);
+ assert.equal(result.status,0);assert.equal(result.stderr,'');
+ assert.equal(result.stdout,['--print','--mode','json','--model','anthropic/claude-sonnet-5-5','--thinking','medium',...OMP_EXECUTION_ARGS.slice(7)].join('\n')+'\n'+body);
+ assert.doesNotMatch(result.stdout,/synthetic-token/);
+ for(const args of [OMP_EXECUTION_ARGS.slice(0,5),OMP_EXECUTION_ARGS.map((arg,index)=>index===6?'medium':arg),OMP_EXECUTION_ARGS.map((arg,index)=>index===4?'anthropic/claude-sonnet-5-5':arg)]){
+  const rejected=invoke(args);assert.equal(rejected.status,126);assert.equal(rejected.stdout,'');assert.equal(rejected.stderr,'');
+ }
 });
 
 test('settings overlay contains only the reviewed registered paths and correctly typed scalar values',async()=>{
@@ -698,7 +823,7 @@ test('image builder derives an offline entry-only candidate from hash-authentica
  const script=await readFile(new URL('../scripts/build-omp-b-image.sh',import.meta.url),'utf8');
  assert.match(script,/SOURCE_IMAGE=sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169/);
  assert.match(script,/EXPECTED=647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992/);
- assert.match(script,/EXPECTED_ENTRY=417a59923ed3aef9e51ebdbdb7bfab19968122ad5a8a2281fa95d2ac77d30171/);
+ assert.match(script,/EXPECTED_ENTRY=e4d1cbae8698b3767d91ef8786f347bc6ad9db8abaa708c0dffe6215c0aa0bc0/);
  assert.match(script,/EXPECTED_SETTINGS=a6211ded7fb160dccb61e0f27dd80ab7e2a31c747e6661f54f4841c13f22ae0a/);
  assert.match(script,/EXPECTED_MANIFEST=e87e2ef469b318547b324a7f4a8a93621012f39024cb0a0e06c61fbc557c4d27/);
  assert.match(script,/--config "\$TMP\/docker-config" --host unix:\/\/\/run\/docker.sock/);

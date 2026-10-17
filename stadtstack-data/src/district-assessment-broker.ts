@@ -15,7 +15,7 @@ import type {ModelAnswer} from './district-model-contract.ts';
 import {StepReceiptSchema,encodeStepReceipt,type ReasonCode} from './district-step-receipt.ts';
 import {assertCivicPolicyAuthority,readCivicOptOutSnapshot,assertManagedSourceReadable,initializeManagedAcquisitionLane,withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID,CivicPolicyStateError,type CivicPolicyAuthorityReceipt} from './civic-opt-out.ts';
 import {ASSESSMENT_BRIDGE_VERSION,NATIVE_B_BRIDGE_VERSION,NATIVE_B_LIFECYCLE_LIMITS,BRIDGE_LIMITS,BridgeLeaseSchema,BridgeRequestSchema,BridgeStatusSchema,BridgePurgeAckSchema,BridgeAnswerSchema,bridgeInputHash,nativeBInputHash,type BridgeAnswer,type BridgeLease,type BridgeRequest,type BridgeStatus} from './district-assessment-bridge-contract.ts';
-import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,OmpAssessmentOutputRejected,OmpNativeCleanupSchema,OmpOutputRejectionSchema,ompOutputRejectionVersions,ompOutputRejectionFromVersions,type OmpOutputRejection,type OmpRunnerResult} from './district-omp-b-runner.ts';
+import {runVmOmpAssessment,ompRunnerOutputContractSha256,OmpRunnerHold,OmpAssessmentOutputRejected,OmpNativeCleanupSchema,OmpOutputRejectionSchema,ompOutputRejectionVersions,ompOutputRejectionFromVersions,OMP_NATIVE_STREAM_VERSION,type OmpOutputRejection,type OmpRunnerResult} from './district-omp-b-runner.ts';
 import {AssessmentContextHold,assertAssessmentContextBound} from './district-assessment-context.ts';
 import {assertValueAssessmentContext} from './district-value-context.ts';
 import {assertBSubscriptionResume,recordBSubscriptionHold,bSubscriptionFailureVersions} from './district-subscription-usage.ts';
@@ -103,7 +103,7 @@ export async function settledOmpOutputRejectionLeases(pool:Pick<Pool,'query'>,jo
   const parsed=StepReceiptSchema.safeParse(row.receipt);if(!parsed.success)continue;const receipt=parsed.data,v=receipt.versions;
   if(receipt.id!==row.receipt_id||receipt.jobKey!==jobKey||receipt.runId!==row.run_id||receipt.leaseToken!==String(row.fencing_token)||receipt.step!=='assessment_b'||receipt.outcome!=='held_quality'||receipt.reasonCode!=='quality_failed'||encodeStepReceipt(receipt).sha256!==row.receipt_hash||v.transport!=='vm-omp-docker'||v.ompContainerExitCode!=='0'||v.ompBridgeLeaseId!==row.id)continue;
   const proof=ompOutputRejectionFromVersions(v);if(!proof)continue;
-  if(proof.version==='omp-output-rejection-v3'&&proof.structure.delivery.requestSha256!==row.request_sha256)continue;
+  if('structure' in proof&&proof.structure.delivery.requestSha256!==row.request_sha256)continue;
   const binding={leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,itemSha256:row.item_sha256,requestSha256:row.request_sha256};
   const expected=rejectedOmpArtifacts(binding,proof);
   if(row.intent_sha256!==assessmentBIntentHash({leaseId:row.id,jobKey,runId:row.run_id,fencingToken:String(row.fencing_token),inputSha256:row.input_sha256,clientId:'vm-omp-docker'},row.requested_model)
@@ -525,7 +525,7 @@ export class DistrictAssessmentBroker {
   const rejection=OmpOutputRejectionSchema.parse(error.rejection);
   const initial=(await this.pool.query<LeaseRow>('SELECT * FROM district_pipeline.assessment_bridge_leases WHERE id=$1',[leaseId])).rows[0];
   if(!initial)throw new DistrictExecutionHold('lease_lost');
-  if(rejection.version==='omp-output-rejection-v3'&&rejection.structure.delivery.requestSha256!==initial.request_sha256)throw new DistrictExecutionHold('quality_failed');
+  if('structure' in rejection&&rejection.structure.delivery.requestSha256!==initial.request_sha256)throw new DistrictExecutionHold('quality_failed');
   const evidence=await this.readCurrent(initial);if('reason' in evidence)throw new DistrictExecutionHold(evidence.reason);
   const binding={leaseId,jobKey:job.jobKey,runId:job.runId,fencingToken:job.fencingToken,inputSha256:initial.input_sha256,itemSha256:initial.item_sha256,requestSha256:initial.request_sha256};
   const documents=rejectedOmpArtifacts(binding,rejection);
@@ -636,6 +636,7 @@ export class DistrictAssessmentBroker {
    if('reason' in checked)throw new DistrictExecutionHold(checked.reason);
    const receivedAt=(await this.pool.query<{now:Date}>('SELECT clock_timestamp() AS now')).rows[0]!.now;
    assertNativeBResponseIdentity(run.answer);
+   if(run.nativeStreamVersion!==OMP_NATIVE_STREAM_VERSION||run.thinking!=='medium'||run.outputNormalization!==undefined)throw new DistrictExecutionHold('execution_exception');
    const receipt=createAssessmentReceipt(checked.checked.item,'B',run.answer,{startedAt:run.startedAt,finishedAt:run.finishedAt},checked.checked.evidence);
    if(receipt.requestSha256!==row.request_sha256||receipt.schemaSha256!==run.outputSchemaSha256||receipt.dependencies.length||receipt.provider!=='anthropic-subscription'||Date.parse(run.startedAt)<prepared.claimedAt.getTime()||Date.parse(run.finishedAt)>Math.min(row.expires_at.getTime(),receivedAt.getTime()))throw new DistrictExecutionHold('quality_failed');
    const structure=OmpOutputStructureSchema.parse(run.outputStructure);
@@ -645,7 +646,7 @@ export class DistrictAssessmentBroker {
    // Native cleanup is a distinct immutable acknowledgement, never a fabricated
    // Mac proof claiming file writes were denied. The database purge gate stays intact.
    const pendingPurge=pendingArtifact(Buffer.from(canonicalJson({version:'assessment-vm-omp-purge-ack-v1',leaseId:row.id,inputSha256:row.input_sha256,cleanup})),'receipt');
-   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',ompControlMode:run.controlMode,ompPurgeAckSha256:pendingPurge.sha256,...run.outputNormalization?{ompOutputNormalization:run.outputNormalization}:{}};
+   const normalizationVersions:Record<string,string>={...ompOutputStructureVersions(structure),ompContainerExitCode:'0',ompControlMode:run.controlMode,ompPurgeAckSha256:pendingPurge.sha256,ompNativeStreamVersion:run.nativeStreamVersion,ompThinking:run.thinking};
    const transport={selector:NATIVE_B_SELECTOR,bootstrapSelector:'anthropic/claude-haiku-5-5',effectiveModel:NATIVE_B_MODEL,transport:'vm-omp-docker',transportMayInternallyRetry:true,internalRetryDisclosure:'Provider transient retries may occur up to ten times with one authentication retry; usage covers only the final attempt.',usageScope:'final_attempt_only',networkDisclosure:'Default bridge egress permits inference and may permit shared model-catalog refreshes; no egress-only inference restriction is enforced.',promptDisclosure:'The source-free control prompt includes the exact frozen output schema; stock omp may append generated context, footer, date, or cwd material despite this pinned file.',imageId:run.imageId,settingsSha256:run.settingsSha256,systemPromptSha256:run.systemPromptSha256,outputSchemaSha256:run.outputSchemaSha256,accountLabelSha256:run.accountLabelSha256,runnerContractSha256:run.runnerContractSha256,outputStructure:structure,...normalizationVersions};
    const pendingResponse=pendingArtifact(Buffer.from(run.stdout),'provider_response','application/x-ndjson');
    const pendingAnswer=pendingArtifact(Buffer.from(canonicalJson({version:'assessment-vm-omp-answer-v2',inputSha256:row.input_sha256,responseArtifactSha256:pendingResponse.sha256,modelAnswer:run.answer,transport,startedAt:run.startedAt,finishedAt:run.finishedAt})),'derived');

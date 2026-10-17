@@ -6,7 +6,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 # derivation inherits its complete runtime and replaces ONLY the reviewed entry.
 SOURCE_IMAGE=sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169
 EXPECTED=647237242329897c3a7c0f3591fdd9cafe4a4e13872baa9bbdfe45b84f9d8992
-EXPECTED_ENTRY=417a59923ed3aef9e51ebdbdb7bfab19968122ad5a8a2281fa95d2ac77d30171
+EXPECTED_ENTRY=e4d1cbae8698b3767d91ef8786f347bc6ad9db8abaa708c0dffe6215c0aa0bc0
 EXPECTED_SETTINGS=a6211ded7fb160dccb61e0f27dd80ab7e2a31c747e6661f54f4841c13f22ae0a
 EXPECTED_MANIFEST=e87e2ef469b318547b324a7f4a8a93621012f39024cb0a0e06c61fbc557c4d27
 DOCKER=/usr/bin/docker
@@ -54,8 +54,8 @@ verify_image() {
  docker_local rm "$VERIFY_NAME" >/dev/null
 }
 verify_image "$SOURCE_IMAGE"
-DOCKER_BUILDKIT=0 docker_local build --pull=false --network none --file "$TMP/Dockerfile" --tag stadtstack-omp-b:sonnet-candidate "$TMP"
-IMAGE_ID=$(docker_local image inspect --format '{{.Id}}' stadtstack-omp-b:sonnet-candidate)
+DOCKER_BUILDKIT=0 docker_local build --pull=false --network none --file "$TMP/Dockerfile" --tag stadtstack-omp-b:sonnet-medium-candidate "$TMP"
+IMAGE_ID=$(docker_local image inspect --format '{{.Id}}' stadtstack-omp-b:sonnet-medium-candidate)
 verify_image "$IMAGE_ID" "$EXPECTED_ENTRY"
 # Inheritance must preserve the entire image configuration and base layer prefix.
 # Docker's legacy parent Image field is provenance, not effective configuration.
