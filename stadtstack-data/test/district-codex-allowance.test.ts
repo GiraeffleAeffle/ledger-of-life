@@ -3,11 +3,16 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {digest} from '../src/district-adapter-contract.ts';
 import {CODEX_ASSESSMENT_ALLOWANCE_PIN,CodexAssessmentAllowanceSchema,CohortSchema} from '../src/district-codex-allowance.ts';
+import {assessmentQueueContract} from '../src/district-assessment-jobs.ts';
 
 const approvals=new URL('../reports/approvals/',import.meta.url);
 test('committed lead allowance authenticates both owner records and the exact frozen membership',async()=>{
  const bytes=await readFile(new URL(CODEX_ASSESSMENT_ALLOWANCE_PIN.id+'.json',approvals));assert.equal(digest(bytes),CODEX_ASSESSMENT_ALLOWANCE_PIN.sha256);
  const record=CodexAssessmentAllowanceSchema.parse(JSON.parse(bytes.toString('utf8')));assert.equal(record.id,CODEX_ASSESSMENT_ALLOWANCE_PIN.id);assert.equal(record.expiresAt,'2026-10-25T21:59:59Z');
+ assert.equal(record.assessment.queueContractSha256,await assessmentQueueContract());
+ const historicalBytes=await readFile(new URL('r1-codex-assessment-allowance-2026-10-17.json',approvals));assert.equal(digest(historicalBytes),'fe20dffb70f1521b90deca2b5070fcf37a3c468fbad386820b12a6e040a6055a');
+ assert.equal(CodexAssessmentAllowanceSchema.safeParse(JSON.parse(historicalBytes.toString('utf8'))).success,false);
+ assert.equal(CodexAssessmentAllowanceSchema.safeParse({...record,id:record.id+'-other'}).success,false);
  for(const owner of [record.parentApproval,record.delegationApproval])assert.equal(digest(await readFile(new URL(owner.id+'.json',approvals))),owner.sha256);
  const cohortBytes=await readFile(new URL('r1-frozen-assessment-cohort-2026-10-17.json',approvals));assert.equal(digest(cohortBytes),record.cohort.sha256);assert.equal(record.cohort.sha256,'24c8629ec588f4898988c7ee7a61eb7e7b2809d0b0ab052fc34669512e789965');
  const cohort=CohortSchema.parse(JSON.parse(cohortBytes.toString('utf8')));

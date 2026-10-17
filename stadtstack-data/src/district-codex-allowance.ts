@@ -11,11 +11,11 @@ import * as assessmentQueue from './district-assessment-jobs.ts';
 const PARENT='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b';
 const DELEGATION='a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f';
 const COHORT='24c8629ec588f4898988c7ee7a61eb7e7b2809d0b0ab052fc34669512e789965';
-export const CODEX_ASSESSMENT_ALLOWANCE_PIN=Object.freeze({id:'r1-codex-assessment-allowance-2026-10-17',sha256:'fe20dffb70f1521b90deca2b5070fcf37a3c468fbad386820b12a6e040a6055a'});
+export const CODEX_ASSESSMENT_ALLOWANCE_PIN=Object.freeze({id:'r1-codex-assessment-allowance-2026-10-17-r2',sha256:'8e246c5736c0a556b7d27f87e72e38ece1fe946e66a5fef13023e36cae0fef8d'});
 const APPROVALS=new URL('../reports/approvals/',import.meta.url);
 const ApprovalPinSchema=z.object({id:z.string(),sha256:HashSchema}).strict();
 export const CodexAssessmentAllowanceSchema=z.object({
- schemaVersion:z.literal('r1-codex-assessment-allowance-v1'),id:z.literal('r1-codex-assessment-allowance-2026-10-17'),issuedBy:z.literal('R1 VM lead (omp session in tmux on codex-workstation)'),issuedAt:z.iso.datetime(),expiresAt:z.iso.datetime(),
+ schemaVersion:z.literal('r1-codex-assessment-allowance-v1'),id:z.literal('r1-codex-assessment-allowance-2026-10-17-r2'),issuedBy:z.literal('R1 VM lead (omp session in tmux on codex-workstation)'),issuedAt:z.iso.datetime(),expiresAt:z.iso.datetime(),
  parentApproval:ApprovalPinSchema.extend({id:z.literal('r1-nine-town-models-2026-10-13'),sha256:z.literal(PARENT)}),
  delegationApproval:ApprovalPinSchema.extend({id:z.literal('r1-b-model-sonnet-2026-10-17'),sha256:z.literal(DELEGATION)}),
  cohort:z.object({path:z.literal('stadtstack-data/reports/approvals/r1-frozen-assessment-cohort-2026-10-17.json'),sha256:HashSchema}).strict(),

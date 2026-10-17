@@ -380,7 +380,7 @@ Apply migrations **005** and **006** in the operator's explicit migration step b
 Migration 004 counts cumulative selected `(municipality, original SHA)` identities (maximum 500) and durable pre-effect source-bearing Codex intents **per original SHA** across extraction, A and C. The ordinary ceiling remains `min(48, selected maxModelCalls)`; failed/ambiguous intents are never refunded, and ambiguous effects cannot silently replay. Cache hits do not reserve a new call. All intents have `paid_micro_usd=0`; API-equivalent estimates are not invoices. The same migration creates authorization/run-scoped usage-limit holds and their immutable resumption audit directly: that authorization cannot continue Codex effects, with no waiting, automatic retry or fallback. Continuation requires a genuinely later explicit lead-issued stage authorization narrowing and citing #81; the accounting records its actual approval SHA, approver, approval time, run and the hold it supersedes. Only an explicitly recorded usage-limit failure may be attempted under that new authorization, consuming another cumulative intent. Native pause files are run-scoped. Extraction never borrows assessment allowance.
 
 **Pinned fresh source-record A/C allowance.** Operational record
-`r1-codex-assessment-allowance-2026-10-17` is fixed by exact committed bytes, the
+`r1-codex-assessment-allowance-2026-10-17-r2` is fixed by exact committed bytes, the
 owner #81/delegation #88 hashes, the frozen 27-source/208-document/193-original
 cohort and the final projection-v2 assessment queue contract. It expires no later
 than **2026-10-25T21:59:59Z** and admits at most **24 additional lifetime intents
@@ -390,6 +390,8 @@ Missing, unissued, expired, altered or mismatched records never permit call49.
 The stored `max_calls` and all selector bounds stay at most48; narrower bounds
 are never widened. Extraction, preparation, B, historical/value assessment,
 foreign originals and old queue contracts cannot borrow this allowance.
+The original issued record remains unchanged as historical evidence; it is not
+accepted as current authority. Reissuance never resets lifetime allowance charges.
 
 Core authenticates canonical A/C identities, pinned successful receipts and
 exact execution dependencies through C→A→source-item preparation→residual
