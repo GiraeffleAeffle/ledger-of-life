@@ -10,8 +10,13 @@ test('committed lead allowance authenticates both owner records and the exact fr
  const bytes=await readFile(new URL(CODEX_ASSESSMENT_ALLOWANCE_PIN.id+'.json',approvals));assert.equal(digest(bytes),CODEX_ASSESSMENT_ALLOWANCE_PIN.sha256);
  const record=CodexAssessmentAllowanceSchema.parse(JSON.parse(bytes.toString('utf8')));assert.equal(record.id,CODEX_ASSESSMENT_ALLOWANCE_PIN.id);assert.equal(record.expiresAt,'2026-10-25T21:59:59Z');
  assert.equal(record.assessment.queueContractSha256,await assessmentQueueContract());
- const historicalBytes=await readFile(new URL('r1-codex-assessment-allowance-2026-10-17.json',approvals));assert.equal(digest(historicalBytes),'fe20dffb70f1521b90deca2b5070fcf37a3c468fbad386820b12a6e040a6055a');
- assert.equal(CodexAssessmentAllowanceSchema.safeParse(JSON.parse(historicalBytes.toString('utf8'))).success,false);
+ for(const [id,sha256] of [
+  ['r1-codex-assessment-allowance-2026-10-17','fe20dffb70f1521b90deca2b5070fcf37a3c468fbad386820b12a6e040a6055a'],
+  ['r1-codex-assessment-allowance-2026-10-17-r2','8e246c5736c0a556b7d27f87e72e38ece1fe946e66a5fef13023e36cae0fef8d']
+ ]){
+  const historicalBytes=await readFile(new URL(id+'.json',approvals));assert.equal(digest(historicalBytes),sha256);
+  assert.equal(CodexAssessmentAllowanceSchema.safeParse(JSON.parse(historicalBytes.toString('utf8'))).success,false);
+ }
  assert.equal(CodexAssessmentAllowanceSchema.safeParse({...record,id:record.id+'-other'}).success,false);
  for(const owner of [record.parentApproval,record.delegationApproval])assert.equal(digest(await readFile(new URL(owner.id+'.json',approvals))),owner.sha256);
  const cohortBytes=await readFile(new URL('r1-frozen-assessment-cohort-2026-10-17.json',approvals));assert.equal(digest(cohortBytes),record.cohort.sha256);assert.equal(record.cohort.sha256,'24c8629ec588f4898988c7ee7a61eb7e7b2809d0b0ab052fc34669512e789965');
