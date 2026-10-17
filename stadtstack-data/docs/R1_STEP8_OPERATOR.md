@@ -76,9 +76,9 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
   and output contract. Every admitting B step must match that exact job/selector/
   runner identity and explicitly attest the required stream version and medium
   thinking; missing/legacy stream markers and fenced-output normalization fail.
-  Do not compute replacement worker hashes from the later publication/replay
-  HEAD: its security-review footprint can differ from the processing pin without
-  changing the authentic sealed processing evidence.
+  Do not compute replacement worker hashes from publication/replay HEAD or repin
+  sealed campaign generations to accommodate an operator code change. All 14
+  processing contracts must remain byte-identical to the active processing pin.
 
   The production catalogue still has exactly 27 source scopes and 208 original
   document memberships. The isolated fixture instead supplies synthetic control
@@ -192,10 +192,12 @@ The sealed extraction archive compares exact source bytes for
 `district-graph-claims.ts`, `topic-vocabulary.ts`, and
 `../regional/taxonomy.mjs`; cache-context bytes are
 `district-prepared-document.ts` again. None is changed by this operator cutover.
-The additive reader is in `civic-opt-out.ts`, outside that boundary. Its security
-fingerprints do change: execute step 8/9 on the final new HEAD with fresh parser
-and OMP security reviews, while authenticating source archives against their
-original processing contract. Do not silently reseal campaign source bytes.
+The lock-free reader is in `r1-step8-managed-read-view.ts`, imported only by the
+step-8 audit and its tests. `civic-opt-out.ts` remains byte-identical to the active
+processing baseline, so neither its parser security nor OMP runner contract moves.
+The separate reader reuses public authority, objection and binding validators;
+its bounded, strict v1 inventory/segment adapter supplies only the missing
+lock-free read path. It never calls the existing locking inventory API.
 
 
 ### Native runs found read-only in the canonical DB
@@ -532,7 +534,7 @@ The earlier unfiltered `tests-20261017T132331Z.tap` was not green: it exposed
 the now-fixed strip-only runtime/type/error-matcher issues and the separate
 120-second B-broker aggregate fixture timeout. This targeted receipt is not
 represented as a passing unfiltered full gate. The final integrated HEAD still
-requires its complete gate and fresh security reviews.
+requires its complete gate and exact compatibility with the active security-review contracts.
 
 Production discovery was exercised again read-only on 2026-10-17 using the
 documented `discover` command. All five exact selected native runs still had one
@@ -586,5 +588,47 @@ of a production source selection. The check reported `selectionValidated: false`
 `publicationExecuted: false`, `writes: []`, `network: false`, `providers: false`.
 It did not connect to production PG, read selected source closures, publish,
 replay or run value acceptance. No unfiltered full gate was run for this cutover;
-the final integrated gate and fresh publication-HEAD security reviews remain
-the integration owner's responsibility.
+the final integrated gate and confirmation of existing security-review eligibility
+remain the integration owner's responsibility.
+
+### Processing-contract-neutral managed reader
+
+The integration owner required all fourteen exported processing contracts to
+remain identical to the active window-14 baseline, including security contracts.
+The `ce69f9e` implementation did not meet this condition: twelve contracts matched,
+but adding the factory to `civic-opt-out.ts` changed parser isolation to
+`5ed076bac8718b46202c13b8341328caa7be43c4de2646fed2a6850d60e049fe`
+and the OMP runner to
+`e7aa21a60788f717dd1bf2581e8d4fe418fc069f01c71469a138cd3b08cf7ba7`.
+
+The factory now lives solely in `r1-step8-managed-read-view.ts`; the processing
+authority module and its original private inventory loader are restored.
+The adapter independently decodes the existing strict inventory/segment v1
+envelope, delegates source proof validation to `ManagedSourceBindingSchema`,
+and retains the live authority/objection checks. It validates chain and retired-root
+semantics, source/root/lease identities, safe inode metadata and exact segment
+digests. Finalization reopens and validates every captured segment inside the
+manifest/objection fence. Epoch hashing streams through a 64-KiB buffer rather
+than retaining a second inventory-sized buffer. No writing lock API is called.
+
+Using the actual fourteen exported functions (the same set as the processing
+cutover comparison), archived `b32bc96` and `ce69f9e` bytes were supplied through
+their supported hash callbacks; the restored runtime used normal filesystem
+reads. All fourteen final results equal `b32bc962e617c876763f34c9734908f59116a00a`:
+preparation extractor, residual preparation, residual job, joint extraction,
+assessment queue, assessment B, acquisition, policy refresh, structured state
+gauges, operator registry config, parser output, parser isolation, OMP output,
+and OMP runner. In particular, parser isolation is again
+`287e701cdbddef1c22b2d202b54983467651eccfe43ead8cb67365ead00a4942`
+and the OMP runner is again
+`95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2`.
+The test expectations were restored to those active pins, not updated to bless
+a new contract.
+
+The focused command from the preceding subsection was then run again on CPUs
+6–7, using disposable PG and isolated authority. Receipt
+`/home/max/.local/state/stadtstack-data/r1-verify/tests-20261017T164739Z.tap`:
+TypeScript exit 0; 190 tests, 190 passed, 0 failed/cancelled/skipped; test exit 0.
+This includes all ten captured-segment finalization regressions and the full
+guarded candidate/exact-replay fixture using the standalone reader.
+No full gate or production publication was run.

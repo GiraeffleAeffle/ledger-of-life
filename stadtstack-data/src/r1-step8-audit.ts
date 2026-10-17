@@ -6,7 +6,7 @@ import {canonicalJson,digest,HashSchema,semanticHash} from './district-adapter-c
 import {canonicalJobIdentity,type DistrictJobSpec} from './district-jobs.ts';
 import {StepReceiptSchema,encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import {DistrictCas,type CasPutOptions} from './district-cas.ts';
-import {createReadOnlyManagedSourceAudit} from './civic-opt-out.ts';
+import {createReadOnlyManagedSourceAudit} from './r1-step8-managed-read-view.ts';
 import {Step8CampaignSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
 import {r1TextCompositionInputSchema} from './district-r1-text-composition.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';

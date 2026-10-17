@@ -786,11 +786,10 @@ function rememberReadInventory(state:string,sha256:string,value:Inventory,physic
  }
  return value;
 }
-async function loadInventory(state:string,readOnly=false,manifestName='inventory.json',expectedSha256?:string):Promise<Inventory>{
+async function loadInventory(state:string,readOnly=false,manifestName='inventory.json'):Promise<Inventory>{
  let value:Inventory,bytes:Buffer,sha256:string,validated:boolean,physical:unknown,hot:HotInventory|undefined;
  try{
   bytes=(await fileBytes(join(state,manifestName),MAX_STATE,true)).bytes;sha256=digest(bytes);
-  if(expectedSha256!==undefined&&sha256!==expectedSha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUDIT_EPOCH_CHANGED');
   validated=validatedInventoryBytes.get(state)===sha256;
   const cached=readOnly?readInventorySnapshots.get(state):undefined;
   if(cached?.sha256===sha256){
@@ -1131,42 +1130,6 @@ export async function assertManagedSourceReadable(input:string,options:ManagedSo
   if(current.some(entry=>['retained_publication','authenticated_git_snapshot','operator_registry_config'].includes(entry.kind)||entry.sourceSha256!==actual.sha256)&&all.some(entry=>entry.contentSha256===actual.sha256&&entry.state!=='active'))throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');
   await assertCivicPolicyAuthority(policy);
  });
-}
-
-/** Batch audit only: no lock, registration, reconciliation or durable cache writes.
- * The caller must finish before using any result. A concurrently published or
- * detached inventory/objection epoch invalidates the entire batch, not one member. */
-export async function createReadOnlyManagedSourceAudit(options:CivicPolicyOptions={}){
- const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy);
- const epoch=await fileDigest(join(state,'inventory.json')),snapshot=await readCivicOptOutSnapshot(policy),inventory=await loadInventory(state,true,'inventory.json',epoch.sha256);
- const roots=new Set<Root>(),objections=new Set(snapshot.objections.map(entry=>entry.hostSha256));let finished=false;
- const assertEpoch=async()=>{
-  const current=await fileDigest(join(state,'inventory.json'));
-  if(current.sha256!==epoch.sha256||!sameIdentity(current.stat,epoch.stat)||(await readCivicOptOutSnapshot(policy)).sha256!==snapshot.sha256)throw new CivicPolicyStateError('CIVIC_POLICY_AUDIT_EPOCH_CHANGED');
-  await assertCivicPolicyAuthority(policy);
- };
- await assertEpoch();
- return {authority,inventorySha256:epoch.sha256,optOutSnapshotSha256:snapshot.sha256,
-  async read(input:string,expectedSha256?:string,purpose?:'historical_change_reconstruction_only'){
-   if(finished)throw new CivicPolicyStateError('CIVIC_POLICY_AUDIT_FINISHED');
-   const path=resolve(input),root=inventory.roots.find(item=>contained(item.path,path));
-   if(!root||!root.complete)throw new CivicPolicyStateError('MANAGED_INVENTORY_INCOMPLETE');
-   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);roots.add(root);
-   const entries=entriesAt(inventory,root.id,relative(root.path,path).split(sep).join('/'));
-   if(!entries.length)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
-   if(entries.some(entry=>entry.state==='revoked'||objections.has(digest(entry.host))))throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');
-   if(entries.some(entry=>entry.kind==='authenticated_git_snapshot')&&purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('HISTORICAL_SOURCE_PURPOSE_REQUIRED');
-   const {bytes}=await fileBytes(path,MAX_CONTENT),sha256=digest(bytes),current=entries.filter(entry=>entry.contentSha256===sha256);
-   if(!current.length||expectedSha256!==undefined&&sha256!==hex.parse(expectedSha256))throw new CivicPolicyStateError('CONTENT_BINDING_MISMATCH');
-   if(current.some(entry=>entry.state!=='active'))throw new CivicPolicyStateError('CONTENT_REFERENCE_REVOKED');
-   return bytes;
-  },
-  async finish(){
-   if(finished)throw new CivicPolicyStateError('CIVIC_POLICY_AUDIT_FINISHED');
-   finished=true;for(const root of roots){await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);}
-   await assertEpoch();await loadInventory(state,true,'inventory.json',epoch.sha256);await assertEpoch();
-   return {inventorySha256:epoch.sha256,optOutSnapshotSha256:snapshot.sha256};
-  }};
 }
 
 /** Immutable fetch audit metadata may be unbound; source-bearing observations

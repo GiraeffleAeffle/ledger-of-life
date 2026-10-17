@@ -16,7 +16,7 @@ import {assertCivicPolicyAuthority,provisionCivicPolicyAuthority,CIVIC_POLICY_AU
 import {assertManagedSourceBindings,assertManagedIndependentHttpSourceBinding,assertManagedRawSourceBinding,assertManagedObservationReadable,ManagedSourceBindingSchema,parseContentFreePreparationPlan,assertSourceHostsNotOptedOut} from '../src/civic-opt-out.ts';
 import {retireManagedRoot,RetireReceiptSchema} from '../src/civic-opt-out.ts';
 import {compactCivicPolicyInventory,repackCivicPolicyInventory,readCivicPolicyInventory,recoverCivicPolicyLock} from '../src/civic-opt-out.ts';
-import {createReadOnlyManagedSourceAudit} from '../src/civic-opt-out.ts';
+import {createReadOnlyManagedSourceAudit} from '../src/r1-step8-managed-read-view.ts';
 import {projectSourcePolicyMetadata} from '../src/source-policy.ts';
 import type {SourceAccessPolicy} from '../src/source-policy.ts';
 import type {ManagedSourceContent,ManagedSourceBinding,CivicPolicyOptions} from '../src/civic-opt-out.ts';
