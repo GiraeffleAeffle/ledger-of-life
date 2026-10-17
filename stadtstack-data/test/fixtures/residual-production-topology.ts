@@ -35,6 +35,14 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   return typeof bytes==='string'?bytes+suffix:Buffer.concat([bytes,Buffer.from(suffix)]);
  }) as typeof readFile;
  t.mock.module('node:fs/promises',{namedExports:{...filesystem,readFile:contractReadFile}});
+ let forceDuplicateItemHold=false;
+ const contextModule=await import('../../src/district-assessment-context.ts');
+ // Exercise a genuine producer-owned, pre-effect child hold. The held record
+ // shares its ID with the canonical admission but belongs to another extraction.
+ t.mock.module(new URL('../../src/district-assessment-context.ts',import.meta.url),{namedExports:{...contextModule,buildPreparedAssessmentContext:(...args:Parameters<typeof contextModule.buildPreparedAssessmentContext>)=>{
+  if(forceDuplicateItemHold)throw new contextModule.AssessmentContextHold('assessment_context_exceeded');
+  return contextModule.buildPreparedAssessmentContext(...args);
+ }}});
  const claimsModule=await import('../../src/district-claims.ts');
  let chunkFailure:'oversized'|'unexpected'|undefined;
  // Deterministic chunk-boundary seam, after genuine predecessor admission:
@@ -302,8 +310,18 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     const duplicateRun=JSON.parse((await cas.read(duplicateSeal.runId)).toString('utf8'));assert.equal(duplicateRun.attemptedDocumentGroups,1);assert.equal(duplicateRun.availableDocumentGroups,1);assert.equal(duplicateRun.municipalities.find((city:{id:string})=>city.id===scope.municipalityId).selectedDocumentGroups,1);assert.equal(duplicateRun.queue.assessments.length,1);
     duplicateRun.queue.terminalDocumentExceptions[0].canonical.sourceSha256='f'.repeat(64);const tamperedBytes=Buffer.from(canonicalJson(duplicateRun)),tamperedHash=digest(tamperedBytes),contribution=duplicateComposition.contributions[0];
     await assert.rejects(exportQueueTextContribution(pool,cas,duplicateInput.jobKeys,{...contribution,runId:tamperedHash,artifacts:{...contribution.artifacts,extractionRun:{bytes:tamperedBytes,sha256:tamperedHash}}}),/seal differs/);
+    const itemSpec=(await pool.query('SELECT spec FROM district_pipeline.jobs WHERE job_key=$1',[duplicateItems])).rows[0].spec;
+    const heldPreparation=await store.enqueue({...itemSpec,lane:'assessment-item-hold-fixture'},{dependencies:[{jobKey:duplicateExtraction,expectedReceiptSha256:itemSpec.selector.extraction.receiptSha256}]});
+    const callsBeforeHold=modelCalls;forceDuplicateItemHold=true;
+    try{await run(heldPreparation,assessmentHandlers);}finally{forceDuplicateItemHold=false;}
+    assert.equal(modelCalls,callsBeforeHold,'Item hold consumes no provider calls');
+    const heldResult=(await assessments.exportAssessmentResults(pool,cas,[heldPreparation],policy)).results[0];
+    assert.equal(heldResult.heldItems.length,1);const {preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256}=heldResult.heldItems[0],duplicateItemHold={preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256};
+    const combinedInput={...duplicateInput,assessmentItemHolds:[duplicateItemHold]},combinedSeal=await sealQueueTextContribution(pool,cas,combinedInput);
+    assert.equal(combinedSeal.records,1);assert.equal(combinedSeal.assessmentItemHolds[0].recordIds[0],originalOutput.result.records[0].id);
+    assert.ok(combinedSeal.terminalDocumentExceptions[0].reasonCode==='duplicate_source_content'&&combinedSeal.terminalDocumentExceptions[0].excludedAssessmentJobKeys.includes(heldPreparation));
     const calls=modelCalls,probes=toolProbes;
-    await exerciseStep8(t,{pool,cas,policy,fixtureRoot:join(root,'duplicate-generation'),sealed:duplicateSeal,jobKey:extractionKey,reconcileKey,sealInput:duplicateInput,documentJobKeys:{[document.id]:extractionKey,[duplicateDocument.id]:duplicateExtraction},scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Duplicate step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
+    await exerciseStep8(t,{pool,cas,policy,fixtureRoot:join(root,'duplicate-generation'),sealed:combinedSeal,jobKey:extractionKey,reconcileKey,sealInput:combinedInput,documentJobKeys:{[document.id]:extractionKey,[duplicateDocument.id]:duplicateExtraction},scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Duplicate step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,calls);assert.equal(toolProbes,probes);
    }else{
     await exerciseStep8(t,{pool,cas,policy,fixtureRoot:root,sealed,legacyGeneration:{sealed:historicalSeal,reconcileKey:historicalReconcileKey},jobKey:extractionKey,reconcileKey,sealInput:positiveInput,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});

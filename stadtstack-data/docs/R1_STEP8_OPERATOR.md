@@ -173,6 +173,11 @@ holds. Full document/job membership remains exact (including excluded documents)
 the smallest-document-ID canonical extraction alone can supply admission evidence.
 Derived own/canonical extraction pins, excluded native records, attempt histories
 and excluded assessment custody are checked against the sealed DB-backed closure.
+An item hold is scoped to its selected extraction, not a global record ID:
+an authenticated excluded duplicate may retain a zero-provider-call child hold
+even when the canonical extraction legitimately admits the same logical ID.
+The hold's native preparation, extraction, bundle and evidence pins still must
+authenticate exactly.
 
 The audit reads migration-009 lifetime intents and immutable allowance
 attributions, retaining the real r1–r5 approval pins, frozen cohort, ordinals,
