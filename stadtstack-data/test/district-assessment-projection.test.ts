@@ -12,6 +12,7 @@ import type {OriginalEvidence} from '../src/district-assessment.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
 import {NATIVE_B_MODEL} from '../src/district-b-native-model.ts';
 import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt,historicalResidualAssessmentItem} from './district-assessment.fixture.ts';
+import {compactSourceProviderData,assertCompactSourceProviderData,resolveProviderQuoteReferences} from '../src/district-assessment-projection.ts';
 
 async function fixture(t:TestContext,text='Strausberg prüft den Entwurf. Beschlussvorlage 123 vom 17.10.2026.'){
  const f=await admittedAssessmentFixture(text);t.after(()=>rm(f.directory,{recursive:true,force:true}));
@@ -38,7 +39,7 @@ test('source projection v2 separates genuine statements from generated identity 
  assert.deepEqual(f.item.sourceRecord?.record,f.record);assert.equal(f.item.sourceRecord?.recordSha256,semanticHash(f.record));
  const data=assessmentProviderInput(f.item,f.evidence),wire=canonicalJson(data);
  assert.equal('sourceRecord' in data,false);assert.equal(wire.includes('PRIVATE_GENERATED_ABSENCE_REASON'),false);
- assert.equal(wire.includes('faithfulness'),false);assert.equal(wire.includes('r1-provider-propositions-v2'),true);
+ assert.equal(wire.includes('faithfulness'),false);assert.equal(wire.includes('r1-provider-propositions-v3'),true);
  assert.equal(canonicalJson(data),canonicalJson(buildAssessmentPassInput(f.item,f.evidence,'B').data));
  const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(f.item,f.evidence,'A')).value);
  assert.deepEqual(deterministicChecks(f.item,f.evidence,output),[]);
@@ -99,7 +100,8 @@ test('ordinary relation propositions preserve source direction, not just endpoin
  assert.notEqual(reverseProposition.claimId,proposition.claimId);assert.notDeepEqual(reverseProposition.asserted,proposition.asserted);
  assert.equal((proposition.asserted as {modality:string}).modality,'asserted');assert.equal(proposition.assertionEncoding.modality,'confirmed');
  assert.equal(proposition.assertionEncoding.subjectId,graph.relations[0].fromId);assert.equal(proposition.assertionEncoding.objectId,graph.relations[0].toId);
- const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(item,f.evidence,'A')).value);
+ const source=item.sources[0],evidence:OriginalEvidence=[{...f.evidence[0],assessmentContext:source.assessmentContext,locators:source.locators.map(locator=>({...locator,quote:text.slice(locator.start,locator.end)}))}];
+ const output=assessmentOutputSchema.parse(answer(buildAssessmentPassInput(item,evidence,'A')).value);
  for(const [raw,wire] of [['asserted','confirmed'],['decided','confirmed'],['implemented','confirmed'],['planned','planned'],['proposed','planned'],['conditional','conditional'],['negated','negated'],['historical','historical']] as const){
   const variant=structuredClone(record);variant.relations[0].modality=raw;variant.verification.evidenceHash=knowledgeEvidenceHash(variant);
   const encoded=residualRecordPropositions(variant).propositions.find(value=>value.selector==='/relations/0')!;
@@ -110,13 +112,13 @@ test('ordinary relation propositions preserve source direction, not just endpoin
   const response=structuredClone(output);response.assertions.find(value=>value.claimId===proposition.claimId)!.modality=wire;
   assert.doesNotThrow(()=>assessmentOutputSchema.parse(response));
  }
- assert.deepEqual(deterministicChecks(item,f.evidence,output),[]);
+ assert.deepEqual(deterministicChecks(item,evidence,output),[]);
  const wrong=structuredClone(output),relation=wrong.assertions.find(value=>value.claimId===proposition.claimId)!;
  [relation.subjectId,relation.objectId]=[relation.objectId,relation.subjectId];
- assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_direction:'+proposition.claimId));
+ assert.ok(deterministicChecks(item,evidence,wrong).includes('relation_direction:'+proposition.claimId));
  relation.subjectId=null;relation.objectId=null;relation.modality='unknown';
- assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_direction:'+proposition.claimId));
- assert.ok(deterministicChecks(item,f.evidence,wrong).includes('relation_modality:'+proposition.claimId));
+ assert.ok(deterministicChecks(item,evidence,wrong).includes('relation_direction:'+proposition.claimId));
+ assert.ok(deterministicChecks(item,evidence,wrong).includes('relation_modality:'+proposition.claimId));
 });
 test('historical reconstruction authenticates the persisted version while new preparation remains v2 only',async t=>{
  const f=await fixture(t);
@@ -154,4 +156,31 @@ test('standalone assessment cannot route B through VM Codex',async t=>{
  const f=await fixture(t);
  await assert.rejects(runAssessmentPass(f.item,'B','openai-subscription',{ledgerPath:'not-created-by-guard',pausePath:'not-created-by-guard'},undefined,f.context),/B requires the reviewed VM omp runner/);
  await assert.rejects(runAssessmentPass(f.item,'B','anthropic-subscription',{ledgerPath:'not-created-by-guard',pausePath:'not-created-by-guard'},undefined,f.context),/B requires the reviewed VM omp runner/);
+});
+
+test('compact provider encoding re-derives exact quotes and private partition without transmitting bookkeeping values',async t=>{
+ const f=await fixture(t),projection=assertSourceRecordProjection(f.item)!,encoded=compactSourceProviderData(projection,f.evidence);
+ assert.equal(encoded.claim.bindingsSha256,semanticHash(projection.bindings));assert.equal('bindings' in encoded.claim,false);
+ assert.deepEqual(encoded.claim.qualifications,projection.qualifications.map(({selector,value})=>[selector,value]));
+ assert.deepEqual(resolveProviderQuoteReferences(encoded.claim.context,f.evidence),projection.context.map(({selector,value})=>[selector,value]));
+ assert.deepEqual(resolveProviderQuoteReferences(encoded.claim.propositions,f.evidence),projection.propositions);
+ assert.deepEqual(assertCompactSourceProviderData(encoded,projection,f.evidence),encoded);
+ assert.equal(f.item.claim,canonicalJson(projection),'private complete partition and its original hashes stay unchanged');
+ const critical={claimProjection:{summaryQuote:f.text},claims:[{quote:f.text,claimId:'synthetic-critical',context:{dateQuote:f.text}}]};
+ const criticalEncoding=compactSourceProviderData(projection,f.evidence,critical);
+ assert.deepEqual(resolveProviderQuoteReferences(criticalEncoding.criticalTarget,f.evidence),critical);
+ for(const forged of [{$quote:[[-1,0]]},{$quote:[[0,9999]]},{$quote:[[0,0.5]]},{$quote:[]},{$quote:[[0,0],[0,0]]},{$quote:[[0,0]],extra:true}]){
+  assert.throws(()=>resolveProviderQuoteReferences(forged,f.evidence));
+ }
+ const mixed=[{...f.evidence[0],locators:[f.evidence[0].locators[0],{...f.evidence[0].locators[0],quote:'different exact quote'}]}];
+ assert.throws(()=>resolveProviderQuoteReferences({$quote:[[0,0],[0,1]]},mixed),'different quote contents cannot share one reference');
+ const repeated=[...f.evidence,{...f.evidence[0]}],allOccurrences=compactSourceProviderData(projection,repeated);
+ const missingOccurrence=JSON.parse(JSON.stringify(allOccurrences));missingOccurrence.claim.propositions[0].quote.$quote.pop();
+ assert.throws(()=>assertCompactSourceProviderData(missingOccurrence,projection,repeated),'even a same-content locator omission is rejected');
+ const altered=structuredClone(encoded);altered.claim.propositions=[];
+ assert.throws(()=>assertCompactSourceProviderData(altered,projection,f.evidence));
+ const ambiguous=structuredClone(projection);ambiguous.propositions[0].asserted={$quote:[[0,0]]};
+ assert.throws(()=>compactSourceProviderData(ambiguous,f.evidence));
+ const missing=structuredClone(projection);missing.propositions[0].quote='not a supplied literal quote';
+ assert.throws(()=>compactSourceProviderData(missing,f.evidence));
 });

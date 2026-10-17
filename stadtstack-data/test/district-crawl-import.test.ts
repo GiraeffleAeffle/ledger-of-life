@@ -28,7 +28,7 @@ import {loadPolicyReceipt,recheckPolicyReceipt} from '../src/district-policy-rec
 import {prepareDocument,PreparedDocumentSchema} from '../src/district-prepared-document.ts';
 import {parserOutputContractSha256,PARSER_ISOLATION_VERSION} from '../src/district-parser-isolation.ts';
 import {assessmentItemSchema,originalEvidence,buildAssessmentPassInput,createAssessmentReceipt,type AssessmentOutput,type AssessmentPassInput,type AssessmentItem} from '../src/district-assessment.ts';
-import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,residualAssessmentItem,reconstructResidualAssessmentItem} from '../src/district-assessment-jobs.ts';
+import {assessmentQueueHandlers,enqueueResidualAssessmentItems,enqueuePreparedAssessmentPass,enqueueAssessmentResolution,residualAssessmentItem,reconstructResidualAssessmentItem,exportAssessmentResults} from '../src/district-assessment-jobs.ts';
 import {buildPreparedAssessmentContext} from '../src/district-assessment-context.ts';
 import {DistrictAssessmentBroker,enqueueAssessmentB} from '../src/district-assessment-broker.ts';
 import {BridgeLeaseSchema,BridgeStatusSchema} from '../src/district-assessment-bridge-contract.ts';
@@ -46,6 +46,9 @@ import {CriticalRecordTargetSchema} from '../src/district-critical-assessment-co
 import {readRegisteredRobotsAudit,REGISTERED_SOURCE_POLICY_VALIDITY_MS} from '../src/registered-source-policy.ts';
 import type {BoundSourceObservation} from '../src/source-observation.ts';
 import {MAX_POLICY_METADATA_EVIDENCE} from '../src/source-policy.ts';
+import {resolveProviderQuoteReferences} from '../src/district-assessment-projection.ts';
+import {loadAssessmentItemHold} from '../src/district-assessment-item-holds.ts';
+import {documentChunks} from '../src/district-claims.ts';
 import {NATIVE_B_MODEL} from '../src/district-b-native-model.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
@@ -597,6 +600,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    // stage. Native inference uses synthetic providers; no DocumentResult or model-answer cache envelope is hand-assembled.
    const extractionKey=await enqueueCommittedResidualExtraction(pool!,store,item.cas,preparationKey);
    let extractionFailure:unknown;
+   const assessmentWideMarker='SYNTHETIC_ASSESSMENT_WIDE',assessmentWideLabel='漢'.repeat(280);
    const extractionFixture:JobHandler=async context=>{
     try{
     const selected=ResidualInputSchema.strip().parse(context.job.spec.selector),source=await loadResidualSource(context.cas,selected,{store});
@@ -615,9 +619,16 @@ test('offline frozen crawl import preserves managed originals and produces enque
      ledgerPath:join(out,'usage.jsonl'),pausePath:join(out,'pause.json'),signal:context.signal,
      onModelIdentity:async evidence=>{identity=evidence;const stored=await putAssessment(evidence);versions['modelIdentity.'+evidence.modelIdentitySha256]=stored.sha256;},
      beforeSourceCall:request=>reserveR1CodexCall(pool!,context.job,source.document.sha256,request,selected.bounds.maxModelCalls).then(()=>{}),
-     fixtureProvider:async(_provider,_system,_input,_schema,usage)=>{generationCalls++;assert.ok(identity);const value=usage.purpose==='extraction'?{record:supported?claims:null,reason:supported?'Synthetic grounded extraction fixture':'Synthetic narrative with no supported case'}:{score:0.95,reason:'Synthetic same-provider fixture judge, not independent gold',criticalUnsupported:false};return {value,evidence:identity,responseSha256:digest(canonicalJson(value)),requestedModel:identity.model,returnedModel:identity.model,reportedModels:[identity.model],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};},
+     fixtureProvider:async(_provider,_system,_input,_schema,usage)=>{
+      generationCalls++;assert.ok(identity);
+      const wide=usage.purpose==='extraction'&&(_input as {source:{text:string}}).source.text.includes(assessmentWideMarker);
+      const candidate=wide?{...claims,locations:Array.from({length:12},()=>({label:assessmentWideLabel,quote:assessmentWideLabel,geometry:null,precision:'none' as const}))}:claims;
+      const value=usage.purpose==='extraction'?{record:supported?candidate:null,reason:supported?'Synthetic grounded extraction fixture':'Synthetic narrative with no supported case'}:{score:0.95,reason:'Synthetic same-provider fixture judge, not independent gold',criticalUnsupported:false};
+      return {value,evidence:identity,responseSha256:digest(canonicalJson(value)),requestedModel:identity.model,returnedModel:identity.model,reportedModels:[identity.model],runtimeWarnings:[],usage:{...EMPTY_USAGE,perModel:{}}};
+     },
     }});
-    assert.equal(generationCalls,supported?2:1);assert.equal(result.records.length,supported?1:0,canonicalJson(result.quarantine));
+    const expectedRecords=prepared.text.includes(assessmentWideMarker)?documentChunks(prepared.text).length:supported?1:0;
+    assert.equal(generationCalls,supported?2*expectedRecords:1);assert.equal(result.records.length,expectedRecords,canonicalJson(result.quarantine));
     assert.equal(result.chunks.length,result.records.length+result.quarantine.length);
     for(const hold of result.quarantine.filter(entry=>entry.reason==='Model input exceeds bounded context'))assert.deepEqual(result.chunks.find(chunk=>chunk.index===hold.chunk),{index:hold.chunk,outcome:'rejected',responseSha256:null,recordId:null});
     if(supported){
@@ -637,7 +648,7 @@ test('offline frozen crawl import preserves managed originals and produces enque
    const groundedAnswer=(input:AssessmentPassInput)=>{
     const response=answer(input),output=response.value as AssessmentOutput;
     const data=input.data as {criticalTarget?:unknown;evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
-    const target=CriticalRecordTargetSchema.strip().parse(data.criticalTarget);
+    const target=CriticalRecordTargetSchema.strip().parse(resolveProviderQuoteReferences(data.criticalTarget,data.evidence));
     output.assertions=[...output.assertions.filter(assertion=>!target.claims.some(claim=>claim.claimId===assertion.claimId)),...target.claims.map(claim=>({claimId:claim.claimId,sourceId:claim.sourceId,locatorId:data.evidence.find(source=>source.sourceId===claim.sourceId)!.locators.find(locator=>locator.quote===claim.quote)!.id,quote:claim.quote,subjectId:claim.subjectId,objectId:claim.objectId,value:null,unit:null,date:claim.date,dateRole:claim.dateRole,financialRole:claim.financialRoles[0],stage:claim.stage,modality:claim.modality}))];
     output.criticalReview={recordId:target.recordId,recordEvidenceSha256:target.recordEvidenceSha256,claimProjectionSha256:target.claimProjectionSha256,claims:target.claims.map(claim=>({claimId:claim.claimId,claimSha256:claim.claimSha256,verdict:'supported',rationale:'Synthetic source-bound critical assessment; never independent gold.'}))};
     return {...response,value:output,responseSha256:digest(canonicalJson(output))};
@@ -782,6 +793,39 @@ test('offline frozen crawl import preserves managed originals and produces enque
      await exportResidualTextContribution(pool!,mixed.cas,[key],inputValue.contributions[0]);
      const replayed=await sealQueueTextContribution(pool!,mixed.cas,input);assert.deepEqual(replayed,sealedMixed);
      assert.deepEqual(await mixed.cas.read(replayed.compositionArtifactSha256),compositionBytes);
+    });
+   });
+   for(const mode of ['mixed','all-held'] as const)await st.test('item preparation isolates '+mode+' context holds with immutable child dispositions and seal replay',async()=>{
+    const wide=Buffer.concat([item.bytes,Buffer.from('\n'+assessmentWideMarker+'\n'+assessmentWideLabel+'\n')]);
+    const body=mode==='mixed'?Buffer.concat([wide,Buffer.from('x'.repeat(12000)+'\n'),item.bytes]):wide;
+    const isolated=await fixture('item-context-isolation-'+mode,{body});
+    await withFixtureAuthorizedCorpus(isolated.indexBytes,policy,async()=>{
+     const imported=await importCrawlCorpusForResidual(store,isolated.cas,isolated.manifest),preparedKey=await enqueueResidualPreparation(store,isolated.cas,imported.jobs[0]);
+     const run=async(key:string,handlers:Readonly<Record<string,JobHandler>>,phase:string)=>runDistrictJobs({store,cas:isolated.cas,handlers,authorizationId:await authorize(key,phase),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});
+     assert.equal((await run(preparedKey,{residual_prepare:prepareFixture},'isolated-parser')).state,'completed');
+     const extractionKey=await enqueueCommittedResidualExtraction(pool!,store,isolated.cas,preparedKey);
+     assert.equal((await run(extractionKey,{residual_extract:extractionFixture},'isolated-extraction')).state,'completed');
+     const preparationKey=await enqueueResidualAssessmentItems(pool!,store,isolated.cas,extractionKey),beforeCalls=modelCalls;
+     const intentsBefore=Number((await pool!.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[isolated.document.sha256])).rows[0].count);
+     assert.equal((await run(preparationKey,assessmentHandlers,'isolated-item-preparation')).state,'completed');
+     const exported=await exportAssessmentResults(pool!,isolated.cas,[preparationKey],policy),result=exported.results[0];
+     assert.equal(exported.version,'r1-assessment-results-v2');assert.equal(result.outcome,'succeeded');
+     assert.equal(result.items.length,mode==='mixed'?1:0);assert.equal(result.heldItems.length,1);assert.equal(modelCalls,beforeCalls);
+     assert.equal(Number((await pool!.query('SELECT count(*) FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[isolated.document.sha256])).rows[0].count),intentsBefore);
+     const pins=result.heldItems.map(({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256})=>({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256}));
+     const authenticated=await loadAssessmentItemHold(pool!,isolated.cas,pins[0],policy);
+     assert.equal(authenticated.hold.reasonCode,'assessment_context_exceeded');assert.equal(authenticated.hold.assessmentProviderCalls,0);assert.ok(authenticated.hold.itemArtifactSha256);
+     await assert.rejects(loadAssessmentItemHold(pool!,isolated.cas,{...pins[0],itemBundleArtifactSha256:digest('uncommitted bundle')},policy));
+     const AKeys=await enqueuePreparedAssessmentPass(pool!,store,isolated.cas,preparationKey,'A',undefined,policy);assert.equal(AKeys.length,result.items.length);
+     const heldJobs=await pool!.query("SELECT count(*) FROM district_pipeline.jobs WHERE step IN ('assessment_a','assessment_b','assessment_c') AND spec->'selector'->>'itemArtifactSha256'=$1",[authenticated.hold.itemArtifactSha256]);assert.equal(Number(heldJobs.rows[0].count),0);
+     const input={jobKeys:[extractionKey],reconciliationJobKeys:[],assessmentItemHolds:pins},sealed=await sealQueueTextContribution(pool!,isolated.cas,input);
+     assert.equal(sealed.records,0,'unassessed eligible siblings never become admissions');assert.equal(sealed.heldRecords,mode==='mixed'?2:1);
+     assert.equal(sealed.assessmentItemHolds.length,1);assert.equal(sealed.assessmentItemHolds[0].reasonCode,'assessment_context_exceeded');assert.equal(sealed.assessmentItemHolds[0].assessmentProviderCalls,0);
+     const composition=await loadR1TextCompositionInput(JSON.parse((await isolated.cas.read(sealed.compositionArtifactSha256)).toString('utf8')),pin=>isolated.cas.read(pin.sha256));
+     const replayed=await exportQueueTextContribution(pool!,isolated.cas,[extractionKey],composition.contributions[0]);assert.deepEqual(replayed.assessmentItemHolds,sealed.assessmentItemHolds);
+     assert.deepEqual(await sealQueueTextContribution(pool!,isolated.cas,input),sealed);
+     const cases=JSON.parse((await isolated.cas.read(sealed.artifacts.quarantine.sha256)).toString('utf8')).cases;
+     assert.equal(cases.filter((entry:{reason:string})=>entry.reason==='assessment_item_hold:assessment_context_exceeded').length,1);
     });
    });
    await st.test('terminal assessment context and A/B holds retain receipt-authenticated source ancestry',async()=>{

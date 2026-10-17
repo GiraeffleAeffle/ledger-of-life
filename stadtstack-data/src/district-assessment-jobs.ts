@@ -22,15 +22,16 @@ import {assertValueAssessmentContext} from './district-value-context.ts';
 import {bankSchema,parseCandidateCollection,prepareValueAssessment,bindCandidateValueContext,valueAssessmentTarget,canonical as valueCanonical,type Report} from './evaluate-pilot-value.ts';
 import {sourceRecordPropositions} from './district-assessment-projection.ts';
 import {NATIVE_B_RECEIPT_VERSION} from './district-b-native-model.ts';
+import {AssessmentItemBundleSchema,AssessmentItemHoldReceiptSchema,loadAssessmentItemHold} from './district-assessment-item-holds.ts';
 
 export const R1_ASSESSMENT_RUBRIC='Assess only the admissible original evidence. Verify exact source quotations, claim and entity identity, date and date role, stage and modality, and financial plan/approval/payment/actual roles. Hold missing evidence, suspected OCR and unsupported critical claims. Score correctness, sources and usefulness 0–2. Abstention has zero usefulness. AI agreement is not independent validation.';
 const PredecessorSchema=z.object({jobKey:HashSchema,receiptId:z.uuid(),receiptSha256:HashSchema}).strict();
 const ItemSelectorSchema=z.object({version:z.literal('r1-assessment-item-job-v1'),extraction:PredecessorSchema,extractionArtifactSha256:HashSchema}).strict();
 const PassSelectorSchema=z.object({version:z.literal('r1-assessment-pass-job-v1'),itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48),predecessors:z.array(PredecessorSchema),AJobKey:HashSchema.optional(),BJobKey:HashSchema.optional(),CJobKey:HashSchema.optional()}).strict();
-const ItemBundleSchema=z.object({version:z.literal('r1-assessment-items-v1'),items:z.array(z.object({itemArtifactSha256:HashSchema,recordArtifactSha256:HashSchema,maxModelCalls:z.number().int().min(2).max(48)}).strict())}).strict();
+const ItemBundleSchema=AssessmentItemBundleSchema;
 export async function assessmentQueueContract(hash?:(file:string)=>Promise<string>){
  // Item building, evidence context, reconciliation and model framing are semantic.
- const files=['district-assessment-jobs.ts','district-assessment-projection.ts','district-b-native-model.ts','district-schema.ts','district-graph-claims.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','evaluate-pilot-value.ts','../evaluation/pilot-questions.json','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
+ const files=['district-assessment-jobs.ts','district-assessment-item-holds.ts','district-assessment-projection.ts','district-b-native-model.ts','district-schema.ts','district-graph-claims.ts','district-assessment-context.ts','district-value-context.ts','pilot-value-transcript.ts','evaluate-pilot-value.ts','../evaluation/pilot-questions.json','district-claims.ts','district-assessment.ts','district-critical-assessment.ts','district-critical-assessment-public.ts','district-residual-jobs.ts','district-inference.ts','district-model.ts','district-model-contract.ts'];
  return semanticHash(await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(new URL(file,import.meta.url)))}))));
 }
 /** Operational usage/failure metadata is not CAS content or a nested managed lane. */
@@ -47,7 +48,7 @@ async function committed(pool:Pool,jobKey:string,step:string){
  return {...row,receipt:encoded.receipt,pin:{jobKey,receiptId:encoded.receipt.id,receiptSha256:encoded.sha256}};
 }
 async function json(cas:DistrictCas,hash:string){return JSON.parse((await cas.read(HashSchema.parse(hash))).toString('utf8'));}
-async function persist(store:DistrictJobStore,cas:DistrictCas,item:AssessmentItem,value:unknown,options:Omit<AssessmentEvidenceContext,'cas'>,kind:'derived'|'receipt'='derived'){
+async function persist(store:DistrictJobStore,cas:DistrictCas,item:{sources:ReadonlyArray<{admissionReceiptSha256:string}>;valueContext?:{custodyReceiptSha256:string}},value:unknown,options:Omit<AssessmentEvidenceContext,'cas'>,kind:'derived'|'receipt'='derived'){
  const bytes=Buffer.from(canonicalJson(value)),hash=digest(bytes),relativePath=`sha256/${hash.slice(0,2)}/${hash}`,policy=options.policyOptions??{};
  const proofs=[...new Set([...item.sources.map(source=>source.admissionReceiptSha256),...(item.valueContext?[item.valueContext.custodyReceiptSha256]:[])])];
  const originals=await Promise.all(proofs.map(hash=>loadPolicyReceipt(cas,hash)));
@@ -315,18 +316,38 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
    const prepared=PreparedDocumentSchema.parse(await json(context.cas,envelope.preparedArtifactSha256));
    verifyPreparedDocument(prepared,{...prepared,receiptSha256:envelope.result.preparedSha256,sourceSha256:source.document.sha256,municipalityId:source.municipality.id,extractorSha256:contract.preparationSha256,references:[source.reference]},await context.cas.read(source.document.sha256));
    if(!preparation.receipt.outputHashes.includes(prepared.textSha256)||digest(await context.cas.read(prepared.textSha256))!==prepared.textSha256)throw new DistrictExecutionHold('quality_failed');
-   const outputs:CasArtifact[]=[],items:z.infer<typeof ItemBundleSchema>['items']=[];
+   const outputs:CasArtifact[]=[],items:z.infer<typeof ItemBundleSchema>['items']=[],heldItems:Array<{recordArtifactSha256:string;itemArtifactSha256:string|null;holdReceiptArtifactSha256:string}>=[];
    const policy={...evidenceOptions.policyOptions,authorityId:source.receipt.authorityId,authoritySha256:source.receipt.authoritySha256},preparationEvidence={...evidenceOptions,policyOptions:policy};
-   let first:AssessmentItem|undefined;
+   const custody={sources:[{admissionReceiptSha256:residual.policyReceiptSha256}]};
    for(const record of envelope.result.records){
-    context.signal.throwIfAborted();const item=residualAssessmentItem(record,prepared,envelope.preparedArtifactSha256,residual.policyReceiptSha256);
-    const evidence=await originalEvidence(item,{cas:context.cas,...preparationEvidence});buildAssessmentPassInput(item,evidence,'A');
-    const itemArtifact=await persist(store,context.cas,item,item,preparationEvidence),recordArtifact=await persist(store,context.cas,item,record,preparationEvidence);first??=item;
-    outputs.push(itemArtifact,recordArtifact);items.push({itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:residual.bounds.maxModelCalls});
+    context.signal.throwIfAborted();
+    let item:AssessmentItem|undefined,holdReason:'assessment_context_exceeded'|'quality_failed'|undefined;
+    try{
+     item=residualAssessmentItem(record,prepared,envelope.preparedArtifactSha256,residual.policyReceiptSha256);
+     const evidence=await originalEvidence(item,{cas:context.cas,...preparationEvidence});buildAssessmentPassInput(item,evidence,'A');
+    }catch(error){
+     if(error instanceof AssessmentContextHold)holdReason=error.reasonCode;
+     else if(error instanceof DistrictExecutionHold&&error.reasonCode==='quality_failed')holdReason='quality_failed';
+     else throw error;
+    }
+    const recordArtifact=await persist(store,context.cas,custody,record,preparationEvidence);
+    const itemArtifact=item?await persist(store,context.cas,custody,item,preparationEvidence):null;
+    outputs.push(recordArtifact,...(itemArtifact?[itemArtifact]:[]));
+    if(holdReason){
+     const hold=AssessmentItemHoldReceiptSchema.parse({version:'r1-assessment-item-hold-v1',preparationJobKey:context.job.jobKey,assessmentQueueContractSha256:context.job.spec.semanticContractSha256,
+      recordId:record.id,recordArtifactSha256:recordArtifact.sha256,itemArtifactSha256:itemArtifact?.sha256??null,extractionArtifactSha256:selector.extractionArtifactSha256,
+      preparedArtifactSha256:envelope.preparedArtifactSha256,preparedTextSha256:prepared.textSha256,originalSha256:prepared.sourceSha256,policyReceiptSha256:residual.policyReceiptSha256,
+      outcome:'held_quality',reasonCode:holdReason,assessmentProviderCalls:0});
+     const receipt=await persist(store,context.cas,custody,hold,preparationEvidence,'receipt');outputs.push(receipt);
+     heldItems.push({recordArtifactSha256:recordArtifact.sha256,itemArtifactSha256:itemArtifact?.sha256??null,holdReceiptArtifactSha256:receipt.sha256});
+    }else{
+     if(!itemArtifact)throw Error('Eligible assessment item was not constructed');
+     items.push({itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:residual.bounds.maxModelCalls});
+    }
    }
-   if(!first)return {outcome:'no_supported_case',reasonCode:'no_supported_case'};
-   outputs.push(await persist(store,context.cas,first,ItemBundleSchema.parse({version:'r1-assessment-items-v1',items}),preparationEvidence));
-   return {outcome:'succeeded',reasonCode:'completed',outputs,counts:{candidates:items.length}};
+   if(!items.length&&!heldItems.length)return {outcome:'no_supported_case',reasonCode:'no_supported_case'};
+   outputs.push(await persist(store,context.cas,custody,ItemBundleSchema.parse({version:'r1-assessment-items-v2',items,heldItems}),preparationEvidence));
+   return {outcome:'succeeded',reasonCode:'completed',outputs,counts:{candidates:items.length,heldFacts:heldItems.length}};
   }),
   assessment_b:guarded(async(context,evidenceOptions)=>{
    if(process.platform!=='linux')throw new DistrictExecutionHold('isolation_unavailable');
@@ -376,13 +397,17 @@ export function assessmentQueueHandlers(pool:Pool,options:Omit<AssessmentEvidenc
   }),
  };
 }
-export async function enqueuePreparedAssessmentPass(pool:Pool,store:DistrictJobStore,cas:DistrictCas,preparationJobKey:string,role:'A'|'B',broker?:DistrictAssessmentBroker){
- const row=await committed(pool,preparationJobKey,'assessment_prepare'),bundles:z.infer<typeof ItemBundleSchema>[]=[];
+export async function enqueuePreparedAssessmentPass(pool:Pool,store:DistrictJobStore,cas:DistrictCas,preparationJobKey:string,role:'A'|'B',broker?:DistrictAssessmentBroker,policy:CivicPolicyOptions={}){
+ const row=await committed(pool,preparationJobKey,'assessment_prepare'),bundles:Array<{hash:string;bundle:z.infer<typeof ItemBundleSchema>}>=[];
  if(row.spec.semanticContractSha256!==await assessmentQueueContract())throw new AssessmentContextHold();
- for(const hash of row.receipt.outputHashes){const raw=await json(cas,hash);if(raw.version==='r1-assessment-items-v1')bundles.push(ItemBundleSchema.parse(raw));}
+ for(const hash of row.receipt.outputHashes){const raw=await json(cas,hash);if(raw.version==='r1-assessment-items-v1'||raw.version==='r1-assessment-items-v2')bundles.push({hash,bundle:ItemBundleSchema.parse(raw)});}
  if(bundles.length!==1)throw new DistrictExecutionHold('quality_failed');
+ const {hash:itemBundleArtifactSha256,bundle}=bundles[0];
+ if(bundle.version!=='r1-assessment-items-v2')throw new DistrictExecutionHold('quality_failed');
+ if(new Set([...bundle.items,...bundle.heldItems].map(entry=>entry.recordArtifactSha256)).size!==bundle.items.length+bundle.heldItems.length)throw new DistrictExecutionHold('quality_failed');
+ for(const entry of bundle.heldItems)await loadAssessmentItemHold(pool,cas,{preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256:entry.holdReceiptArtifactSha256},policy);
  const jobKeys:string[]=[];
- for(const entry of bundles[0].items){
+ for(const entry of bundle.items){
   if(!row.receipt.outputHashes.includes(entry.itemArtifactSha256)||!row.receipt.outputHashes.includes(entry.recordArtifactSha256))throw new DistrictExecutionHold('quality_failed');
   const item=assessmentItemSchema.parse(await json(cas,entry.itemArtifactSha256)),proof=await loadPolicyReceipt(cas,item.sources[0].admissionReceiptSha256);
   assertResidualAssessmentContext(item);
@@ -413,11 +438,17 @@ export async function exportAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:
   if(rows.rows.length!==1)throw new DistrictExecutionHold('dependency_uncommitted');
   const row=rows.rows[0],encoded=encodeStepReceipt(row.receipt);
   if(encoded.sha256!==row.receipt_sha256||canonicalJobIdentity(row.spec).jobKey!==jobKey||encoded.receipt.jobKey!==jobKey)throw new DistrictExecutionHold('quality_failed');
-  const receipts:Array<{role:string;artifactSha256:string;receiptSha256:string;itemSha256:string}>=[],items:z.infer<typeof ItemBundleSchema>['items']=[];
+  const receipts:Array<{role:string;artifactSha256:string;receiptSha256:string;itemSha256:string}>=[],items:z.infer<typeof ItemBundleSchema>['items']=[],heldItems:Array<{preparationJobKey:string;itemBundleArtifactSha256:string;holdReceiptArtifactSha256:string;recordArtifactSha256:string;itemArtifactSha256:string|null;outcome:'held_quality';reasonCode:'assessment_context_exceeded'|'quality_failed';assessmentProviderCalls:0}>=[];
   for(const hash of row.receipt.outputHashes){
    await assertManagedSourceReadable(join(cas.root,'sha256',hash.slice(0,2),hash),policy);
    let raw;try{raw=await json(cas,hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}
-   if(raw.version==='r1-assessment-items-v1')items.push(...ItemBundleSchema.parse(raw).items);
+   if(raw.version==='r1-assessment-items-v1'||raw.version==='r1-assessment-items-v2'){
+    const bundle=ItemBundleSchema.parse(raw);items.push(...bundle.items);
+    if(bundle.version==='r1-assessment-items-v2')for(const entry of bundle.heldItems){
+     const authenticated=await loadAssessmentItemHold(pool,cas,{preparationJobKey:jobKey,itemBundleArtifactSha256:hash,holdReceiptArtifactSha256:entry.holdReceiptArtifactSha256},policy),hold=authenticated.hold;
+     heldItems.push({...authenticated.pin,recordArtifactSha256:hold.recordArtifactSha256,itemArtifactSha256:hold.itemArtifactSha256,outcome:hold.outcome,reasonCode:hold.reasonCode,assessmentProviderCalls:hold.assessmentProviderCalls});
+    }
+   }
    if(raw.version==='assessment-receipt-v1'||raw.version===NATIVE_B_RECEIPT_VERSION){
     const selected=z.object({itemArtifactSha256:HashSchema}).passthrough().parse(row.spec.selector);
     const item=assessmentItemSchema.parse(await json(cas,selected.itemArtifactSha256));
@@ -425,9 +456,9 @@ export async function exportAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:
     receipts.push({role,artifactSha256:hash,receiptSha256:receipt.receiptSha256,itemSha256:receipt.itemSha256});
    }
   }
-  results.push({jobKey,step:row.spec.step,outcome:row.receipt.outcome,reasonCode:row.receipt.reasonCode,stepReceiptId:row.receipt.id,stepReceiptSha256:encoded.sha256,inputHashes:row.receipt.inputHashes,outputHashes:row.receipt.outputHashes,selector:row.spec.step==='assessment_prepare'?null:PassSelectorSchema.safeParse(row.spec.selector).success?PassSelectorSchema.parse(row.spec.selector):{itemArtifactSha256:z.object({itemArtifactSha256:HashSchema}).passthrough().parse(row.spec.selector).itemArtifactSha256},receipts,items});
+  results.push({jobKey,step:row.spec.step,outcome:row.receipt.outcome,reasonCode:row.receipt.reasonCode,stepReceiptId:row.receipt.id,stepReceiptSha256:encoded.sha256,inputHashes:row.receipt.inputHashes,outputHashes:row.receipt.outputHashes,selector:row.spec.step==='assessment_prepare'?null:PassSelectorSchema.safeParse(row.spec.selector).success?PassSelectorSchema.parse(row.spec.selector):{itemArtifactSha256:z.object({itemArtifactSha256:HashSchema}).passthrough().parse(row.spec.selector).itemArtifactSha256},receipts,items,heldItems});
  }
- return {version:'r1-assessment-results-v1',results};
+ return {version:'r1-assessment-results-v2',results};
 }
 /** Export only committed value reconciliation chains, as private CAS file references. */
 export async function exportValueAssessmentResults(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],policy:CivicPolicyOptions={}){

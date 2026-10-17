@@ -18,6 +18,7 @@ import {admittedAssessmentFixture,recordFor,answer} from './district-assessment.
 import {poolShutdownBarrier} from './helpers/postgres-pool.ts';
 import type {PreparedDocument} from '../src/district-prepared-document.ts';
 import {buildPreparedAssessmentContext,AssessmentContextHold} from '../src/district-assessment-context.ts';
+import {assertCompactSourceProviderData} from '../src/district-assessment-projection.ts';
 
 const connectionString=process.env.DISTRICT_TEST_DATABASE_URL;
 
@@ -50,7 +51,7 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const boundedSource={...f.source,locators,assessmentContext:buildPreparedAssessmentContext(text,f.source.textSha256,record.extraction.chunk,record.sources.map(source=>source.locator),locators)};
   const item=assessmentItemSchema.parse({version:'assessment-item-v1',itemId:record.id,sourceRecord:{version:'assessment-source-record-v2',recordSha256:semanticHash(record),record},question:'Verify every actual source proposition independently against the original source.',claim:canonicalJson(projection),rubric,rubricSha256:digest(rubric),sources:[boundedSource],claimIds:projection.propositions.map(proposition=>proposition.claimId),entityIds:[record.id,...record.entities.map(entity=>entity.entityId)],constraints:[],criticalKinds:[]});
   mutateItem?.(item);
-  const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v1',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}]});
+  const itemArtifact=await put(item),recordArtifact=await put(record),bundle=await put({version:'r1-assessment-items-v2',items:[{itemArtifactSha256:itemArtifact.sha256,recordArtifactSha256:recordArtifact.sha256,maxModelCalls:48}],heldItems:[]});
   const snapshot=randomUUID(),scope=f.policy.scope;
   await pool.query(`INSERT INTO district_pipeline.source_snapshots(id,publisher_id,source_id,municipality_id,ags,tenant,resource_identity,request_method,request_selector_sha256,observation_window,retrieved_at,scope_sha256) VALUES($1,$2,$3,$4,$5,NULL,$6,'GET',$7,$8,$9,$10)`,[snapshot,scope.publisherId,scope.sourceId,scope.municipalityId,scope.ags,f.policy.source.url,digest('synthetic GET '+name),scope.observationWindow,f.policy.checkedAt,semanticHash(scope)]);
   await pool.query(`INSERT INTO district_pipeline.policy_decisions(id,source_snapshot_id,proof_sha256,source_sha256,receipt_json,state,observed_robots,owner_robots_override,opt_out_version,policy_version,checked_at,expires_at,reason_code) VALUES($1,$2,$3,$4,$5,'allowed','allowed',false,$6,$7,$8,$9,'synthetic_shared_admission')`,[randomUUID(),snapshot,f.policyArtifact.sha256,f.source.originalSha256,f.policy,f.policy.optOutSnapshotSha256,f.policy.version,f.policy.checkedAt,f.policy.expiresAt]);
@@ -138,9 +139,7 @@ test('governed A/B/C queue and original-wide Codex ceilings',{skip:!connectionSt
   const projected=JSON.parse(f.item.claim);assert.ok(projected.propositions.some((p:{selector:string;asserted:unknown})=>p.selector==='/'+field&&p.asserted===f.record[field]));
   assert.equal('verification' in projected,false);assert.equal('extraction' in projected,false);
   const reject=async(input:AssessmentPassInput)=>{
-   const supplied=JSON.parse(JSON.stringify(input.data.claim));
-   const restored={...supplied,version:'r1-record-propositions-v2'};
-   assert.equal(canonicalJson(restored),f.item.claim);return answer(input,true);
+   assertCompactSourceProviderData({providerEncoding:input.data.providerEncoding,claim:input.data.claim},residualRecordPropositions(f.record),input.data.evidence as Parameters<typeof assertCompactSourceProviderData>[2]);return answer(input,true);
   };
   await f.run(f.AJobKey,f.handlers(reject));await f.runB();
   const pair={AJobKey:f.AJobKey,BJobKey:f.BJobKey},CJobKey=await enqueueAssessmentResolution(pool,f.store,f.cas,pair,'C',f.policy);

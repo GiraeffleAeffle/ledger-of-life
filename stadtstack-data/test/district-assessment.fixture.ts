@@ -9,7 +9,7 @@ import { encodeStepReceipt, unknownReceiptCounts, type StepReceipt } from '../sr
 import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-opt-out.ts';
 import { z } from 'zod';
 import { assessmentBlindProjection, assessmentItemSchema, assessmentOutputSchema, PROMPTS, digest as assessmentDigest, originalEvidence, buildAssessmentPassInput,
-  type AssessmentEvidenceContext, type AssessmentItem, type AssessmentOutput, type AssessmentReceipt, type AssessmentPassInput } from '../src/district-assessment.ts';
+  type AssessmentEvidenceContext, type AssessmentItem, type AssessmentOutput, type AssessmentReceipt, type AssessmentPassInput,type OriginalEvidence } from '../src/district-assessment.ts';
 import {DistrictKnowledgeRecordSchema,REQUIRED_DETERMINISTIC_CHECKS,knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {GRAPH_DETERMINISTIC_CHECKS} from '../src/district-graph-claims.ts';
 import {PROVIDER_CONFIGS,EMPTY_USAGE,type ModelAnswer} from '../src/district-model-contract.ts';
@@ -17,6 +17,7 @@ import type {PolicyReceipt} from '../src/district-policy-receipt.ts';
 import {prepareCriticalAssessment} from '../src/district-critical-assessment.ts';
 import {criticalKnowledgeTarget} from '../src/district-critical-assessment-public.ts';
 import type {DistrictKnowledgeRecord} from '../src/district-schema.ts';
+import {resolveProviderQuoteReferences} from '../src/district-assessment-projection.ts';
 
 // Synthetic licensed bytes and explicit parser receipts; never source data or provider calls.
 export async function admittedAssessmentFixture(text: string, managed = false) {
@@ -94,7 +95,7 @@ export function recordFor(f:{source:AssessmentItem['sources'][number];policy:Pol
  record.verification.evidenceHash=knowledgeEvidenceHash(record);return DistrictKnowledgeRecordSchema.parse(record);
 }
 export function answer(input:AssessmentPassInput,unresolved=false):ModelAnswer{
- const data=input.data as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;assertionEncoding?:{modality?:AssessmentOutput['assertions'][number]['modality'];subjectId?:string|null;objectId?:string|null}}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
+ const data=(input.data.providerEncoding?resolveProviderQuoteReferences(input.data,input.data.evidence as OriginalEvidence):input.data) as {itemId:string;claimIds:string[];claim?:{propositions?:{claimId:string;selector:string;quote:string|null;assertionEncoding?:{modality?:AssessmentOutput['assertions'][number]['modality'];subjectId?:string|null;objectId?:string|null}}[]};evidence:{sourceId:string;locators:{id:string;quote:string}[]}[]};
  const source=data.evidence[0],locator=source.locators[0];
  const assertions:AssessmentOutput['assertions']=unresolved?[]:data.claimIds.map(claimId=>{
   const proposition=data.claim?.propositions?.find(proposition=>proposition.claimId===claimId),selected=source.locators.find(candidate=>candidate.quote===proposition?.quote)??locator;

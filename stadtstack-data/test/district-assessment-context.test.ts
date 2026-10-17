@@ -20,6 +20,7 @@ import {verifyPreparedDocument,type PreparedDocument} from '../src/district-prep
 import {knowledgeEvidenceHash} from '../src/district-schema.ts';
 import {withManagedSourceWrite,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {admittedAssessmentFixture,recordFor,answer,syntheticAssessmentReceipt} from './district-assessment.fixture.ts';
+import {assertCompactSourceProviderData,resolveProviderQuoteReferences} from '../src/district-assessment-projection.ts';
 
 async function largeItem(t:TestContext,critical=false){
  // Many chunks, one independently extraction-cited chunk; irrelevant duplicate
@@ -55,12 +56,13 @@ test('100+ KB multichunk prepared original yields bounded byte-exact blind A/B/C
  verifyAssessmentContext(context,f.text,f.prepared.textSha256,f.item.sources[0].locators);
  const AInput=buildAssessmentPassInput(f.item,evidence,'A'),BInput=buildAssessmentPassInput(f.item,evidence,'B');assert.equal(canonicalJson(AInput.data),canonicalJson(BInput.data));
  const projected=JSON.parse(JSON.stringify(AInput.data.claim));
- assert.equal(projected.version,'r1-provider-propositions-v2');
- const restored={...projected,version:'r1-record-propositions-v2'};
- assert.deepEqual(restored,JSON.parse(f.item.claim));
+ assert.equal(projected.version,'r1-provider-propositions-v3');
+ assertCompactSourceProviderData({providerEncoding:AInput.data.providerEncoding,claim:AInput.data.claim},JSON.parse(f.item.claim),evidence);
+ assert.deepEqual(resolveProviderQuoteReferences(projected.propositions,evidence),JSON.parse(f.item.claim).propositions);
  const output=assessmentOutputSchema.parse(answer(AInput).value);
  const A=syntheticAssessmentReceipt(f.item,'A',output,AInput.data),B=syntheticAssessmentReceipt(f.item,'B',output,BInput.data);
  const CInput=buildAssessmentPassInput(f.item,evidence,'C',{A,B});assert.equal(canonicalJson(CInput.data.evidence),canonicalJson(AInput.data.evidence));
+ assert.equal(canonicalJson(CInput.data.claim),canonicalJson(AInput.data.claim));
  for(const input of [AInput,BInput,CInput]){
   const bytes=Buffer.byteLength(canonicalJson(input.data));assert.ok(bytes<=(input.role==='C'?ASSESSMENT_RECONCILIATION_BYTES:ASSESSMENT_CONTEXT_BYTES));if(input.role!=='C')assert.ok(bytes<BRIDGE_LIMITS.evidenceContextBytes);assert.ok(bytes<MAX_SUBSCRIPTION_INPUT_BYTES);assert.ok(bytes<OMP_LIMITS.inputBytes);
   assert.ok(Buffer.byteLength(PROMPTS[input.role])<8000);

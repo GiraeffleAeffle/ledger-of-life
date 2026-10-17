@@ -12,7 +12,7 @@ import {residualPreparationContract,residualJobContract} from '../src/district-r
 import {assessmentQueueContract} from '../src/district-assessment-jobs.ts';
 import {assessmentBJobContract} from '../src/district-assessment-broker.ts';
 import {policyRefreshContract} from '../src/district-policy-refresh.ts';
-import {ompRunnerContractSha256} from '../src/district-omp-b-runner.ts';
+import {ompRunnerContractSha256,ompRunnerOutputContractSha256} from '../src/district-omp-b-runner.ts';
 import {parserIsolationContractSha256,parserOutputContractSha256} from '../src/district-parser-isolation.ts';
 import {acquisitionContract} from '../src/district-r1.ts';
 const a=digest('synthetic original'),b=digest('synthetic policy'),scope={publisherId:'synthetic',sourceId:'website',municipalityId:'strausberg',ags:'12064472',tenant:null,observationWindow:'synthetic terminal fixture'};
@@ -41,13 +41,14 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
  assert.equal(TerminalAssessmentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,true);assert.equal(TerminalDocumentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,false);
 });
 // Acquisition, preparation/extraction/residual, policy-refresh and parser identities
-// retain the authenticated campaign baseline. Source-proposition v2, native Sonnet
-// and bounded renewable ownership advance assessment queue/B/runner pins only;
-// terminal sealing itself adds no semantic change.
+// retain the authenticated campaign baseline. Private proposition v2, compact
+// provider encoding v3, item holds, native Sonnet and bounded renewable ownership
+// advance assessment queue/B/runner/output pins only.
 test('terminal sealing preserves acquisition and upstream identities while assessment contracts advance',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'253c32cf907b21d6381834db397768075facfb60bbd5df81ef2a5ab9d406d438');assert.equal(await assessmentBJobContract(),'0fa35573bb8b0a4a263412cbd10f1c9bcb3800634b717f7de78d68388525dc19');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'4579d37a1fa0ddf17523f5a31e1cd393e20480fe57dfc191d62310d6b1688f88');
+ assert.equal(await assessmentQueueContract(),'6c67b4731aa8ca6a436d6e19b3c09c7953b70191e0f2d559d102c87b45e3ac46');assert.equal(await assessmentBJobContract(),'f95767c91f13f43f304673b62055474374f40a8f485bfc03fbea85fecdecd36a');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'42916b42aeef7d770092da365124fb989894bf3b89ca28351942d8b94e908e6f');
+ assert.equal(await ompRunnerOutputContractSha256(),'574bfa71bafbd1b882dbfa853c2ee887a26aa6698a5eb149108507d4ca92705f');
  assert.equal(await parserIsolationContractSha256(),'2917aca62d207e39159e3191c7ea51125aea24dd1fd37339f424111c03b25764');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
  assert.equal(await acquisitionContract(),'ff1980b18c6c22def8f2ed8572957c355562d4814d1e9a3bbbc5125ad5f0bbcb');
 });

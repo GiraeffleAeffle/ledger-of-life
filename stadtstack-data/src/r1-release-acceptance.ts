@@ -25,7 +25,7 @@ const handoffSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step9-hando
 const classificationSchema=z.object({critical:z.boolean(),rights:z.boolean(),disagreement:z.boolean(),terminal:z.boolean().optional()}).strict();
 const dispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),documentId:z.string(),sourceSha256:HashSchema,jobKey:HashSchema,
   admittedRecordIds:z.array(z.string()),cases:z.array(z.unknown()),classification:classificationSchema,assessments:z.array(z.unknown()),
-  terminalDocumentException:z.unknown().optional(),terminalAssessmentExceptions:z.array(z.unknown()).optional(),queueEvidence:z.unknown()}).strict();
+  terminalDocumentException:z.unknown().optional(),terminalAssessmentExceptions:z.array(z.unknown()).optional(),assessmentItemHolds:z.array(z.unknown()).optional(),queueEvidence:z.unknown()}).strict();
 export const Step8ExceptionInventorySchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-exceptions-v1'),releaseId:HashSchema,
   campaign:AcceptancePinSchema,sourceDispositionInventory:AcceptancePinSchema.optional(),complete:z.boolean(),sourceDispositions:z.array(dispositionSchema),
   native:z.object({coverage:z.array(z.unknown()),fieldHolds:z.record(z.string(),z.unknown())}).strict(),
@@ -72,9 +72,9 @@ export function classifyReleaseException(value:unknown):ReleaseExceptionItem['cl
         if(key==='reasonCode'&&!ReasonCodeSchema.safeParse(child).success)unknownReasonCode=true;
         if(key==='reasonCode'&&ReasonCodeSchema.safeParse(child).success&&!['completed','no_supported_case'].includes(String(child)))knownGap=true;
         if(key==='reason'&&typeof child==='string'){
-          const code=child.replace(/^terminal_(?:document|assessment)_exception:/,'');
+          const code=child.replace(/^(?:terminal_(?:document|assessment)_exception|assessment_item_hold):/,'');
           if(ReasonCodeSchema.safeParse(code).success&&!['completed','no_supported_case'].includes(code))knownGap=true;
-          if(child.startsWith('terminal_')&&!ReasonCodeSchema.safeParse(code).success)unknownReasonCode=true;
+          if((child.startsWith('terminal_')||child.startsWith('assessment_item_hold:'))&&!ReasonCodeSchema.safeParse(code).success)unknownReasonCode=true;
           if(['narrative_requires_text_model','source_literal_exceeds_short_quote'].includes(child))knownGap=true;
         }
       }else visit(child);
@@ -122,6 +122,7 @@ export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
     if(source.terminalDocumentException)append(`sourceDispositions/${index}/terminalDocumentException`,source.terminalDocumentException);
     for(const [terminalIndex,entry] of terminals.entries())append(`sourceDispositions/${index}/terminalAssessmentExceptions/${terminalIndex}`,
       entry.superseded?{exception:entry.item,selectedAdmission:selected}:entry.item,entry.superseded?'superseded_assessment':undefined);
+    for(const [holdIndex,entry] of (source.assessmentItemHolds??[]).entries())append(`sourceDispositions/${index}/assessmentItemHolds/${holdIndex}`,entry);
     if(queue.success&&queue.data.extractionAttemptHistory!==undefined)append(`sourceDispositions/${index}/queueEvidence/extractionAttemptHistory`,queue.data.extractionAttemptHistory,'execution_history');
     if(current.length!==1)append(`sourceDispositions/${index}/currentExtractionReceipt`,{reason:'current_extraction_receipt_missing_or_ambiguous'},'unknown');
     else if(!['succeeded','no_supported_case'].includes(current[0].receipt.outcome))append(`sourceDispositions/${index}/currentExtractionReceipt`,current[0]);

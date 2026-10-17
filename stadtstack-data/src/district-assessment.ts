@@ -15,7 +15,7 @@ import { CIVIC_ACQUISITION_DECISION_ID, ManagedSourceBindingSchema, type CivicPo
 import {AssessmentContextSchema,AssessmentContextHold,verifyAssessmentContext,assertAssessmentContextBound,type AssessmentContext} from './district-assessment-context.ts';
 import {ValueAssessmentContextSchema,assertValueAssessmentContext,assertValueSourceContext} from './district-value-context.ts';
 import {validateValueTargetTranscript,valueCallSchema} from './pilot-value-transcript.ts';
-import {SourceRecordBindingSchema,sourceRecordPropositions} from './district-assessment-projection.ts';
+import {SourceRecordBindingSchema,sourceRecordPropositions,compactSourceProviderData} from './district-assessment-projection.ts';
 import {NATIVE_B_MODEL,NATIVE_B_RECEIPT_VERSION,NativeBModelEvidenceSchema,assertNativeBReceiptIdentity,assertNativeBResponseIdentity} from './district-b-native-model.ts';
 export interface AssessmentEvidenceContext {
   cas: DistrictCas; policyOptions?: CivicPolicyOptions;
@@ -298,7 +298,6 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
   const sourceProjection=assertSourceRecordProjection(item);
   if(sourceProjection){
     assertResidualAssessmentContext(item);
-    data.claim={...sourceProjection,version:'r1-provider-propositions-v2'};
   }
   if (!item.valueTarget && !item.criticalTarget && !sourceProjection) {
     let parsed: unknown;
@@ -315,7 +314,6 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
           ({ ...proposition, sourceIds: sources.map(source => source.id) })) };
     } else if (evidence.some(source => source.assessmentContext)) throw new AssessmentContextHold();
   }
-  if (!item.valueTarget && !item.criticalTarget) { assertAssessmentContextBound(data); return data; }
   // Metadata is not evidence. Do not let historical judges or classifiers cue the
   // blind verifiers, including through duplicate record projections in MCP calls.
   const project = assessmentBlindProjection;
@@ -331,6 +329,11 @@ export function assessmentProviderInput(item: AssessmentItem, evidence: Original
     projectionVersion: 'assessment-blind-provider-v1', fullTargetSha256: digest(item.criticalTarget),
     claimProjection: project(item.criticalTarget.claimProjection),
     claims: item.criticalTarget.claims.map(claim => ({ ...claim, context: project(claim.context) })) };
+  if(sourceProjection){
+    const compact=compactSourceProviderData(sourceProjection,evidence,data.criticalTarget);
+    data.claim=compact.claim;data.providerEncoding=compact.providerEncoding;
+    if(item.criticalTarget)data.criticalTarget=compact.criticalTarget;
+  }
   assertAssessmentContextBound(data);
   return data;
 }

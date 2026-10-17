@@ -10,6 +10,7 @@ export const ASSESSMENT_CONTEXT_BYTES=22000;
 export const ASSESSMENT_RECONCILIATION_BYTES=36000;
 export const ASSESSMENT_NEIGHBOUR_CODE_UNITS=256;
 export class AssessmentContextHold extends DistrictExecutionHold {
+ declare readonly reasonCode:'quality_failed'|'assessment_context_exceeded';
  constructor(reason:'quality_failed'|'assessment_context_exceeded'='quality_failed'){super(reason);}
 }
 const CitedChunkSchema=z.object({id:z.string().min(1),index:z.number().int().nonnegative(),start:z.number().int().nonnegative(),end:z.number().int().positive()}).strict();

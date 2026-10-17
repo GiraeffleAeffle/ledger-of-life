@@ -219,6 +219,8 @@ test('release exception classifier never treats unknown classes or operator-clea
   assert.equal(classifyReleaseException({reason:'terminal_document_exception:assessment_context_exceeded'}),'known_gap');
   assert.equal(classifyReleaseException({reason:'terminal_document_exception:execution_exception'}),'known_gap');
   assert.equal(classifyReleaseException({reason:'source_literal_exceeds_short_quote'}),'known_gap');
+  assert.equal(classifyReleaseException({reason:'assessment_item_hold:assessment_context_exceeded'}),'known_gap');
+  assert.equal(classifyReleaseException({reason:'assessment_item_hold:invented_code'}),'unknown');
 });
 
 test('authenticated excluded origin, disagreement, legal and critical claims are high-priority known gaps',async t=>{
@@ -304,4 +306,19 @@ test('handoff artifact substitution and omission of selected triplets fail close
   await assert.rejects(loadStep8ExceptionBundle(selected.step8),/hash mismatch/);
   f.inventory.assessments=[];
   await assert.rejects(f.seal(),/omits selected triplets/);
+});
+
+test('authenticated per-item preparation holds remain inventoried without authorizing their published material',async t=>{
+ const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+ const source=f.inventory.sourceDispositions[0];
+ source.cases=[{reason:'assessment_item_hold:assessment_context_exceeded',candidate:{id:'withheld:item'}}];
+ source.classification=classifyStep8Exception(source.cases);
+ source.assessmentItemHolds=[{preparationJobKey:b,itemBundleArtifactSha256:h,holdReceiptArtifactSha256:h,recordIds:['withheld:item'],outcome:'held_quality',reasonCode:'assessment_context_exceeded',assessmentProviderCalls:0}];
+ const excluded=await computeReleaseAcceptance(await f.seal());
+ assert.equal(excluded.accepted,true);
+ assert.ok(excluded.exceptionItems.some(item=>item.origin.includes('/assessmentItemHolds/')&&item.classification==='known_gap'&&!item.blocking));
+ source.cases=[{reason:'assessment_item_hold:assessment_context_exceeded',candidate:{id:'admitted:fixture'}}];source.classification=classifyStep8Exception(source.cases);
+ source.assessmentItemHolds=[{recordIds:['admitted:fixture'],outcome:'held_quality',reasonCode:'assessment_context_exceeded',assessmentProviderCalls:0}];
+ const leaked=await computeReleaseAcceptance(await f.seal());assert.equal(leaked.accepted,false);
+ assert.ok(leaked.exceptionItems.some(item=>item.origin.includes('/assessmentItemHolds/')&&item.blocking));
 });
