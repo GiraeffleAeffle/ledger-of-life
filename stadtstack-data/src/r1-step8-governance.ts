@@ -7,6 +7,8 @@ import {HashSchema,canonicalJson} from './district-adapter-contract.ts';
 import {loadFrozenCorpusBytes,R1_NINE_TOWN_2026_10_13_CORPUS_SHA256} from './district-corpus.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {assertCivicPolicyAuthority} from './civic-opt-out.ts';
+import {DuplicateSourceContentExceptionSchema,assertDuplicateSourceContentReceipt} from './district-duplicate-source-content.ts';
+import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 
 export const Step8CampaignSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-v1'),sources:z.array(z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1),corpus:z.object({path:z.string().min(1),sha256:HashSchema}).strict(),documents:z.array(z.object({documentId:z.string().min(1),sha256:HashSchema,jobKey:HashSchema}).strict()).min(1)}).strict()).min(1)}).strict();
 export type Step8Campaign=z.infer<typeof Step8CampaignSchema>;
@@ -17,18 +19,34 @@ export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>
  if(mode!=='isolated-fixture'&&canonicalJson([...corpora].sort())!==canonicalJson([...R1_NINE_TOWN_2026_10_13_CORPUS_SHA256].sort()))throw Error('Campaign must equal the complete frozen nine-town corpus set');
  for(const source of campaign.sources){
   const identity=canonicalJson([source.municipalityId,source.sourceId]);if(identities.has(identity))throw Error('Duplicate campaign source identity');identities.add(identity);
-  const corpus=loadFrozenCorpusBytes(await read(source.corpus.path),source.corpus.sha256),groups=new Map<string,Set<string>>();
-  for(const document of corpus.documents){if(document.municipalityId!==source.municipalityId||document.sourceId!==source.sourceId)throw Error('Campaign corpus contains another source scope');const ids=groups.get(document.sha256)??new Set<string>();ids.add(document.id);groups.set(document.sha256,ids);}
-  if(source.documents.length!==groups.size||new Set(source.documents.map(document=>document.sha256)).size!==groups.size)throw Error('Campaign omits or duplicates frozen document groups');
-  for(const document of source.documents){if(!groups.get(document.sha256)?.has(document.documentId)||jobs.has(document.jobKey))throw Error('Campaign document/job membership mismatch');jobs.add(document.jobKey);}
+  const corpus=loadFrozenCorpusBytes(await read(source.corpus.path),source.corpus.sha256),documents=new Map<string,string>();
+  for(const document of corpus.documents){if(document.municipalityId!==source.municipalityId||document.sourceId!==source.sourceId||documents.has(document.id))throw Error('Campaign corpus contains another scope or duplicate document identity');documents.set(document.id,document.sha256);}
+  if(source.documents.length!==documents.size||new Set(source.documents.map(document=>document.documentId)).size!==documents.size)throw Error('Campaign omits or duplicates frozen documents');
+  for(const document of source.documents){if(documents.get(document.documentId)!==document.sha256||jobs.has(document.jobKey))throw Error('Campaign document/job membership mismatch');jobs.add(document.jobKey);}
  }
  return campaign;
 }
-export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string}[]=[]){
+export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string;reasonCode?:string}[]=[],steps:readonly {receipt:StepReceipt;sha256:string}[]=[]){
  const expected=source.documents.map(document=>canonicalJson([document.documentId,document.sha256,document.jobKey])).sort();
  const actual=results.map(result=>{if(result.corpusSha256!==source.corpus.sha256||result.result.municipalityId!==source.municipalityId)throw Error('Exported campaign source scope mismatch');return canonicalJson([result.documentId,result.result.sourceSha256,result.result.taskId]);}).sort();
  for(const exception of exceptions){if(exception.corpusSha256!==source.corpus.sha256||exception.municipalityId!==source.municipalityId||exception.sourceId!==source.sourceId)throw Error('Terminal campaign source scope mismatch');actual.push(canonicalJson([exception.documentId,exception.sourceSha256,exception.jobKey]));}actual.sort();
  if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exported campaign document/job set mismatch');
+ const groups=new Map<string,typeof source.documents>();
+ for(const document of source.documents){const group=groups.get(document.sha256);if(group)group.push(document);else groups.set(document.sha256,[document]);}
+ for(const group of groups.values()){
+  const canonical=group.reduce((selected,document)=>document.documentId<selected.documentId?document:selected);
+  if(group.length>1&&!results.some(result=>result.documentId===canonical.documentId))throw Error('Duplicate group lacks its canonical native document');
+  for(const document of group){
+   const exception=exceptions.find(entry=>entry.documentId===document.documentId);
+   if(document===canonical){if(exception?.reasonCode==='duplicate_source_content')throw Error('Duplicate group lacks its canonical native document');continue;}
+   const duplicate=DuplicateSourceContentExceptionSchema.parse(exception);assertDuplicateSourceContentReceipt(duplicate);
+   if(duplicate.canonical.documentId!==canonical.documentId||duplicate.canonical.jobKey!==canonical.jobKey||duplicate.canonical.sourceSha256!==canonical.sha256||duplicate.sourceSha256!==canonical.sha256||duplicate.selectionRule!=='smallest_document_id_v1')throw Error('Duplicate disposition changes canonical document or byte identity');
+   for(const pin of [duplicate,duplicate.canonical]){
+    const selected=steps.find(step=>step.receipt.jobKey===pin.jobKey&&step.receipt.id===pin.receiptId);
+    if(!selected||selected.sha256!==pin.receiptSha256||encodeStepReceipt(selected.receipt).sha256!==selected.sha256||selected.receipt.step!=='residual_extract'||selected.receipt.municipalityId!==source.municipalityId||selected.receipt.sourceId!==source.sourceId||!selected.receipt.inputHashes.includes(canonical.sha256)||selected.receipt.outputHashes.length!==1||selected.receipt.outputHashes[0]!==pin.extractionArtifactSha256)throw Error('Duplicate disposition extraction pin is not in the authenticated seal');
+   }
+  }
+ }
 }
 /** mkdir is the atomic generation reservation; the sibling claim is non-source control metadata. */
 export async function reserveStep8Generation(output:string){

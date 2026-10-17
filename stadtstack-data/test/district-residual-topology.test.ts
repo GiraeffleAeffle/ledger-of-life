@@ -17,3 +17,10 @@ test('real residual queue handlers preserve an enrolled production-topology CAS'
  });
  assert.match(result.stdout,/# fail 0/);
 });
+test('duplicate-byte documents retain full real-PG source coverage through Step8 without duplicate admission',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:910_000},async()=>{
+ const {NODE_TEST_CONTEXT:_parentTestContext,...env}=process.env;
+ const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_DUPLICATE_CONTENT:'1'},timeout:900_000,maxBuffer:4*1024*1024}).catch((error:unknown)=>{
+  if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});throw error;
+ });
+ assert.match(result.stdout,/# fail 0/);
+});

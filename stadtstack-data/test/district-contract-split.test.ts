@@ -71,6 +71,13 @@ test('seal exception diagnostics stay outside all fourteen contracts and the gen
   assert.equal((EXTRACTOR_SOURCE_FILES as readonly string[]).includes(file),false,file);
  }
 });
+test('duplicate source dispositions and Step8 document accounting stay outside all fourteen contracts and generation replay',async()=>{
+ for(const file of ['district-queue-text-run.ts','district-duplicate-source-content.ts','r1-step8.ts','r1-step8-governance.ts']){
+  for(const [name,{compute}] of Object.entries(contracts))assert.deepEqual(await compute(change(file)),await compute(hash),name+': '+file);
+  for(const compute of [parserIsolationContractSha256,ompRunnerContractSha256])assert.equal(await compute(change(file)),await compute(hash),file);
+  assert.equal((EXTRACTOR_SOURCE_FILES as readonly string[]).includes(file),false,file);
+ }
+});
 test('notification presentation stays outside every semantic contract and the OMP runner contract',async()=>{
  for(const file of ['district-notifications.ts','district-jobs.ts']){
   for(const [name,{compute}] of Object.entries(contracts))assert.deepEqual(await compute(change(file)),await compute(hash),name+': '+file);

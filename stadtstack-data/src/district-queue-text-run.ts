@@ -30,9 +30,10 @@ import {districtRegistrySchema} from './district-registry.ts';
 import {residualOriginalIdentity,readPolicyRefreshCommit,recordedPolicyIdentity} from './district-policy-refresh.ts';
 import {loadPolicyReceipt} from './district-policy-receipt.ts';
 import {CrawlCorpusImportSchema} from './district-crawl-import.ts';
-import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException,assertTerminalSourceScope} from './district-terminal-exceptions.ts';
+import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException,assertTerminalSourceScope,authenticateTerminalReceiptRow} from './district-terminal-exceptions.ts';
 import type {QuarantineCase} from './district-inference.ts';
 import {formatQueueTextSealException} from './district-exception-diagnostics.ts';
+import {DuplicateSourceContentExceptionSchema,type DuplicateSourceContentException} from './district-duplicate-source-content.ts';
 
 export const QueueTextSealInputSchema=z.object({jobKeys:z.array(HashSchema).max(10000),reconciliationJobKeys:z.array(HashSchema).max(10000),attemptHistory:z.literal('committed-v1').optional(),terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema).max(10000).default([]),terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema).max(10000).default([]),assessmentItemHolds:z.array(AssessmentItemHoldPinSchema).max(10000).default([])}).strict().superRefine((value,ctx)=>{
  for(const keys of [value.jobKeys,value.reconciliationJobKeys,value.terminalDocumentExceptions.map(pin=>pin.jobKey),value.terminalAssessmentExceptions.map(pin=>pin.jobKey)])if(new Set(keys).size!==keys.length)ctx.addIssue({code:'custom',message:'Queue seal requires distinct committed jobs'});
@@ -55,6 +56,25 @@ const artifact=(value:unknown)=>{const bytes=Buffer.from(canonicalJson(value));r
 export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,serialization:{extractionAttemptHistory?:boolean;terminalAssessmentHistory?:TerminalAssessmentHistory}={}){
  const input=QueueTextSealInputSchema.parse(raw),store=new DistrictJobStore(pool),includeAttemptHistory=serialization.extractionAttemptHistory===true||input.attemptHistory!==undefined||input.terminalDocumentExceptions.length>0||input.terminalAssessmentExceptions.length>0||input.assessmentItemHolds.length>0;
  const committed:Awaited<ReturnType<typeof loadCommittedResidualOutputs>>=input.jobKeys.length?await loadCommittedResidualOutputs(pool,cas,input.jobKeys):{receipts:[],results:[],sources:[],selectors:[]};
+ // Only authenticated native extractions can be excluded as duplicate content.
+ // The choice is document identity, never model quality, job order or assessment.
+ const documentGroups=new Map<string,number[]>(),duplicateDocuments=new Map<number,number>(),documentIds=new Set<string>();
+ for(let index=0;index<committed.sources.length;index++){
+  const original=committed.sources[index],id=original.document.id;
+  if(documentIds.has(id))throw Error('Queue seal selects multiple extractions for one document');documentIds.add(id);
+  const key=canonicalJson([original.municipality.id,original.document.sourceId,original.document.sha256]),group=documentGroups.get(key);
+  if(group)group.push(index);else documentGroups.set(key,[index]);
+ }
+ for(const group of documentGroups.values())if(group.length>1){
+  const canonical=group.reduce((selected,index)=>committed.sources[index].document.id<committed.sources[selected].document.id?index:selected);
+  for(const index of group)if(index!==canonical){
+   if(canonicalJson(committed.sources[index].receipt.scope)!==canonicalJson(committed.sources[canonical].receipt.scope))throw Error('Queue seal duplicate content crosses source scope');
+   duplicateDocuments.set(index,canonical);
+  }
+ }
+ const excludedAssessmentJobs=new Map<number,Set<string>>();
+ const excludeAssessment=(index:number,jobKey:string)=>{if(duplicateDocuments.has(index)){let keys=excludedAssessmentJobs.get(index);if(!keys){keys=new Set();excludedAssessmentJobs.set(index,keys);}keys.add(jobKey);}};
+ const assessmentIdentity=(index:number,recordId:string)=>duplicateDocuments.has(index)?committed.results[index].result.taskId+':'+recordId:recordId;
  const terminalDocuments=await Promise.all([...input.terminalDocumentExceptions].sort((a,b)=>a.jobKey.localeCompare(b.jobKey)).map(async pin=>{
   const entry=await loadTerminalException(pool,pin),selector=ResidualInputSchema.passthrough().parse(entry.spec.selector);
   if(selector.documentId!==pin.documentId||entry.spec.semanticContractSha256!==semanticHash(selector.contract))throw Error('Terminal exception document or semantic contract mismatch');
@@ -150,19 +170,24 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   terminalDocumentExceptions.push({...document.pin,municipalityId:document.source.municipality.id,sourceId:document.source.document.sourceId,sourceSha256:document.source.document.sha256,corpusSha256:document.selector.corpusSha256,outcome:document.entry.receipt.outcome,receipt:document.entry.receipt,attemptHistory:document.entry.attemptHistory});
  }
  const candidates=new Map<string,{record:DistrictKnowledgeRecord;index:number}>();
- committed.results.forEach((result,index)=>result.result.records.forEach(record=>{if(candidates.has(record.id))throw Error('Queue seal duplicate native record ID');candidates.set(record.id,{record,index});}));
+ committed.results.forEach((result,index)=>{if(!duplicateDocuments.has(index))for(const record of result.result.records){if(candidates.has(record.id))throw Error('Queue seal duplicate native record ID');candidates.set(record.id,{record,index});}});
+ const candidateFor=(record:DistrictKnowledgeRecord,extractionJobKey:string)=>{
+  if(duplicateDocuments.size){const index=committed.results.findIndex(result=>result.result.taskId===extractionJobKey);if(index<0)return undefined;if(duplicateDocuments.has(index)){const original=committed.results[index].result.records.find(value=>value.id===record.id);return original?{record:original,index}:undefined;}}
+  return candidates.get(record.id);
+ };
  const inventory:CriticalAssessmentInventory={records:[]},admitted=new Set<string>(),assessments=[],assessed=new Set<string>();
  for(const key of [...input.reconciliationJobKeys].sort()){
   const entry=await load(key,'assessment_reconcile'),selector=reconciliationSelectorSchema.parse(entry.spec.selector);await closeDependencies(entry);
-  const record=await json(selector.recordArtifactSha256),candidate=candidates.get(record.id);
-  if(!candidate||canonicalJson(record)!==canonicalJson(candidate.record)||assessed.has(record.id))throw Error('Queue seal assessment record membership mismatch');assessed.add(record.id);
+  const record=await json(selector.recordArtifactSha256),itemPreparation=[...steps.values()].find(step=>step.spec.step==='assessment_prepare'&&step.receipt.outputHashes.includes(selector.itemArtifactSha256)&&step.receipt.outputHashes.includes(selector.recordArtifactSha256));
+  const preparationSelector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(itemPreparation?.spec.selector),candidate=candidateFor(record,preparationSelector.extraction.jobKey);
+  const assessmentKey=candidate?assessmentIdentity(candidate.index,record.id):'';
+  if(!candidate||canonicalJson(record)!==canonicalJson(candidate.record)||assessed.has(assessmentKey))throw Error('Queue seal assessment record membership mismatch');assessed.add(assessmentKey);
+  excludeAssessment(candidate.index,entry.receipt.jobKey);excludeAssessment(candidate.index,itemPreparation!.receipt.jobKey);
   const residual=committed.results[candidate.index],original=committed.sources[candidate.index];
   if(entry.spec.policyProofSha256!==residual.policyReceiptSha256||canonicalJson(entry.spec.sourceScope)!==canonicalJson(original.receipt.scope))throw Error('Queue seal assessment source scope mismatch');
   const item=assessmentItemSchema.parse(await json(selector.itemArtifactSha256)),expected=reconstructResidualAssessmentItem(candidate.record,prepared.get(residual.result.taskId)!,residual.preparedArtifactSha256,residual.policyReceiptSha256,item);
   if(canonicalJson(item)!==canonicalJson(expected))throw Error('Queue seal assessment item differs from original record/prepared evidence');
   // The item must have been actually emitted by this extraction's committed queue preparation.
-  const itemPreparation=[...steps.values()].find(step=>step.spec.step==='assessment_prepare'&&step.receipt.outputHashes.includes(selector.itemArtifactSha256)&&step.receipt.outputHashes.includes(selector.recordArtifactSha256));
-  const preparationSelector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(itemPreparation?.spec.selector);
   const extraction=steps.get(residual.result.taskId)!;
   if(preparationSelector.extraction.jobKey!==residual.result.taskId||preparationSelector.extraction.receiptId!==extraction.receipt.id||preparationSelector.extraction.receiptSha256!==extraction.sha256||!extraction.receipt.outputHashes.includes(preparationSelector.extractionArtifactSha256))throw Error('Queue seal assessment preparation ancestry mismatch');
   const partialPins={recordId:record.id as string,recordEvidenceSha256:record.verification.evidenceHash as string,itemArtifactSha256:selector.itemArtifactSha256,finalArtifactSha256:entry.receipt.outputHashes[0]};
@@ -170,6 +195,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
   for(const role of ['A','B','C'] as const){
    const jobKey=selector[role+'JobKey' as 'AJobKey'|'BJobKey'|'CJobKey'];if(!jobKey)continue;
    const pass=await load(jobKey,'assessment_'+role.toLowerCase());await closeDependencies(pass);
+   excludeAssessment(candidate.index,pass.receipt.jobKey);
    if(!entry.receipt.dependencyReceiptIds.includes(pass.receipt.id)||pass.receipt.outcome!=='succeeded')throw Error('Queue seal assessment pass is not committed');
    const matches:string[]=[];
    // The committed B outputs also contain original JSONL stdout, not another JSON receipt.
@@ -185,14 +211,15 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
    if(!pins||!verified)throw Error('Queue seal admission lacks genuine final/C receipt');
    const output=verified.final.output;
    if(verified.final.disposition!=='ai_reconciled'||verified.final.blocksAffectedAdmission||!output||output.outcome!=='supported'||output.holdReasons.length||!item.claimIds.every(id=>output.assertions.some(assertion=>assertion.claimId===id)))throw Error('Queue seal succeeded reconciliation is not an admission');
-   admitted.add(record.id);if(criticalKnowledgeTarget(candidate.record))inventory.records.push(pins);
+   if(!duplicateDocuments.has(candidate.index)){admitted.add(record.id);if(criticalKnowledgeTarget(candidate.record))inventory.records.push(pins);}
   }
-  assessments.push({jobKey:key,recordId:record.id,outcome:entry.receipt.outcome,pins:selector.CJobKey&&entry.receipt.outputHashes.length===1?pins:null});
+  if(!duplicateDocuments.has(candidate.index))assessments.push({jobKey:key,recordId:record.id,outcome:entry.receipt.outcome,pins:selector.CJobKey&&entry.receipt.outputHashes.length===1?pins:null});
  }
  const terminalAssessmentExceptions=[],terminalHeldRecords=new Set<string>();
  for(const pin of [...input.terminalAssessmentExceptions].sort((a,b)=>a.jobKey.localeCompare(b.jobKey))){
   const entry=await loadTerminalException(pool,pin),index=committed.results.findIndex(result=>result.documentId===pin.documentId);if(index<0)throw Error('Terminal assessment lacks an extracted document');
   const result=committed.results[index],original=committed.sources[index],extraction=steps.get(result.result.taskId)!;assertTerminalSourceScope(entry.spec,original.receipt.scope,result.policyReceiptSha256);
+  excludeAssessment(index,entry.receipt.jobKey);
   remember({spec:entry.spec,receipt:entry.receipt,receipt_sha256:entry.sha256});await closeDependencies(steps.get(pin.jobKey)!);
   let recordIds:string[];
   let selectedPreparation:PreparationPin|undefined;
@@ -214,31 +241,40 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
    const emitted=await pool.query<{spec:DistrictJobSpec;receipt:StepReceipt;receipt_sha256:string}>(`SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.step='assessment_prepare' AND r.outcome='succeeded' AND r.receipt->'outputHashes' ? $1 AND r.receipt->'dependencyReceiptIds' ? $2 AND ${selectedPins?'r.id=ANY($3::uuid[])':"j.spec->>'semanticContractSha256'=$3"}`,[selector.itemArtifactSha256,extraction.receipt.id,selectedPins?selectedPins.map(candidate=>candidate.receiptId):await assessmentQueueContract()]);
    if(emitted.rows.length!==1)throw Error('Terminal assessment item lacks unique committed preparation ancestry');
    const preparation=remember(emitted.rows[0]);selectedPreparation=preparationPin(preparation);
+   excludeAssessment(index,preparation.receipt.jobKey);
    if(selectedPins&&!selectedPins.some(candidate=>canonicalJson(candidate)===canonicalJson(selectedPreparation)))throw Error('Terminal assessment preparation receipt pin mismatch');
    await closeDependencies(preparation);assertTerminalSourceScope(preparation.spec,original.receipt.scope,result.policyReceiptSha256);
    const preparationSelector=z.object({extraction:pinSchema,extractionArtifactSha256:HashSchema}).passthrough().parse(preparation.spec.selector);
    if(preparationSelector.extraction.jobKey!==extraction.receipt.jobKey||preparationSelector.extraction.receiptId!==extraction.receipt.id||preparationSelector.extraction.receiptSha256!==extraction.sha256||!extraction.receipt.outputHashes.includes(preparationSelector.extractionArtifactSha256)||!preparation.spec.inputArtifactHashes.includes(preparationSelector.extractionArtifactSha256))throw Error('Terminal assessment preparation pin mismatch');
    recordIds=[record.id];
   }
-  for(const id of recordIds)terminalHeldRecords.add(id);
+  if(!duplicateDocuments.has(index))for(const id of recordIds)terminalHeldRecords.add(id);
   terminalAssessmentExceptions.push({...pin,...(selectedPreparation&&(!serialization.terminalAssessmentHistory||serialization.terminalAssessmentHistory.recordedPins.has(pin.jobKey))?{preparation:selectedPreparation}:{}),municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceSha256:original.document.sha256,corpusSha256:result.corpusSha256,outcome:entry.receipt.outcome,recordIds,receipt:entry.receipt,attemptHistory:entry.attemptHistory});
  }
  const assessmentItemHolds=[],itemHoldReasons=new Map<string,string>();
  for(const pin of [...input.assessmentItemHolds].sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256))){
-  const entry=await loadAssessmentItemHold(pool,cas,pin,policy),candidate=candidates.get(entry.record.id);
-  if(!candidate||canonicalJson(entry.record)!==canonicalJson(candidate.record)||assessed.has(entry.record.id)||terminalHeldRecords.has(entry.record.id))throw Error('Item hold overlaps or lacks an extracted record');
+  const entry=await loadAssessmentItemHold(pool,cas,pin,policy),candidate=candidateFor(entry.record,entry.extraction.pin.jobKey);
+  if(!candidate||canonicalJson(entry.record)!==canonicalJson(candidate.record)||assessed.has(assessmentIdentity(candidate.index,entry.record.id))||!duplicateDocuments.has(candidate.index)&&terminalHeldRecords.has(entry.record.id))throw Error('Item hold overlaps or lacks an extracted record');
   const result=committed.results[candidate.index],original=committed.sources[candidate.index],extraction=steps.get(result.result.taskId)!;
   if(entry.documentId!==result.documentId||entry.extraction.pin.jobKey!==extraction.receipt.jobKey||entry.extraction.pin.receiptId!==extraction.receipt.id||entry.extraction.pin.receiptSha256!==extraction.sha256||entry.hold.preparedArtifactSha256!==result.preparedArtifactSha256||entry.hold.originalSha256!==original.document.sha256)throw Error('Item hold changes selected extraction ancestry');
   assertTerminalSourceScope(entry.preparation.spec,original.receipt.scope,result.policyReceiptSha256);
   remember(entry.preparation);await closeDependencies(steps.get(pin.preparationJobKey)!);
-  terminalHeldRecords.add(entry.record.id);
-  itemHoldReasons.set(entry.record.id,entry.hold.reasonCode);
+  excludeAssessment(candidate.index,entry.preparation.receipt.jobKey);
+  if(!duplicateDocuments.has(candidate.index)){terminalHeldRecords.add(entry.record.id);itemHoldReasons.set(entry.record.id,entry.hold.reasonCode);}
   assessmentItemHolds.push({...pin,documentId:result.documentId,municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceSha256:original.document.sha256,recordIds:[entry.record.id],outcome:entry.hold.outcome,reasonCode:entry.hold.reasonCode,assessmentProviderCalls:entry.hold.assessmentProviderCalls,receipt:entry.hold,preparationStepReceiptId:entry.preparation.receipt.id,preparationStepReceiptSha256:entry.preparation.receipt_sha256});
  }
+ for(const [index,canonicalIndex] of [...duplicateDocuments].sort(([a],[b])=>committed.sources[a].document.id<committed.sources[b].document.id?-1:1)){
+  const result=committed.results[index],original=committed.sources[index],entry=steps.get(result.result.taskId)!,canonicalResult=committed.results[canonicalIndex],canonicalEntry=steps.get(canonicalResult.result.taskId)!;
+  const history=await pool.query<Parameters<typeof authenticateTerminalReceiptRow>[0]>(`SELECT j.id AS job_id,j.job_key,j.step AS job_step,j.spec,j.state,j.reason_code,j.attempt AS current_attempt,r.id AS receipt_id,r.job_id AS receipt_job_id,r.run_id,r.attempt,r.fencing_token,r.outcome,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE j.job_key=$1 ORDER BY r.attempt,r.id`,[entry.receipt.jobKey]);
+  const exception:DuplicateSourceContentException={documentId:result.documentId,step:'residual_extract',reasonCode:'duplicate_source_content',selectionRule:'smallest_document_id_v1',jobKey:entry.receipt.jobKey,receiptId:entry.receipt.id,receiptSha256:entry.sha256,extractionArtifactSha256:entry.receipt.outputHashes[0],sourceSha256:original.document.sha256,municipalityId:original.municipality.id,sourceId:original.document.sourceId,sourceUrl:original.document.url,corpusSha256:result.corpusSha256,outcome:entry.receipt.outcome,receipt:entry.receipt,attemptHistory:history.rows.map(row=>{const encoded=authenticateTerminalReceiptRow(row);return {receipt:encoded.receipt,sha256:encoded.sha256};}),canonical:{documentId:canonicalResult.documentId,jobKey:canonicalEntry.receipt.jobKey,receiptId:canonicalEntry.receipt.id,receiptSha256:canonicalEntry.sha256,extractionArtifactSha256:canonicalEntry.receipt.outputHashes[0],sourceSha256:canonicalResult.result.sourceSha256},excludedRecords:result.result.records.map(record=>({recordId:record.id,evidenceSha256:record.verification.evidenceHash})),excludedAssessmentJobKeys:[...excludedAssessmentJobs.get(index)??[]].sort()};
+  terminalDocumentExceptions.push(exception);
+ }
+ if(duplicateDocuments.size)terminalDocumentExceptions.sort((a,b)=>a.jobKey.localeCompare(b.jobKey));
  const critical=await admitCriticalKnowledge([...admitted].map(id=>candidates.get(id)!.record),inventory,cas,{policyOptions:policy,currentAdmissionReceipts});
  for(const hold of critical.holds)admitted.delete(hold.recordId);
- const records=committed.results.flatMap(result=>result.result.records.filter(record=>admitted.has(record.id)));
+ const records=committed.results.flatMap((result,index)=>duplicateDocuments.has(index)?[]:result.result.records.filter(record=>admitted.has(record.id)));
  const quarantine=committed.results.flatMap((result,index)=>{
+  if(duplicateDocuments.has(index))return [terminalCase(committed.sources[index],'terminal_document_exception:duplicate_source_content')];
   const cases=[...result.result.quarantine];
   for(const record of result.result.records)if(!admitted.has(record.id))cases.push({documentId:result.documentId,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:result.result.sourceSha256,chunk:null,reason:itemHoldReasons.has(record.id)?'assessment_item_hold:'+itemHoldReasons.get(record.id):assessed.has(record.id)||terminalHeldRecords.has(record.id)?'assessment_held':'assessment_missing',candidate:record});
   // A real negative extraction still counts as an attempted group in v2 lineage.
@@ -286,20 +322,21 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
  for(const required of callRequirements)if(!accounting.rows.some(row=>row.intent.original_sha256===required.originalSha256&&row.intent.request_sha256===required.requestSha256&&(!required.jobKey||row.jobKey===required.jobKey)&&(!required.runId||row.authorization.run_id===required.runId)))throw Error('Queue seal source-bearing model call lacks committed accounting');
  const crawl={bytes:await read(first.corpusSha256),sha256:first.corpusSha256},registry={bytes:await read(first.registrySha256),sha256:first.registrySha256};
  const crawlValue=crawlSummarySchema.parse(JSON.parse(crawl.bytes.toString('utf8'))),registryValue=districtRegistrySchema.parse(JSON.parse(registry.bytes.toString('utf8')));
+ const groupOriginals=duplicateDocuments.size?originals.filter((_original,index)=>!duplicateDocuments.has(index)):originals;
  const group=(municipalityId:string,sourceSha256:string)=>canonicalJson([municipalityId,sourceSha256]),fetched=new Set(crawlValue.documents.map(doc=>group(doc.municipalityId,doc.sha256))),attempted=new Set(originals.map(original=>group(original.municipality.id,original.document.sha256)));
- if(attempted.size!==originals.length)throw Error('Queue seal duplicate municipal-byte groups must be resolved before selection');
- const limit=Math.max(...registryValue.municipalities.map(city=>originals.filter(original=>original.municipality.id===city.id).length));
- const preparedOriginals=originals.filter((_original,index)=>index<committed.results.length||terminalDocuments[index-committed.results.length].pin.step==='residual_extract');
- const municipalities=registryValue.municipalities.map(city=>({id:city.id,availableDocumentGroups:new Set(crawlValue.documents.filter(doc=>doc.municipalityId===city.id).map(doc=>doc.sha256)).size,selectedDocumentGroups:originals.filter(original=>original.municipality.id===city.id).length,preparedDocumentGroups:preparedOriginals.filter(original=>original.municipality.id===city.id).length,attemptedDocumentGroups:originals.filter(original=>original.municipality.id===city.id).length}));
+ if(attempted.size!==groupOriginals.length)throw Error('Queue seal duplicate municipal-byte groups must be resolved before selection');
+ const limit=Math.max(...registryValue.municipalities.map(city=>groupOriginals.filter(original=>original.municipality.id===city.id).length));
+ const preparedOriginals=originals.filter((_original,index)=>!duplicateDocuments.has(index)&&(index<committed.results.length||terminalDocuments[index-committed.results.length].pin.step==='residual_extract'));
+ const municipalities=registryValue.municipalities.map(city=>({id:city.id,availableDocumentGroups:new Set(crawlValue.documents.filter(doc=>doc.municipalityId===city.id).map(doc=>doc.sha256)).size,selectedDocumentGroups:groupOriginals.filter(original=>original.municipality.id===city.id).length,preparedDocumentGroups:preparedOriginals.filter(original=>original.municipality.id===city.id).length,attemptedDocumentGroups:groupOriginals.filter(original=>original.municipality.id===city.id).length}));
  const preparationPlan=artifact(preparationPlanSchema.parse({
   schemaVersion:'stadtstack-preparation-plan-v1',generatedAt,corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,
   extractorSha256:first.contract.preparationSha256,maxDocumentsPerMunicipality:limit,availableDocumentGroups:fetched.size,
   selectedDocumentGroups:attempted.size,selectedRepresentations:originals.length,
   municipalities:municipalities.map(counts=>{
    const city=registryValue.municipalities.find(city=>city.id===counts.id)!;
-   return {id:city.id,name:city.name,ags:city.ags,districtId:city.districtId,availableDocumentGroups:counts.availableDocumentGroups,selectedDocumentGroups:counts.selectedDocumentGroups,selectedRepresentations:counts.selectedDocumentGroups};
+   return {id:city.id,name:city.name,ags:city.ags,districtId:city.districtId,availableDocumentGroups:counts.availableDocumentGroups,selectedDocumentGroups:counts.selectedDocumentGroups,selectedRepresentations:duplicateDocuments.size?originals.filter(original=>original.municipality.id===city.id).length:counts.selectedDocumentGroups};
   }),
-  groups:[...committed.results.map((result,index)=>({municipality:committed.sources[index].municipality,documentIds:[result.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(result.result.taskId)),referenceWarnings:[]})),...terminalDocuments.filter(document=>document.pin.step==='residual_extract').map(document=>({municipality:document.source.municipality,documentIds:[document.pin.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(document.pin.jobKey)),referenceWarnings:[]}))],
+  groups:[...committed.results.flatMap((result,index)=>duplicateDocuments.has(index)?[]:[{municipality:committed.sources[index].municipality,documentIds:[result.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(result.result.taskId)),referenceWarnings:[]}]),...terminalDocuments.filter(document=>document.pin.step==='residual_extract').map(document=>({municipality:document.source.municipality,documentIds:[document.pin.documentId],expected:preparedExpectationSchema.strip().parse(prepared.get(document.pin.jobKey)),referenceWarnings:[]}))],
   quarantine:terminalDocuments.filter(document=>document.pin.step==='residual_prepare').map(document=>terminalCase(document.source,'terminal_document_exception:'+document.pin.reasonCode)),
  }));
  const extractionRun=artifact({schemaVersion:'stadtstack-extraction-run-v2',generatedAt,assignmentMode:'codex-only',corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,promptContractSha256:first.contract.extraction.promptSha256,schemaSha256:first.contract.extraction.schemaSha256,scope:'bounded_per_municipality',maxDocumentsPerMunicipality:limit,availableDocumentGroups:fetched.size,attemptedDocumentGroups:attempted.size,pendingDocumentGroups:fetched.size-attempted.size,municipalities,promotedRecords:records.length,quarantinedCases:quarantine.length,queue:{...(input.attemptHistory?{attemptHistory:input.attemptHistory}:{}),...(extractionAttemptHistory.length?{extractionAttemptHistory}:{}),...(terminalDocumentExceptions.length?{terminalDocumentExceptions}:{}),...(terminalAssessmentExceptions.length?{terminalAssessmentExceptions}:{}),...(assessmentItemHolds.length?{assessmentItemHolds}:{}),reconciliationJobKeys:[...input.reconciliationJobKeys].sort(),stepReceipts:allSteps.map(step=>({spec:step.spec,receipt:step.receipt,sha256:step.sha256})),generationArchiveSha256s:[...archives].sort(),assessments,callAccounting:{basis:'committed_pre_effect_intents_not_wire_calls_or_invoices',codex:accounting.rows},criticalAdmissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}});
@@ -307,7 +344,8 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
  const contribution:TextRunContribution={runId:extractionRun.sha256,pins:{corpusSha256:first.corpusSha256,registrySha256:first.registrySha256,promptContractSha256:first.contract.extraction.promptSha256,schemaSha256:first.contract.extraction.schemaSha256},sourceArtifactKind:'native_extraction_output',artifacts:{extractionRun,records:artifact(knowledge),quarantine:artifact({schemaVersion:'stadtstack-quarantine-v1',generatedAt,cases:quarantine}),preparationPlan,crawl,registry}};
  authenticateTextRunContribution(contribution);
  const policyInventory=publicationPolicyReceiptInventorySchema.parse({records:records.map(record=>{const candidate=candidates.get(record.id)!,selector=committed.selectors[candidate.index],currentReceiptSha256=currentAdmissionReceipts[selector.policyReceiptSha256];return {recordId:record.id,receipts:record.sources.map(reference=>({sourceUrl:reference.url,sourceSha256:reference.sha256,receiptSha256:selector.policyReceiptSha256,...(currentReceiptSha256?{currentReceiptSha256}:{})}))};}),currentAdmissionReceipts});
- return {contribution,knowledge,committed,first,originals,...(input.attemptHistory?{attemptHistory:input.attemptHistory}:{}),terminalDocumentExceptions,terminalAssessmentExceptions,assessmentItemHolds,steps:allSteps,policy,criticalInventory:CriticalAssessmentInventorySchema.parse({records:inventory.records.filter(entry=>admitted.has(entry.recordId))}),criticalAdmissions:CriticalAdmissionsSchema.parse({schemaVersion:CRITICAL_ADMISSIONS_VERSION,admissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}),policyInventory,heldRecords:quarantine.filter(entry=>entry.candidate!==undefined).length};
+ const exportedCommitted=duplicateDocuments.size?{results:committed.results.filter((_result,index)=>!duplicateDocuments.has(index)),receipts:committed.receipts.filter((_receipt,index)=>!duplicateDocuments.has(index)),sources:committed.sources.filter((_source,index)=>!duplicateDocuments.has(index)),selectors:committed.selectors.filter((_selector,index)=>!duplicateDocuments.has(index))}:committed;
+ return {contribution,knowledge,committed:exportedCommitted,first,originals,...(input.attemptHistory?{attemptHistory:input.attemptHistory}:{}),terminalDocumentExceptions,terminalAssessmentExceptions,assessmentItemHolds,steps:allSteps,policy,criticalInventory:CriticalAssessmentInventorySchema.parse({records:inventory.records.filter(entry=>admitted.has(entry.recordId))}),criticalAdmissions:CriticalAdmissionsSchema.parse({schemaVersion:CRITICAL_ADMISSIONS_VERSION,admissions:critical.admissions.filter(admission=>admitted.has(admission.recordId))}),policyInventory,heldRecords:quarantine.filter(entry=>entry.candidate!==undefined).length};
 }
 
 /** Content-addressed immutable managed outputs. Existing current-policy/custody
@@ -350,7 +388,7 @@ export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:
 export async function exportQueueTextContribution(pool:Pool,cas:DistrictCas,jobKeys:readonly string[],contribution:TextRunContribution){
  const authenticated=authenticateTextRunContribution(contribution),queue=z.object({
   reconciliationJobKeys:z.array(HashSchema),attemptHistory:z.literal('committed-v1').optional(),extractionAttemptHistory:z.array(z.unknown()).optional(),
-  terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema.strip()).default([]),
+  terminalDocumentExceptions:z.array(z.union([TerminalDocumentExceptionSchema.strip(),DuplicateSourceContentExceptionSchema])).default([]),
   terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema.strip().extend({preparation:pinSchema.optional()})).default([]),
   assessmentItemHolds:z.array(AssessmentItemHoldPinSchema.strip()).default([]),
   stepReceipts:z.array(z.object({spec:z.object({step:z.string()}),receipt:z.object({jobKey:HashSchema,id:z.uuid()}),sha256:HashSchema})),
@@ -363,6 +401,6 @@ export async function exportQueueTextContribution(pool:Pool,cas:DistrictCas,jobK
  for(const key of ['extractionRun','records','quarantine','crawl','registry','preparationPlan'] as const)if(contribution.artifacts[key]?.sha256!==expected.contribution.artifacts[key]?.sha256)throw Error('Queue text terminal exception seal differs from committed lineage');
  return {contribution,stepReceipts:expected.committed.receipts,results:expected.committed.results,terminalDocumentExceptions:expected.terminalDocumentExceptions,terminalAssessmentExceptions:expected.terminalAssessmentExceptions,assessmentItemHolds:expected.assessmentItemHolds};
 }
-function queueSchemaInput(queue:{reconciliationJobKeys:string[];attemptHistory?:'committed-v1';terminalDocumentExceptions:z.infer<typeof TerminalDocumentExceptionSchema>[];terminalAssessmentExceptions:z.infer<typeof TerminalAssessmentExceptionSchema>[];assessmentItemHolds:z.infer<typeof AssessmentItemHoldPinSchema>[]}){
- return {reconciliationJobKeys:queue.reconciliationJobKeys,...(queue.attemptHistory?{attemptHistory:queue.attemptHistory}:{}),terminalDocumentExceptions:queue.terminalDocumentExceptions,terminalAssessmentExceptions:queue.terminalAssessmentExceptions.map(pin=>TerminalAssessmentExceptionSchema.strip().parse(pin)),assessmentItemHolds:queue.assessmentItemHolds};
+function queueSchemaInput(queue:{reconciliationJobKeys:string[];attemptHistory?:'committed-v1';terminalDocumentExceptions:(z.infer<typeof TerminalDocumentExceptionSchema>|DuplicateSourceContentException)[];terminalAssessmentExceptions:z.infer<typeof TerminalAssessmentExceptionSchema>[];assessmentItemHolds:z.infer<typeof AssessmentItemHoldPinSchema>[]}){
+ return {reconciliationJobKeys:queue.reconciliationJobKeys,...(queue.attemptHistory?{attemptHistory:queue.attemptHistory}:{}),terminalDocumentExceptions:queue.terminalDocumentExceptions.filter(pin=>pin.reasonCode!=='duplicate_source_content'),terminalAssessmentExceptions:queue.terminalAssessmentExceptions.map(pin=>TerminalAssessmentExceptionSchema.strip().parse(pin)),assessmentItemHolds:queue.assessmentItemHolds};
 }
