@@ -1,0 +1,19 @@
+{
+ "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+ "id": "r1-owner-notification-preference-2026-10-16-addendum-1",
+ "amends": {
+  "id": "r1-owner-notification-preference-2026-10-16",
+  "path": "stadtstack-data/reports/approvals/r1-owner-notification-preference-2026-10-16.json"
+ },
+ "recordedAt": "2026-10-17T01:04:49Z",
+ "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "approver": "Max (owner)",
+ "channel": "omp chat with the R1 session (same message as recorded in r1-b-model-sonnet-2026-10-17)",
+ "ownerStatementsVerbatim": [
+  "And like I said don't post this cryptic updated about the pipelines all the time"
+ ],
+ "finding": "The 2026-10-16 interpretation (routine executor startup/disposition messages kept on topic pipeline at ntfy priority 1) did not meet the preference: silent messages still appear in the owner's topic.",
+ "interpretation": "Topic pipeline carries only plain-language lead messages for decisions, blockers and milestones. All automated executor startup/disposition notifications (including holds and failures) move to a separate topic pipeline-audit that the owner does not subscribe to (approval identity pipeline-audit-notification-approval-v1). The startup acknowledgement before job claims remains mandatory. Authorities already bound to the legacy pipeline profile may still deliver until they finish or expire; no new authorization binds it.",
+ "dependsOn": "Ops provisioning of topic pipeline-audit and its publisher permission (Vikunja #89)",
+ "supersedes": "interpretation field of r1-owner-notification-preference-2026-10-16"
+}
