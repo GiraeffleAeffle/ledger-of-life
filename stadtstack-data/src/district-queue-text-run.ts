@@ -32,6 +32,7 @@ import {loadPolicyReceipt} from './district-policy-receipt.ts';
 import {CrawlCorpusImportSchema} from './district-crawl-import.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException,assertTerminalSourceScope} from './district-terminal-exceptions.ts';
 import type {QuarantineCase} from './district-inference.ts';
+import {formatQueueTextSealException} from './district-exception-diagnostics.ts';
 
 export const QueueTextSealInputSchema=z.object({jobKeys:z.array(HashSchema).max(10000),reconciliationJobKeys:z.array(HashSchema).max(10000),attemptHistory:z.literal('committed-v1').optional(),terminalDocumentExceptions:z.array(TerminalDocumentExceptionSchema).max(10000).default([]),terminalAssessmentExceptions:z.array(TerminalAssessmentExceptionSchema).max(10000).default([]),assessmentItemHolds:z.array(AssessmentItemHoldPinSchema).max(10000).default([])}).strict().superRefine((value,ctx)=>{
  for(const keys of [value.jobKeys,value.reconciliationJobKeys,value.terminalDocumentExceptions.map(pin=>pin.jobKey),value.terminalAssessmentExceptions.map(pin=>pin.jobKey)])if(new Set(keys).size!==keys.length)ctx.addIssue({code:'custom',message:'Queue seal requires distinct committed jobs'});
@@ -311,7 +312,7 @@ export async function buildQueueTextRun(pool:Pool,cas:DistrictCas,raw:unknown,se
 
 /** Content-addressed immutable managed outputs. Existing current-policy/custody
  * writers own every byte; sealing does not authorize publication or invoke models. */
-export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:unknown){
+async function persistQueueTextContribution(pool:Pool,cas:DistrictCas,input:unknown){
  const built=await buildQueueTextRun(pool,cas,input),store=new DistrictJobStore(pool);
  const bindings:SourceArtifactBinding[]=built.originals.map(source=>({...source.sourceBinding,independentAllowed:true}));
  const unique=[...new Map(bindings.map(binding=>[canonicalJson(binding),binding])).values()];
@@ -333,6 +334,15 @@ export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:
  // A final offline current-policy/queue recheck prevents a changed cohort escaping.
  const final=await buildQueueTextRun(pool,cas,input);if(final.contribution.runId!==built.contribution.runId||semanticHash(final.policyInventory)!==semanticHash(built.policyInventory))throw Error('Queue seal inputs changed during managed persistence');
  return {runId:built.contribution.runId,compositionArtifactSha256:compositionPin.sha256,path:compositionPin.path,artifacts,criticalInventory,criticalAdmissions,policyInventory,privateProvenance:provenance,records:built.knowledge.records.length,heldRecords:built.heldRecords,committedDocuments:built.originals.length,...(built.attemptHistory?{attemptHistory:built.attemptHistory}:{}),terminalDocumentExceptions:built.terminalDocumentExceptions,terminalAssessmentExceptions:built.terminalAssessmentExceptions,assessmentItemHolds:built.assessmentItemHolds};
+}
+
+/** Diagnose only the failed sealing command; preserve its exact rejection. */
+export async function sealQueueTextContribution(pool:Pool,cas:DistrictCas,input:unknown){
+ try{return await persistQueueTextContribution(pool,cas,input);}
+ catch(error){
+  try{process.stderr.write(await formatQueueTextSealException(error));}catch{/* Diagnostics cannot replace the original seal failure. */}
+  throw error;
+ }
 }
 
 /** Preserve historical non-exception exports without changing their frozen job
