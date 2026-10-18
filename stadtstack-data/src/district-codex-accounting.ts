@@ -6,6 +6,7 @@ import {SubscriptionRuntimeError} from './district-model-contract.ts';
 import {guardDistrictPool} from './district-database.ts';
 import {SubscriptionLimitSchema} from './district-subscription-limit.ts';
 import {codexCallCapacity,type CodexAllowanceOptions} from './district-codex-allowance.ts';
+import {codexUnsettledRetryAdmission,consumeCodexUnsettledRetry,type CodexDispositionOptions} from './district-codex-disposition.ts';
 export async function registerR1CodexDocument(pool:Pool,municipalityId:string,originalSha256:string,maxCalls:number){
  guardDistrictPool(pool);
  HashSchema.parse(originalSha256);
@@ -25,7 +26,7 @@ export async function registerR1CodexDocument(pool:Pool,municipalityId:string,or
 }
 
 /** Committed before a source-bearing effect; never refunded or silently replayed. */
-export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256:string,requestSha256:string,maxCalls=48,allowance:CodexAllowanceOptions={}){
+export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256:string,requestSha256:string,maxCalls=48,allowance:CodexAllowanceOptions={},disposition:CodexDispositionOptions={}){
  guardDistrictPool(pool);
  HashSchema.parse(originalSha256);HashSchema.parse(requestSha256);
  if(!Number.isInteger(maxCalls)||maxCalls<2||maxCalls>48||!['residual_extract','assessment_a','assessment_c'].includes(job.spec.step))throw new DistrictExecutionHold('authorization_revoked');
@@ -49,14 +50,19 @@ export async function reserveR1CodexCall(pool:Pool,job:ClaimedJob,originalSha256
   // Pin the per-original ceiling through count+insert, even if selection/usage
   // accounting later narrows its independent global transaction lock.
   const document=await client.query<{max_calls:number}>('SELECT max_calls FROM district_pipeline.r1_codex_documents WHERE original_sha256=$1 FOR UPDATE',[originalSha256]);
-  const prior=await client.query(`SELECT 1 FROM district_pipeline.r1_codex_call_intents i LEFT JOIN district_pipeline.r1_codex_usage_holds h ON h.failed_intent_id=i.id WHERE i.job_id=$1 AND i.request_sha256=$2 AND (h.authorization_id IS NULL OR h.authorization_id=$3)`,[job.id,requestSha256,authorization.authorization_id]);
-  if(prior.rowCount)throw new DistrictExecutionHold('usage_unknown');
+  const retry=await codexUnsettledRetryAdmission(client,job,originalSha256,requestSha256,disposition);
+  const prior=await client.query<{id:string}>(`SELECT i.id FROM district_pipeline.r1_codex_call_intents i LEFT JOIN district_pipeline.r1_codex_usage_holds h ON h.failed_intent_id=i.id WHERE i.job_id=$1 AND i.request_sha256=$2 AND (h.authorization_id IS NULL OR h.authorization_id=$3)`,[job.id,requestSha256,authorization.authorization_id]);
+  if(prior.rows.some(intent=>!retry.ignoredIntentIds.includes(intent.id)))throw new DistrictExecutionHold('usage_unknown');
+  // Unknown effects stay charged. Their one replacement cannot borrow an
+  // assessment-only allowance or execute in another attempt.
+  if(retry.target&&(await client.query<{count:number}>('SELECT count(*)::int AS count FROM district_pipeline.r1_codex_call_intents WHERE original_sha256=$1',[originalSha256])).rows[0].count>=48)throw new DistrictExecutionHold('source_limit_exceeded');
   const capacity=await codexCallCapacity(client,job.jobKey,originalSha256,Math.min(maxCalls,document.rows[0].max_calls),allowance);
   if(!capacity.allowed)throw new DistrictExecutionHold('source_limit_exceeded');
   const id=randomUUID();
   const inserted=await client.query('INSERT INTO district_pipeline.r1_codex_call_intents(id,original_sha256,job_id,fencing_token,request_sha256,stage) SELECT $1,$2,$3,$4,$5,$6 WHERE $7::timestamptz IS NULL OR clock_timestamp()<$7::timestamptz RETURNING id',[id,originalSha256,job.id,job.fencingToken,requestSha256,job.spec.step,capacity.allowanceExpiresAt]);
   if(inserted.rowCount!==1)throw new DistrictExecutionHold('source_limit_exceeded');
   await client.query('INSERT INTO district_pipeline.r1_codex_call_authorizations(intent_id,authorization_id,run_id) VALUES($1,$2,$3)',[id,authorization.authorization_id,job.runId]);
+  if(retry.target)await consumeCodexUnsettledRetry(client,retry.target.recordSha256,id);
   if(capacity.allowanceEligible&&capacity.baseRemaining===0){
    if(!capacity.allowancePin||!capacity.allowanceCohortSha256||!capacity.allowanceQueueContractSha256||capacity.cohortExtraCalls===null)throw new DistrictExecutionHold('authorization_revoked');
    await client.query('INSERT INTO district_pipeline.r1_codex_allowance_intents(intent_id,original_sha256,allowance_sha256,cohort_sha256,queue_contract_sha256,original_extra_ordinal,cohort_extra_ordinal) VALUES($1,$2,$3,$4,$5,$6,$7)',[id,originalSha256,capacity.allowancePin.sha256,capacity.allowanceCohortSha256,capacity.allowanceQueueContractSha256,capacity.lifetimeExtraCalls+1,capacity.cohortExtraCalls+1]);
