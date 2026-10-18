@@ -50,7 +50,7 @@ layers:  # product architecture, bottom-up
   - id: local_services
     concepts: [LocalInferenceRequest, InferencePayment, InferenceHost, HostPairingInvitation, HostEconomicsScenario]
   - id: civic_system
-    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment, CivicTopic, CivicContribution, OpinionPoll]
+    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment, DocumentDisposition, CivicTopic, CivicContribution, OpinionPoll]
   - id: vision
     concepts: [ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
@@ -157,6 +157,16 @@ concepts:
       - A changed assessment target needs fresh A/B/C receipts; historical v1 artifacts retain their original version and meaning, with no call-cap reset or inferred support.
       - Read-only seal/export reconstructs and authenticates the exact persisted v1 or v2 target and committed preparation ancestry; new preparation emits v2 only.
     code: [stadtstack-data/src/district-assessment-projection.ts, stadtstack-data/src/district-assessment.ts, stadtstack-data/src/district-assessment-jobs.ts]
+  DocumentDisposition:
+    definition: A source-scoped terminal seal disposition for byte-identical frozen campaign documents; it accounts for duplicate members without admitting or merging their records.
+    reality: prototype
+    relations: {disposes: source document, canonical_carrier: smallest documentId in the same municipality/sourceId/sourceSha256 group, pinned_to: canonical document and the duplicate's extraction receipt/output}
+    invariants:
+      - Duplicate identity is exact source-byte identity within the same municipality, sourceId and sourceSha256; matching titles or URLs alone do not qualify.
+      - The smallest documentId is the canonical native record carrier; every other member receives derived reasonCode duplicate_source_content.
+      - The disposition binds the canonical document and the duplicate's own residual-extraction receipt and sole output artifact; authenticated seal membership includes both extraction pins.
+      - A duplicate disposition is terminal accounting only: its records are excluded from admission and merging, not asserted to be the same legal instrument or case.
+    code: [stadtstack-data/src/district-duplicate-source-content.ts, stadtstack-data/src/district-queue-text-run.ts, stadtstack-data/src/r1-step8-governance.ts]
 
   Organization:
     definition: A public body, enterprise, cooperative or builder in a city Context; sourced Strausberg profiles describe products, participation channels, published opportunities and documented group membership. These independent organizations are separate from fictional test issuers.
