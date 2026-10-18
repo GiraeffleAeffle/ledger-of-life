@@ -1,0 +1,44 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-resumed-key-continuation-index-2026-10-18",
+ "action": "resumed-key-continuation-index",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-18T01:05:34Z",
+ "expiresAt": "2026-10-25T21:59:59Z",
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "autonomyApproval": {
+  "id": "r1-autonomy-and-release-2026-10-14",
+  "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+ },
+ "holdPolicy": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15",
+  "sha256": "c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"
+ },
+ "holdPolicyAmendment": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-1",
+  "sha256": "4ef8a73624eeb33672dc41b367f4c56c7ef9dcbd9df77bff30fffc9d5648befe"
+ },
+ "bounds": {
+  "maxExecutionsPerJobKey": 1,
+  "maxResumesPerJobKey": 2,
+  "maxModelCallsPerDocument": 48,
+  "paidMicroUsd": 0
+ },
+ "previousIndex": null,
+ "records": [
+  {
+   "id": "r1-resumed-key-continuation-2026-10-16",
+   "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-resumed-key-continuation-2026-10-16.json",
+   "sha256": "9507df571dfc1f73d921c362291fc67c4dee0cdbe0952e20ead874156ba676dd"
+  },
+  {
+   "id": "r1-resumed-key-continuation-2026-10-18",
+   "path": "/home/max/.local/state/stadtstack-data/r1-records-7/stadtstack-data/reports/approvals/r1-resumed-key-continuation-2026-10-18.json",
+   "sha256": "29b34625c752cd5e7310f0d9bd7d67b0c77cb138c486be0d898089fed8f0ff72"
+  }
+ ],
+ "reason": "Main-issued exact membership catalogue only. It does not renew any member record, consumed epoch, stage grant or clock, authorize an execution, reset any attempt/resume/call counter or waive policy, usage, settlement, overlap or canonical Core checks. Every action keeps its own scope, baseline and expiry; retained prior indices and record families are immutable history."
+}

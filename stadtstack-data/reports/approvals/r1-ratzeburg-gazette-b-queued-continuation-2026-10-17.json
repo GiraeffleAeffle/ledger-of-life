@@ -1,0 +1,96 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-ratzeburg-gazette-b-queued-continuation-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-17T21:34:53Z",
+ "expiresAt": "2026-10-18T21:59:59Z",
+ "action": "adopt-authenticated-saved-b-stage-provenance",
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "autonomyApproval": {
+  "id": "r1-autonomy-and-release-2026-10-14",
+  "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+ },
+ "assessmentBApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "source": "ratzeburg-gazette",
+ "step": "assessment_b",
+ "scope": {
+  "publisherId": "ratzeburg",
+  "sourceId": "ratzeburg-gazette",
+  "municipalityId": "ratzeburg",
+  "ags": "01053100",
+  "tenant": null,
+  "observationWindow": "2026-10-13"
+ },
+ "jobKeys": [
+  "2dd48812639d8afea854dcddc60b417b12562b00217ca8dc1943495755c93ca0",
+  "439026cece36c2d251c8b45e11e222951b8526a90c87da7c35b8f1a62ce5bd0e",
+  "6e4615bff10686e25475148c37deee13a8cad37c4d719f65940c76335de93fd7",
+  "94a12c7f1f3ad965b67c6a2605221665eba1aa207adae554a103a92e596f47c4",
+  "f212d8535863171f3ba5f1d7a85c07acc6cba7fe0f233d3f56770a7686d7e6c7"
+ ],
+ "originalStageRecord": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/b32bc962e617c876763f34c9734908f59116a00a/continuations/items-884249cc1a0f01d45ae0a539b7e7aee5e1ec233c0d28996f9c7f1f8f4b4f40e5/b.stage-record.json",
+  "sha256": "1c9589e3bec08218edcf1925e0d44e8a4d5fed678c4aa6491175c82cab69200e"
+ },
+ "originalAuthorizationCapture": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/b32bc962e617c876763f34c9734908f59116a00a/continuations/items-884249cc1a0f01d45ae0a539b7e7aee5e1ec233c0d28996f9c7f1f8f4b4f40e5/b.authorized.json",
+  "sha256": "5612c119b82beede67d3242f39c82244d4f8d4857dda8e8c63b2ca55645937eb"
+ },
+ "originalAuthorization": {
+  "id": "874959d0-5c74-4582-a865-b1b39f5f58c6",
+  "expiresAt": "2026-10-18T01:01:17.727Z",
+  "maxJobs": 5,
+  "maxElapsedMs": 21480000
+ },
+ "currentSelection": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/continuations/items-884249cc1a0f01d45ae0a539b7e7aee5e1ec233c0d28996f9c7f1f8f4b4f40e5/b-enqueued.json",
+  "sha256": "fab445d3ff510ab9ede46cb90032a7e0378ffbc75464966a257025695990859c"
+ },
+ "destination": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/continuations/items-884249cc1a0f01d45ae0a539b7e7aee5e1ec233c0d28996f9c7f1f8f4b4f40e5/b.stage-record.json",
+ "stoppedSummary": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ratzeburg-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/continuations/items-884249cc1a0f01d45ae0a539b7e7aee5e1ec233c0d28996f9c7f1f8f4b4f40e5/summary.json",
+  "sha256": "595c27d5714b2261079c637f747620e1ba71aa60c755464207c0c18b12258c38"
+ },
+ "catalogue": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/catalogue.json",
+  "sha256": "9ff7c709d85f7e4d564083841ae48c0d1fbfce8ba4c816b0572e1b6e32741eea"
+ },
+ "processingCodeCommit": "478b3e39004cf0bb45219595aafef65f7bddadd7",
+ "processingPinReview": {
+  "path": "processing-pin-478b3e3.json",
+  "sha256": "c1bf90fd3b7c55673b284f128608ca6833699296c66d2f645c6fc8e974cc69b8"
+ },
+ "bounds": {
+  "maxProvenanceAdoptions": 1,
+  "maxJobs": 5,
+  "neverStartedOnly": true,
+  "sourceScopeUnchanged": true,
+  "model": "anthropic/claude-sonnet-5-5",
+  "requestedModel": "claude-sonnet-5-5",
+  "provider": "anthropic-subscription",
+  "transport": "vm-omp",
+  "ompBConcurrency": 1,
+  "ompBStageParallel": 1,
+  "paidMicroUsd": 0,
+  "extraModelCallsAuthorized": 0,
+  "extraResumesAuthorized": 0,
+  "resetClocksOrCounters": false,
+  "directExecutionAuthorized": false
+ },
+ "conditions": [
+  "Main issues this record with a genuine issuedAt and explicitly pins its exact issued bytes when invoking the guarded adoption command. The unissued draft is refused.",
+  "Adoption is permitted only after the original authorization has actually expired according to the database clock, while this record and parent #81 remain valid. A revoked authorization is refused, not treated as an expired grant.",
+  "Authenticate the exact prior stage record and authorization capture against the committed canonical authorization; all five keys must still be queued at attempt zero, with no receipt, executor run, intent, lease, reservation or other overlapping authority. The source must retain the exact STOPped invocation summary above; refuse if its driver is running. Hold the source driver and authority-CLI exclusive locks during adoption.",
+  "The only admitted publication is the original stage-record bytes, unchanged, at the exact destination above, with a separate content-free adoption-provenance sidecar citing this record. Do not copy an authorized response, run journal, recovery proof, grant, receipt or claim; do not change any old file or clock.",
+  "This record authorizes a one-time provenance adoption only, not execution or a grant renewal. Subsequent execution can occur only through the existing saved-stage queued-only canonical continuation under #81. Its fresh stage audit must cite the original grant and stage-record hash; original authority is never renewed.",
+  "The existing current-contract, source-policy, never-started, idle, live-overlap, provider-settlement, subscription-usage, parent-expiry and cumulative #81 accounting gates remain mandatory at fresh canonical authorization and execution. Any refusal stops the source; there is no fallback.",
+  "No extra model calls, paid spend, resumes, refunds or cap resets are authorized. B stays Sonnet 5.5, Anthropic subscription, vm-omp, provider concurrency 1 and stage parallelism 1. Any subsequent hold follows the unchanged hold-resume policy and normal settlement gates."
+ ],
+ "reason": "Window-15 HEAD-only generation change re-enqueued the identical five never-started B keys but the authentic b32-generation saved B stage record remained outside the current namespace. The old Oct-16 resumed-key record does not authorize B. Preserve authenticated provenance and let the existing expired saved-stage continuation perform all normal admission; do not silently exempt an overlap or alter the old grant."
+}

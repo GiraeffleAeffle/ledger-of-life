@@ -1,0 +1,240 @@
+{
+  "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+  "id": "r1-assessment-export-recapture-ludwigslust-website-2026-10-18",
+  "action": "recapture-completed-unacknowledged-assessment-export",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-18T03:05:44Z",
+  "expiresAt": "2026-10-18T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "autonomyApproval": {
+    "id": "r1-autonomy-and-release-2026-10-14",
+    "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+  },
+  "source": "ludwigslust-website",
+  "scope": {
+    "publisherId": "ludwigslust",
+    "sourceId": "ludwigslust-website",
+    "municipalityId": "ludwigslust",
+    "ags": "13076090",
+    "tenant": null,
+    "observationWindow": "2026-10-13"
+  },
+  "processingCommit": "478b3e39004cf0bb45219595aafef65f7bddadd7",
+  "generationDirectory": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7",
+  "outputName": "a-results",
+  "command": "assessment-results",
+  "input": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/a-enqueued.json",
+    "sha256": "85bfd30af2de7c11dabec1c69bc6c894dea84bb624276a9b4f9eb91c29858dd6"
+  },
+  "capture": {
+    "started": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/a-results.json.started.json",
+      "sha256": "3911d9e6afb3d7d7256e391344da069acc44e393f319b5a25feeaee590ac633c"
+    },
+    "pending": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/a-results.json.pending",
+      "sha256": "dfae6f723cd74c8b7b4bdef6c18c21aa5f79c5fdee27f4fbadec14a8e04dff5a"
+    },
+    "exit": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/a-results.exit.json",
+      "sha256": "74c0fc89e5806fb458a68d7ce7ff66a2afefe102e993fd92a73ea42c0ef13663"
+    },
+    "stderr": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/a-results.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "startedAt": "2026-10-18T01:04:42.189Z",
+    "finishedAt": "2026-10-18T01:06:16.715Z",
+    "admissionSha256": "d5382d82e0d6037018346be9f63cfab116dfdeb6b4c589a0c836d3e3dfd74838"
+  },
+  "selection": [
+    "1687dfb28e5f3bc16752e3261f39bfb706e77fcb090a8099decff52674974ff1",
+    "2209f48461e7eae555b027a207baa7466759eab84313454b8315034d5e101bcf",
+    "3562f933ec30a4e006961a7ed2f3d4642b21c910b24d69be12bfce66bd090d66",
+    "41f87a4bf3c45119f348cd2ee22d723efa856e0806a8fd6944853586116b92f4",
+    "96baf3f23581c67ed003ee5a2549c7869fdc5286888dad30f342d58a8014790c",
+    "a48f5bb66fa43f9aaecc6d39677f5049f14b687d8df4225528b3d7cb6eed7ca0",
+    "a5198329010e6d91db1bdf38a2e75fe470a8c7e4333a393f3370e5c78ab604d2",
+    "b203ceca8134221a71debfe228bb2c6193707a3ff3fc379983bf072f3cac10ee",
+    "c3b66138d7858bc03de4a0f5d7ddcf914468726d6fd3cd05f72208b02a39dc80",
+    "dd841f1d75a00bf37810c327e3b94345bc8fadcb7f2333c7877d2c6df48dbea2",
+    "eeaf73290a8fc097d81acba5810c807ada98456986152365da8866ea385352ba",
+    "ffbfb12f5cdb8d45c5be4e2e08946f231979a79b62b23c2928f44333aee6c9d2"
+  ],
+  "results": [
+    {
+      "jobKey": "1687dfb28e5f3bc16752e3261f39bfb706e77fcb090a8099decff52674974ff1",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "de7d81d2-988e-43c6-b538-e6c5483aa0c0",
+      "stepReceiptSha256": "e67e50138872c900335c60ffa00481a06902a8278d7789dbb9f10ec4d3162a91",
+      "outputHashes": [
+        "838b15e5165637c5f5527373e92622c6535c209351e591d2c7c913cd5e0a2883",
+        "ca064f4c3b3402a36da9042c88ec5722947e39e5f2ba8c67087847bca13bb13e"
+      ]
+    },
+    {
+      "jobKey": "2209f48461e7eae555b027a207baa7466759eab84313454b8315034d5e101bcf",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "defe470a-e6b5-4fdb-9e86-94d229456d19",
+      "stepReceiptSha256": "bc93ce6eee614549a71ca1c67a885f00c7c087497b3811b449c5328ca1fdf14f",
+      "outputHashes": [
+        "262c7893d01b782c658b6e1b714426d858fe8599eca0c407ea71cbda58555b57",
+        "d3bfc80ee76e99c8044bdf092baeeae43d74ee4edd1bd74f6829ab118409e061"
+      ]
+    },
+    {
+      "jobKey": "3562f933ec30a4e006961a7ed2f3d4642b21c910b24d69be12bfce66bd090d66",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "48b2c2e4-3e0b-4437-b04a-88b3e137730a",
+      "stepReceiptSha256": "e5bf92aef5b8531a61e18dc160e8c0225ec4540c4f9a3567ea7e71b6f9e2e78e",
+      "outputHashes": [
+        "12058e74cd2c4f5fd0fbb1c2036ab3b953b2cab16c152e04cfbbe34f5feb487f",
+        "cac4d0a9039b1836aed866186da864f100b4bdfef369615e880063cb80186622"
+      ]
+    },
+    {
+      "jobKey": "41f87a4bf3c45119f348cd2ee22d723efa856e0806a8fd6944853586116b92f4",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "0f42a02d-6cdb-4c74-b1d7-c3e101193d80",
+      "stepReceiptSha256": "e6d1258ce56d8a92b3c6898359ce300059a2805ca206f2ddb08b38751e74e280",
+      "outputHashes": [
+        "4902fcac1ebf66168858ea5ff244e26743060fbea7498056d2d09a70e2c08d2b",
+        "6b18dea53ba533fce639a9293c3f2172f5aedfad3eb8a6d105078a982e9101f7"
+      ]
+    },
+    {
+      "jobKey": "96baf3f23581c67ed003ee5a2549c7869fdc5286888dad30f342d58a8014790c",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "2413b3fd-fdfe-483f-aabf-2d6f4a36b91c",
+      "stepReceiptSha256": "2f15d0798e4df47813e0b7f366b073ff427592055dafce782d812c37fabc3dd9",
+      "outputHashes": [
+        "a0da2c11286ad9a753116b45b0249b865bc46c311cecfa6c8864e70a953a8a72",
+        "bf89807a2d4deefcf8775f437fde330cbab71eb1a1630aeb4f2f217df97cce83"
+      ]
+    },
+    {
+      "jobKey": "a48f5bb66fa43f9aaecc6d39677f5049f14b687d8df4225528b3d7cb6eed7ca0",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "9e1de6e9-88b9-4f3a-9e4f-f3017cd30453",
+      "stepReceiptSha256": "309490a4e19b907ed83911062ad4391916968b295ed3a2beed88f2d1aad0a662",
+      "outputHashes": [
+        "34c8f92b869178aee7ed872c079106757b0a76f0ac6e92312f90bcd929d13f68",
+        "dba9c667876032a93cf100ddfb421ef9d51badf2718eb1fded615ff43b73ac54"
+      ]
+    },
+    {
+      "jobKey": "a5198329010e6d91db1bdf38a2e75fe470a8c7e4333a393f3370e5c78ab604d2",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "831f3be3-98f6-4868-b9bb-1e05c1d095b8",
+      "stepReceiptSha256": "8b438615f4ad7669fb542e8b21b69d574238d8fff3d4c2c6a5939b0eb9ca89e9",
+      "outputHashes": [
+        "d3dbc597bb905e1b63bb6d7ead6de5b432dfef48b1ffea25c076791eed013e5a",
+        "f63dff8db2fbca83d4a5bd2649ddd970be44558b290f1d8495f51eabce31a293"
+      ]
+    },
+    {
+      "jobKey": "b203ceca8134221a71debfe228bb2c6193707a3ff3fc379983bf072f3cac10ee",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "9a55e153-e2e3-4b1f-8bb3-e62845371b41",
+      "stepReceiptSha256": "357ef52d536d8ded9e84e6933c439de4635993efb6edba85320e3a5507f83bb1",
+      "outputHashes": [
+        "81a2b654f17d97860ff0fe33460704f7c59e21e9e363f9f105e65675e026f2b6",
+        "e3987662857e26d13a1f1d65112639648e8b535b44c8577b51befc1c638a0227"
+      ]
+    },
+    {
+      "jobKey": "c3b66138d7858bc03de4a0f5d7ddcf914468726d6fd3cd05f72208b02a39dc80",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "a18a4737-e5f9-4284-a5de-57170969f79c",
+      "stepReceiptSha256": "0735e128c84a6775c51438e03b93a6acb0dee6deea599c83e01d7978355f9077",
+      "outputHashes": [
+        "dcc56f3141b2cf937720e2118325394ecd583155f9439f5794c6a5857b82a909",
+        "f2165aaa105e13d2d42a7b3fb550eaa44b60952a3ef268d8e01ee0696a4b1888"
+      ]
+    },
+    {
+      "jobKey": "dd841f1d75a00bf37810c327e3b94345bc8fadcb7f2333c7877d2c6df48dbea2",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "0ffc9221-0405-446f-a27c-99c325d1707b",
+      "stepReceiptSha256": "bb95934a21618a79ba1e3a9a5e527ccce50e651730debd65a48f67bebc77e5a3",
+      "outputHashes": [
+        "481898a3bd169b000a1b3dedd2ab764cce5e467aa58493e98aee572374c3ac50",
+        "75851bef39959ea830c94e745bfe7c7f493ddc523b6b4f1460c610de93dac027"
+      ]
+    },
+    {
+      "jobKey": "eeaf73290a8fc097d81acba5810c807ada98456986152365da8866ea385352ba",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "3bbf97e5-60e5-4fab-9417-0d0ac3fa45ad",
+      "stepReceiptSha256": "2d216f80c25b8e71921448126fa2ac10d5720a8a7952a16de6a7ef12f0968da5",
+      "outputHashes": [
+        "cd6a6e4c506297436e3fa92805e789cf9a56f15e5977c7183df9d57c58ba8ae3",
+        "f7772dd7c04ab2e0994ca0fda3a9de112d810cdb354a242ab32e8ee770b8502b"
+      ]
+    },
+    {
+      "jobKey": "ffbfb12f5cdb8d45c5be4e2e08946f231979a79b62b23c2928f44333aee6c9d2",
+      "step": "assessment_a",
+      "outcome": "succeeded",
+      "stepReceiptId": "77701f54-73cf-40a3-9fdb-f92c46d6f6ae",
+      "stepReceiptSha256": "bab8f0e47e4261da373ddc0d15e5f11e87baf6369fb298d88f86d22d716622a2",
+      "outputHashes": [
+        "553d5f2037709432db0c13b6ee1778f1face6a4b9620aaacf60bc76fa6d0286d",
+        "991795d335e7eb5e5f51c55446f5212a409ff53fe2e8dc328930eec201909e14"
+      ]
+    }
+  ],
+  "catalogueBefore": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window16/operation-overlay-478b3e3/catalogue.before.json",
+    "sha256": "9ff7c709d85f7e4d564083841ae48c0d1fbfce8ba4c816b0572e1b6e32741eea"
+  },
+  "catalogueAfter": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window16/operation-overlay-478b3e3/catalogue.after.json",
+    "sha256": "7d1d0fd2f0aeda742c37f4a88da11349f360f81c27ccc69544954829c3313b37"
+  },
+  "transition": {
+    "plan": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-window16/operation-overlay-478b3e3/plan.json",
+      "sha256": "8fdcb8278e1d0771c2433dd565929acaca6b9f27d7852956677dbc3199b87314"
+    },
+    "activation": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-window16/operation-overlay-478b3e3/activated.json",
+      "sha256": "1e2c08bd53d4b4548b2ce8b645881091fc95a4341ca650dda1ea4b7f78ebdd2f"
+    }
+  },
+  "processingPinReview": {
+    "path": "processing-pin-478b3e3.json",
+    "sha256": "c1bf90fd3b7c55673b284f128608ca6833699296c66d2f645c6fc8e974cc69b8"
+  },
+  "stoppedSummary": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ludwigslust-website/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/summary.json",
+    "sha256": "11d1d970fd2dec32f0fff19659eaafbecd4419a28437eaf0b4194b6aabc74bad"
+  },
+  "tooling": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window16/export-recapture/tooling.json",
+    "sha256": "3009bb7dfad42122bd31e168cbccd20a1f490857044eeea42f24482a92b334b2"
+  },
+  "bounds": {
+    "maxFreshExports": 1,
+    "maxModelCalls": 0,
+    "maxExecutorRuns": 0,
+    "paidMicroUsd": 0,
+    "maxElapsedMs": 1800000
+  },
+  "reason": "Main-only metadata recapture of one completed-but-unacknowledged Ludwigslust website A export after the exact window16 retained-continuation-index cutover. Permit one fresh canonical assessment-results export including its ordinary idempotent managed registry setup, only if all original twelve committed results and exact pending bytes reproduce under unchanged non-pin/current Core admission. Atomically publish the genuine fresh output with append-only custody audit; preserve old journals/frames/exit. No model/executor run, acquisition, enqueue, authority issuance/renewal, resume, extra call allowance, refund, counter reset, catalogue/runtime/Core change or campaign restart is authorized."
+}
