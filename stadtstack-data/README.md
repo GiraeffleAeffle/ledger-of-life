@@ -464,6 +464,8 @@ permitted. A lost/unknown replacement is ambiguous again, not silently replaced.
 Migration 010 creates only additive append-only decision/consumption tables;
 deploy it explicitly before updated accounting. This host-side change requires
 a processing-code identity cutover, not new semantic contracts or archive replay.
+Migration integrity tests include both new tables and the exact 010 byte pin;
+altered applied-migration hashes refuse startup rather than silently upgrading.
 
 **Owner-approved subscription reset disposition (migration 007).** The lead may use
 `district-r1.ts usage-holds --registry-config PATH --registry-descriptor PATH`
