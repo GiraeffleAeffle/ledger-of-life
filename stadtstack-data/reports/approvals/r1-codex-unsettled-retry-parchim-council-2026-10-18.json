@@ -1,0 +1,43 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-codex-unsettled-retry-parchim-council-2026-10-18",
+ "action": "codex-unsettled-intent-bounded-retry",
+ "version": "r1-codex-unsettled-retry-v1",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "issuedAt": "2026-10-18T10:54:19Z",
+ "expiresAt": "2026-10-25T21:59:59Z",
+ "parentApproval": {"id":"r1-nine-town-models-2026-10-13","sha256":"2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"},
+ "autonomyApproval": {"id":"r1-autonomy-and-release-2026-10-14","sha256":"865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"},
+ "holdPolicy": {"id":"r1-lead-hold-resume-policy-2026-10-15","sha256":"c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"},
+ "holdPolicyAmendment": {"id":"r1-lead-hold-resume-policy-2026-10-15-amendment-1","sha256":"4ef8a73624eeb33672dc41b367f4c56c7ef9dcbd9df77bff30fffc9d5648befe"},
+ "binding": {
+  "scope": {"publisherId":"parchim","sourceId":"parchim-council","municipalityId":"parchim","ags":"13076108","tenant":null,"observationWindow":"2026-10-13"},
+  "step": "residual_extract",
+  "jobKey": "5172a9e769f7594bbe4bce6037a226390742b021f56d67009091d145792ae2de",
+  "jobId": "c9538143-995f-46e2-b16b-b29447ab7875",
+  "semanticContractSha256": "74f24df53adcad56f32186e62123e2634cdeebf8d175cb61c50ab9ae2ea1257f",
+  "documentId": "document-a3480b3b3128f2586ac7e689",
+  "originalSha256": "4c826beb83a91ed348b9f02b6a1a350b1f68232078e8947de780734365395c2c",
+  "intentId": "e4ef5e02-c358-4cfd-a628-48477c491ae1",
+  "requestSha256": "2d63514fdd0e63edcd45f4d7045e140dd7f8c3542aa94b6e0b58d2bbdc6d3103",
+  "runId": "f479b1f0-e5d6-4f8d-af67-0b280b51473f",
+  "authorizationId": "bdb2d73f-4d41-4eaa-b260-ea72a0b92430",
+  "fencingToken": 1,
+  "priorAttempt": 1,
+  "heldReceiptId": "cfb8e6b6-a8be-4e63-9ca3-be55b57cab7c",
+  "heldReceiptSha256": "41dea8dd5e48f62e4965cb2795a672f914215204db4582037bc9bf045d85c570"
+ },
+ "completionState": "completion_unknown",
+ "decision": "bounded_retry",
+ "bounds": {
+  "maxReplacementIntents": 1,
+  "allowedAttempt": 2,
+  "maxModelCallsPerOriginal": 48,
+  "paidMicroUsd": 0,
+  "refund": false,
+  "resetLifetimeCalls": false,
+  "extraResumes": 0,
+  "maxResumesPerJobKey": 2
+ },
+ "reason": "The exact attempt-1 max_time_reached receipt is committed. Its first Codex intent has a managed published answer; its second intent is charged but has no authenticated published answer. Completion of that second effect is UNKNOWN, not proven empty or completed. Under the owner's delegated decision authority, permit exactly one new replacement intent for this same job/original/request in attempt 2 under a fresh ordinary canonical authorization, current source policy and the unchanged lifetime 48-call cap. Preserve the unknown intent, its charge, every original clock and the ordinary two-resume budget. This record neither resumes nor authorizes a job and permits no refund, abandonment, paid use, new reason code, cached-answer fabrication, widening to another intent, or additional replacement if the new effect is itself unknown. Registration must reauthenticate all live state and refuse account usage incidents, unresolved additional effects or a running attempt. This unissued draft is not authority."
+}
