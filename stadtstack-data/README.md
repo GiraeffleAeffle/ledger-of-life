@@ -426,6 +426,45 @@ Counts must equal `max(total−48)`, not an inference from UUID or wall-clock or
 No grant/receipt rewriting, subscription usage/ambiguity relaxation or semantic
 fingerprint change is introduced.
 
+**Explicit lead decision for an unknown Codex effect (migration 010).** An
+unknown answer is neither an empty response nor a completed call. The separately
+issued, committed `r1-codex-unsettled-retry-v1` operator action record may permit
+exactly **one NEW intent**, for the exact original/job/request and next ordinary
+attempt only. It pins the original run, authorization, fence, committed held
+receipt, scope and parent/hold-policy approval bytes. The record must retain
+`completionState: "completion_unknown"`; unissued drafts grant nothing.
+
+After explicit migration and record issuance, the authorized lead OS/DB operator
+can register the decision (no job resume, authorization or provider request):
+
+```sh
+DATABASE_URL="$DATABASE_URL" node --experimental-strip-types \
+  src/district-codex-disposition-cli.ts <<'JSON'
+{"recordId":"<issued committed record ID>","recordSha256":"<exact issued bytes SHA-256>"}
+JSON
+```
+
+Registration reauthenticates the canonical job and receipt, current policy,
+inactive prior execution, non-revoked original authority, remaining normal
+two-resume budget, both account usage-hold tables, remaining 48/original capacity
+and exactly one otherwise-unsettled effect. Completed-answer evidence still
+comes only from the existing managed cache helper. The original unknown intent
+stays charged and immutable; all original clocks, grants and receipts remain.
+The normal operator hold-resume policy and a fresh canonical authorization
+remain independently required. `readCodexRetrySettlement` is SELECT-only and
+reports unknown decisions separately from genuine completions; an expired,
+unused decision or a changed held attempt cannot admit continuation.
+
+At reservation, existing custody/policy, authorization, lease, paid-zero and
+capacity checks still run. The same serialized transaction appends the new
+intent, its ordinary attribution and a unique consumption row. No refund,
+lifetime-cap increase (including assessment allowance), resume-budget increase,
+terminal abandonment, new receipt kind, automatic replay or native-B change is
+permitted. A lost/unknown replacement is ambiguous again, not silently replaced.
+Migration 010 creates only additive append-only decision/consumption tables;
+deploy it explicitly before updated accounting. This host-side change requires
+a processing-code identity cutover, not new semantic contracts or archive replay.
+
 **Owner-approved subscription reset disposition (migration 007).** The lead may use
 `district-r1.ts usage-holds --registry-config PATH --registry-descriptor PATH`
 with JSON stdin `{}` for a content-free report of unresolved holds. `reset_status`
