@@ -47,7 +47,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  assert.equal(operatorAudit.status,'compatible',JSON.stringify(operatorAudit.blockers));assert.equal(canonicalBuildCount()-beforeStandalone,1,'standalone operator audit owns one canonical pass');
  await assert.rejects(readFile(join(managedRoot,'staging-component.json')),{code:'ENOENT'});
  assert.deepEqual(await readFile(join(manifest.policy.stateDir,'inventory.json')),beforeAudit);assert.deepEqual(await counts(),beforeCounts);
- const beforeShared=canonicalBuildCount(),context=await createWitnessedProvenanceContext(manifest.nativeSealSelection,manifest.policy,{pool,casRoot:manifest.casRoot,catalogue:manifest.currentGeneration.catalogue,mode:'step8',workers:1});
+ const beforeShared=canonicalBuildCount(),context=await createWitnessedProvenanceContext(manifest.nativeSealSelection,manifest.policy,{pool,casRoot:manifest.casRoot,catalogue:manifest.currentGeneration.catalogue,mode:'step8',workers:1,timing:manifest.reconstructionTiming});
  const prepared=await prepareStep8Staging(request,pool,context);let finished=false,result:Awaited<ReturnType<typeof commitStep8Staging>>,audit:Awaited<ReturnType<typeof auditStep8>>;
  try{
   await assert.rejects(commitStep8Staging(prepared),/successfully finished canonical source epoch/);

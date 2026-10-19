@@ -68,7 +68,7 @@ export function assertReconstructionMemory(workers:number,meminfo:string){
 export interface WitnessedProvenanceContext {readonly witnesses:number;readonly reconstructionWorkers:number;checkpoint():Promise<void>;finish():Promise<void>}
 type ContextOptions={pool:Pool;casRoot:string;catalogue:NativeProvenancePin;mode:'step8';coreRoot?:string;workers?:number;timing?:z.input<typeof ReconstructionTimingSchema>;importDispositionDecision?:NativeProvenancePin};
 interface ContextState {
- core:Core;coreRoot:string;casRoot:string;policy:CivicPolicyOptions;selection:Selection;selectionPin:NativeProvenancePin;issuancePin:NativeProvenancePin;issuance:z.infer<typeof NativeSealSelectionActionSchema>;native:Map<string,NativeRecord>;files:Map<string,FileRecord>;db:Pool;steps:Map<string,CanonicalStep>;controls?:string;importDispositions:NativeImportDisposition[];importDispositionDecision?:NativeProvenancePin;
+ core:Core;coreRoot:string;casRoot:string;policy:CivicPolicyOptions;selection:Selection;selectionPin:NativeProvenancePin;issuancePin:NativeProvenancePin;issuance:z.infer<typeof NativeSealSelectionActionSchema>;native:Map<string,NativeRecord>;files:Map<string,FileRecord>;db:Pool;steps:Map<string,CanonicalStep>;controls?:string;importDispositions:NativeImportDisposition[];importDispositionDecision?:NativeProvenancePin;importDecisionWindow?:{issuedAt:string;expiresAt:string};
  fence:Awaited<ReturnType<Core['audit']['createReadOnlyManagedSourceAudit']>>;inventoryPin:NativeProvenancePin;inventoryStamp:string;finished:boolean;epochAccepted:boolean;
 }
 const contexts=new WeakMap<WitnessedProvenanceContext,ContextState>();
@@ -91,12 +91,13 @@ async function readPrivate(pin:NativeProvenancePin,files:Map<string,FileRecord>,
  try{const opened=await handle.stat({bigint:true}),bytes=await handle.readFile(),after=await handle.stat({bigint:true});if(stamp(before)!==stamp(opened)||stamp(opened)!==stamp(after)||bytes.length!==Number(after.size)||actual.bytes!==undefined&&actual.bytes!==bytes.length||digest(bytes)!==actual.sha256)throw Error('Native provenance control pin mismatch');files.set(pinKey(actual),{bytes,stamp:stamp(after)});return bytes;}finally{await handle.close();}
 }
 function equal(value:ContextState,left:unknown,right:unknown,message:string){if(value.core.adapter.canonicalJson(left)!==value.core.adapter.canonicalJson(right))throw Error(message);}
-function assertIssued(issuance:z.infer<typeof NativeSealSelectionActionSchema>){const now=Date.now();if(Date.parse(issuance.issuedAt)>now||Date.parse(issuance.expiresAt)<=now||Date.parse(issuance.expiresAt)<=Date.parse(issuance.issuedAt))throw Error('Native seal selection is unissued, future-issued or expired');}
+function assertIssued(issuance:{issuedAt:string;expiresAt:string},label='Native seal selection'){const now=Date.now();if(Date.parse(issuance.issuedAt)>now||Date.parse(issuance.expiresAt)<=now||Date.parse(issuance.expiresAt)<=Date.parse(issuance.issuedAt))throw Error(label+' is unissued, future-issued or expired');}
 async function assertCurrent(value:ContextState){
  if(value.finished)throw Error('Native provenance context finished');
  await value.core.civic.assertCivicPolicyAuthority(value.policy);
  if(stamp(await metadata(value.inventoryPin.path))!==value.inventoryStamp)throw Error('Native provenance inventory epoch changed');
  assertIssued(value.issuance);assertPolicyClocks(value);
+ if(value.importDecisionWindow)assertIssued(value.importDecisionWindow,'Import disposition decision');
  if((await value.core.civic.readCivicOptOutSnapshot(value.policy)).sha256!==value.fence.optOutSnapshotSha256)throw Error('Native provenance objection epoch changed');
  for(const [key,file] of value.files){const path=JSON.parse(key)[0] as string;if(stamp(await metadata(path))!==file.stamp||await realpath(path)!==path)throw Error('Native provenance witness changed');}
  // One fresh SQL snapshot, not the historical snapshot used to rebuild a seal.
@@ -176,6 +177,7 @@ async function openContextState(selectionPin:NativeProvenancePin,policy:CivicPol
    value.importDispositions=contract.ImportRejectionDispositionSchema.array().parse(await helper.authenticateImportDispositions({decision:options.importDispositionDecision,nativeSealSelection:value.issuancePin,catalogue:selection.catalogue,seals:selection.seals.map(seal=>({sealResult:seal.output})),policy:bound,
     control:(pin:NativeProvenancePin)=>readPrivate(pin,files,MAX_BYTES,pin.path===options.importDispositionDecision!.path||pin.path===value.issuancePin.path),
     managed:(pin:NativeProvenancePin)=>fence.read(pin.path,pin.sha256)}));
+   const decision=contract.ImportDispositionDecisionSchema.parse(JSON.parse((await readPrivate(options.importDispositionDecision,files,MAX_BYTES,true)).toString('utf8')));value.importDecisionWindow={issuedAt:decision.issuedAt,expiresAt:decision.expiresAt};
    for(const disposition of value.importDispositions)if(!selection.seals.some(seal=>seal.municipalityId===disposition.municipalityId&&seal.sourceId===disposition.sourceId&&seal.corpus.sha256===disposition.corpusSha256&&pinKey(seal.output)===pinKey(disposition.sealResult)))throw Error('Import disposition lies outside the issued native frame');
   }
   return value;
