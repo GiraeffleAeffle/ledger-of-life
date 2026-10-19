@@ -138,6 +138,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   await migrateDistrictJobs(pool);const store=new DistrictJobStore(pool);
   const value=operatorRegistryFixtureValue(),city=value.municipalities[0];city.id='strausberg';city.ags='12064472';city.name='Synthetic Strausberg fixture';value.inventory[0].ags=city.ags;
   const now=new Date(Date.now()-1000).toISOString(),source=city.sources.find(row=>row.id==='website')!;source.checkState='checked';source.checkedAt=now;source.evidence=[{url:source.url!,locator:'Synthetic source configuration',sha256:digest('synthetic topology source'),retrievedAt:now}];
+  if(!duplicateMode)for(const id of ['witness-alpha','witness-beta'])city.sources.push({...structuredClone(source),id});
   const registry=await createOperatorRegistryFixture(t,{context:fixture,value,label:'topology-registry'}),rawRoot=join(root,'raw'),indexRoot=join(root,'index'),cas=new DistrictCas(join(root,'cas'));
   // This is the production topology: the whole CAS, not its hash subdirectory,
   // is enrolled as artifacts before any real residual queue handler runs.
@@ -330,6 +331,36 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     assert.equal(modelCalls,callsBeforeStep8);assert.equal(toolProbes,probesBeforeStep8);
     await exerciseStep8(t,{pool,cas,policy,fixtureRoot:join(root,'terminal-only-generation'),sealed:terminalSeal,jobKey:terminalKey,reconcileKey,sealInput:terminalInput,expectedTextRecords:0,expectedAssessments:0,expectDatedSliceHold:true,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Terminal-only step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,callsBeforeStep8);assert.equal(toolProbes,probesBeforeStep8);
+   }
+   if(!duplicateMode&&process.env.R1_TEST_STEP8_STAGING!=='1'){
+    const witnesses:Array<{scope:typeof scope;document:typeof document;queue:{jobKeys:string[];reconciliationJobKeys:string[];terminalDocumentExceptions:{documentId:string;step:string;jobKey:string;receiptId:string;receiptSha256:string;reasonCode:string}[]};sealed:Awaited<ReturnType<typeof sealQueueTextContribution>>;indexBytes:Buffer}>=[];
+    const witnessUrl='https://example.org/canonical-witness',witnessObservationId=Date.now()+'-'+randomUUID()+'.json',witnessObservationPath=join(rawRoot,'observations',witnessObservationId),witnessObservationBytes=Buffer.from(JSON.stringify({...JSON.parse(observationBytes.toString('utf8')),url:witnessUrl})+'\n');
+    const witnessBinding={...binding,url:witnessUrl,observationId:witnessObservationId,receiptSha256:digest(witnessObservationBytes)};
+    await civic.withManagedSourceWrite(rawRoot,[binding,witnessBinding].map(item=>({...item,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true})),()=>writeFile(witnessObservationPath,witnessObservationBytes,{mode:0o600}),policy);
+    const witnessRequest=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:witnessBinding,request:{url:witnessUrl,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[witnessUrl]},policy);
+    for(const sourceId of ['witness-alpha','witness-beta']){
+     const witnessScope={...scope,sourceId},witnessDocument={...document,id:'canonical-'+sourceId,sourceId,url:witnessUrl,observationPath:witnessObservationPath},witnessIndexBytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',generatedAt:now,documents:[witnessDocument],checks:[{municipalityId:city.id,sourceId,checkState:'checked',checkedAt:now,documentCount:1,coverage:{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,scope:'Canonical witness fixture',sourceCoverage:'not_assessed'}}]})+'\n'),witnessIndexPath=join(indexRoot,sourceId+'.json'),witnessIndexHash=digest(witnessIndexBytes);
+     await civic.withManagedSourceWrite(indexRoot,[...registry.admitted.bindings,witnessBinding].map(item=>({...item,relativePath:sourceId+'.json',contentSha256:witnessIndexHash,independentAllowed:false})),()=>writeFile(witnessIndexPath,witnessIndexBytes,{mode:0o600}),policy);
+     const requestEvidence=witnessRequest;
+     await withFixtureAuthorizedCorpus(witnessIndexBytes,policy,async()=>{
+      const importedWitness=await importCrawlCorpusForResidual(store,cas,{index:{path:witnessIndexPath,sha256:witnessIndexHash},rawRoot,registry:registry.registryPin,observations:[{path:witnessObservationPath,sha256:witnessBinding.receiptSha256}],documents:[{documentId:witnessDocument.id,scope:witnessScope,permission:{kind:'facts_with_attribution'},bounds,requestEvidence}]});
+      assert.deepEqual(importedWitness.holds,[]);
+      const preparation=await residual.enqueueResidualPreparation(store,cas,importedWitness.jobs[0]);await run(preparation,handlers);
+      const extraction=await residual.enqueueCommittedResidualExtraction(pool,store,cas,preparation);
+      chunkFailure='oversized';try{const held=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(extraction),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(held.state,'held');assert.equal(held.reasonCode,'quality_failed');}finally{chunkFailure=undefined;}await complete();
+      const row=(await pool.query('SELECT receipt,receipt_sha256 FROM district_pipeline.step_receipts WHERE job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$1) ORDER BY attempt DESC LIMIT 1',[extraction])).rows[0],queue={jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[{documentId:witnessDocument.id,step:'residual_extract',jobKey:extraction,receiptId:row.receipt.id,receiptSha256:row.receipt_sha256,reasonCode:row.receipt.reasonCode}]},sealed=await sealQueueTextContribution(pool,cas,queue);
+      assert.equal(sealed.records,0);witnesses.push({scope:witnessScope,document:witnessDocument,queue,sealed,indexBytes:witnessIndexBytes});
+     });
+    }
+    const canonicalQueue=await import('../../src/district-queue-text-run.ts'),canonicalBuild=canonicalQueue.buildQueueTextRun;
+    // Only the isolated fixture's owner-corpus capability changes per source.
+    // The real canonical builder, DB receipts and all lineage checks are intact.
+    t.mock.module(new URL('../../src/district-queue-text-run.ts',import.meta.url),{namedExports:{...canonicalQueue,buildQueueTextRun:(...args:Parameters<typeof canonicalBuild>)=>{
+     const selected=canonicalQueue.QueueTextSealInputSchema.parse(args[2]),witness=witnesses.find(entry=>entry.queue.terminalDocumentExceptions[0].jobKey===selected.terminalDocumentExceptions[0]?.jobKey);
+     return witness?withFixtureAuthorizedCorpus(witness.indexBytes,policy,()=>canonicalBuild(...args)):canonicalBuild(...args);
+    }}});
+    const {exerciseCanonicalProvenance}=await import('../helpers/step8-provenance-fixture.ts');
+    await exerciseCanonicalProvenance(t,{pool,cas,policy,root,base:{scope,document,queue:terminalInput,sealed:terminalSeal},witnesses});
    }
    await complete();assert.deepEqual(await readFile(bodyPath),body);assert.deepEqual(await readFile(observationPath),observationBytes);
   });

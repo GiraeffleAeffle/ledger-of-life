@@ -1,6 +1,7 @@
 import {readFile,lstat,realpath} from 'node:fs/promises';
 import {dirname,isAbsolute,join,relative,resolve} from 'node:path';
 import {z} from 'zod';
+import type {Pool} from 'pg';
 import {cacheDir} from './common.ts';
 import {digest,canonicalJson,HashSchema} from './district-adapter-contract.ts';
 import {dataReleaseId,dataReleaseSchema} from './data-release.ts';
@@ -12,14 +13,14 @@ import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,typ
 import {authenticateStep8Campaign,reserveStep8Generation} from './r1-step8-governance.ts';
 import {STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {requiredReplayStaging} from './replay-pipeline.ts';
-import {NativeProvenancePinSchema,NativeProvenanceWitnessSchema,ProvenanceSupplementSelectionSchema,createWitnessedProvenanceContext,authenticateSealProvenance} from './r1-step8-provenance.ts';
+import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,createWitnessedProvenanceContext,authenticateSealProvenance,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Absolute input path required'),sha256:HashSchema}).strict();
 const Policy=z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict();
 export const Step8StagingAssemblySchema=z.object({
  schemaVersion:z.literal('stadtstack-r1-step8-staging-assembly-v1'),
  retainedPlan:Pin,provenances:z.array(Pin).min(1),campaign:Pin,registry:Pin,
- provenanceWitnesses:z.array(NativeProvenanceWitnessSchema).max(256).optional(),
+ nativeSealSelection:NativeProvenancePinSchema.optional(),nativeSealCatalogue:NativeProvenancePinSchema.optional(),nativeCasRoot:z.string().refine(isAbsolute).optional(),
  provenanceSupplements:z.array(z.object({nativeOutput:NativeProvenancePinSchema,nativeProvenance:NativeProvenancePinSchema,supplement:ProvenanceSupplementSelectionSchema}).strict()).optional(),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
  managedRoot:z.string().refine(isAbsolute),policy:Policy,
@@ -62,7 +63,7 @@ export async function buildStep8RetainedPlan(publicationRoot:string,managedRoot=
 /** Consumes already imported retained copies and genuine managed dependencies.
  * Only campaign/provenance/component derivatives are created; no source rights
  * are inferred from an operator path, a registry descriptor, or Git membership. */
-export async function assembleStep8Staging(raw:unknown){
+export async function assembleStep8Staging(raw:unknown,pool?:Pool){
  const input=Step8StagingAssemblySchema.parse(raw),policy:CivicPolicyOptions=input.policy,authority=await assertCivicPolicyAuthority(policy),output=resolve(input.managedRoot);
  const relativeOutput=relative(cacheDir,output);
  if(!relativeOutput||relativeOutput.startsWith('..')||isAbsolute(relativeOutput)||relativeOutput.split('/').some(part=>part==='out'||part==='release'))throw Error('Fresh staging control root beneath package cache required');
@@ -76,12 +77,17 @@ export async function assembleStep8Staging(raw:unknown){
  const expected=await buildStep8RetainedPlan(plan.imports[0].publicationRoot,plan.managedRoot);
  if(!same(plan,expected))throw Error('Retained plan differs from the complete authentic 0.3.2 staging plan');
  const inventories=new Map<string,{pin:InventoryPin;read:()=>Promise<Buffer>}>();
- const provenanceContext=await createWitnessedProvenanceContext(input.provenanceWitnesses??[],policy);
+ let provenanceContext:WitnessedProvenanceContext|undefined;
+ try{
+ if(input.provenanceSupplements?.length){
+  if(!pool||!input.nativeSealSelection||!input.nativeSealCatalogue||!input.nativeCasRoot)throw Error('Supplements require canonical DB, governed selection, catalogue and CAS root');
+  provenanceContext=await createWitnessedProvenanceContext(input.nativeSealSelection,policy,{pool,casRoot:input.nativeCasRoot,catalogue:input.nativeSealCatalogue,mode:'step8'});
+ }else if(input.nativeSealSelection||input.nativeSealCatalogue||input.nativeCasRoot)throw Error('Unused native selection context');
  const supplements=new Map<string,NonNullable<typeof input.provenanceSupplements>[number]>();
  for(const selected of input.provenanceSupplements??[]){const key=canonicalJson([selected.nativeProvenance.path,selected.nativeProvenance.sha256]);if(supplements.has(key)||!input.provenances.some(pin=>pin.path===selected.nativeProvenance.path&&pin.sha256===selected.nativeProvenance.sha256))throw Error('Duplicate or unused source provenance supplement');supplements.set(key,selected);}
  for(const control of input.provenances){
   const selected=supplements.get(canonicalJson([control.path,control.sha256]));
-  const supplemental=selected?await authenticateSealProvenance(selected.nativeOutput,selected.supplement,policy,provenanceContext):undefined;
+  const supplemental=selected?await authenticateSealProvenance(selected.nativeOutput,selected.supplement,policy,provenanceContext!):undefined;
   if(supplemental&&(supplemental.originalProvenance.path!==control.path||supplemental.originalProvenance.sha256!==control.sha256))throw Error('Supplement names another native provenance');
   const provenance=supplemental?.reader??await authenticatePublicationProvenance(control.path,control.sha256,policy);
   const inventory=supplemental?.inventory??privatePublicationProvenanceSchema.parse(await readPinnedJson(control.path,control.sha256));
@@ -114,7 +120,7 @@ export async function assembleStep8Staging(raw:unknown){
   const pin={path,sha256:digest(bytes),bytes:bytes.length,bindings:authenticated.bindings};selected.set(path,pin);
   staging.push({path,sha256:pin.sha256,destination:member.memberPath});
  }
- await provenanceContext.finish();
+ const completedContext=provenanceContext;provenanceContext=undefined;await completedContext?.finish();
  // Do not upgrade derivative custody into independent original-source rights.
  const bindings=uniqueBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
  await assertStagingRootsDisjoint(output,policy);
@@ -137,4 +143,5 @@ export async function assembleStep8Staging(raw:unknown){
  const component={campaign:campaignPin,registry:input.registry,privateProvenance,staging,...(input.identityAssessments?{identityAssessments:input.identityAssessments}:{}),...(input.criticalAssessments?{criticalAssessments:input.criticalAssessments}:{}),...(input.regionalPolicyReceipts?{regionalPolicyReceipts:input.regionalPolicyReceipts}:{})};
  const componentPin=await write('staging-component.json',encoded(component));
  return {schemaVersion:'stadtstack-r1-step8-staging-result-v2',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:staging.length,publicationExecuted:false,valueAccepted:false,hostedReleaseAuthorized:false};
+ }finally{await provenanceContext?.finish();}
 }

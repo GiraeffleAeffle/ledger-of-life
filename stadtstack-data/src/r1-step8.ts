@@ -25,7 +25,7 @@ import {authenticateStep8Campaign,assertStep8ExportMembership,reserveStep8Genera
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 import {auditStep8} from './r1-step8-audit.ts';
 import {STEP8_ALLOWANCE_READ_PLAN} from './r1-step8-allowance-audit.ts';
-import {NativeProvenanceWitnessSchema,ProvenanceSupplementSelectionSchema,createWitnessedProvenanceContext,authenticateSealProvenance} from './r1-step8-provenance.ts';
+import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateSealProvenance} from './r1-step8-provenance.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Operator paths must be absolute'),sha256:HashSchema}).strict();
 const sealSchema=z.object({compositionArtifactSha256:HashSchema,privateProvenance:Pin.passthrough(),policyInventory:Pin.passthrough(),criticalInventory:Pin.passthrough()}).passthrough();
@@ -35,7 +35,7 @@ export const Step8InputSchema=z.object({
  campaign:Pin,
  currentGeneration:Step8CurrentGenerationSchema,
  seals:z.array(QueueTextSealInputSchema.safeExtend({sealResult:Pin,provenanceSupplement:ProvenanceSupplementSelectionSchema.optional()})).min(1),
- provenanceWitnesses:z.array(NativeProvenanceWitnessSchema).max(256).optional(),
+ nativeSealSelection:NativeProvenancePinSchema,
  structuredRunIds:z.array(z.uuid()).min(1),registry:Pin,privateProvenance:Pin,
  staging:z.array(Pin.extend({destination:z.string().min(1)}).strict()).min(1),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
@@ -53,7 +53,7 @@ const uniqueBindings=(bindings:SourceArtifactBinding[])=>[...new Map(bindings.ma
 export function step8ReadPlan(input:Step8Input){
  return {schemaVersion:'stadtstack-r1-step8-read-plan-v1',writes:[],network:false,providers:false,
   reads:{campaign:input.campaign,seals:input.seals,structuredRunIds:input.structuredRunIds,registry:input.registry,privateProvenance:input.privateProvenance,
-   currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,provenanceWitnesses:input.provenanceWitnesses,
+   currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,nativeSealSelection:input.nativeSealSelection,
    staging:input.staging,identityAssessments:input.identityAssessments,criticalAssessments:input.criticalAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts,
    casRoot:input.casRoot,policy:input.policy,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,
    database:['district_pipeline.jobs','district_pipeline.step_receipts','district_pipeline.artifacts','district_pipeline.r1_codex_documents','district_pipeline.r1_codex_call_intents','district_pipeline.r1_codex_call_authorizations','district_pipeline.r1_codex_allowance_intents','district_pipeline.preauthorizations','district_pipeline.assessment_bridge_leases'],
@@ -90,12 +90,13 @@ export async function runStep8(raw:unknown,pool:Pool){
  const remainingSources=new Map(campaign.sources.map(source=>[source.corpus.sha256,source])),sourceDispositions:unknown[]=[],auditAssessments:Array<{recordId:string;item:string;A:string;B:string;C:string}>=[];
  const compositions:z.infer<typeof r1TextCompositionInputSchema>[]=[],policyInventories:z.infer<typeof publicationPolicyReceiptInventorySchema>[]=[],criticalInventories:z.infer<typeof CriticalAssessmentInventorySchema>[]=[];
  const exports=[];
- const provenanceContext=await createWitnessedProvenanceContext(input.provenanceWitnesses??[],policy);
+ const provenanceContext=await createWitnessedProvenanceContext(input.nativeSealSelection,policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8'});
  try{
+ await assertCanonicalSealSelection(provenanceContext,input.seals.map(({sealResult,provenanceSupplement:_,...queue})=>({output:sealResult,queue})));
  for(const selected of input.seals){
   const seal=sealSchema.parse(JSON.parse((await readReplayPin(selected.sealResult,process.cwd())).toString('utf8')));
   const authenticated=await authenticateSealProvenance(selected.sealResult,selected.provenanceSupplement,policy,provenanceContext),source=authenticated.reader;
-  addInventory(authenticated.inventory.inputs,dirname(resolve(selected.provenanceSupplement?.path??seal.privateProvenance.path)));
+  addInventory(authenticated.inventory.inputs,dirname(resolve(selected.provenanceSupplement?.inventory.path??seal.privateProvenance.path)));
   const compositionPath=join(cas.root,'sha256',seal.compositionArtifactSha256.slice(0,2),seal.compositionArtifactSha256),bytes=await source.read(compositionPath);
   if(digest(bytes)!==seal.compositionArtifactSha256)throw Error('Sealed composition digest mismatch');
   const serialized=r1TextCompositionInputSchema.parse(JSON.parse(bytes.toString('utf8')));

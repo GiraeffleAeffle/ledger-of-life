@@ -47,6 +47,9 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 - `expectedSources`: **27** and `expectedDocuments`: **208** for this production
   campaign. The command rejects an incomplete count or duplicate extraction
   jobs; the isolated synthetic fixture declares its own 1-source/1-document scope.
+- `nativeSealSelection`: the independently pinned **issued lead-action record**,
+  not its bare strict frame. It selects the exact ordered 27 published seals and
+  the same current catalogue; see “Witnessed shared-content provenance supplements”.
 - `currentGeneration`: pins the active catalogue and its immutable processing
   approval, independently of the runtime HEAD used for publication/replay.
   Follow `catalogue.processingPinReview.path` (relative to the catalogue when
@@ -789,110 +792,88 @@ own cohort. Core deliberately requires complete derived ancestry
 special case is permitted. The old audit's byte-only checks could miss this
 execute-time failure.
 
-The single step8-only implementation is `src/r1-step8-provenance.ts`. It derives
-an **operator supplement**, never a replacement native seal/receipt: every added
-HTTP binding must occur in an independently pinned native manifest whose outer
-managed provenance and native extraction-run identity are authenticated. Target
-hash, path and byte size stay identical. Non-target inputs remain unchanged.
-Targets must be explicitly present and genuinely grow; unrelated/nonshared
-sources (such as a nonempty critical inventory) use ordinary authentication.
-The deterministic supplement must exactly equal the independently witnessed
-union. Unchanged Core then authenticates its complete current binding sets and
-reads **every** pinned input body. Missing witnesses, revoked contributors,
-unregistered bindings, permission changes or a later expanded live union remain
-failures, not fallback opportunities.
+The single step8-only implementation is `src/r1-step8-provenance.ts`. It accepts
+an independently reviewed and **issued** `stadtstack-r1-operator-action-record-v1`
+action `select-governed-native-seals`, not arbitrary witness files. This record
+pins a strict `stadtstack-r1-native-seal-selection-v1` frame, the current
+catalogue, collection evidence and collector implementation. The frame's ordered
+`seals` entries contain `municipalityId`, `sourceId`, `corpus`, `output`,
+`admission` (`published` or `adoption_candidate`), and the exact saved
+`QueueTextSealInput`. Issuance/expiry, frozen parent approval and zero execution/
+spending bounds are checked. A draft or bare frame grants no authority.
 
-The final Step8 input may additionally contain:
+Parchim adoption requires the 24 published sources plus its one candidate;
+final production step8 requires all 27 published. Step8 audit/execute must match
+the exact ordered selected outputs and queues. Duplicate identities and other
+catalogues refuse. An opaque context authenticates all selected seals once.
 
-```json
-{
-  "provenanceWitnesses": [
-    {
-      "output": {"path": "/absolute/native-seal-result.json", "sha256": "actual output hash", "bytes": 123},
-      "provenance": {"path": "/absolute/native-provenance.json", "sha256": "actual provenance hash", "bytes": 456}
-    }
-  ],
-  "seals": [
-    {
-      "sealResult": {"path": "/absolute/native-seal-result.json", "sha256": "actual output hash"},
-      "jobKeys": ["actual extraction job hash"],
-      "reconciliationJobKeys": [],
-      "provenanceSupplement": {
-        "path": "/absolute/operator-supplement.json",
-        "sha256": "actual deterministic supplement hash",
-        "bytes": 789,
-        "targets": ["actual shared control hash"]
-      }
-    }
-  ]
-}
-```
+**Custody is not producer authentication:** unchanged Core `buildQueueTextRun`
+reconstructs every native seal from actual canonical PostgreSQL receipts, in a
+repeatable-read read-only transaction. The source/document/corpus cohort, all
+six artifacts, composition, all three ancillary roles, full ten-member private
+provenance body/hash and native output metadata must match the canonical producer.
+Enrolling invented JSON, or combining a real run with fabricated ancillary roles,
+does not pass. The CAS facade only reads existing epoch-fenced members: no
+initialization/put. Its independent one-connection pool accepts only scalar local
+Unix-socket settings, not caller Client/stream/hooks or DSN GUC overrides.
+Password authentication is prohibited; this is a local peer/trust path.
 
-Those explanatory strings/counts are not executable evidence. Keep every
-source's existing queue/exception/item-hold fields unchanged. The globally pinned
-witness set must include all actual contributors; supply a per-source supplement
-only where applicable. Native output/provenance bytes are never edited in place.
-Audit and execute both use the same module before accepting a source; final
-managed aggregate provenance preserves the witnessed complete union for replay.
-The read plan includes the witness pins and each source's supplement metadata.
+The deterministic binding-union inventory has a mandatory **v2 attestation**
+binding the issuance/frame pins, exact ordered source/output/provenance/run/queue/
+receipt identities, target list and inventory digest/size. Extra no-op witnesses,
+omissions, reordered sets and copied aliases cannot reuse an attestation even
+when union bytes are identical. Targets must exist and grow; their path/hash/size
+and non-target members remain unchanged. Every added binding is a canonical
+original HTTP observation with `independentAllowed:true`. Unchanged Core then
+authenticates exact live binding sets and reads every input. Native seals and
+receipts are never rewritten; missing contributors and revocations stay failures.
 
-The staging assembler accepts the same `provenanceWitnesses` plus
-`provenanceSupplements: [{nativeOutput, nativeProvenance, supplement}]`, where the
-two native pins have the same path/hash/optional-byte shape and `supplement` has
-the per-seal shape above. Each entry must match an explicitly supplied
-`provenances` control; duplicates or unused mappings are rejected. It authenticates
-through this module instead of bypassing a failing source manifest. Ordinary
-already-complete source provenance still uses unchanged Core authentication.
+Step8 input requires `nativeSealSelection` (the **issued-record** Pin).
+Optional per-seal `provenanceSupplement` now has the strict shape
+`{inventory: Pin, attestation: Pin, targets: Hash[]}`; a bare union pin is invalid.
+The read plan includes these controls. Audit and execute share authentication;
+replay receives the authenticated complete aggregate inventory.
 
-Public APIs for independent adoption tooling:
+Supplemented staging assembly additionally requires `nativeSealSelection`,
+`nativeSealCatalogue`, `nativeCasRoot` and the canonical socket database, plus
+`provenanceSupplements: [{nativeOutput, nativeProvenance, supplement}]`.
+Mappings must match explicitly supplied `provenances` controls. Ordinary complete
+provenance still uses unchanged Core without a database context.
+
+Private adoption uses the same APIs:
 
 ```ts
 const context = await createWitnessedProvenanceContext(
-  inputs.witnesses, policy,
-  {coreRoot: '/home/max/civic-rebuild-r1/stadtstack-data'}
+  issuedSelectionPin, policy,
+  {pool, casRoot, catalogue: currentCataloguePin, mode: 'adoption',
+   coreRoot: '/home/max/civic-rebuild-r1/stadtstack-data'}
 );
 try {
-  const body = await buildProvenanceSupplement(inputs, policy, context);
-  // Persist body.bytes privately through the caller's governed immutable IO.
-  const reader = await authenticateSupplement(inputs, supplementPin, policy, context);
-  // Perform the caller's full native/adoption checks with the genuine Core reader.
+  const evidence = {nativeOutput, nativeProvenance, targets};
+  const body = await buildProvenanceSupplement(evidence, policy, context);
+  // Governed immutable IO persists body.bytes and body.attestationBytes,
+  // pinned by body.sha256 and body.attestationSha256.
+  const reader = await authenticateSupplement(
+    evidence, {inventory: inventoryPin, attestation: attestationPin}, policy, context
+  );
+  // Perform the caller's complete independent native/adoption checks.
 } finally {
   await context.finish();
 }
 ```
 
-`inputs` contains `nativeOutput`, `nativeProvenance`, `witnesses` and `targets`;
-adoption-specific window/frame approvals remain the caller's responsibility.
-All runtime Core imports come from the explicitly selected `coreRoot` (default:
-the module's package). Private adoption can therefore pin the new module while
-calling active pinned Core, without substituting a side-worktree implementation.
-`WITNESSED_PROVENANCE_CORE_DEPENDENCIES` lists its four dynamic entry modules;
-their transitive imports remain in that same selected checkout.
+All runtime Core entry modules come from the explicitly selected active
+`coreRoot`; `WITNESSED_PROVENANCE_CORE_DEPENDENCIES` enumerates them. No protected
+processing/archive source changes are required. Cached decoding is not cached
+authorization: file identity/realpath, authority, issuance expiry, live selected
+job/receipt state, inventory/objection epochs and final segment/root integrity
+remain mandatory. Changed views fail closed, without silent reselection.
+Final writes still require the governed quiescent window.
 
-An opaque context caches immutable witness decoding/outer-proof checks **once
-per batch**, not once per source. It checks private file identity stamps,
-authority, current inventory epoch and objections around use, then finalizes
-through the existing segment/root epoch fence. It does not hold an inventory lock
-across the batch. A changed epoch produces an explicit refusal; active provider
-writes can legitimately invalidate a read-only preflight. Do not reinterpret
-that as a missing-witness permission or silently retry under another view.
-Final candidate/adoption writes still require the governed quiescent window.
-
-
-
-Focused verification of the witnessed-union cutover used CPUs 6–7, isolated
-authority and a fresh socket-only disposable PostgreSQL cluster:
-`r1-step8-provenance`, `district-publication-provenance`, `r1-step8`,
-`r1-step8-governance` and `district-residual-topology` tests: **25 passed,
-0 failed/cancelled/skipped**, exit 0. Both native full-publication/exact-replay
-fixtures passed, including duplicate-source handling and a malformed declared
-binding-set audit regression. Unit cases cover deterministic prototype-compatible
-bytes, missing/invented contributors, changed non-target fields, absent/duplicate/
-nongrowing targets, wrong paths/kinds/permissions, changed witness files,
-unchanged-inode parent aliases, changed inventory epochs and live Core revocation.
-All fourteen actual exported processing-contract results equal active Core
-`aceb0a658c48f2e683e79316f4ddd2d13689b36e` (zero differences).
-Disposable PG stopped with exit 0 and was removed. No full gate/typecheck or
-production supplement/adoption/publication was executed by this implementation
-verification; operational adoption remains separately governed.
-
+Focused regressions are in `r1-step8-provenance.test.ts` and the real disposable-
+PG `residual-production-topology` fixture, including native publication/exact
+replay and `helpers/step8-provenance-fixture.ts`. Distinct source cohorts use
+genuine canonical held queue receipts, including a real no-op binding witness.
+Tests cover ancillary forgery, exact-set/alias changes, unchanged-inode parent
+aliases, epoch changes and unchanged DB/inventory state. Merely enrolled
+native-looking synthetic JSON is deliberately not a positive fixture.

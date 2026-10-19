@@ -13,7 +13,9 @@ if(mode==='retained-plan'){
  console.log(JSON.stringify(await buildStep8RetainedPlan(path),null,2));
 }else if(mode==='assemble-staging'){
  const bytes=await readFile(path);if(digest(bytes)!==sha256)throw Error('Step8 staging assembly pin mismatch');
- console.log(JSON.stringify(await assembleStep8Staging(JSON.parse(bytes.toString('utf8'))),null,2));
+ const input=JSON.parse(bytes.toString('utf8'));
+ const pool=input.provenanceSupplements?.length?new Pool({connectionString:step8SocketConnection(process.env.DATABASE_URL??''),max:1,options:'-c default_transaction_read_only=on',application_name:'r1-step8-staging-canonical-readonly'}):undefined;
+ try{console.log(JSON.stringify(await assembleStep8Staging(input,pool),null,2));}finally{await pool?.end();}
 }else if(mode==='discover'){
  const pool=new Pool({connectionString:process.env.DATABASE_URL,max:1,application_name:'r1-step8-read-only-discovery',options:'-c default_transaction_read_only=on'});
  try{console.log(JSON.stringify(await discoverStep8Plan(path,sha256!,pool),null,2));}finally{await pool.end();}

@@ -13,13 +13,14 @@ import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 
 const execute=promisify(execFile),hash='a'.repeat(64),pin={path:'/synthetic/pinned-input',sha256:hash},at='2026-10-15T00:00:00.000Z';
 const input={schemaVersion:'stadtstack-r1-step8-v1',campaign:pin,expectedSources:1,expectedDocuments:1,seals:[{sealResult:pin,jobKeys:[hash],reconciliationJobKeys:[]}],structuredRunIds:['3fe33cb6-fb63-4151-b56d-e94271c0d0af'],registry:pin,privateProvenance:pin,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'b'.repeat(40),manifestSha256:hash,releaseId:hash,directory:'release'},asOf:'2026-10-15',clocks:{recordsGeneratedAt:at,quarantineGeneratedAt:at,coverageGeneratedAt:at,qualityGeneratedAt:at,manifestGeneratedAt:at},casRoot:'/synthetic/cas',outputRoot:'/synthetic/cache/candidate',policy:{stateDir:'/synthetic/policy',authorityId:'synthetic',authoritySha256:hash}};
+Object.assign(input,{nativeSealSelection:pin});
 const currentGeneration={processingCommit:'a'.repeat(40),catalogue:pin,processingReview:pin,assessmentQueueContractSha256:hash,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:hash,runnerContractSha256:hash,runnerOutputContractSha256:hash,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
 
 test('operator plan is closed, explicit and never claims execution/value acceptance',()=>{
  const parsed=Step8InputSchema.parse({...input,currentGeneration}),plan=step8ReadPlan(parsed);
  assert.deepEqual(plan.writes,[]);assert.equal(plan.network,false);assert.equal(plan.providers,false);
  assert.equal(plan.reads.priorRelease.directory,'release');assert.ok(plan.notAuthorized.includes('value acceptance (step 9)'));
- for(const field of ['priorRelease','privateProvenance','clocks','asOf','seals','structuredRunIds','currentGeneration'])assert.throws(()=>Step8InputSchema.parse({...input,currentGeneration,[field]:undefined}));
+ for(const field of ['priorRelease','privateProvenance','clocks','asOf','seals','structuredRunIds','currentGeneration','nativeSealSelection'])assert.throws(()=>Step8InputSchema.parse({...input,currentGeneration,[field]:undefined}));
  assert.throws(()=>Step8InputSchema.parse({...input,currentGeneration,allowLiveFallback:true}));
  assert.ok(plan.reads.database.includes('district_pipeline.r1_codex_allowance_intents'));
  assert.equal(plan.reads.allowance.approvals.length,5);assert.equal(plan.reads.allowance.approvals.at(-1)!.sha256,'12f110244241e0294148cafc5fe13319b627b692136dfbfe18d61022f5e9b7d2');assert.equal(plan.reads.allowance.bounds.paidMicroUsd,0);assert.equal(plan.reads.allowance.bounds.maxExtraCallsCohort,100);
