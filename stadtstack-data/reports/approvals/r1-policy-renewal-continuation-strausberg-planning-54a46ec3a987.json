@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "r1-window20-inspected-continuation-v1",
+  "id": "r1-policy-renewal-continuation-strausberg-planning-54a46ec3a987",
+  "action": "continue-inspected-policy-renewal-source",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-19T23:28:53.580Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "candidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "sourceId": "strausberg-planning",
+  "phase": "refresh",
+  "processingCommit": "5a9a14c105195043fda1c4f9aa8b9f6697e33c3d",
+  "inspection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/inspection-54a46ec3a987739ad44f6d382ad9b7329ab87f8d72ab6edb35b4ab0a791ea3e6.json",
+    "sha256": "f8ec6a2a80c3691a67fc74e83aa3497e894ff7326ceb27b7960bbe3eec0d9bc0"
+  },
+  "inspectionIdentitySha256": "54a46ec3a987739ad44f6d382ad9b7329ab87f8d72ab6edb35b4ab0a791ea3e6",
+  "resolution": {
+    "action": "fresh_bounded_policy_authority",
+    "maxJobs": 3,
+    "maxPolicyRequests": 24
+  },
+  "bounds": {
+    "maxJobs": 3,
+    "maxPolicyRequests": 24,
+    "maxCoreReconciliations": 0,
+    "maxIdempotentEnqueueReplays": 1,
+    "maxIdempotentSeals": 0,
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0
+  },
+  "rules": "No blind replay. Closed genuine successful captures may be adopted. Enqueue/seal alone are idempotent; authorize is adopted from exact canonical rows or created once after absence proof. A started executor is never replayed: source-scoped infra holds require exact Core resume and fresh bounded authority; policy/refusal/unknown holds remain blocked. Dead leases require canonical reconciliation then new inspection/review. All original captures are retained."
+}
