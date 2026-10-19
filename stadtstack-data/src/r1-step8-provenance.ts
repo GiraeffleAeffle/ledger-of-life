@@ -50,6 +50,14 @@ type PolicyCheck={receipt:import('./district-policy-receipt.ts').PolicyReceipt;c
 type NativeRecord={output:NativeProvenancePin;provenance:NativeProvenancePin;inventory:PrivatePublicationProvenance;identity:unknown;exported:CanonicalExport;policyChecks:PolicyCheck[]};
 type FileRecord={bytes:Buffer;stamp:string};
 export const ReconstructionWorkersSchema=z.number().int().min(1).max(3).default(3);
+export const ReconstructionTimingSchema=z.object({estimatedDurationSeconds:z.number().int().min(1).max(7*86400),expiryMarginSeconds:z.number().int().min(60).max(86400)}).strict().default({estimatedDurationSeconds:43200,expiryMarginSeconds:3600});
+export function reconstructionPolicyHorizon(raw:z.input<typeof ReconstructionTimingSchema>,startedAt=Date.now()){
+ const timing=ReconstructionTimingSchema.parse(raw);return startedAt+1000*(timing.estimatedDurationSeconds+timing.expiryMarginSeconds);
+}
+export function assertReconstructionPolicyExpiry(expiresAt:string,requiredThrough:number){
+ if(!Number.isFinite(requiredThrough)||Date.parse(z.iso.datetime().parse(expiresAt))<=requiredThrough)throw Error('Pinned policy proof expires before estimated reconstruction end plus margin; require a re-issued selection with genuine refreshed/re-sealed proofs');
+}
+type NativeImportDisposition={kind:'import_rejection';municipalityId:string;sourceId:string;corpusSha256:string;documentId:string;sourceSha256:string;sealResult:NativeProvenancePin;processed:false;admittedRecordIds:never[]};
 export function assertReconstructionMemory(workers:number,meminfo:string){
  const count=ReconstructionWorkersSchema.parse(workers),match=/^MemAvailable:\s+(\d+)\s+kB$/m.exec(meminfo);
  if(!match)throw Error('Reconstruction requires Linux MemAvailable');
@@ -58,9 +66,9 @@ export function assertReconstructionMemory(workers:number,meminfo:string){
  return {workers:count,availableBytes:available,requiredBytes:required};
 }
 export interface WitnessedProvenanceContext {readonly witnesses:number;readonly reconstructionWorkers:number;checkpoint():Promise<void>;finish():Promise<void>}
-type ContextOptions={pool:Pool;casRoot:string;catalogue:NativeProvenancePin;mode:'step8';coreRoot?:string;workers?:number};
+type ContextOptions={pool:Pool;casRoot:string;catalogue:NativeProvenancePin;mode:'step8';coreRoot?:string;workers?:number;timing?:z.input<typeof ReconstructionTimingSchema>;importDispositionDecision?:NativeProvenancePin};
 interface ContextState {
- core:Core;coreRoot:string;casRoot:string;policy:CivicPolicyOptions;selection:Selection;selectionPin:NativeProvenancePin;issuancePin:NativeProvenancePin;issuance:z.infer<typeof NativeSealSelectionActionSchema>;native:Map<string,NativeRecord>;files:Map<string,FileRecord>;db:Pool;steps:Map<string,CanonicalStep>;controls?:string;
+ core:Core;coreRoot:string;casRoot:string;policy:CivicPolicyOptions;selection:Selection;selectionPin:NativeProvenancePin;issuancePin:NativeProvenancePin;issuance:z.infer<typeof NativeSealSelectionActionSchema>;native:Map<string,NativeRecord>;files:Map<string,FileRecord>;db:Pool;steps:Map<string,CanonicalStep>;controls?:string;importDispositions:NativeImportDisposition[];importDispositionDecision?:NativeProvenancePin;
  fence:Awaited<ReturnType<Core['audit']['createReadOnlyManagedSourceAudit']>>;inventoryPin:NativeProvenancePin;inventoryStamp:string;finished:boolean;epochAccepted:boolean;
 }
 const contexts=new WeakMap<WitnessedProvenanceContext,ContextState>();
@@ -111,7 +119,12 @@ async function canonicalSeal(value:ContextState,selected:Selection['seals'][numb
  const rows=catalogue.rows.filter(row=>row.scope.municipalityId===selected.municipalityId&&row.scope.sourceId===selected.sourceId);if(rows.length!==1)throw Error('Native selection source is absent or duplicated in governed catalogue');
  equal(value,{path:selected.corpus.path,sha256:selected.corpus.sha256},rows[0].index,'Native selection corpus differs from governed catalogue');
  const documents=(entries:{documentId:string;sha256:string}[])=>entries.map(entry=>[entry.documentId,entry.sha256]).sort((a,b)=>a[0].localeCompare(b[0]));
- equal(value,documents(built.originals.map(source=>({documentId:source.document.id,sha256:source.document.sha256}))),documents(rows[0].originals),'Native selection document cohort differs from governed catalogue');
+ const rejected=value.importDispositions.filter(disposition=>disposition.municipalityId===selected.municipalityId&&disposition.sourceId===selected.sourceId&&disposition.corpusSha256===selected.corpus.sha256&&pinKey(disposition.sealResult)===pinKey(selected.output)),excluded=new Set<string>();
+ for(const disposition of rejected){
+  if(!rows[0].originals.some(original=>original.documentId===disposition.documentId&&original.sha256===disposition.sourceSha256)||built.originals.some(original=>original.document.id===disposition.documentId&&original.document.sha256===disposition.sourceSha256))throw Error('Import rejection differs from catalogue or names a processed native original');
+  const key=JSON.stringify([disposition.documentId,disposition.sourceSha256]);if(excluded.has(key))throw Error('Duplicate native import rejection');excluded.add(key);
+ }
+ equal(value,documents(built.originals.map(source=>({documentId:source.document.id,sha256:source.document.sha256}))),documents(rows[0].originals.filter(original=>!excluded.has(JSON.stringify([original.documentId,original.sha256])))),'Native selection document cohort differs from governed catalogue');
  await value.fence.read(selected.corpus.path,selected.corpus.sha256);
  const bindings=[...new Map(built.originals.map(source=>{const binding={...source.sourceBinding,independentAllowed:true};return [core.adapter.canonicalJson(binding),binding] as const;})).values()];
  const pin=(bytes:Uint8Array|string,sha256=digest(typeof bytes==='string'?Buffer.from(bytes):bytes),declared:PrivatePublicationProvenance['inputs'][number]['bindings']=bindings)=>({path:join(cas.root,'sha256',sha256.slice(0,2),sha256),sha256,bytes:typeof bytes==='string'?Buffer.byteLength(bytes):bytes.byteLength,bindings:declared});
@@ -157,8 +170,44 @@ async function openContextState(selectionPin:NativeProvenancePin,policy:CivicPol
  const db=createCanonicalWitnessReadPool(options.pool.options);
  try{
   const fence=await core.audit.createReadOnlyManagedSourceAudit(bound),inventoryPin={path:join(resolve(bound.stateDir??core.civic.CIVIC_POLICY_STATE_DIR),'inventory.json'),sha256:fence.inventorySha256},epochFiles=new Map<string,FileRecord>();await readPrivate(inventoryPin,epochFiles,512*1024*1024);
-  return {core,coreRoot:resolve(options.coreRoot??defaultCoreRoot),casRoot:resolve(options.casRoot),policy:bound,selection,selectionPin:{...issuance.selection,bytes:frameBytes.length},issuancePin:{...selectionPin,bytes:issuanceBytes.length},issuance,native:new Map(),files,db,steps:new Map(),fence,inventoryPin,inventoryStamp:epochFiles.get(pinKey(inventoryPin))!.stamp,finished:false,epochAccepted:false};
+  const value:ContextState={core,coreRoot:resolve(options.coreRoot??defaultCoreRoot),casRoot:resolve(options.casRoot),policy:bound,selection,selectionPin:{...issuance.selection,bytes:frameBytes.length},issuancePin:{...selectionPin,bytes:issuanceBytes.length},issuance,native:new Map(),files,db,steps:new Map(),fence,inventoryPin,inventoryStamp:epochFiles.get(pinKey(inventoryPin))!.stamp,finished:false,epochAccepted:false,importDispositions:[],...(options.importDispositionDecision?{importDispositionDecision:{...options.importDispositionDecision}}:{})};
+  if(options.importDispositionDecision){
+   const [helper,contract]=await Promise.all(['src/r1-step8-import-dispositions.ts','src/r1-step8-import-disposition-contract.ts'].map(file=>import(pathToFileURL(join(value.coreRoot,file)).href)));
+   value.importDispositions=contract.ImportRejectionDispositionSchema.array().parse(await helper.authenticateImportDispositions({decision:options.importDispositionDecision,nativeSealSelection:value.issuancePin,catalogue:selection.catalogue,seals:selection.seals.map(seal=>({sealResult:seal.output})),policy:bound,
+    control:(pin:NativeProvenancePin)=>readPrivate(pin,files,MAX_BYTES,pin.path===options.importDispositionDecision!.path||pin.path===value.issuancePin.path),
+    managed:(pin:NativeProvenancePin)=>fence.read(pin.path,pin.sha256)}));
+   for(const disposition of value.importDispositions)if(!selection.seals.some(seal=>seal.municipalityId===disposition.municipalityId&&seal.sourceId===disposition.sourceId&&seal.corpus.sha256===disposition.corpusSha256&&pinKey(seal.output)===pinKey(disposition.sealResult)))throw Error('Import disposition lies outside the issued native frame');
+  }
+  return value;
  }catch(error){await db.end();throw error;}
+}
+/** This preflight can only refuse: native producer authentication still follows.
+ * Read the exact pinned current continuations, never replace a proof from a
+ * mutable latest-proof lookup or renew it here. */
+async function preflightPolicyHorizon(value:ContextState,requiredThrough:number){
+ await assertCurrent(value);
+ const {core}=value,cas={read:(hash:string)=>value.fence.read(join(value.casRoot,'sha256',hash.slice(0,2),hash),hash)},proofs=new Map<string,import('./district-policy-receipt.ts').PolicyReceipt>(),checked=new Set<string>();
+ const proof=async(hash:string)=>{let result=proofs.get(hash);if(!result){result=await core.policyReceipt.loadPolicyReceipt(cas,hash);proofs.set(hash,result);}return result;};
+ const sourcePin=z.object({path:z.string().refine(isAbsolute),sha256:Hash,bytes:z.number().int().nonnegative().optional()}).passthrough();
+ const policySchema=z.object({currentAdmissionReceipts:z.record(Hash,Hash).default({}),records:z.array(z.object({receipts:z.array(z.object({receiptSha256:Hash,currentReceiptSha256:Hash.optional()}).passthrough())}).passthrough())}).passthrough();
+ for(const selected of value.selection.seals){
+  const output=z.object({runId:Hash,policyInventory:sourcePin}).passthrough().parse(JSON.parse((await readPrivate(selected.output,value.files)).toString('utf8')));
+  const recorded=z.object({queue:z.object({stepReceipts:z.array(z.object({spec:z.object({policyProofSha256:Hash.nullable().optional()}).passthrough()}).passthrough())}).passthrough()}).passthrough().parse(JSON.parse((await cas.read(output.runId)).toString('utf8')));
+  const policy=policySchema.parse(JSON.parse((await value.fence.read(output.policyInventory.path,output.policyInventory.sha256)).toString('utf8'))),hashes=new Set<string>(Object.keys(policy.currentAdmissionReceipts));
+  for(const step of recorded.queue.stepReceipts)if(step.spec.policyProofSha256)hashes.add(step.spec.policyProofSha256);
+  for(const record of policy.records)for(const receipt of record.receipts){
+   hashes.add(receipt.receiptSha256);
+   if(receipt.currentReceiptSha256&&policy.currentAdmissionReceipts[receipt.receiptSha256]!==receipt.currentReceiptSha256)throw Error('Pinned policy inventory current-proof mapping conflicts');
+  }
+  for(const hash of hashes){
+   const currentHash=policy.currentAdmissionReceipts[hash]??hash,key=hash+':'+currentHash;if(checked.has(key))continue;
+   const original=await proof(hash),current=await proof(currentHash);
+   await core.policyReceipt.recheckPolicyReceipt(original,{...value.policy,evaluationAt:new Date().toISOString(),currentProof:current});
+   try{assertReconstructionPolicyExpiry(current.expiresAt,requiredThrough);}catch(error){throw Error(`${selected.municipalityId}/${selected.sourceId}: policy ${currentHash} expires ${current.expiresAt}; required through ${new Date(requiredThrough).toISOString()}: ${(error as Error).message}`);}
+   checked.add(key);
+  }
+ }
+ await assertCurrent(value);
 }
 function epochIdentity(value:ContextState){return JSON.stringify([value.policy.authorityId,value.policy.authoritySha256,value.inventoryPin.sha256,value.inventoryStamp,value.fence.optOutSnapshotSha256]);}
 function assertPolicyClocks(value:ContextState){
@@ -204,7 +253,7 @@ async function reconstruct(value:ContextState,indices:readonly number[]){
 const WorkerRequestSchema=z.object({
  schemaVersion:z.literal('stadtstack-r1-canonical-worker-v1'),nonce:z.uuid(),
  issuance:NativeProvenancePinSchema,policy:z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:Hash,lockWaitMs:z.number().int().positive().optional()}).strict(),
- options:z.object({casRoot:z.string().refine(isAbsolute),catalogue:NativeProvenancePinSchema,mode:z.literal('step8'),coreRoot:z.string().refine(isAbsolute)}).strict(),
+ options:z.object({casRoot:z.string().refine(isAbsolute),catalogue:NativeProvenancePinSchema,mode:z.literal('step8'),coreRoot:z.string().refine(isAbsolute),importDispositionDecision:NativeProvenancePinSchema.optional()}).strict(),
  connection:z.object({host:z.string().refine(isAbsolute),database:z.string().min(1),user:z.string().min(1),port:z.number().int().min(1).max(65535)}).strict(),
  indices:z.array(z.number().int().min(0).max(255)).min(1),epoch:z.string().min(1),
 }).strict();
@@ -247,7 +296,7 @@ async function reconstructParallel(value:ContextState,options:ContextOptions,wor
     });
     child.on('error',error=>{failure=error;abort();});
     child.once('close',(code,signal)=>{if(failure||code!==0||signal||!packet){abort();reject(failure??new Error(`Canonical worker exited without a complete result (${code}/${signal})`));}else accept(packet);});
-    child.send({schemaVersion:'stadtstack-r1-canonical-worker-v1',nonce,issuance:value.issuancePin,policy:value.policy,options:{casRoot:value.casRoot,catalogue:options.catalogue,mode:options.mode,coreRoot:value.coreRoot},connection:{host:db.host,database:db.database,user:db.user,port:db.port},indices,epoch},error=>{if(error){failure=error;abort();}});
+    child.send({schemaVersion:'stadtstack-r1-canonical-worker-v1',nonce,issuance:value.issuancePin,policy:value.policy,options:{casRoot:value.casRoot,catalogue:options.catalogue,mode:options.mode,coreRoot:value.coreRoot,...(options.importDispositionDecision?{importDispositionDecision:options.importDispositionDecision}:{})},connection:{host:db.host,database:db.database,user:db.user,port:db.port},indices,epoch},error=>{if(error){failure=error;abort();}});
    }));
   }
  }catch(error){launchError=error;abort();}
@@ -266,9 +315,10 @@ async function reconstructParallel(value:ContextState,options:ContextOptions,wor
 /** Exactly one canonical producer pass, with one common epoch and current
  * receipt fence. The result set is an opaque in-process capability, not a cache. */
 export async function createWitnessedProvenanceContext(selectionPin:NativeProvenancePin,policy:CivicPolicyOptions,options:ContextOptions):Promise<WitnessedProvenanceContext>{
- const workers=ReconstructionWorkersSchema.parse(options.workers);assertReconstructionMemory(workers,await readFile('/proc/meminfo','utf8'));
+ const requiredThrough=reconstructionPolicyHorizon(options.timing),workers=ReconstructionWorkersSchema.parse(options.workers);assertReconstructionMemory(workers,await readFile('/proc/meminfo','utf8'));
  const value=await openContextState(selectionPin,policy,options);
  try{
+  await preflightPolicyHorizon(value,requiredThrough);
   if(workers===1)await reconstruct(value,value.selection.seals.map((_seal,index)=>index));else await reconstructParallel(value,options,workers);
   await checkpoint(value);
   const context:WitnessedProvenanceContext=Object.freeze({witnesses:value.selection.seals.length,reconstructionWorkers:workers,async checkpoint(){await checkpoint(state(context));},async finish(){
@@ -374,7 +424,7 @@ export function canonicalOutputForProvenance(context:WitnessedProvenanceContext,
  if(matches.length>1)throw Error('Canonical provenance selection is ambiguous');
  return matches[0]?{...matches[0].output}:undefined;
 }
-export function assertCanonicalContextInputs(context:WitnessedProvenanceContext,policy:CivicPolicyOptions,inputs:{selection?:NativeProvenancePin;catalogue?:NativeProvenancePin;casRoot?:string}={}){
+export function assertCanonicalContextInputs(context:WitnessedProvenanceContext,policy:CivicPolicyOptions,inputs:{selection?:NativeProvenancePin;catalogue?:NativeProvenancePin;casRoot?:string;importDispositionDecision?:NativeProvenancePin}={}){
  const value=state(context);samePolicy(value,policy);
- if(inputs.selection&&pinKey(inputs.selection)!==pinKey(value.issuancePin)||inputs.catalogue&&pinKey(inputs.catalogue)!==pinKey(value.selection.catalogue)||inputs.casRoot&&resolve(inputs.casRoot)!==value.casRoot)throw Error('Borrowed canonical context belongs to different staging inputs');
+ if(inputs.selection&&pinKey(inputs.selection)!==pinKey(value.issuancePin)||inputs.catalogue&&pinKey(inputs.catalogue)!==pinKey(value.selection.catalogue)||inputs.casRoot&&resolve(inputs.casRoot)!==value.casRoot||inputs.importDispositionDecision&&(!value.importDispositionDecision||pinKey(inputs.importDispositionDecision)!==pinKey(value.importDispositionDecision)))throw Error('Borrowed canonical context belongs to different staging inputs');
 }

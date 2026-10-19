@@ -373,7 +373,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     }
     }finally{extractionGeneration=previousExtractionGeneration;}
     const {exerciseCanonicalProvenance}=await import('../helpers/step8-provenance-fixture.ts');
-    await exerciseCanonicalProvenance(t,{pool,cas,policy,root,base:{scope,document,queue:terminalInput,sealed:terminalSeal},witnesses});
+    await exerciseCanonicalProvenance(t,{pool,cas,policy,root,base:{scope,document,queue:terminalInput,sealed:terminalSeal},witnesses,canonicalBuildCount});
    }
    await complete();assert.deepEqual(await readFile(bodyPath),body);assert.deepEqual(await readFile(observationPath),observationBytes);
   });

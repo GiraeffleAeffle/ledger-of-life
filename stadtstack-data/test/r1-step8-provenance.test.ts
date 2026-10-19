@@ -9,7 +9,7 @@ import {join} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {randomUUID} from 'node:crypto';
 import {watch,type FSWatcher} from 'node:fs';
-import {NativeSealSelectionSchema,ProvenanceSupplementSelectionSchema,createCanonicalWitnessReadPool,assertProductionNativeSealCohort,ReconstructionWorkersSchema,assertReconstructionMemory,assertCanonicalEpochFinished} from '../src/r1-step8-provenance.ts';
+import {NativeSealSelectionSchema,ProvenanceSupplementSelectionSchema,createCanonicalWitnessReadPool,assertProductionNativeSealCohort,ReconstructionWorkersSchema,ReconstructionTimingSchema,reconstructionPolicyHorizon,assertReconstructionPolicyExpiry,assertReconstructionMemory,assertCanonicalEpochFinished} from '../src/r1-step8-provenance.ts';
 
 const pin={path:'/synthetic/private/control.json',sha256:'a'.repeat(64)};
 const seal={municipalityId:'synthetic',sourceId:'website',corpus:pin,output:pin,admission:'published',queue:{jobKeys:['b'.repeat(64)],reconciliationJobKeys:[]}};
@@ -97,4 +97,15 @@ for(const loss of ['parent','database'] as const)test(`CPU-starved reconstructio
   if(child&&child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');
   await closed?.catch(()=>{});await admin.query('DROP DATABASE IF EXISTS "'+database+'" WITH (FORCE)');await admin.end();await rm(root,{recursive:true,force:true});
  }
+});
+
+test('pinned current policy must outlive the planned canonical pass plus margin',()=>{
+ const now=Date.parse('2026-10-19T12:00:00.000Z'),required=reconstructionPolicyHorizon(undefined,now);
+ assert.equal(required,now+13*3600000);assert.deepEqual(ReconstructionTimingSchema.parse(undefined),{estimatedDurationSeconds:43200,expiryMarginSeconds:3600});
+ assert.throws(()=>assertReconstructionPolicyExpiry(new Date(now+12*3600000).toISOString(),required),/re-issued selection/);
+ assert.throws(()=>assertReconstructionPolicyExpiry(new Date(required).toISOString(),required),/estimated reconstruction/,'expiry is exclusive, including the margin boundary');
+ assert.doesNotThrow(()=>assertReconstructionPolicyExpiry(new Date(now+7*86400000).toISOString(),required));
+ assert.equal(reconstructionPolicyHorizon({estimatedDurationSeconds:600,expiryMarginSeconds:60},now),now+660000);
+ assert.throws(()=>ReconstructionTimingSchema.parse({estimatedDurationSeconds:0,expiryMarginSeconds:60}));
+ assert.throws(()=>ReconstructionTimingSchema.parse({estimatedDurationSeconds:600,expiryMarginSeconds:59}));
 });

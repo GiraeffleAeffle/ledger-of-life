@@ -14,14 +14,14 @@ import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,typ
 import {authenticateStep8Campaign,reserveStep8Generation} from './r1-step8-governance.ts';
 import {STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {requiredReplayStaging} from './replay-pipeline.ts';
-import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,ReconstructionWorkersSchema,createWitnessedProvenanceContext,authenticateCanonicalSealProvenance,canonicalOutputForProvenance,assertCanonicalEpochFinished,assertCanonicalContextInputs,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
+import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,ReconstructionWorkersSchema,ReconstructionTimingSchema,createWitnessedProvenanceContext,authenticateCanonicalSealProvenance,canonicalOutputForProvenance,assertCanonicalEpochFinished,assertCanonicalContextInputs,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Absolute input path required'),sha256:HashSchema}).strict();
 const Policy=z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict();
 export const Step8StagingAssemblySchema=z.object({
  schemaVersion:z.literal('stadtstack-r1-step8-staging-assembly-v1'),
  retainedPlan:Pin,provenances:z.array(Pin).min(1),campaign:Pin,registry:Pin,
- nativeSealSelection:NativeProvenancePinSchema.optional(),nativeSealCatalogue:NativeProvenancePinSchema.optional(),nativeCasRoot:z.string().refine(isAbsolute).optional(),reconstructionWorkers:ReconstructionWorkersSchema,
+ nativeSealSelection:NativeProvenancePinSchema.optional(),nativeSealCatalogue:NativeProvenancePinSchema.optional(),nativeCasRoot:z.string().refine(isAbsolute).optional(),reconstructionWorkers:ReconstructionWorkersSchema,reconstructionTiming:ReconstructionTimingSchema,importDispositionDecision:NativeProvenancePinSchema.optional(),
  provenanceSupplements:z.array(z.object({nativeOutput:NativeProvenancePinSchema,nativeProvenance:NativeProvenancePinSchema,supplement:ProvenanceSupplementSelectionSchema}).strict()).optional(),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
  managedRoot:z.string().refine(isAbsolute),policy:Policy,
@@ -84,10 +84,10 @@ export async function prepareStep8Staging(raw:unknown,pool?:Pool,borrowedContext
  let context=borrowedContext,controls:string|undefined;
  const ownsContext=!borrowedContext;
  try{
-  if(context)assertCanonicalContextInputs(context,policy,{selection:input.nativeSealSelection,catalogue:input.nativeSealCatalogue,casRoot:input.nativeCasRoot});
-  if(input.nativeSealSelection||input.nativeSealCatalogue||input.nativeCasRoot||input.provenanceSupplements?.length){
+  if(context)assertCanonicalContextInputs(context,policy,{selection:input.nativeSealSelection,catalogue:input.nativeSealCatalogue,casRoot:input.nativeCasRoot,importDispositionDecision:input.importDispositionDecision});
+  if(input.nativeSealSelection||input.nativeSealCatalogue||input.nativeCasRoot||input.provenanceSupplements?.length||input.importDispositionDecision){
    if(!input.nativeSealSelection||!input.nativeSealCatalogue||!input.nativeCasRoot||!context&&!pool)throw Error('Native staging requires canonical DB, issued selection, catalogue and CAS root');
-   context??=await createWitnessedProvenanceContext(input.nativeSealSelection,policy,{pool:pool!,casRoot:input.nativeCasRoot,catalogue:input.nativeSealCatalogue,mode:'step8',workers:input.reconstructionWorkers});
+   context??=await createWitnessedProvenanceContext(input.nativeSealSelection,policy,{pool:pool!,casRoot:input.nativeCasRoot,catalogue:input.nativeSealCatalogue,mode:'step8',workers:input.reconstructionWorkers,timing:input.reconstructionTiming,importDispositionDecision:input.importDispositionDecision});
   }
   const supplements=new Map<string,NonNullable<typeof input.provenanceSupplements>[number]>();
   for(const selected of input.provenanceSupplements??[]){const key=canonicalJson([selected.nativeProvenance.path,selected.nativeProvenance.sha256]);if(supplements.has(key)||!input.provenances.some(pin=>pin.path===selected.nativeProvenance.path&&pin.sha256===selected.nativeProvenance.sha256))throw Error('Duplicate or unused source provenance supplement');supplements.set(key,selected);}

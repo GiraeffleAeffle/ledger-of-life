@@ -19,7 +19,7 @@ export async function issueFixtureNativeSelection<T extends {catalogue:NativePro
  return control(name+'-issued.json',{schemaVersion:'stadtstack-r1-operator-action-record-v1',id:name,action:'select-governed-native-seals',issuedBy:'isolated test fixture owner',issuedAt:new Date(Date.now()-1000).toISOString(),expiresAt:new Date(Date.now()+3600000).toISOString(),parentApproval:{id:'synthetic fixture approval',sha256:digest('synthetic fixture approval')},catalogue,selection,evidence,collector,rule:{generationPrecedenceNewestFirst:['a'.repeat(40)],withinGeneration:'latest successful closed finishedAt; ties refuse',publishedSourcesExcluded:[],candidateSource:null,order:'sourceId ascending'},bounds:{maxFreshSeals:0,maxCoreCommands:0,maxModelCalls:0,maxExecutorRuns:0,paidMicroUsd:0},reason:'Synthetic fixture authorization only; canonical DB receipt and producer reconstruction remains mandatory'});
 }
 type Native={scope:{municipalityId:string;sourceId:string};document:{id:string;sha256:string};queue:unknown;sealed:Awaited<ReturnType<typeof sealQueueTextContribution>>};
-export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool;cas:DistrictCas;policy:CivicPolicyOptions;root:string;base:Native;witnesses:Native[]}){
+export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool;cas:DistrictCas;policy:CivicPolicyOptions;root:string;base:Native;witnesses:Native[];canonicalBuildCount:()=>number}){
  const {pool,cas,policy}=input,root=join(input.root,'canonical-provenance-controls'),native=[input.base,...input.witnesses];
  const control:Control=async(name,value)=>{const path=join(root,name),sha256=await writePrivateJson(path,value);return {path,sha256};};
  const catalogue=await control('catalogue.json',{rows:native.map(source=>({scope:source.scope,index:source.sealed.artifacts.crawl,originals:[{documentId:source.document.id,sha256:source.document.sha256}]}))});
@@ -29,6 +29,9 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
  const copiedOutput=await control('copied-seal.json',native[0].sealed),aliased=await issueFixtureNativeSelection(control,{...frame,seals:[{...entries[0],output:copiedOutput},...entries.slice(1)]},'copied-output');
  const options={pool,casRoot:cas.root,catalogue,mode:'step8' as const,workers:1},targets=[native[0].sealed.criticalInventory.sha256,native[0].sealed.criticalAdmissions.sha256],evidence={nativeOutput:entries[0].output,nativeProvenance:{path:native[0].sealed.privateProvenance.path,sha256:native[0].sealed.privateProvenance.sha256,bytes:native[0].sealed.privateProvenance.bytes},targets};
  await assert.rejects(authenticatePublicationProvenance(evidence.nativeProvenance.path,evidence.nativeProvenance.sha256,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
+ const beforeExpiryPreflight=input.canonicalBuildCount();
+ await assert.rejects(createWitnessedProvenanceContext(issued,policy,{...options,timing:{estimatedDurationSeconds:7*86400,expiryMarginSeconds:60}}),/policy .*expires .*required through/);
+ assert.equal(input.canonicalBuildCount(),beforeExpiryPreflight,'insufficient pinned proof lifetime refuses before any canonical producer reconstruction');
  await assert.rejects(createWitnessedProvenanceContext(forged,policy,options),/criticalInventory differs from canonical producer/,'a real canonical6-artifact run does not authenticate fabricated ancillary roles');
  const context=await createWitnessedProvenanceContext(issued,policy,options);
  let built:Awaited<ReturnType<typeof buildProvenanceSupplement>>;
