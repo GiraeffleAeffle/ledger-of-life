@@ -31,18 +31,66 @@ are not modified by this work.
 The wrapper strips the environment (including provider tokens, proxies and
 `NODE_OPTIONS`), and preloads `r1-step8-offline.cjs` before application imports.
 The guard denies HTTP/fetch, DNS, UDP, HTTP/2, TLS/TCP and arbitrary child processes/model
-CLIs. Only Unix-domain sockets (the same-host PG audit connection) and the
-predecessor reader's bounded `git --no-replace-objects show COMMIT:./out|release/MEMBER`
-are permitted. Git lazy fetch and prompts are disabled by the predecessor
-reader. This is an enforced Node transport/process guard for trusted replay,
+CLIs. Only Unix-domain sockets (the same-host PG audit connection), the fixed
+offline reconstruction child over inherited IPC, the predecessor reader's bounded
+`git --no-replace-objects show COMMIT:./out|release/MEMBER`, and Core's exact
+`/usr/bin/flock --exclusive --nonblock 3` inherited-fd recovery mutex are permitted.
+The latter requires a zero-byte, private, owned, unaliased `inventory.break.lock`
+descriptor; no flock command-execution form or arbitrary spawn is allowed.
+The child cannot choose a preload, runtime, provider process or cache file. Git
+lazy fetch and prompts are disabled by the predecessor reader.
+This is an enforced Node transport/process guard for trusted replay,
 **not a claim of OS/network-namespace isolation**. There is no cache-miss model,
 readiness, acquisition or live fallback. The replay proof retains its existing
 honest `networkIsolation` wording; the wrapper's guard is tested separately.
 
+### One canonical pass and bounded reconstruction
+
+`execute` creates one opaque in-process canonical context. Its actual Core
+`buildQueueTextRun` results are reused by the embedded generation audit, source
+authentication, witnessed-union derivation, read-only staging preparation and
+text export. The standalone exporter is not invoked again. No operator-authored
+“passed” cache or persisted result can replace this context.
+
+`reconstructionWorkers` defaults to **3** and accepts only **1–3**. Before startup,
+Linux `MemAvailable` must be at least `workers × 1.5 GiB + 4 GiB`: respectively
+5.5, 7 or 8.5 GiB. This uses available memory, not `MemFree`. Each worker owns a
+real independent same-host PG pool and checked-out client, with a server-checked
+repeatable-read **READ ONLY** transaction for each source. Worker results arrive
+only through parent-created IPC; all workers must share the authority/inventory/
+objection epoch. The parent joins the entire batch, restores issued frame order,
+and checks one common current receipt/spec set. Any worker or epoch failure
+rejects the whole batch. Child PIDs preserve Core's existing lock-owner safety.
+Each child keeps a small supervisor event loop separate from its CPU-bound Core
+thread, plus one scalar-configured read-only PG liveness connection. IPC parent
+loss/stop, SIGTERM/SIGINT, connection loss or a failed one-second heartbeat
+(two-second connection/query bounds) exits the **whole child PID**. A busy Core
+thread cannot hide those signals. Only killing a thread while its PID stays alive
+would strand a live-owner lock, so that is never the shutdown mechanism.
+
+The issued frame and catalogue are runtime inputs, not compiled campaign-window
+hashes. A later re-issued final27 selection with genuine re-sealed sources uses
+the same path; omitted import holds still fail the unchanged exact-membership
+gate and must be resolved through their separately governed disposition.
+
+Reusing immutable reconstruction is not reusing permission. Source policy
+clocks, actual current proofs, issuance expiry, operator control pins, allowance
+accounting, native B purge lease state, selected current attempts, authority and
+inventory/objection epochs are rechecked. The source epoch must finish
+successfully, including segment/root validation, **before the first managed
+candidate/staging write**. Staging commit then authenticates current rights and
+bytes again through unchanged Core.
+
+`audit` remains a standalone validating operation with its own canonical pass.
+Do **not** run it separately before a governed `execute` just to repeat the same
+expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry run.
+
+
 ## Complete input contract
 
-`src/r1-step8.ts` exports the strict `Step8InputSchema`. Its version is
-`stadtstack-r1-step8-v1`. Unknown fields fail closed. Required fields:
+`src/r1-step8.ts` exports strict `Step8OperatorInputSchema` (the ready-component
+`Step8InputSchema` or an assembly invocation). Its version remains
+`stadtstack-r1-step8-v1`; unknown/mixed fields fail closed. Common required fields:
 
 - `expectedSources`: **27** and `expectedDocuments`: **208** for this production
   campaign. The command rejects an incomplete count or duplicate extraction
@@ -50,6 +98,8 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 - `nativeSealSelection`: the independently pinned **issued lead-action record**,
   not its bare strict frame. It selects the exact ordered 27 published seals and
   the same current catalogue; see “Witnessed shared-content provenance supplements”.
+- `reconstructionWorkers` is optional, defaults to **3**, and is bounded **1–3**.
+  Use 1 for constrained hosts and isolated fixtures with in-process seams.
 - `currentGeneration`: pins the active catalogue and its immutable processing
   approval, independently of the runtime HEAD used for publication/replay.
   Follow `catalogue.processingPinReview.path` (relative to the catalogue when
@@ -138,6 +188,18 @@ honest `networkIsolation` wording; the wrapper's guard is tested separately.
 The input file is an operator control artifact: generate it from real completed
 seal results and admitted staging provenance, then independently pin its digest.
 Do not fill missing campaign results with empty arrays or invented predecessors.
+
+For the one-command staging path, supply `stagingAssembly: {path, sha256}` instead
+of the ready-component fields `campaign`, `registry`, `privateProvenance`,
+`staging`, `identityAssessments`, `criticalAssessments`, `regionalPolicyReceipts`.
+The pinned `stadtstack-r1-step8-staging-assembly-v1` request supplies those real
+dependencies (see below); no placeholder output pins are accepted. Its read-only
+preparation borrows the same canonical context and checks every authentic
+retained member and managed dependency. A private campaign control is accepted
+only through that opaque verified preparation; after source-epoch completion its
+exact bytes are copied as a non-independent managed derivative and checked
+through Core before publication. The fresh staging root/claim must be disjoint
+from candidate, preparation and replay roots/claims.
 
 ## Validating read-only audit
 
@@ -263,9 +325,10 @@ change-scope gate is unchanged.
 
 No new extraction or publication engine is introduced:
 
-1. `knowledge:r1 export-text-contribution`'s actual
-   `exportResidualTextContribution` authenticates each source's whole committed
-   queue closure, including original generation/judge/A/B/C and reconciliation.
+1. The existing queue export's unchanged Core `buildQueueTextRun` reconstructs
+   each source exactly once, including its committed original generation/judge/
+   A/B/C/reconciliation closure. The operator exports the validated result from
+   the opaque context, checking every contribution byte rather than rebuilding.
 2. `knowledge:r1 export`'s `exportRun` now also exposes the same native grouping,
    page/coverage and checked-registry assembly without its CLI persistence side
    effects. The operator persists exact native StepReceipts in managed CAS.
@@ -365,8 +428,10 @@ identity, policy or value acceptance gate and never performs hosted rollout.
 
 ## Review cutover: mandatory campaign, custody and exception handoff
 
-The control manifest now also requires `campaign: {path, sha256}`, itself present
-in the authenticated private provenance. Its `stadtstack-r1-step8-campaign-v1`
+Ready-component inputs require `campaign: {path, sha256}` in authenticated private
+provenance. An assembly invocation obtains that managed derivative at commit,
+after validating the private declarative control against genuine managed corpora.
+Its `stadtstack-r1-step8-campaign-v1`
 document has `sources: [{municipalityId, sourceId, corpus: {path, sha256},
 documents: [{documentId, sha256, jobKey}]}]`. Outside an isolated fixture realm,
 its corpus hashes must equal the entire frozen
@@ -691,16 +756,20 @@ catalogue cities: **19 members**. No knowledge, graph, coverage or target manife
 member is used as reconstruction input. The plan makes no managed/DB writes and
 does not even open the authority inventory.
 
-Only in Main's authorized production write window, after campaign drain:
+Only in Main's authorized production write window, after campaign drain, import
+the authentic retained copies through the existing governed importer:
 
 ```sh
 npm run collect -- /absolute/retained-plan.json RETAINED_PLAN_SHA256
-./scripts/r1-step8.sh assemble-staging /absolute/assembly.json ASSEMBLY_SHA256
 ```
 
-`collect` is the existing governed retained importer, not a network collector.
-Current opt-outs still apply. The assembly command uses the Step8 offline guard;
-it does not invoke collect or silently import missing copies. Its strict input is:
+`collect` is not a network collector. Current opt-outs apply. Then pin the
+assembly request below in the operator manifest's `stagingAssembly` and invoke
+`execute` once; it prepares the assembly inside its single source pass and
+commits only after the source epoch finishes. The standalone
+`assemble-staging INPUT SHA256` remains available for independently requested
+staging, but is not a prerequisite extra canonical pass for execute. Missing
+imported copies are never silently collected. The strict assembly input is:
 
 ```json
 {
@@ -802,13 +871,13 @@ catalogue, collection evidence and collector implementation. The frame's ordered
 `QueueTextSealInput`. Issuance/expiry, frozen parent approval and zero execution/
 spending bounds are checked. A draft or bare frame grants no authority.
 
-Production adoption requires the complete live catalogue: **27 entries**, each
-source exactly once, with **26 published** and **only parchim-council** as the
-single adoption candidate. Final production step8 requires all 27 published.
-Previously issued partial25 selections are historical records, not reusable
-adoption authority. Step8 audit/execute must match the exact ordered selected
-outputs and queues. Duplicate identities, omitted/unlisted sources and other
-catalogues refuse. An opaque context authenticates all selected seals once.
+Production step8 requires the complete live catalogue: **27 published entries**,
+each source exactly once. Previously issued partial25/candidate selections are
+historical records, not publication authority. Adoption now uses ordinary native
+outer-proof acceptance separately; there is **no adoption reconstruction mode**
+in this module. Its mandatory full27 witnessed-union/Core check occurs once in
+step8. Audit/execute must match the exact ordered outputs and queues; duplicates,
+omissions, unlisted sources and other catalogues refuse.
 
 **Custody is not producer authentication:** unchanged Core `buildQueueTextRun`
 reconstructs every native seal from actual canonical PostgreSQL receipts, in a
@@ -837,33 +906,20 @@ Optional per-seal `provenanceSupplement` now has the strict shape
 The read plan includes these controls. Audit and execute share authentication;
 replay receives the authenticated complete aggregate inventory.
 
-Supplemented staging assembly additionally requires `nativeSealSelection`,
-`nativeSealCatalogue`, `nativeCasRoot` and the canonical socket database, plus
-`provenanceSupplements: [{nativeOutput, nativeProvenance, supplement}]`.
-Mappings must match explicitly supplied `provenances` controls. Ordinary complete
-provenance still uses unchanged Core without a database context.
+Standalone native staging uses `nativeSealSelection`, `nativeSealCatalogue`,
+`nativeCasRoot` and the canonical socket database. Optional explicitly supplied
+`provenanceSupplements: [{nativeOutput, nativeProvenance, supplement}]` must match
+its `provenances` controls. Execute instead lends its existing context. Complete
+ordinary provenance still authenticates through unchanged Core.
 
-Private adoption uses the same APIs:
-
-```ts
-const context = await createWitnessedProvenanceContext(
-  issuedSelectionPin, policy,
-  {pool, casRoot, catalogue: currentCataloguePin, mode: 'adoption',
-   coreRoot: '/home/max/civic-rebuild-r1/stadtstack-data'}
-);
-try {
-  const evidence = {nativeOutput, nativeProvenance, targets};
-  const body = await buildProvenanceSupplement(evidence, policy, context);
-  // Governed immutable IO persists body.bytes and body.attestationBytes,
-  // pinned by body.sha256 and body.attestationSha256.
-  const reader = await authenticateSupplement(
-    evidence, {inventory: inventoryPin, attestation: attestationPin}, policy, context
-  );
-  // Perform the caller's complete independent native/adoption checks.
-} finally {
-  await context.finish();
-}
-```
+For each selected native inventory, step8 derives all and only growing shared
+HTTP-binding unions from the already canonical complete frame. It does not catch
+a failed Core proof and invent a fallback. Private inventory/attestation control
+metadata is temporary and removed at context close; candidate evidence preserves
+the exact generated bytes under `audit/native-provenance/`. Optional independently
+pinned supplements are still checked byte-for-byte against that derivation.
+Missing or foreign contributors still fail Core's exact-binding check at
+`civic-opt-out.ts:1205`; neither that rule nor any processing closure is changed.
 
 All runtime Core entry modules come from the explicitly selected active
 `coreRoot`; `WITNESSED_PROVENANCE_CORE_DEPENDENCIES` enumerates them. No protected

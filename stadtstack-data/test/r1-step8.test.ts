@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
-import {Step8InputSchema,step8ReadPlan} from '../src/r1-step8.ts';
+import {Step8InputSchema,Step8OperatorInputSchema,step8ReadPlan} from '../src/r1-step8.ts';
 import {loadPriorPublicationRelease,preloadPriorPublicationReleases} from '../src/district-publication-predecessor.ts';
 import {historicalKnowledgeRecords} from '../src/publish.ts';
 import {PublicKnowledgeRecordSchema,knowledgeEvidenceHash} from '../src/district-schema.ts';
@@ -25,6 +25,14 @@ test('operator plan is closed, explicit and never claims execution/value accepta
  assert.ok(plan.reads.database.includes('district_pipeline.r1_codex_allowance_intents'));
  assert.equal(plan.reads.allowance.approvals.length,5);assert.equal(plan.reads.allowance.approvals.at(-1)!.sha256,'12f110244241e0294148cafc5fe13319b627b692136dfbfe18d61022f5e9b7d2');assert.equal(plan.reads.allowance.bounds.paidMicroUsd,0);assert.equal(plan.reads.allowance.bounds.maxExtraCallsCohort,100);
  assert.throws(()=>Step8InputSchema.parse({...input,currentGeneration:{...currentGeneration,B:{...currentGeneration.B,receiptVersion:'assessment-receipt-v1'}}}));
+});
+test('one-command staging assembly replaces, rather than fabricates, prebuilt component pins',()=>{
+ const {campaign:_,registry:__,privateProvenance:___,staging:____,...base}=input;
+ const parsed=Step8OperatorInputSchema.parse({...base,currentGeneration,stagingAssembly:pin,reconstructionWorkers:2}),plan=step8ReadPlan(parsed);
+ assert.equal('stagingAssembly' in parsed,true);assert.deepEqual(plan.writes,[]);assert.equal(plan.reconstruction.passes,1);assert.equal(plan.reconstruction.workers,2);
+ assert.equal(plan.reconstruction.minimumMemAvailableBytes,7*1024**3);
+ assert.throws(()=>Step8OperatorInputSchema.parse({...base,currentGeneration,stagingAssembly:pin,privateProvenance:pin}),'mixed ready-component and assembly inputs are not ambiguous fallbacks');
+ assert.throws(()=>Step8OperatorInputSchema.parse({...base,currentGeneration,stagingAssembly:pin,reconstructionWorkers:4}));
 });
 
 test('operator processing selection follows the active confirmed pin, not a compiled window hash',()=>{
@@ -66,6 +74,9 @@ test('offline bootstrap denies providers, HTTP, DNS, TCP and arbitrary child pro
  assert.throws(()=>net.connect({host:'127.0.0.1',port:443}),/offline guard/);
  assert.throws(()=>cp.spawn('codex',['--version']),/offline guard/);
  assert.throws(()=>cp.execFile('git',['fetch']),/offline guard/);
+ assert.throws(()=>cp.fork('codex',[],{}),/offline guard/);
+ const worker=require('node:path').resolve(${JSON.stringify(guard)},'../../src/r1-step8-reconstruction-worker.ts');
+ assert.throws(()=>cp.fork(worker,[],{execPath:process.execPath,execArgv:['--import','operator-cache.mjs'],serialization:'advanced',stdio:['ignore','ignore','inherit','ipc']}),/offline guard/);
  assert.equal(process.env.STADTSTACK_STEP8_OFFLINE,'1');`;
  await execute(process.execPath,['--require',guard,'-e',script]);
 });

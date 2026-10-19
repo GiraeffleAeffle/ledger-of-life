@@ -6,7 +6,6 @@ import {canonicalJson,digest,HashSchema,semanticHash} from './district-adapter-c
 import {canonicalJobIdentity,type DistrictJobSpec} from './district-jobs.ts';
 import {StepReceiptSchema,encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import {DistrictCas,type CasPutOptions} from './district-cas.ts';
-import {createReadOnlyManagedSourceAudit} from './r1-step8-managed-read-view.ts';
 import {Step8CampaignSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
 import {r1TextCompositionInputSchema} from './district-r1-text-composition.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
@@ -29,10 +28,13 @@ import {auditStep8Allowance} from './r1-step8-allowance-audit.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException} from './district-terminal-exceptions.ts';
 import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source-content.ts';
 import type {Step8Input} from './r1-step8.ts';
-import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateSealProvenance} from './r1-step8-provenance.ts';
+import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,canonicalManagedSourceAudit,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
+import {readPreparedStep8Campaign,readPreparedStep8Provenance,type PreparedStep8Staging} from './r1-step8-staging.ts';
 
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 const pinSchema=z.object({path:z.string(),sha256:HashSchema}).passthrough();
+const auditRechecks=new WeakMap<object,()=>Promise<void>>();
+export async function recheckStep8Audit(report:object){const check=auditRechecks.get(report);if(!check)throw Error('Fresh audit recheck requires its trusted live result');await check();}
 const itemPins=CriticalAssessmentInventorySchema.shape.records.element;
 const queueSchema=z.object({stepReceipts:z.array(z.object({spec:z.unknown(),receipt:StepReceiptSchema,sha256:HashSchema})),
  reconciliationJobKeys:z.array(HashSchema),assessments:z.array(z.object({jobKey:HashSchema,recordId:z.string(),outcome:z.string(),pins:itemPins.nullable()}).passthrough()),
@@ -58,18 +60,19 @@ export function assertStep8AdmissionProfile(policy:Step8Input['currentGeneration
 /** No source writes, provider, readiness, CAS initialization or fallback.
  * Exact declared-binding authentication uses only Core's built-in read locks;
  * bulk reads retain the lock-free inventory/objection epoch fence. */
-export async function auditStep8(input:Step8Input,pool:Pool){
+export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:WitnessedProvenanceContext,preparedStaging?:PreparedStep8Staging){
  const blockers:Array<{scope:string;message:string}>=[],sources:Array<Record<string,unknown>>=[],reads:Array<{path:string;sha256:string}>=[],originals=new Set<string>(),purgeAcknowledgements:unknown[]=[];
  const callRequirements:Array<{originalSha256:string;requestSha256:string;jobKey?:string;runId?:string}>=[];
  const predecessors:Array<Awaited<ReturnType<typeof loadPriorPublicationRelease>>['priorRelease']>=[];
+ const plainPins=new Map<string,{path:string;sha256:string}>(),purgeStates:Array<{id:string;jobKey:string;rows:unknown[]}>=[];
  const attempt=async(scope:string,work:()=>Promise<void>)=>{try{await work();}catch(error){blockers.push({scope,message:error instanceof Error?error.message:String(error)});}};
- const plain=async(pin:{path:string;sha256:string})=>{const bytes=await readFile(pin.path);requireThat(digest(bytes)===pin.sha256,'Operator control pin mismatch: '+pin.path);reads.push(pin);return bytes;};
- const provenanceContext=await createWitnessedProvenanceContext(input.nativeSealSelection,input.policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8'});
- let provenanceFinished=false;
+ const plain=async(pin:{path:string;sha256:string})=>{const bytes=await readFile(pin.path);requireThat(digest(bytes)===pin.sha256,'Operator control pin mismatch: '+pin.path);reads.push(pin);plainPins.set(pin.path,{...pin});return bytes;};
+ const provenanceContext=borrowedContext??await createWitnessedProvenanceContext(input.nativeSealSelection,input.policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8',workers:input.reconstructionWorkers});
+ let provenanceFinished=!!borrowedContext;
  try{
  await assertCanonicalSealSelection(provenanceContext,input.seals.map(({sealResult,provenanceSupplement:_,...queue})=>({output:sealResult,queue})));
  reads.push(input.nativeSealSelection);
- const reader=await createReadOnlyManagedSourceAudit(input.policy),cas=new AuditCas(input.casRoot,async(path,hash)=>{const bytes=await reader.read(path,hash);reads.push({path,sha256:hash});return bytes;});
+ const reader=canonicalManagedSourceAudit(provenanceContext),cas=new AuditCas(input.casRoot,async(path,hash)=>{const bytes=await reader.read(path,hash);reads.push({path,sha256:hash});return bytes;});
  const json=async(hash:string)=>JSON.parse((await cas.read(hash)).toString('utf8'));
  const managed=async(pin:{path:string;sha256:string})=>{const bytes=await reader.read(pin.path,pin.sha256);reads.push(pin);return bytes;};
  const client=await pool.connect();let allowance:Awaited<ReturnType<typeof auditStep8Allowance>>|undefined;
@@ -83,7 +86,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
    assertStep8ProcessingPin(input.currentGeneration,catalogue,review);
    if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208,'Production requires the frozen 27-source campaign');
    if(reader.authority.mode!=='isolated-fixture')requireThat(canonicalJson([...input.structuredRunIds].sort())===canonicalJson([...STEP8_STRUCTURED_RUN_IDS].sort())&&canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires the five committed K1/K2 runs and authentic released 0.3.2 predecessor');
-   campaign=await authenticateStep8Campaign(JSON.parse((await managed(input.campaign)).toString('utf8')),async path=>reader.read(path),input.policy);
+   campaign=await authenticateStep8Campaign(JSON.parse((await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):managed(input.campaign))).toString('utf8')),async path=>reader.read(path),input.policy);
    requireThat(campaign.sources.length===input.expectedSources&&campaign.sources.reduce((n,source)=>n+source.documents.length,0)===input.expectedDocuments,'Campaign totals mismatch');
    requireThat(catalogue.rows.length===campaign.sources.length,'Catalogue source count mismatch');
    for(const source of campaign.sources){const row=catalogue.rows.find((row:{scope:{sourceId:string;municipalityId:string}})=>row.scope.sourceId===source.sourceId&&row.scope.municipalityId===source.municipalityId);requireThat(row,'Campaign source outside active catalogue');requireThat(canonicalJson(row.originals.map((document:{documentId:string;sha256:string})=>[document.documentId,document.sha256]).sort())===canonicalJson(source.documents.map(document=>[document.documentId,document.sha256]).sort()),'Catalogue document membership mismatch');}
@@ -92,7 +95,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   for(const selected of input.seals)await attempt('seal:'+selected.sealResult.sha256,async()=>{
    const seal=JSON.parse((await plain(selected.sealResult)).toString('utf8'));
    await managed(seal.privateProvenance);
-   const authenticatedProvenance=await authenticateSealProvenance(selected.sealResult,selected.provenanceSupplement,input.policy,provenanceContext),provenance=authenticatedProvenance.inventory;
+   const authenticatedProvenance=await authenticateCanonicalSealProvenance(selected.sealResult,selected.provenanceSupplement,input.policy,provenanceContext),provenance=authenticatedProvenance.inventory;
    if(selected.provenanceSupplement)reads.push(selected.provenanceSupplement.inventory,selected.provenanceSupplement.attestation);
    for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(selected.provenanceSupplement?.inventory.path??seal.privateProvenance.path),pin.path)});
    const composition=r1TextCompositionInputSchema.parse(await json(HashSchema.parse(seal.compositionArtifactSha256)));requireThat(composition.contributions.length===1&&!composition.retainedPublication,'Expected one native source contribution');
@@ -157,6 +160,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
     requireThat(leases.length===1&&leases[0].state==='submitted'&&leases[0].run_id===b.receipt.runId&&leases[0].fencing_token===b.receipt.leaseToken&&leases[0].client_id==='vm-omp-docker'&&leases[0].item_sha256===selector(b).itemArtifactSha256&&leases[0].input_sha256===ack.inputSha256&&leases[0].purge_ack_sha256===ackHash&&leases[0].receipt_sha256===receiptArtifactSha256&&leases[0].request_sha256===ack.cleanup.requestSha256&&receipt.requestSha256===ack.cleanup.requestSha256,'Native B purge acknowledgment lease/request binding mismatch');
     requireThat(ack.cleanup.responseSha256===receipt.responseSha256&&ack.cleanup.runnerContractSha256===b.receipt.versions.runnerContractSha256&&ack.cleanup.imageId===b.receipt.versions.imageId&&Date.parse(ack.cleanup.completedAt)>=Date.parse(receipt.finishedAt)&&Date.parse(ack.cleanup.completedAt)<=Date.parse(b.receipt.finishedAt),'Native B cleanup response/runner/time mismatch');
     purgeAcknowledgements.push({recordId:item.itemId,jobKey:b.receipt.jobKey,artifactSha256:ackHash,acknowledgment:ack,receiptArtifactSha256,stepReceiptSha256:b.sha256,lease:leases[0]});
+    purgeStates.push({id:ack.leaseId,jobKey:b.receipt.jobKey,rows:structuredClone(leases)});
    };
    for(const step of steps.values())if(step.spec.step==='assessment_b')for(const hash of step.receipt.outputHashes){let value;try{value=await json(hash);}catch(error){if(error instanceof SyntaxError)continue;throw error;}if(value.version==='assessment-receipt-v2')await checkPurge(step,hash);}
    for(const assessment of queue.assessments){if(!admitted.has(assessment.recordId))continue;const pins=assessment.pins;requireThat(pins&&assessment.outcome==='succeeded','Admission lacks complete selected final assessment');if(!pins)throw Error('Missing admission pins');
@@ -188,7 +192,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   });
   await attempt('complete-source-selection',async()=>{requireThat(seen.size===input.expectedSources&&sources.reduce((n,source)=>n+Number(source.documents),0)===input.expectedDocuments,'Incomplete current-generation source audit');});
   await attempt('external-inputs',async()=>{
-   const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await managed(input.privateProvenance)).toString('utf8')));for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(input.privateProvenance.path),pin.path)});
+   const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await (preparedStaging?readPreparedStep8Provenance(preparedStaging,input.privateProvenance):managed(input.privateProvenance))).toString('utf8')));for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(input.privateProvenance.path),pin.path)});
    const authenticated=await authenticatePublicationProvenance(input.privateProvenance.path,input.privateProvenance.sha256,input.policy);for(const pin of provenance.inputs)await authenticated.read(resolve(dirname(input.privateProvenance.path),pin.path));
    const cataloguePin=input.staging.find(pin=>pin.destination==='catalogue.json');requireThat(cataloguePin,'Staged catalogue missing');const catalogue=JSON.parse((await managed(cataloguePin!)).toString('utf8')),cities=z.array(z.string()).parse(catalogue.cities.map((city:{id:string})=>city.id));requireThat(canonicalJson(input.staging.map(pin=>pin.destination).sort())===canonicalJson(requiredReplayStaging(cities)),'Incomplete/duplicate staging inventory');
    for(const pin of [input.registry,...input.staging,input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts])if(pin)await managed(pin);
@@ -208,8 +212,25 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  await attempt('authority-epoch',async()=>{await reader.finish();});
- await attempt('native-provenance-epoch',async()=>{provenanceFinished=true;await provenanceContext.finish();});
- return {schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:blockers.length?'blocked':'compatible',writes:[],network:false,providers:false,publicationExecuted:false,valueAccepted:false,
+ await attempt('native-provenance-epoch',async()=>{if(borrowedContext)await provenanceContext.checkpoint();else{provenanceFinished=true;await provenanceContext.finish();}});
+ const report={schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:blockers.length?'blocked':'compatible',writes:[],network:false,providers:false,publicationExecuted:false,valueAccepted:false,
   currentGeneration:input.currentGeneration,campaign:input.campaign,sources,blockers,reads:[...new Map(reads.map(pin=>[pin.path,pin])).values()],authority:{...reader.authority,inventorySha256:reader.inventorySha256,optOutSnapshotSha256:reader.optOutSnapshotSha256},allowance,purgeAcknowledgements,predecessors};
+ if(borrowedContext&&!blockers.length)auditRechecks.set(report,async()=>{
+  await provenanceContext.checkpoint();
+  for(const pin of plainPins.values())requireThat(digest(await readFile(pin.path))===pin.sha256,'Audited operator control changed before managed writes');
+  if(preparedStaging)await readPreparedStep8Campaign(preparedStaging,input.campaign);
+  const fresh=await pool.connect();
+  try{
+   await fresh.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+   await auditStep8Allowance(fresh,[...originals],json);
+   for(const expected of purgeStates){
+    const rows=(await fresh.query('SELECT input_sha256,request_sha256,purge_ack_sha256,receipt_sha256,state,run_id::text,fencing_token::text,item_sha256,client_id FROM district_pipeline.assessment_bridge_leases WHERE id=$1 AND job_id=(SELECT id FROM district_pipeline.jobs WHERE job_key=$2)',[expected.id,expected.jobKey])).rows;
+    requireThat(canonicalJson(rows)===canonicalJson(expected.rows),'Native B purge acknowledgment current lease changed');
+   }
+   await fresh.query('COMMIT');
+  }catch(error){await fresh.query('ROLLBACK');throw error;}finally{fresh.release();}
+  await provenanceContext.checkpoint();
+ });
+ return report;
  }finally{if(!provenanceFinished)await provenanceContext.finish();}
 }

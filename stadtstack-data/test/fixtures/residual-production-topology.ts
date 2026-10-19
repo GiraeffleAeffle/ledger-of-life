@@ -291,6 +291,16 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    const extractionExceptionComposition=await loadR1TextCompositionInput(JSON.parse((await cas.read(extractionExceptionSeal.compositionArtifactSha256)).toString('utf8')),pin=>cas.read(pin.sha256));assert.equal((await exportQueueTextContribution(pool,cas,[],extractionExceptionComposition.contributions[0])).terminalDocumentExceptions.length,1);
    await assertLegacyBytes(terminalInput);
    await assertLegacyBytes({jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[extractionException]});
+   const canonicalQueue=await import('../../src/district-queue-text-run.ts');let canonicalBuilds=0;
+   const canonicalBuildCount=()=>canonicalBuilds;
+   t.mock.module(new URL('../../src/district-queue-text-run.ts',import.meta.url),{namedExports:{...canonicalQueue,
+    buildQueueTextRun:async(...args:Parameters<typeof canonicalQueue.buildQueueTextRun>)=>{
+     canonicalBuilds++;const selected=canonicalQueue.QueueTextSealInputSchema.parse(args[2]),previous=extractionGeneration;
+     if(selected.terminalDocumentExceptions.some(pin=>pin.documentId.startsWith('canonical-witness-')))extractionGeneration=0;
+     try{return await canonicalQueue.buildQueueTextRun(...args);}finally{extractionGeneration=previous;}
+    },
+    exportQueueTextContribution:()=>assert.fail('Step8 must export the trusted canonical result, not rebuild through the standalone exporter'),
+   }});
    const {exerciseStep8}=await import('../helpers/step8-fixture.ts'),callsBeforeStep8=modelCalls,probesBeforeStep8=toolProbes;
    if(duplicateMode){
     const duplicatePreparation=await residual.enqueueResidualPreparation(store,cas,imported.jobs[1]);await run(duplicatePreparation,handlers);
@@ -324,12 +334,16 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     assert.equal(combinedSeal.records,1);assert.equal(combinedSeal.assessmentItemHolds[0].recordIds[0],originalOutput.result.records[0].id);
     assert.ok(combinedSeal.terminalDocumentExceptions[0].reasonCode==='duplicate_source_content'&&combinedSeal.terminalDocumentExceptions[0].excludedAssessmentJobKeys.includes(heldPreparation));
     const calls=modelCalls,probes=toolProbes;
-    await exerciseStep8(t,{pool,cas,policy,fixtureRoot:join(root,'duplicate-generation'),sealed:combinedSeal,jobKey:extractionKey,reconcileKey,sealInput:combinedInput,documentJobKeys:{[document.id]:extractionKey,[duplicateDocument.id]:duplicateExtraction},scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Duplicate step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
+    await exerciseStep8(t,{pool,cas,policy,canonicalBuildCount,fixtureRoot:join(root,'duplicate-generation'),sealed:combinedSeal,jobKey:extractionKey,reconcileKey,sealInput:combinedInput,documentJobKeys:{[document.id]:extractionKey,[duplicateDocument.id]:duplicateExtraction},scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Duplicate step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,calls);assert.equal(toolProbes,probes);
    }else{
-    await exerciseStep8(t,{pool,cas,policy,fixtureRoot:root,sealed,legacyGeneration:{sealed:historicalSeal,reconcileKey:historicalReconcileKey},jobKey:extractionKey,reconcileKey,sealInput:positiveInput,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
+    await exerciseStep8(t,{pool,cas,policy,canonicalBuildCount,fixtureRoot:root,sealed,legacyGeneration:{sealed:historicalSeal,reconcileKey:historicalReconcileKey},jobKey:extractionKey,reconcileKey,sealInput:positiveInput,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,callsBeforeStep8);assert.equal(toolProbes,probesBeforeStep8);
-    await exerciseStep8(t,{pool,cas,policy,fixtureRoot:join(root,'terminal-only-generation'),sealed:terminalSeal,jobKey:terminalKey,reconcileKey,sealInput:terminalInput,expectedTextRecords:0,expectedAssessments:0,expectDatedSliceHold:true,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Terminal-only step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
+    // This mode's complete criterion is the authentic19-member plan→audit above.
+    // Do not run an unrelated terminal-only publication against its now-large
+    // retained inventory; the ordinary topology case covers that variant fully.
+    if(process.env.R1_TEST_STEP8_STAGING==='1')return;
+    await exerciseStep8(t,{pool,cas,policy,canonicalBuildCount,fixtureRoot:join(root,'terminal-only-generation'),sealed:terminalSeal,jobKey:terminalKey,reconcileKey,sealInput:terminalInput,expectedTextRecords:0,expectedAssessments:0,expectDatedSliceHold:true,scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Terminal-only step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,callsBeforeStep8);assert.equal(toolProbes,probesBeforeStep8);
    }
    if(!duplicateMode&&process.env.R1_TEST_STEP8_STAGING!=='1'){
@@ -338,6 +352,11 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     const witnessBinding={...binding,url:witnessUrl,observationId:witnessObservationId,receiptSha256:digest(witnessObservationBytes)};
     await civic.withManagedSourceWrite(rawRoot,[binding,witnessBinding].map(item=>({...item,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true})),()=>writeFile(witnessObservationPath,witnessObservationBytes,{mode:0o600}),policy);
     const witnessRequest=await persistCrawlRequestEvidence(rawRoot,{schemaVersion:'stadtstack-crawl-request-evidence-v1',httpObservation:witnessBinding,request:{url:witnessUrl,method:'GET',contentType:null,bodySha256:null,publicSelector:null},redirectChain:[witnessUrl]},policy);
+    // Terminal-only runs bind the current fallback prompt contract. These two
+    // witnesses are deliberately born on the real unedited generation so an
+    // independent worker can reconstruct them without inheriting module mocks.
+    const previousExtractionGeneration=extractionGeneration;extractionGeneration=0;
+    try{
     for(const sourceId of ['witness-alpha','witness-beta']){
      const witnessScope={...scope,sourceId},witnessDocument={...document,id:'canonical-'+sourceId,sourceId,url:witnessUrl,observationPath:witnessObservationPath},witnessIndexBytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',generatedAt:now,documents:[witnessDocument],checks:[{municipalityId:city.id,sourceId,checkState:'checked',checkedAt:now,documentCount:1,coverage:{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,scope:'Canonical witness fixture',sourceCoverage:'not_assessed'}}]})+'\n'),witnessIndexPath=join(indexRoot,sourceId+'.json'),witnessIndexHash=digest(witnessIndexBytes);
      await civic.withManagedSourceWrite(indexRoot,[...registry.admitted.bindings,witnessBinding].map(item=>({...item,relativePath:sourceId+'.json',contentSha256:witnessIndexHash,independentAllowed:false})),()=>writeFile(witnessIndexPath,witnessIndexBytes,{mode:0o600}),policy);
@@ -352,13 +371,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
       assert.equal(sealed.records,0);witnesses.push({scope:witnessScope,document:witnessDocument,queue,sealed,indexBytes:witnessIndexBytes});
      });
     }
-    const canonicalQueue=await import('../../src/district-queue-text-run.ts'),canonicalBuild=canonicalQueue.buildQueueTextRun;
-    // Only the isolated fixture's owner-corpus capability changes per source.
-    // The real canonical builder, DB receipts and all lineage checks are intact.
-    t.mock.module(new URL('../../src/district-queue-text-run.ts',import.meta.url),{namedExports:{...canonicalQueue,buildQueueTextRun:(...args:Parameters<typeof canonicalBuild>)=>{
-     const selected=canonicalQueue.QueueTextSealInputSchema.parse(args[2]),witness=witnesses.find(entry=>entry.queue.terminalDocumentExceptions[0].jobKey===selected.terminalDocumentExceptions[0]?.jobKey);
-     return witness?withFixtureAuthorizedCorpus(witness.indexBytes,policy,()=>canonicalBuild(...args)):canonicalBuild(...args);
-    }}});
+    }finally{extractionGeneration=previousExtractionGeneration;}
     const {exerciseCanonicalProvenance}=await import('../helpers/step8-provenance-fixture.ts');
     await exerciseCanonicalProvenance(t,{pool,cas,policy,root,base:{scope,document,queue:terminalInput,sealed:terminalSeal},witnesses});
    }

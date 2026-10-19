@@ -9,7 +9,8 @@ import {authenticatePublicationProvenance,assertAuthenticatedPublicationProvenan
 import type {CivicPolicyOptions} from '../../src/civic-opt-out.ts';
 import type {DistrictCas} from '../../src/district-cas.ts';
 import type {sealQueueTextContribution} from '../../src/district-queue-text-run.ts';
-import {createWitnessedProvenanceContext,assertCanonicalSealSelection,buildProvenanceSupplement,authenticateSupplement,authenticateSealProvenance,type NativeProvenancePin} from '../../src/r1-step8-provenance.ts';
+import {createWitnessedProvenanceContext,assertCanonicalSealSelection,buildProvenanceSupplement,authenticateSupplement,authenticateSealProvenance,authenticateCanonicalSealProvenance,exportCanonicalTextContribution,type NativeProvenancePin} from '../../src/r1-step8-provenance.ts';
+import {loadR1TextCompositionInput} from '../../src/district-r1-text-composition.ts';
 
 type Control=(name:string,value:unknown)=>Promise<{path:string;sha256:string}>;
 export async function issueFixtureNativeSelection<T extends {catalogue:NativeProvenancePin}>(control:Control,frame:T,name='native-selection'){
@@ -26,7 +27,7 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
  const frame={schemaVersion:'stadtstack-r1-native-seal-selection-v1',catalogue,seals:entries},issued=await issueFixtureNativeSelection(control,frame),withoutNoop=await issueFixtureNativeSelection(control,{...frame,seals:entries.slice(0,2)},'without-noop');
  const changedAncillary={...native[0].sealed,criticalInventory:{...native[0].sealed.criticalInventory,sha256:'f'.repeat(64)}},forgedOutput=await control('forged-seal.json',changedAncillary),forged=await issueFixtureNativeSelection(control,{...frame,seals:[{...entries[0],output:forgedOutput},...entries.slice(1)]},'forged-ancillary');
  const copiedOutput=await control('copied-seal.json',native[0].sealed),aliased=await issueFixtureNativeSelection(control,{...frame,seals:[{...entries[0],output:copiedOutput},...entries.slice(1)]},'copied-output');
- const options={pool,casRoot:cas.root,catalogue,mode:'step8' as const},targets=[native[0].sealed.criticalInventory.sha256,native[0].sealed.criticalAdmissions.sha256],evidence={nativeOutput:entries[0].output,nativeProvenance:{path:native[0].sealed.privateProvenance.path,sha256:native[0].sealed.privateProvenance.sha256,bytes:native[0].sealed.privateProvenance.bytes},targets};
+ const options={pool,casRoot:cas.root,catalogue,mode:'step8' as const,workers:1},targets=[native[0].sealed.criticalInventory.sha256,native[0].sealed.criticalAdmissions.sha256],evidence={nativeOutput:entries[0].output,nativeProvenance:{path:native[0].sealed.privateProvenance.path,sha256:native[0].sealed.privateProvenance.sha256,bytes:native[0].sealed.privateProvenance.bytes},targets};
  await assert.rejects(authenticatePublicationProvenance(evidence.nativeProvenance.path,evidence.nativeProvenance.sha256,policy),{code:'CONTENT_PROVENANCE_MISMATCH'});
  await assert.rejects(createWitnessedProvenanceContext(forged,policy,options),/criticalInventory differs from canonical producer/,'a real canonical6-artifact run does not authenticate fabricated ancillary roles');
  const context=await createWitnessedProvenanceContext(issued,policy,options);
@@ -43,6 +44,15 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   built=await buildProvenanceSupplement(evidence,policy,context);
   assert.equal(built.attestationSha256,expectedAttestation,'returned attestation metadata cannot mutate the cached canonical identity set');
   await assert.rejects(buildProvenanceSupplement({...evidence,targets:[...targets,targets[0]]},policy,context),/Duplicate/);
+  const automatic=await authenticateCanonicalSealProvenance(entries[0].output,undefined,policy,context);assert.ok(automatic.generatedSupplement);assert.doesNotThrow(()=>assertAuthenticatedPublicationProvenance(automatic.reader));
+  for(const pin of automatic.inventory.inputs)assert.equal(digest(await automatic.reader.read(pin.path)),pin.sha256);
+  const contribution=(await loadR1TextCompositionInput(JSON.parse((await automatic.reader.read(native[0].sealed.path)).toString('utf8')),pin=>automatic.reader.read(pin.path))).contributions[0];
+  const exported=await exportCanonicalTextContribution(context,entries[0].output,[],contribution),expectedRun=exported.contribution.runId;
+  exported.contribution.pins.corpusSha256='f'.repeat(64);const mutated=Buffer.from(exported.contribution.artifacts.extractionRun.bytes);mutated[0]^=1;exported.contribution.artifacts.extractionRun.bytes=mutated;
+  assert.equal((await exportCanonicalTextContribution(context,entries[0].output,[],contribution)).contribution.runId,expectedRun,'caller mutations never alter the private canonical result');
+  const changed=structuredClone(contribution),changedBytes=Buffer.from(changed.artifacts.extractionRun.bytes);changedBytes[0]^=1;changed.artifacts.extractionRun.bytes=changedBytes;
+  await assert.rejects(exportCanonicalTextContribution(context,entries[0].output,[],changed),/artifact bytes differ/);
+  await assert.rejects(exportCanonicalTextContribution(context,entries[0].output,['f'.repeat(64)],contribution),/extraction selection differs/);
   await assert.rejects(buildProvenanceSupplement({...evidence,targets:['f'.repeat(64)]},policy,context),/target absent/);
  }finally{await context.finish();}
  const inventory=await control('supplement-inventory.json',built!.inventory),attestation=await control('supplement-attestation.json',built!.attestation),supplement={inventory,attestation};
@@ -55,6 +65,17 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   const different=await createWitnessedProvenanceContext(alternative,policy,options);
   try{const inputEvidence=alternative===aliased?{...evidence,nativeOutput:copiedOutput}:evidence;const other=await buildProvenanceSupplement(inputEvidence,policy,different);assert.deepEqual(other.bytes,built!.bytes,'no-op witness/alias leaves binding union unchanged');assert.notEqual(other.attestationSha256,built!.attestationSha256);await assert.rejects(authenticateSupplement(inputEvidence,supplement,policy,different),/exact governed canonical witness set/);}finally{await different.finish();}
  }
+ // These two genuine pre-model terminal sources require no inherited model or
+ // parser mocks in child processes. Each child reconstructs from real PG/CAS.
+ const parallelCatalogue=await control('parallel-catalogue.json',{rows:input.witnesses.map(source=>({scope:source.scope,index:source.sealed.artifacts.crawl,originals:[{documentId:source.document.id,sha256:source.document.sha256}]}))}),parallelFrame={...frame,catalogue:parallelCatalogue,seals:entries.slice(1)},parallelSelection=await issueFixtureNativeSelection(control,parallelFrame,'parallel');
+ for(const workers of [2,3]){
+  const parallel=await createWitnessedProvenanceContext(parallelSelection,policy,{...options,catalogue:parallelCatalogue,workers});
+  try{assert.equal(parallel.reconstructionWorkers,workers);await assertCanonicalSealSelection(parallel,parallelFrame.seals.map(entry=>({output:entry.output,queue:entry.queue})));await parallel.checkpoint();}
+  finally{await parallel.finish();}
+ }
+ const badParallel=await issueFixtureNativeSelection(control,{...parallelFrame,seals:parallelFrame.seals.map((entry,index)=>index?entry:{...entry,output:forgedOutput})},'parallel-bad-source');
+ await assert.rejects(createWitnessedProvenanceContext(badParallel,policy,{...options,catalogue:parallelCatalogue,workers:2}),/differs from canonical|canonical source scope/,'one worker failure rejects the entire result batch');
+ assert.deepEqual(await readFile(join(policy.stateDir!,'inventory.json')),beforeInventory);assert.deepEqual(await counts(),beforeCounts);
  const cached=await createWitnessedProvenanceContext(issued,policy,options),path=entries[2].output.path,parent=dirname(path),moved=parent+'-moved';
  await rename(parent,moved);await symlink(moved,parent);
  await assert.rejects(buildProvenanceSupplement(evidence,policy,cached),/witness changed/);await assert.rejects(cached.finish(),/witness changed/);

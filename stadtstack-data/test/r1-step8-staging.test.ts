@@ -51,7 +51,7 @@ test('staging rejects enrolled-root overlap before creating directory or claim d
 });
 test('real retained 0.3.2 members collect and assemble through offline Step8 plan and read-only audit',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:910000},async()=>{
  const {NODE_TEST_CONTEXT:_parent,...env}=process.env;
- const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1'},timeout:900000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
+ const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1'},timeout:900000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
   if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});throw error;
  });
  assert.match(result.stdout,/# fail 0/);
