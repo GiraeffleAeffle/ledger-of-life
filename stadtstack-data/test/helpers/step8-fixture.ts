@@ -91,8 +91,14 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
    await exerciseRealRetainedStaging(t,manifest,pool,input.fixtureRoot,sealed.privateProvenance);
    return;
   }
+  const malformed=privatePublicationProvenanceSchema.parse(JSON.parse((await cas.read(sealed.privateProvenance.sha256)).toString('utf8')));
+  malformed.inputs[0].bindings[0]={...malformed.inputs[0].bindings[0],url:'https://unregistered.synthetic.invalid/'};
+  const malformedPin=await control('malformed-native-provenance.json',malformed),malformedSeal={...JSON.parse(sealBytes.toString('utf8')),privateProvenance:{...malformedPin,bytes:Buffer.byteLength(canonicalJson(malformed)),bindings:[binding]}};
+  const malformedSealPin=await control('malformed-native-seal.json',malformedSeal);
   const inventoryBefore=await readFile(join(policy.stateDir!,'inventory.json')),counts=()=>pool.query('SELECT (SELECT count(*) FROM district_pipeline.jobs) AS jobs,(SELECT count(*) FROM district_pipeline.step_receipts) AS receipts,(SELECT count(*) FROM district_pipeline.artifacts) AS artifacts,(SELECT count(*) FROM district_pipeline.r1_codex_call_intents) AS intents,(SELECT count(*) FROM district_pipeline.assessment_bridge_leases) AS leases');
   const beforeCounts=(await counts()).rows,preflight=await auditStep8(manifest,pool);
+  const rejectedBindings=await auditStep8({...manifest,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool);
+  assert.equal(rejectedBindings.status,'blocked');assert.ok(rejectedBindings.blockers.some(entry=>entry.scope.startsWith('seal:')),'audit checks declared binding sets, not only readable pinned bytes');
   assert.equal(preflight.status,'compatible',JSON.stringify(preflight.blockers));assert.deepEqual(preflight.writes,[]);assert.equal(preflight.publicationExecuted,false);
   assert.deepEqual(await readFile(join(policy.stateDir!,'inventory.json')),inventoryBefore);assert.deepEqual((await counts()).rows,beforeCounts);await assert.rejects(readFile(join(outputRoot,'release-gate.json')),{code:'ENOENT'});
   if(legacySealPin&&input.legacyGeneration){

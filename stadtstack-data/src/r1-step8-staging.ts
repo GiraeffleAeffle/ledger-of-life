@@ -12,12 +12,15 @@ import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,typ
 import {authenticateStep8Campaign,reserveStep8Generation} from './r1-step8-governance.ts';
 import {STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {requiredReplayStaging} from './replay-pipeline.ts';
+import {NativeProvenancePinSchema,NativeProvenanceWitnessSchema,ProvenanceSupplementSelectionSchema,createWitnessedProvenanceContext,authenticateSealProvenance} from './r1-step8-provenance.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Absolute input path required'),sha256:HashSchema}).strict();
 const Policy=z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict();
 export const Step8StagingAssemblySchema=z.object({
  schemaVersion:z.literal('stadtstack-r1-step8-staging-assembly-v1'),
  retainedPlan:Pin,provenances:z.array(Pin).min(1),campaign:Pin,registry:Pin,
+ provenanceWitnesses:z.array(NativeProvenanceWitnessSchema).max(256).optional(),
+ provenanceSupplements:z.array(z.object({nativeOutput:NativeProvenancePinSchema,nativeProvenance:NativeProvenancePinSchema,supplement:ProvenanceSupplementSelectionSchema}).strict()).optional(),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
  managedRoot:z.string().refine(isAbsolute),policy:Policy,
 }).strict();
@@ -73,9 +76,15 @@ export async function assembleStep8Staging(raw:unknown){
  const expected=await buildStep8RetainedPlan(plan.imports[0].publicationRoot,plan.managedRoot);
  if(!same(plan,expected))throw Error('Retained plan differs from the complete authentic 0.3.2 staging plan');
  const inventories=new Map<string,{pin:InventoryPin;read:()=>Promise<Buffer>}>();
+ const provenanceContext=await createWitnessedProvenanceContext(input.provenanceWitnesses??[],policy);
+ const supplements=new Map<string,NonNullable<typeof input.provenanceSupplements>[number]>();
+ for(const selected of input.provenanceSupplements??[]){const key=canonicalJson([selected.nativeProvenance.path,selected.nativeProvenance.sha256]);if(supplements.has(key)||!input.provenances.some(pin=>pin.path===selected.nativeProvenance.path&&pin.sha256===selected.nativeProvenance.sha256))throw Error('Duplicate or unused source provenance supplement');supplements.set(key,selected);}
  for(const control of input.provenances){
-  const provenance=await authenticatePublicationProvenance(control.path,control.sha256,policy);
-  const inventory=privatePublicationProvenanceSchema.parse(await readPinnedJson(control.path,control.sha256));
+  const selected=supplements.get(canonicalJson([control.path,control.sha256]));
+  const supplemental=selected?await authenticateSealProvenance(selected.nativeOutput,selected.supplement,policy,provenanceContext):undefined;
+  if(supplemental&&(supplemental.originalProvenance.path!==control.path||supplemental.originalProvenance.sha256!==control.sha256))throw Error('Supplement names another native provenance');
+  const provenance=supplemental?.reader??await authenticatePublicationProvenance(control.path,control.sha256,policy);
+  const inventory=supplemental?.inventory??privatePublicationProvenanceSchema.parse(await readPinnedJson(control.path,control.sha256));
   for(const pin of inventory.inputs){
    const path=resolve(dirname(control.path),pin.path),old=inventories.get(path),normalized={...pin,path};
    if(old&&(old.pin.sha256!==pin.sha256||old.pin.bytes!==pin.bytes))throw Error('Conflicting authenticated input inventory');
@@ -105,6 +114,7 @@ export async function assembleStep8Staging(raw:unknown){
   const pin={path,sha256:digest(bytes),bytes:bytes.length,bindings:authenticated.bindings};selected.set(path,pin);
   staging.push({path,sha256:pin.sha256,destination:member.memberPath});
  }
+ await provenanceContext.finish();
  // Do not upgrade derivative custody into independent original-source rights.
  const bindings=uniqueBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
  await assertStagingRootsDisjoint(output,policy);

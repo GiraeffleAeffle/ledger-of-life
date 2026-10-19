@@ -10,7 +10,7 @@ import {createReadOnlyManagedSourceAudit} from './r1-step8-managed-read-view.ts'
 import {Step8CampaignSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
 import {r1TextCompositionInputSchema} from './district-r1-text-composition.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
-import {privatePublicationProvenanceSchema} from './district-publication-provenance.ts';
+import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} from './district-publication-provenance.ts';
 import {publicationPolicyReceiptInventorySchema} from './district-publication-policy.ts';
 import {PolicyReceiptSchema,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {ResidualExtractionSchema} from './district-residual-jobs.ts';
@@ -29,6 +29,7 @@ import {auditStep8Allowance} from './r1-step8-allowance-audit.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException} from './district-terminal-exceptions.ts';
 import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source-content.ts';
 import type {Step8Input} from './r1-step8.ts';
+import {createWitnessedProvenanceContext,authenticateSealProvenance} from './r1-step8-provenance.ts';
 
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 const pinSchema=z.object({path:z.string(),sha256:HashSchema}).passthrough();
@@ -54,15 +55,17 @@ export function assertStep8AdmissionProfile(policy:Step8Input['currentGeneration
  }
 }
 
-/** No writes, lock acquisition, provider, readiness, CAS initialization or fallback.
- * DB is one repeatable-read read-only snapshot; the inventory/objection epoch is
- * validated before returning. A blocked report is not publication or value proof. */
+/** No source writes, provider, readiness, CAS initialization or fallback.
+ * Exact declared-binding authentication uses only Core's built-in read locks;
+ * bulk reads retain the lock-free inventory/objection epoch fence. */
 export async function auditStep8(input:Step8Input,pool:Pool){
  const blockers:Array<{scope:string;message:string}>=[],sources:Array<Record<string,unknown>>=[],reads:Array<{path:string;sha256:string}>=[],originals=new Set<string>(),purgeAcknowledgements:unknown[]=[];
  const callRequirements:Array<{originalSha256:string;requestSha256:string;jobKey?:string;runId?:string}>=[];
  const predecessors:Array<Awaited<ReturnType<typeof loadPriorPublicationRelease>>['priorRelease']>=[];
  const attempt=async(scope:string,work:()=>Promise<void>)=>{try{await work();}catch(error){blockers.push({scope,message:error instanceof Error?error.message:String(error)});}};
  const plain=async(pin:{path:string;sha256:string})=>{const bytes=await readFile(pin.path);requireThat(digest(bytes)===pin.sha256,'Operator control pin mismatch: '+pin.path);reads.push(pin);return bytes;};
+ const provenanceContext=await createWitnessedProvenanceContext(input.provenanceWitnesses??[],input.policy);
+ for(const witness of input.provenanceWitnesses??[])reads.push(witness.output,witness.provenance);
  const reader=await createReadOnlyManagedSourceAudit(input.policy),cas=new AuditCas(input.casRoot,async(path,hash)=>{const bytes=await reader.read(path,hash);reads.push({path,sha256:hash});return bytes;});
  const json=async(hash:string)=>JSON.parse((await cas.read(hash)).toString('utf8'));
  const managed=async(pin:{path:string;sha256:string})=>{const bytes=await reader.read(pin.path,pin.sha256);reads.push(pin);return bytes;};
@@ -85,8 +88,10 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   const seen=new Set<string>();
   for(const selected of input.seals)await attempt('seal:'+selected.sealResult.sha256,async()=>{
    const seal=JSON.parse((await plain(selected.sealResult)).toString('utf8'));
-   const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await managed(seal.privateProvenance)).toString('utf8')));
-   for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(seal.privateProvenance.path),pin.path)});
+   await managed(seal.privateProvenance);
+   const authenticatedProvenance=await authenticateSealProvenance(selected.sealResult,selected.provenanceSupplement,input.policy,provenanceContext),provenance=authenticatedProvenance.inventory;
+   if(selected.provenanceSupplement)reads.push(selected.provenanceSupplement);
+   for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(selected.provenanceSupplement?.path??seal.privateProvenance.path),pin.path)});
    const composition=r1TextCompositionInputSchema.parse(await json(HashSchema.parse(seal.compositionArtifactSha256)));requireThat(composition.contributions.length===1&&!composition.retainedPublication,'Expected one native source contribution');
    const raw=composition.contributions[0],artifacts={} as TextRunContribution['artifacts'];
    for(const [kind,value] of Object.entries(raw.artifacts)){if(!value)continue;const pin=pinSchema.parse(value);requireThat(pin.path===join(cas.root,'sha256',pin.sha256.slice(0,2),pin.sha256),'Seal artifact escapes CAS');(artifacts as Record<string,unknown>)[kind]={bytes:await cas.read(pin.sha256),sha256:pin.sha256};}
@@ -181,6 +186,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   await attempt('complete-source-selection',async()=>{requireThat(seen.size===input.expectedSources&&sources.reduce((n,source)=>n+Number(source.documents),0)===input.expectedDocuments,'Incomplete current-generation source audit');});
   await attempt('external-inputs',async()=>{
    const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await managed(input.privateProvenance)).toString('utf8')));for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(input.privateProvenance.path),pin.path)});
+   const authenticated=await authenticatePublicationProvenance(input.privateProvenance.path,input.privateProvenance.sha256,input.policy);for(const pin of provenance.inputs)await authenticated.read(resolve(dirname(input.privateProvenance.path),pin.path));
    const cataloguePin=input.staging.find(pin=>pin.destination==='catalogue.json');requireThat(cataloguePin,'Staged catalogue missing');const catalogue=JSON.parse((await managed(cataloguePin!)).toString('utf8')),cities=z.array(z.string()).parse(catalogue.cities.map((city:{id:string})=>city.id));requireThat(canonicalJson(input.staging.map(pin=>pin.destination).sort())===canonicalJson(requiredReplayStaging(cities)),'Incomplete/duplicate staging inventory');
    for(const pin of [input.registry,...input.staging,input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts])if(pin)await managed(pin);
    const baseline=await loadPriorPublicationRelease(input.priorRelease,[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'],input.clocks.manifestGeneratedAt);predecessors.push(baseline.priorRelease);
@@ -199,6 +205,7 @@ export async function auditStep8(input:Step8Input,pool:Pool){
   await client.query('COMMIT');
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  await attempt('authority-epoch',async()=>{await reader.finish();});
+ await attempt('native-provenance-epoch',async()=>{await provenanceContext.finish();});
  return {schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:blockers.length?'blocked':'compatible',writes:[],network:false,providers:false,publicationExecuted:false,valueAccepted:false,
   currentGeneration:input.currentGeneration,campaign:input.campaign,sources,blockers,reads:[...new Map(reads.map(pin=>[pin.path,pin])).values()],authority:{...reader.authority,inventorySha256:reader.inventorySha256,optOutSnapshotSha256:reader.optOutSnapshotSha256},allowance,purgeAcknowledgements,predecessors};
 }
