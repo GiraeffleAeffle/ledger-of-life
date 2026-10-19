@@ -802,9 +802,12 @@ catalogue, collection evidence and collector implementation. The frame's ordered
 `QueueTextSealInput`. Issuance/expiry, frozen parent approval and zero execution/
 spending bounds are checked. A draft or bare frame grants no authority.
 
-Parchim adoption requires the 24 published sources plus its one candidate;
-final production step8 requires all 27 published. Step8 audit/execute must match
-the exact ordered selected outputs and queues. Duplicate identities and other
+Production adoption requires the complete live catalogue: **27 entries**, each
+source exactly once, with **26 published** and **only parchim-council** as the
+single adoption candidate. Final production step8 requires all 27 published.
+Previously issued partial25 selections are historical records, not reusable
+adoption authority. Step8 audit/execute must match the exact ordered selected
+outputs and queues. Duplicate identities, omitted/unlisted sources and other
 catalogues refuse. An opaque context authenticates all selected seals once.
 
 **Custody is not producer authentication:** unchanged Core `buildQueueTextRun`
@@ -883,3 +886,8 @@ The private witness pool accepts the ordinary
 normalizes to the configured port or PostgreSQL's default `5432`. Explicit
 nondefault ports are preserved; invalid zero ports are rejected. Caller Client
 constructors and DSN read-write GUC overrides are not inherited.
+
+Returned attestation, inventory and provenance-pin metadata are detached
+snapshots, not writable references into cached canonical authority. Caller
+mutation cannot change a later build/authentication in the same context; the
+reader capability itself remains the genuine unchanged-Core capability.

@@ -23,6 +23,7 @@ import {authenticateStep8Campaign} from '../../src/r1-step8-governance.ts';
 import {userInfo} from 'node:os';
 import type {TerminalDocumentException,TerminalAssessmentException} from '../../src/district-terminal-exceptions.ts';
 import {auditStep8} from '../../src/r1-step8-audit.ts';
+import {createWitnessedProvenanceContext,authenticateSealProvenance} from '../../src/r1-step8-provenance.ts';
 import {assessmentQueueContract} from '../../src/district-assessment-jobs.ts';
 import {assessmentBJobContract} from '../../src/district-assessment-broker.ts';
 import {OMP_NATIVE_STREAM_VERSION,ompRunnerContractSha256,ompRunnerOutputContractSha256} from '../../src/district-omp-b-runner.ts';
@@ -104,6 +105,13 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
   const legacySelection=legacySealPin&&legacyQueue?await issueFixtureNativeSelection(control,{...selectionValue,seals:[{...selectionValue.seals[0],output:legacySealPin,queue:legacyQueue}]},'historical-native-selection'):undefined;
   const inventoryBefore=await readFile(join(policy.stateDir!,'inventory.json')),counts=()=>pool.query('SELECT (SELECT count(*) FROM district_pipeline.jobs) AS jobs,(SELECT count(*) FROM district_pipeline.step_receipts) AS receipts,(SELECT count(*) FROM district_pipeline.artifacts) AS artifacts,(SELECT count(*) FROM district_pipeline.r1_codex_call_intents) AS intents,(SELECT count(*) FROM district_pipeline.assessment_bridge_leases) AS leases');
   const beforeCounts=(await counts()).rows,preflight=await auditStep8(manifest,pool);
+  const metadataContext=await createWitnessedProvenanceContext(manifest.nativeSealSelection,policy,{pool,casRoot:cas.root,catalogue:manifest.currentGeneration.catalogue,mode:'step8'});
+  try{
+   const first=await authenticateSealProvenance(manifest.seals[0].sealResult,undefined,policy,metadataContext),expectedInventory=canonicalJson(first.inventory);
+   first.inventory.inputs[0].bindings[0].url='https://caller-mutation.invalid/';first.originalProvenance.sha256='f'.repeat(64);
+   const next=await authenticateSealProvenance(manifest.seals[0].sealResult,undefined,policy,metadataContext);
+   assert.equal(canonicalJson(next.inventory),expectedInventory);assert.equal(next.originalProvenance.sha256,sealed.privateProvenance.sha256,'ordinary return metadata is not mutable cached authority');
+  }finally{await metadataContext.finish();}
   await assert.rejects(auditStep8({...manifest,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/witness identity or order differs/);
   await assert.rejects(auditStep8({...manifest,nativeSealSelection:malformedSelection,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/privateProvenance differs from canonical producer/);
   assert.equal(preflight.status,'compatible',JSON.stringify(preflight.blockers));assert.deepEqual(preflight.writes,[]);assert.equal(preflight.publicationExecuted,false);

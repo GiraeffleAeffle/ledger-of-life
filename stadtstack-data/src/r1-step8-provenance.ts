@@ -33,6 +33,15 @@ async function loadCore(root:string){
 type Core=Awaited<ReturnType<typeof loadCore>>;
 type CanonicalStep=Awaited<ReturnType<Core['queue']['buildQueueTextRun']>>['steps'][number];
 type Selection=z.infer<typeof NativeSealSelectionSchema>;
+/** Production adoption and publication both require the complete live catalogue.
+ * A formerly issued partial selection is historical evidence, not current authority. */
+export function assertProductionNativeSealCohort(selection:Selection,rawCatalogue:unknown,mode:'step8'|'adoption'){
+ const catalogue=z.object({rows:z.array(z.object({scope:z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1)}).passthrough()}).passthrough())}).passthrough().parse(rawCatalogue);
+ const identity=(source:{municipalityId:string;sourceId:string})=>JSON.stringify([source.municipalityId,source.sourceId]),expected=catalogue.rows.map(row=>identity(row.scope)).sort(),actual=selection.seals.map(identity).sort();
+ if(expected.length!==27||actual.length!==27||new Set(expected).size!==27||new Set(actual).size!==27||JSON.stringify(expected)!==JSON.stringify(actual))throw Error('Production native seal selection must equal the complete 27-source live catalogue exactly once');
+ const candidates=selection.seals.filter(seal=>seal.admission==='adoption_candidate');
+ if(mode==='step8'&&candidates.length!==0||mode==='adoption'&&(candidates.length!==1||candidates[0].municipalityId!=='parchim'||candidates[0].sourceId!=='parchim-council'))throw Error('Production adoption requires only parchim-council as its single candidate; step8 requires all 27 published');
+}
 type NativeRecord={output:NativeProvenancePin;provenance:NativeProvenancePin;inventory:PrivatePublicationProvenance;identity:unknown};
 type FileRecord={bytes:Buffer;stamp:string};
 export interface WitnessedProvenanceContext {readonly witnesses:number;finish():Promise<void>}
@@ -123,7 +132,7 @@ export async function createWitnessedProvenanceContext(selectionPin:NativeProven
  const authority=await core.civic.assertCivicPolicyAuthority(policy),bound={...policy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},candidates=selection.seals.filter(seal=>seal.admission==='adoption_candidate').length;
  if(authority.mode!=='isolated-fixture'&&(issuance.parentApproval.id!=='r1-nine-town-models-2026-10-13'||issuance.parentApproval.sha256!=='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b'))throw Error('Native selection parent approval differs from frozen campaign');
  if(options.mode==='step8'&&candidates!==0||options.mode==='adoption'&&candidates!==1)throw Error('Native selection admission set differs from governed operation');
- if(authority.mode!=='isolated-fixture'&&selection.seals.length!==(options.mode==='adoption'?25:27))throw Error('Incomplete production native seal selection');
+ if(authority.mode!=='isolated-fixture')assertProductionNativeSealCohort(selection,JSON.parse((await readPrivate(selection.catalogue,files)).toString('utf8')),options.mode);
  if(options.pool.options.connectionString)core.governance.step8SocketConnection(options.pool.options.connectionString);
  const db=createCanonicalWitnessReadPool(options.pool.options);
  try{
@@ -153,11 +162,11 @@ async function supplemented(value:ContextState,inputs:SupplementEvidence){
  }
  if(found.size!==targets.size)throw Error('Supplement target absent from native provenance');
  const inventory=value.core.provenance.privatePublicationProvenanceSchema.parse(result),bytes=encode(inventory),sha256=digest(bytes);
- const attestation={schemaVersion:'stadtstack-r1-native-provenance-union-v2',issuance:value.issuancePin,selection:value.selectionPin,witnesses:[...value.native.values()].map(witness=>witness.identity),nativeOutput:native.output,nativeProvenance:native.provenance,targets:inputs.targets,inventory:{sha256,bytes:bytes.length}},attestationBytes=encode(attestation);
+ const attestation=structuredClone({schemaVersion:'stadtstack-r1-native-provenance-union-v2',issuance:value.issuancePin,selection:value.selectionPin,witnesses:[...value.native.values()].map(witness=>witness.identity),nativeOutput:native.output,nativeProvenance:native.provenance,targets:inputs.targets,inventory:{sha256,bytes:bytes.length}}),attestationBytes=encode(attestation);
  return {inventory,bytes,sha256,attestation,attestationBytes,attestationSha256:digest(attestationBytes)};
 }
 export async function buildProvenanceSupplement(raw:SupplementEvidence,policy:CivicPolicyOptions,context:WitnessedProvenanceContext){const inputs=EvidenceSchema.parse(raw);return withContext(policy,context,value=>supplemented(value,inputs));}
 async function authenticatedSupplement(value:ContextState,inputs:SupplementEvidence,raw:z.infer<typeof ProvenanceSupplementPinSchema>){const pin=ProvenanceSupplementPinSchema.parse(raw),expected=await supplemented(value,inputs),bytes=await readPrivate(pin.inventory,value.files),attestation=await readPrivate(pin.attestation,value.files);if(!bytes.equals(expected.bytes)||!attestation.equals(expected.attestationBytes))throw Error('Supplement differs from exact governed canonical witness set');const reader=await value.core.provenance.authenticatePublicationProvenance(pin.inventory.path,pin.inventory.sha256,value.policy);for(const input of expected.inventory.inputs)await reader.read(resolve(dirname(pin.inventory.path),input.path));return {reader,inventory:expected.inventory};}
 /** The final capability and exact live binding checks come from unchanged Core. */
 export async function authenticateSupplement(raw:SupplementEvidence,pin:z.infer<typeof ProvenanceSupplementPinSchema>,policy:CivicPolicyOptions,context:WitnessedProvenanceContext):Promise<AuthenticatedPublicationProvenance>{const inputs=EvidenceSchema.parse(raw);return withContext(policy,context,async value=>(await authenticatedSupplement(value,inputs,pin)).reader);}
-export async function authenticateSealProvenance(output:NativeProvenancePin,selection:SupplementSelection|undefined,policy:CivicPolicyOptions,context:WitnessedProvenanceContext){return withContext(policy,context,async value=>{const native=nativeRecord(value,output);if(!selection){const reader=await value.core.provenance.authenticatePublicationProvenance(native.provenance.path,native.provenance.sha256,value.policy);for(const input of native.inventory.inputs)await reader.read(resolve(dirname(native.provenance.path),input.path));return {reader,inventory:native.inventory,originalProvenance:native.provenance};}const {targets,...pin}=ProvenanceSupplementSelectionSchema.parse(selection),authenticated=await authenticatedSupplement(value,{nativeOutput:output,nativeProvenance:native.provenance,targets},pin);return {...authenticated,originalProvenance:native.provenance};});}
+export async function authenticateSealProvenance(output:NativeProvenancePin,selection:SupplementSelection|undefined,policy:CivicPolicyOptions,context:WitnessedProvenanceContext){return withContext(policy,context,async value=>{const native=nativeRecord(value,output);if(!selection){const reader=await value.core.provenance.authenticatePublicationProvenance(native.provenance.path,native.provenance.sha256,value.policy);for(const input of native.inventory.inputs)await reader.read(resolve(dirname(native.provenance.path),input.path));return {reader,inventory:structuredClone(native.inventory),originalProvenance:{...native.provenance}};}const {targets,...pin}=ProvenanceSupplementSelectionSchema.parse(selection),authenticated=await authenticatedSupplement(value,{nativeOutput:output,nativeProvenance:native.provenance,targets},pin);return {...authenticated,originalProvenance:{...native.provenance}};});}

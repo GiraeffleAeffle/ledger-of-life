@@ -37,6 +37,11 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   await assert.rejects(assertCanonicalSealSelection(context,[...entries].reverse().map(entry=>({output:entry.output,queue:entry.queue}))),/identity or order differs/);
   await assert.rejects(authenticateSealProvenance(copiedOutput,undefined,policy,context),/not in the exact governed/);
   built=await buildProvenanceSupplement(evidence,policy,context);
+  const expectedAttestation=built.attestationSha256,witness=built.attestation.witnesses[0];
+  assert.ok(witness&&typeof witness==='object'&&'sourceId' in witness);witness.sourceId='caller-mutation';
+  built.attestation.issuance.sha256='f'.repeat(64);built.attestation.selection.sha256='f'.repeat(64);built.attestation.nativeOutput.path='/synthetic/caller-alias';built.attestation.nativeProvenance.sha256='f'.repeat(64);
+  built=await buildProvenanceSupplement(evidence,policy,context);
+  assert.equal(built.attestationSha256,expectedAttestation,'returned attestation metadata cannot mutate the cached canonical identity set');
   await assert.rejects(buildProvenanceSupplement({...evidence,targets:[...targets,targets[0]]},policy,context),/Duplicate/);
   await assert.rejects(buildProvenanceSupplement({...evidence,targets:['f'.repeat(64)]},policy,context),/target absent/);
  }finally{await context.finish();}
@@ -44,7 +49,7 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
  assert.equal(digest(await readFile(inventory.path)),built!.sha256);assert.equal(digest(await readFile(attestation.path)),built!.attestationSha256);
  const beforeInventory=await readFile(join(policy.stateDir!,'inventory.json')),counts=async()=>(await pool.query('SELECT (SELECT count(*) FROM district_pipeline.jobs) AS jobs,(SELECT count(*) FROM district_pipeline.step_receipts) AS receipts,(SELECT count(*) FROM district_pipeline.artifacts) AS artifacts')).rows,beforeCounts=await counts();
  const authenticated=await createWitnessedProvenanceContext(issued,policy,options);
- try{const reader=await authenticateSupplement(evidence,supplement,policy,authenticated);assert.doesNotThrow(()=>assertAuthenticatedPublicationProvenance(reader));for(const pin of built!.inventory.inputs)assert.equal(digest(await reader.read(pin.path)),pin.sha256);const selected=await authenticateSealProvenance(evidence.nativeOutput,{...supplement,targets},policy,authenticated);assert.equal(selected.originalProvenance.sha256,evidence.nativeProvenance.sha256);}finally{await authenticated.finish();}
+ try{const reader=await authenticateSupplement(evidence,supplement,policy,authenticated);assert.doesNotThrow(()=>assertAuthenticatedPublicationProvenance(reader));for(const pin of built!.inventory.inputs)assert.equal(digest(await reader.read(pin.path)),pin.sha256);const selected=await authenticateSealProvenance(evidence.nativeOutput,{...supplement,targets},policy,authenticated);assert.equal(selected.originalProvenance.sha256,evidence.nativeProvenance.sha256);selected.originalProvenance.sha256='f'.repeat(64);assert.equal((await authenticateSealProvenance(evidence.nativeOutput,{...supplement,targets},policy,authenticated)).originalProvenance.sha256,evidence.nativeProvenance.sha256,'supplemented return pin is not mutable cached authority');}finally{await authenticated.finish();}
  assert.deepEqual(await readFile(join(policy.stateDir!,'inventory.json')),beforeInventory);assert.deepEqual(await counts(),beforeCounts);
  for(const alternative of [withoutNoop,aliased]){
   const different=await createWitnessedProvenanceContext(alternative,policy,options);
