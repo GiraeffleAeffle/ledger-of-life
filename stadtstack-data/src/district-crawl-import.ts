@@ -63,7 +63,7 @@ const MAX_IMPORTED_DISCOVERY_HOPS=32;
 /** Reconstruct only byte-verified HTML edges in the authenticated frozen corpus.
  * A frontier/metadata parent URL is a lookup hint, never discovery authorization.
  * Multi-hop parents must reach a reviewed root/page through at most 32 such edges. */
-function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:string,policy:CivicPolicyOptions,observations:ReadonlyMap<string,{binding:BoundSourceObservation['binding'];observation:BoundSourceObservation['observation']}>){
+export function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:string,policy:CivicPolicyOptions,observations:ReadonlyMap<string,{binding:BoundSourceObservation['binding'];observation:BoundSourceObservation['observation']}>){
  const byUrl=new Map<string,ImportedDocument|null>(),parents=new Map<string,Set<string>>();
  for(const document of documents)byUrl.set(document.url,byUrl.has(document.url)?null:document);
  return async(document:ImportedDocument,acquired:BoundSourceObservation,source:DistrictRegistry['municipalities'][number]['sources'][number],base:RegisteredRobotsAudit|undefined):Promise<BoundSourceObservation['policy']>=>{
@@ -107,6 +107,14 @@ function importedRegisteredPolicy(documents:readonly ImportedDocument[],rawRoot:
   // observation and every existing policy clock stay byte-for-byte unchanged.
   return {...original,tdm:{...original.tdm,evidence:[registeredRobotsEvidence(audit,document.url,acquired.observation.checkedAt),...original.tdm.evidence]}};
  };
+}
+
+/** Shared pure scope rule for import and authenticated rejection accounting. */
+export function registeredImportScope(registry:DistrictRegistry,document:ImportedDocument,scope:z.infer<typeof ScopeSchema>){
+ const city=registry.municipalities.find(row=>row.id===scope.municipalityId),source=city?.sources.find(row=>row.id===scope.sourceId);
+ if(!city||R1_MUNICIPALITIES[city.id]!==city.ags||city.ags!==scope.ags||document.municipalityId!==city.id||document.ags!==city.ags||document.districtId!==city.districtId||!source?.url||source.id!==document.sourceId||source.checkState!=='checked')throw Error('Selected scope differs from registered original');
+ const roots=[source.url,...source.crawlScope?.pageRoots??[],...city.seedDocuments.filter(row=>row.sourceId===source.id).map(row=>row.url),...source.api?[source.api.url]:[]],origins=new Set(roots.map(url=>new URL(url).origin));
+ return {city,source,origins,withinOrigins:origins.has(new URL(document.url).origin)};
 }
 /** Default import is offline; the separate durable refresh path supplies explicit operations. */
 export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:DistrictCas,rawInput:unknown,operation:CrawlPolicyRefreshOperation={}){
@@ -157,11 +165,9 @@ export async function importCrawlCorpusForResidual(store:DistrictJobStore,cas:Di
   let reasonCode:HoldCode='scope_mismatch',committing=false,refreshing=false,deriving=false;
   try{
    const matches=corpus.documents.filter(row=>row.id===selected.documentId);if(matches.length!==1)throw Error('Selected ID must identify exactly one original');
-   const document=matches[0],city=admitted.registry.municipalities.find(row=>row.id===selected.scope.municipalityId),source=city?.sources.find(row=>row.id===selected.scope.sourceId);
-   if(!city||R1_MUNICIPALITIES[city.id]!==city.ags||city.ags!==selected.scope.ags||document.municipalityId!==city.id||document.ags!==city.ags||document.districtId!==city.districtId||!source?.url||source.id!==document.sourceId||source.checkState!=='checked')throw Error('Selected scope differs from registered original');
+   const document=matches[0],{city,source,origins,withinOrigins}=registeredImportScope(admitted.registry,document,selected.scope);
    const registeredSourceEligibility=registeredEligibility.find(row=>row.municipalityId===city.id&&row.sourceId===source.id&&row.ags===city.ags&&row.root===source.url);
-   const roots=[source.url,...source.crawlScope?.pageRoots??[],...city.seedDocuments.filter(row=>row.sourceId===source.id).map(row=>row.url),...source.api?[source.api.url]:[]],origins=new Set(roots.map(url=>new URL(url).origin));
-   if(!origins.has(new URL(document.url).origin))throw Error('Original URL lies outside registered source origins');
+   if(!withinOrigins)throw Error('Original URL lies outside registered source origins');
    reasonCode='unsupported_mime';if(!residualMimeSupported(document.mimeType))throw Error('Original MIME is unsupported');
    reasonCode='original_observation_invalid';
    if(resolve(dirname(resolve(input.index.path)),document.localPath)!==join(rawRoot,'sha256',document.sha256))throw Error('Frozen original path changes managed raw body');

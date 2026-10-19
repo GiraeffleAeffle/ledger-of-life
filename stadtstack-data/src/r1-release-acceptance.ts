@@ -10,6 +10,7 @@ import {writeImmutable} from './district-assessment.ts';
 import {ReasonCodeSchema,JobOutcomeSchema} from './district-step-receipt.ts';
 import {RELEASE_ACCEPTANCE_RULES,readCandidateMaterialContext,bindReleaseExceptionContext,type CandidateMaterialContext} from './r1-release-context.ts';
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
+import {ImportRejectionDispositionSchema} from './r1-step8-import-disposition-contract.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -25,9 +26,15 @@ const gateSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-gate-v1'
 const handoffSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step9-handoff-v1'),releaseId:HashSchema,
   candidateDirectory:z.string().refine(isAbsolute),exceptionInventory:AcceptancePinSchema,assessmentManifest:AcceptancePinSchema,policy:z.unknown()}).strict();
 const classificationSchema=z.object({critical:z.boolean(),rights:z.boolean(),disagreement:z.boolean(),terminal:z.boolean().optional()}).strict();
-const dispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),documentId:z.string(),sourceSha256:HashSchema,jobKey:HashSchema,
+const nativeDispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),documentId:z.string(),sourceSha256:HashSchema,jobKey:HashSchema,
   admittedRecordIds:z.array(z.string()),cases:z.array(z.unknown()),classification:classificationSchema,assessments:z.array(z.unknown()),
   terminalDocumentException:z.unknown().optional(),terminalAssessmentExceptions:z.array(z.unknown()).optional(),assessmentItemHolds:z.array(z.unknown()).optional(),queueEvidence:z.unknown()}).strict();
+const importDispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),documentId:z.string(),sourceSha256:HashSchema,
+  admittedRecordIds:z.tuple([]),cases:z.tuple([]),classification:classificationSchema,assessments:z.tuple([]),importDisposition:ImportRejectionDispositionSchema}).strict().superRefine((entry,ctx)=>{
+  if(entry.municipalityId!==entry.importDisposition.municipalityId||entry.sourceId!==entry.importDisposition.sourceId||entry.documentId!==entry.importDisposition.documentId||entry.sourceSha256!==entry.importDisposition.sourceSha256
+    ||entry.classification.critical||entry.classification.disagreement||entry.classification.terminal!==undefined||entry.classification.rights!==(entry.importDisposition.reasonCode==='source_policy_stale'))ctx.addIssue({code:'custom',message:'Import disposition identity or classification mismatch'});
+});
+const dispositionSchema=z.union([nativeDispositionSchema,importDispositionSchema]);
 export const Step8ExceptionInventorySchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-exceptions-v1'),releaseId:HashSchema,
   campaign:AcceptancePinSchema,sourceDispositionInventory:AcceptancePinSchema.optional(),complete:z.boolean(),sourceDispositions:z.array(dispositionSchema),
   generationAuditEvidence:AcceptancePinSchema.optional(),
@@ -104,6 +111,10 @@ export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
   };
   if(!inventory.complete)append('complete',{reason:'exception_inventory_incomplete'},'unknown');
   for(const [index,source] of inventory.sourceDispositions.entries()){
+    if('importDisposition' in source){
+      append(`sourceDispositions/${index}/importDisposition`,source.importDisposition,source.importDisposition.reasonCode==='source_policy_stale'?'rights':'known_gap');
+      continue;
+    }
     const terminalSchema=z.object({recordIds:z.array(z.string()).min(1),reasonCode:ReasonCodeSchema}).passthrough();
     const selectedSchema=z.object({recordId:z.string(),pins:z.object({itemArtifactSha256:HashSchema,AArtifactSha256:HashSchema,BArtifactSha256:HashSchema,CArtifactSha256:HashSchema,finalArtifactSha256:HashSchema}).passthrough()}).passthrough();
     const selected=source.assessments.flatMap(raw=>{const parsed=selectedSchema.safeParse(raw);return parsed.success?[parsed.data]:[];});
@@ -210,8 +221,10 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
     ||canonicalJson(gate.exceptionInventory)!==canonicalJson(pins.exceptions)||canonicalJson(handoff.exceptionInventory)!==canonicalJson(pins.exceptions)
     ||canonicalJson(gate.step9Handoff)!==canonicalJson(pins.handoff)||canonicalJson(gate.campaign)!==canonicalJson(inventory.campaign))throw Error('Step8 gate/inventory/handoff binding mismatch');
   const campaign=Step8CampaignSchema.parse(await readAcceptancePin(gate.campaign));
-  const expected=campaign.sources.flatMap(source=>source.documents.map(document=>canonicalJson([source.municipalityId,source.sourceId,document.documentId,document.sha256,document.jobKey]))).sort();
-  const actual=inventory.sourceDispositions.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.documentId,source.sourceSha256,source.jobKey])).sort();
+  const expected=campaign.sources.flatMap(source=>source.documents.map(document=>canonicalJson([source.municipalityId,source.sourceId,document.documentId,document.sha256,
+    'jobKey' in document?document.jobKey:['import_rejection',document.importDisposition.decisionSha256,document.importDisposition.reasonCode]]))).sort();
+  const actual=inventory.sourceDispositions.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.documentId,source.sourceSha256,
+    'jobKey' in source?source.jobKey:['import_rejection',source.importDisposition.decision.sha256,source.importDisposition.reasonCode]])).sort();
   if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exception inventory omits or duplicates campaign documents');
   const generationAudit=z.object({schemaVersion:z.literal('stadtstack-r1-step8-read-only-audit-v1'),status:z.literal('compatible'),
     currentGeneration:Step8CurrentGenerationSchema,campaign:AcceptancePinSchema,blockers:z.array(z.unknown()).length(0),
@@ -225,6 +238,9 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
   for(const source of generationAudit.sources){
     const admitted=[...new Set(inventory.sourceDispositions.filter(entry=>entry.municipalityId===source.municipalityId&&entry.sourceId===source.sourceId).flatMap(entry=>entry.admittedRecordIds))].sort();
     if(canonicalJson(admitted)!==canonicalJson([...source.admittedRecordIds].sort()))throw Error('Current generation audit admission mismatch');
+    const imports=inventory.sourceDispositions.filter(entry=>entry.municipalityId===source.municipalityId&&entry.sourceId===source.sourceId).flatMap(entry=>'importDisposition' in entry?[entry.importDisposition]:[]);
+    const audited=z.object({importDispositions:z.array(ImportRejectionDispositionSchema).default([])}).passthrough().parse(source);
+    if(canonicalJson(imports)!==canonicalJson(audited.importDispositions))throw Error('Current generation audit import disposition mismatch');
   }
   if(inventory.sourceDispositionInventory){
     const sourceInventory=record(await readAcceptancePin(inventory.sourceDispositionInventory));

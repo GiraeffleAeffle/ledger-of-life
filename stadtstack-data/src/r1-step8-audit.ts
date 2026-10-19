@@ -30,6 +30,8 @@ import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source
 import type {Step8Input} from './r1-step8.ts';
 import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,canonicalManagedSourceAudit,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 import {readPreparedStep8Campaign,readPreparedStep8Provenance,type PreparedStep8Staging} from './r1-step8-staging.ts';
+import {authenticateImportDispositions} from './r1-step8-import-dispositions.ts';
+import type {ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
 
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 const pinSchema=z.object({path:z.string(),sha256:HashSchema}).passthrough();
@@ -67,7 +69,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  const plainPins=new Map<string,{path:string;sha256:string}>(),purgeStates:Array<{id:string;jobKey:string;rows:unknown[]}>=[];
  const attempt=async(scope:string,work:()=>Promise<void>)=>{try{await work();}catch(error){blockers.push({scope,message:error instanceof Error?error.message:String(error)});}};
  const plain=async(pin:{path:string;sha256:string})=>{const bytes=await readFile(pin.path);requireThat(digest(bytes)===pin.sha256,'Operator control pin mismatch: '+pin.path);reads.push(pin);plainPins.set(pin.path,{...pin});return bytes;};
- const provenanceContext=borrowedContext??await createWitnessedProvenanceContext(input.nativeSealSelection,input.policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8',workers:input.reconstructionWorkers});
+ const provenanceContext=borrowedContext??await createWitnessedProvenanceContext(input.nativeSealSelection,input.policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8',workers:input.reconstructionWorkers,timing:input.reconstructionTiming,importDispositionDecision:input.importDispositionDecision});
  let provenanceFinished=!!borrowedContext;
  try{
  await assertCanonicalSealSelection(provenanceContext,input.seals.map(({sealResult,provenanceSupplement:_,...queue})=>({output:sealResult,queue})));
@@ -75,6 +77,9 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  const reader=canonicalManagedSourceAudit(provenanceContext),cas=new AuditCas(input.casRoot,async(path,hash)=>{const bytes=await reader.read(path,hash);reads.push({path,sha256:hash});return bytes;});
  const json=async(hash:string)=>JSON.parse((await cas.read(hash)).toString('utf8'));
  const managed=async(pin:{path:string;sha256:string})=>{const bytes=await reader.read(pin.path,pin.sha256);reads.push(pin);return bytes;};
+ const readImports=()=>authenticateImportDispositions({decision:input.importDispositionDecision,nativeSealSelection:input.nativeSealSelection,catalogue:input.currentGeneration.catalogue,seals:input.seals,policy:input.policy,control:plain,managed});
+ let importDispositions:ImportRejectionDisposition[]=[];
+ await attempt('import-dispositions',async()=>{importDispositions=await readImports();for(const disposition of importDispositions)originals.add(disposition.sourceSha256);});
  const client=await pool.connect();let allowance:Awaited<ReturnType<typeof auditStep8Allowance>>|undefined;
  try{
   await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
@@ -131,7 +136,8 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
    }
    const source=campaign?.sources.find(source=>source.corpus.sha256===raw.pins.corpusSha256);requireThat(source&&!seen.has(source.corpus.sha256),'Duplicate/unexpected source generation');if(!source)throw Error('Missing campaign source');seen.add(source.corpus.sha256);
    const duplicates=queue.terminalDocumentExceptions.filter(pin=>pin.reasonCode==='duplicate_source_content').map(pin=>DuplicateSourceContentExceptionSchema.parse(pin)),duplicateKeys=new Set(duplicates.map(pin=>pin.jobKey)),canonicalResults=results.filter(result=>!duplicateKeys.has(result.result.taskId));
-   assertStep8ExportMembership(source,canonicalResults,queue.terminalDocumentExceptions,queue.stepReceipts);
+   const imports=importDispositions.filter(entry=>entry.corpusSha256===source.corpus.sha256&&entry.municipalityId===source.municipalityId&&entry.sourceId===source.sourceId);
+   assertStep8ExportMembership(source,canonicalResults,queue.terminalDocumentExceptions,queue.stepReceipts,imports);
    for(const duplicate of duplicates){
     const result=results.find(result=>result.result.taskId===duplicate.jobKey);requireThat(result&&result.documentId===duplicate.documentId,'Duplicate disposition lacks its native extraction');
     requireThat(canonicalJson(duplicate.excludedRecords)===canonicalJson(result!.result.records.map(record=>({recordId:record.id,evidenceSha256:record.verification.evidenceHash}))),'Duplicate disposition changes excluded native records');
@@ -188,9 +194,10 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
     requireThat(canonicalJson([...bundle.items,...(bundle.version==='r1-assessment-items-v2'?bundle.heldItems:[])].map(entry=>entry.recordArtifactSha256).sort())===canonicalJson(result.result.records.map(record=>semanticHash(record)).sort()),'Item hold bundle does not cover exact extraction');
     await cas.read(hold.originalSha256);requireThat((await cas.read(hold.preparedTextSha256)).toString('utf8')===prepared.text,'Item hold prepared text mismatch');
    }
-   sources.push({municipalityId:source.municipalityId,sourceId:source.sourceId,corpusSha256:source.corpus.sha256,sealResult:selected.sealResult,documents:source.documents.length,admittedRecordIds:[...admitted],profiles,terminalDocuments:queue.terminalDocumentExceptions,terminalAssessments:queue.terminalAssessmentExceptions,itemHolds:queue.assessmentItemHolds});
+   sources.push({municipalityId:source.municipalityId,sourceId:source.sourceId,corpusSha256:source.corpus.sha256,sealResult:selected.sealResult,documents:source.documents.length,admittedRecordIds:[...admitted],profiles,terminalDocuments:queue.terminalDocumentExceptions,terminalAssessments:queue.terminalAssessmentExceptions,itemHolds:queue.assessmentItemHolds,importDispositions:imports});
   });
   await attempt('complete-source-selection',async()=>{requireThat(seen.size===input.expectedSources&&sources.reduce((n,source)=>n+Number(source.documents),0)===input.expectedDocuments,'Incomplete current-generation source audit');});
+  await attempt('complete-import-dispositions',async()=>{requireThat(sources.reduce((count,source)=>count+(source.importDispositions as ImportRejectionDisposition[]).length,0)===importDispositions.length,'Unused import disposition');});
   await attempt('external-inputs',async()=>{
    const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await (preparedStaging?readPreparedStep8Provenance(preparedStaging,input.privateProvenance):managed(input.privateProvenance))).toString('utf8')));for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(input.privateProvenance.path),pin.path)});
    const authenticated=await authenticatePublicationProvenance(input.privateProvenance.path,input.privateProvenance.sha256,input.policy);for(const pin of provenance.inputs)await authenticated.read(resolve(dirname(input.privateProvenance.path),pin.path));
@@ -218,6 +225,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  if(borrowedContext&&!blockers.length)auditRechecks.set(report,async()=>{
   await provenanceContext.checkpoint();
   for(const pin of plainPins.values())requireThat(digest(await readFile(pin.path))===pin.sha256,'Audited operator control changed before managed writes');
+  requireThat(canonicalJson(await readImports())===canonicalJson(importDispositions),'Audited import disposition changed before managed writes');
   if(preparedStaging)await readPreparedStep8Campaign(preparedStaging,input.campaign);
   const fresh=await pool.connect();
   try{

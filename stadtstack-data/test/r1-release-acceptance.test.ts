@@ -40,10 +40,12 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
     const auditPin=await save('replay-audit.json',audit),auditPath=join(casRoot,'sha256',auditPin.sha256.slice(0,2),auditPin.sha256);
     await mkdir(dirname(auditPath),{recursive:true});await writeFile(auditPath,await readFile(auditPin.path));return auditPin;
   };
-  const inventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign,complete:true,
+  const parsedInventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign,complete:true,
     sourceDispositions:[{municipalityId:'synthetic-town',sourceId:'website',documentId:'document:fixture',sourceSha256:h,jobKey:b,admittedRecordIds:['admitted:fixture'],cases:[],classification:{critical:false,rights:false,disagreement:false},assessments:[],queueEvidence:{stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'succeeded',reasonCode:'completed'}}]}}],
     native:{coverage:[],fieldHolds:{schemaVersion:'district-r1-native-field-holds-v1',basis:'actual_committed_output_pages',unpublishedObservations:0,counts:{narrative_requires_text_model:0,source_literal_exceeds_short_quote:0,contact_field:0}}},
     preparation:{publicationQuarantine:{schemaVersion:'stadtstack-publication-quarantine-v1',records:[]},criticalHolds:[],classification:{critical:false,rights:false,disagreement:false}},assessments:[]});
+  const inventory={...parsedInventory,sourceDispositions:parsedInventory.sourceDispositions.filter(source=>'jobKey' in source)};
+  assert.equal(inventory.sourceDispositions.length,parsedInventory.sourceDispositions.length,'This fixture models native dispositions only');
   const gateState={status:'passed',checks:[...requiredChecks]};
   const value={version:'pilot-value-r1-verdict-v1',releaseId:manifest.id,manifestSha256:manifestPin.sha256,reportSha256:h,packetSha256:b,
     frozenInputs:FROZEN_R1_INPUTS,verdict:'pass',blockingReasons:[] as string[],pending_owner_audit:true,ownerAuditPolicy:'option_B_post_release_sample_only',

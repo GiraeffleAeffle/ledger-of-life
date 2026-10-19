@@ -25,8 +25,9 @@ import {authenticateStep8Campaign,assertStep8ExportMembership,reserveStep8Genera
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 import {auditStep8,recheckStep8Audit} from './r1-step8-audit.ts';
 import {STEP8_ALLOWANCE_READ_PLAN} from './r1-step8-allowance-audit.ts';
-import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,ReconstructionWorkersSchema,createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,exportCanonicalTextContribution,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
+import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,ReconstructionWorkersSchema,ReconstructionTimingSchema,createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,exportCanonicalTextContribution,canonicalManagedSourceAudit,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 import {Step8StagingAssemblySchema,prepareStep8Staging,commitStep8Staging,readPreparedStep8Campaign,type PreparedStep8Staging} from './r1-step8-staging.ts';
+import {authenticateImportDispositions} from './r1-step8-import-dispositions.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Operator paths must be absolute'),sha256:HashSchema}).strict();
 const sealSchema=z.object({compositionArtifactSha256:HashSchema,privateProvenance:Pin.passthrough(),policyInventory:Pin.passthrough(),criticalInventory:Pin.passthrough()}).passthrough();
@@ -36,7 +37,8 @@ export const Step8InputSchema=z.object({
  campaign:Pin,
  currentGeneration:Step8CurrentGenerationSchema,
  seals:z.array(QueueTextSealInputSchema.safeExtend({sealResult:Pin,provenanceSupplement:ProvenanceSupplementSelectionSchema.optional()})).min(1),
- nativeSealSelection:NativeProvenancePinSchema,reconstructionWorkers:ReconstructionWorkersSchema,
+ nativeSealSelection:NativeProvenancePinSchema,reconstructionWorkers:ReconstructionWorkersSchema,reconstructionTiming:ReconstructionTimingSchema,
+ importDispositionDecision:Pin.optional(),
  structuredRunIds:z.array(z.uuid()).min(1),registry:Pin,privateProvenance:Pin,
  staging:z.array(Pin.extend({destination:z.string().min(1)}).strict()).min(1),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
@@ -57,8 +59,8 @@ const uniqueBindings=(bindings:SourceArtifactBinding[])=>[...new Map(bindings.ma
 export function step8ReadPlan(input:Step8OperatorInput){
  const staging='stagingAssembly' in input?{stagingAssembly:input.stagingAssembly}:{campaign:input.campaign,registry:input.registry,privateProvenance:input.privateProvenance,staging:input.staging,identityAssessments:input.identityAssessments,criticalAssessments:input.criticalAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts};
  return {schemaVersion:'stadtstack-r1-step8-read-plan-v1',writes:[],network:false,providers:false,
-  reconstruction:{passes:1,workers:input.reconstructionWorkers,workerBudgetBytes:1.5*1024**3,reserveBytes:4*1024**3,minimumMemAvailableBytes:(input.reconstructionWorkers*1.5+4)*1024**3,transport:'trusted child IPC; no passed-result files'},
-  reads:{...staging,seals:input.seals,structuredRunIds:input.structuredRunIds,currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,nativeSealSelection:input.nativeSealSelection,
+  reconstruction:{passes:1,workers:input.reconstructionWorkers,timing:input.reconstructionTiming,workerBudgetBytes:1.5*1024**3,reserveBytes:4*1024**3,minimumMemAvailableBytes:(input.reconstructionWorkers*1.5+4)*1024**3,transport:'trusted child IPC; no passed-result files'},
+  reads:{...staging,seals:input.seals,structuredRunIds:input.structuredRunIds,currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,nativeSealSelection:input.nativeSealSelection,importDispositionDecision:input.importDispositionDecision,
    casRoot:input.casRoot,policy:input.policy,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,host:['/proc/meminfo'],
    database:['district_pipeline.jobs','district_pipeline.step_receipts','district_pipeline.artifacts','district_pipeline.r1_codex_documents','district_pipeline.r1_codex_call_intents','district_pipeline.r1_codex_call_authorizations','district_pipeline.r1_codex_allowance_intents','district_pipeline.preauthorizations','district_pipeline.assessment_bridge_leases'],
    transitive:'Every pinned assembly/retained member, seal provenance member, queue dependency, original policy/HTTP observation, generation archive, model answer, A/B/C receipt and native parser output; no provider cache miss fallback.'},
@@ -78,7 +80,7 @@ async function resolveStep8OperatorInput(invocation:Step8OperatorInput,pool:Pool
 
 /** Standalone audit owns exactly one pass and never commits prepared staging. */
 export async function auditStep8Operator(raw:unknown,pool:Pool){
- const invocation=Step8OperatorInputSchema.parse(raw),context=await createWitnessedProvenanceContext(invocation.nativeSealSelection,invocation.policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers});
+ const invocation=Step8OperatorInputSchema.parse(raw),context=await createWitnessedProvenanceContext(invocation.nativeSealSelection,invocation.policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
  let prepared:PreparedStep8Staging|undefined;
  try{const resolved=await resolveStep8OperatorInput(invocation,pool,context);prepared=resolved.prepared;return await auditStep8(resolved.input,pool,context,prepared);}
  finally{try{await context.finish();}finally{await prepared?.dispose();}}
@@ -95,7 +97,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  try{await lstat(output);throw Error('Step8 candidate root already exists; use a fresh generation');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  const parent=await realpath(dirname(output));if(parent!==await realpath(cacheDir)&&!inside(await realpath(cacheDir),parent))throw Error('Candidate parent escapes cache');
  await assertCivicPolicyAuthority(policy);
- const provenanceContext=await createWitnessedProvenanceContext(invocation.nativeSealSelection,policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers});
+ const provenanceContext=await createWitnessedProvenanceContext(invocation.nativeSealSelection,policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
  let provenanceFinished=false,preparedStaging:PreparedStep8Staging|undefined;
  try{
  const resolved=await resolveStep8OperatorInput(invocation,pool,provenanceContext);let input=resolved.input;preparedStaging=resolved.prepared;
@@ -111,6 +113,8 @@ export async function runStep8(raw:unknown,pool:Pool){
  const campaignBytes=await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):external.read(input.campaign.path));if(digest(campaignBytes)!==input.campaign.sha256)throw Error('Campaign independent pin mismatch');
  const campaign=await authenticateStep8Campaign(JSON.parse(campaignBytes.toString('utf8')),path=>external.read(path),policy);
  if(campaign.sources.length!==input.expectedSources||campaign.sources.reduce((n,source)=>n+source.documents.length,0)!==input.expectedDocuments)throw Error('Campaign totals mismatch');
+ const managed=canonicalManagedSourceAudit(provenanceContext);
+ const importDispositions=await authenticateImportDispositions({decision:input.importDispositionDecision,nativeSealSelection:input.nativeSealSelection,catalogue:input.currentGeneration.catalogue,seals:input.seals,policy,control:pin=>readReplayPin(pin,process.cwd()),managed:pin=>managed.read(pin.path,pin.sha256)});
  const remainingSources=new Map(campaign.sources.map(source=>[source.corpus.sha256,source])),sourceDispositions:unknown[]=[],auditAssessments:Array<{recordId:string;item:string;A:string;B:string;C:string}>=[];
  const compositions:z.infer<typeof r1TextCompositionInputSchema>[]=[],policyInventories:z.infer<typeof publicationPolicyReceiptInventorySchema>[]=[],criticalInventories:z.infer<typeof CriticalAssessmentInventorySchema>[]=[];
  const exports=[],derivedSupplements:Array<{sourceSeal:typeof input.seals[number]['sealResult'];value:NonNullable<Awaited<ReturnType<typeof authenticateCanonicalSealProvenance>>['generatedSupplement']>}>=[];
@@ -130,7 +134,8 @@ export async function runStep8(raw:unknown,pool:Pool){
   const exported=await exportCanonicalTextContribution(provenanceContext,selected.sealResult,selected.jobKeys,composition.contributions[0]);
   const extraction=JSON.parse(Buffer.from(exported.contribution.artifacts.extractionRun.bytes).toString('utf8'));
   const expectedSource=remainingSources.get(exported.contribution.pins.corpusSha256);if(!expectedSource)throw Error('Duplicate or unexpected sealed source');
-  assertStep8ExportMembership(expectedSource,exported.results,exported.terminalDocumentExceptions,extraction.queue.stepReceipts);remainingSources.delete(expectedSource.corpus.sha256);
+  const imports=importDispositions.filter(entry=>entry.corpusSha256===expectedSource.corpus.sha256&&entry.municipalityId===expectedSource.municipalityId&&entry.sourceId===expectedSource.sourceId);
+  assertStep8ExportMembership(expectedSource,exported.results,exported.terminalDocumentExceptions,extraction.queue.stepReceipts,imports);remainingSources.delete(expectedSource.corpus.sha256);
   for(const [key,schema] of [['terminalDocumentExceptions',QueueTextSealInputSchema.shape.terminalDocumentExceptions],['terminalAssessmentExceptions',QueueTextSealInputSchema.shape.terminalAssessmentExceptions]] as const){const actual=exported[key].filter(pin=>pin.reasonCode!=='duplicate_source_content').map(pin=>({documentId:pin.documentId,step:pin.step,jobKey:pin.jobKey,receiptId:pin.receiptId,receiptSha256:pin.receiptSha256,reasonCode:pin.reasonCode}));if(canonicalJson([...schema.parse(selected[key])].sort((a,b)=>a.jobKey.localeCompare(b.jobKey)))!==canonicalJson(actual))throw Error('Source terminal exception selection differs from seal');}
   const holdPins=exported.assessmentItemHolds.map(({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256})=>({preparationJobKey,itemBundleArtifactSha256,holdReceiptArtifactSha256}));
   if(canonicalJson([...selected.assessmentItemHolds].sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256)))!==canonicalJson(holdPins))throw Error('Source item hold selection differs from authenticated seal');
@@ -143,16 +148,17 @@ export async function runStep8(raw:unknown,pool:Pool){
    sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:result.documentId,sourceSha256:result.result.sourceSha256,jobKey:result.result.taskId,admittedRecordIds:records.map((entry:{id:string})=>entry.id),cases:documentCases,classification:classifyStep8Exception(documentCases),assessments:assessmentPins.filter(entry=>result.result.records.some(record=>record.id===entry.recordId)),terminalAssessmentExceptions:exported.terminalAssessmentExceptions.filter(entry=>entry.documentId===result.documentId),...(itemHolds.length?{assessmentItemHolds:itemHolds}:{}),queueEvidence:extraction.queue});
   }
   for(const exception of exported.terminalDocumentExceptions){const documentCases=cases.filter((entry:{documentId?:string})=>entry.documentId===exception.documentId);if(!documentCases.length)throw Error('Terminal document lacks explicit quarantine disposition');sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:exception.documentId,sourceSha256:exception.sourceSha256,jobKey:exception.jobKey,admittedRecordIds:[],cases:documentCases,classification:{...classifyStep8Exception(documentCases),terminal:true},terminalDocumentException:exception,assessments:[],queueEvidence:extraction.queue});}
+  for(const disposition of imports)sourceDispositions.push({municipalityId:disposition.municipalityId,sourceId:disposition.sourceId,documentId:disposition.documentId,sourceSha256:disposition.sourceSha256,admittedRecordIds:[],cases:[],classification:{critical:false,rights:disposition.reasonCode==='source_policy_stale',disagreement:false},importDisposition:disposition,assessments:[]});
   for(const entry of assessmentPins)if(entry.pins){const pathFor=(sha256:string)=>join(cas.root,'sha256',sha256.slice(0,2),sha256);auditAssessments.push({recordId:entry.recordId,item:pathFor(entry.pins.itemArtifactSha256),A:pathFor(entry.pins.AArtifactSha256),B:pathFor(entry.pins.BArtifactSha256),C:pathFor(entry.pins.CArtifactSha256)});}
   if(canonicalJson([...selected.reconciliationJobKeys].sort())!==canonicalJson(extraction.queue.reconciliationJobKeys))throw Error('Source reconciliation selection differs from seal');
   compositions.push(serialized);
   policyInventories.push(publicationPolicyReceiptInventorySchema.parse(JSON.parse((await source.read(seal.policyInventory.path)).toString('utf8'))));
   criticalInventories.push(CriticalAssessmentInventorySchema.parse(JSON.parse((await source.read(seal.criticalInventory.path)).toString('utf8'))));
-  exports.push({compositionArtifactSha256:seal.compositionArtifactSha256,runId:exported.contribution.runId,committedDocuments:exported.results.length+exported.terminalDocumentExceptions.length,jobKeys:selected.jobKeys,reconciliationJobKeys:selected.reconciliationJobKeys,terminalDocumentExceptions:exported.terminalDocumentExceptions,terminalAssessmentExceptions:exported.terminalAssessmentExceptions,provenanceSupplement:selected.provenanceSupplement,...(exported.assessmentItemHolds.length?{assessmentItemHolds:exported.assessmentItemHolds}:{})});
+  exports.push({compositionArtifactSha256:seal.compositionArtifactSha256,runId:exported.contribution.runId,committedDocuments:exported.results.length+exported.terminalDocumentExceptions.length,importRejectedDocuments:imports.length,jobKeys:selected.jobKeys,reconciliationJobKeys:selected.reconciliationJobKeys,terminalDocumentExceptions:exported.terminalDocumentExceptions,terminalAssessmentExceptions:exported.terminalAssessmentExceptions,importDispositions:imports,provenanceSupplement:selected.provenanceSupplement,...(exported.assessmentItemHolds.length?{assessmentItemHolds:exported.assessmentItemHolds}:{})});
  }
  await recheckStep8Audit(generationAudit);
  provenanceFinished=true;await provenanceContext.finish();
- if(exports.reduce((n,item)=>n+item.committedDocuments,0)!==input.expectedDocuments)throw Error('Incomplete committed document set');
+ if(exports.reduce((n,item)=>n+item.committedDocuments+item.importRejectedDocuments,0)!==input.expectedDocuments||exports.reduce((n,item)=>n+item.importRejectedDocuments,0)!==importDispositions.length)throw Error('Incomplete native/import-rejection document set');
  if(remainingSources.size||sourceDispositions.length!==input.expectedDocuments)throw Error('Campaign disposition inventory incomplete');
  let stagingAssemblyResult;
  if(preparedStaging){

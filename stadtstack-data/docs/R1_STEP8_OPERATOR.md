@@ -73,6 +73,17 @@ hashes. A later re-issued final27 selection with genuine re-sealed sources uses
 the same path; omitted import holds still fail the unchanged exact-membership
 gate and must be resolved through their separately governed disposition.
 
+`reconstructionTiming` is a strict optional object containing positive integer
+`estimatedDurationSeconds` (1–604800) and `expiryMarginSeconds` (60–86400).
+Its defaults are **43200 + 3600 seconds** (12 hours plus one hour). These are
+conservative planning inputs, **not a measured ETA**. Before starting any
+canonical builder or worker, the context authenticates the selected run's exact
+policy proofs and sealed continuation mapping. Every current proof must remain
+valid strictly beyond the current time plus estimate plus margin. An insufficient
+horizon fails before expensive reconstruction and requires genuine renewal,
+re-sealing and a newly issued exact selection; shortening a clock or silently
+substituting unsealed proofs is not a continuation mechanism.
+
 Reusing immutable reconstruction is not reusing permission. Source policy
 clocks, actual current proofs, issuance expiry, operator control pins, allowance
 accounting, native B purge lease state, selected current attempts, authority and
@@ -145,6 +156,10 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   `seal-text-contribution`. No aggregate rows, invented lineage or substituted
   model receipts are accepted. The declared reconciliation set is checked
   against the extraction-run queue closure.
+- Optional `importDispositionDecision: {path, sha256}` pins an **issued owner**
+  import-rejection decision. Omission enables no importer exceptions. An unissued
+  draft, expired/future record, changed reason or changed evidence is refused.
+  This pin is common to ready and staging-assembly invocations.
 - `structuredRunIds`: the committed K1/K2 runs listed below. They are exported
   together, not merged by title or relabeled as text-model work.
 - `registry: {path, sha256}`: the admitted registry artifact against which the
@@ -200,6 +215,55 @@ only through that opaque verified preparation; after source-epoch completion its
 exact bytes are copied as a non-independent managed derivative and checked
 through Core before publication. The fresh staging root/claim must be disjoint
 from candidate, preparation and replay roots/claims.
+
+
+### Import rejections are not processed documents
+
+The campaign remains the complete 208-document frozen set. A native document
+has `{documentId, sha256, jobKey}`. A rejected import instead has the strict shape
+`{documentId, sha256, importDisposition: {decisionSha256, reasonCode}}`; never
+invent an extraction job key or residual `StepReceipt` for it.
+
+The decision schema is `stadtstack-r1-import-disposition-decision-v1`. It pins
+the immutable native-selection **JSON** (the lead-action record independently
+pins that same selection), catalogue, selected seal, corpus and exact historical
+`import-crawl-corpus.json` / `import-result.json` per affected source. Each member
+also binds document ID and original SHA-256. Consumers authenticate the admitted
+registry against the selected seal, original observation ancestry, retained raw
+bytes and managed bindings, then recompute importer precedence:
+
+1. `scope_mismatch`: original URL origin is outside registered roots/page roots,
+   source seed documents and API origins.
+2. `unsupported_mime`: scope passes but the shared residual MIME rule refuses it.
+3. `source_policy_stale`: scope/MIME, original HTTP and request/redirect evidence
+   pass; authenticated frozen HTML discovery cannot derive registered-source
+   eligibility and the ordinary policy has expired. No refreshed selection,
+   incomplete clock or operational/authority failure becomes this disposition.
+
+All reasons require an issued owner record. `policy.kind: "permanent_only"`
+enables only the first two permanent classes. The alternative
+`"include_expired_unregistered_discovery"` additionally requires
+`ownerDecision: "dispose_without_processing"` and explicitly enables the stale
+class. Processing those 22 originals instead remains possible; select their
+genuine native results/terminal exceptions and do not select import dispositions
+for them.
+
+Review-only drafts (both have empty `issuedAt`, hence authorize nothing):
+
+- `reports/approvals/r1-import-dispositions-permanent-2026-10-19.draft.json` — 2
+  permanent documents; the remaining 22 still require processing.
+- `reports/approvals/r1-import-dispositions-owner-stale-2026-10-19.draft.json` — 24
+  import rejections, conditional on the owner's still-pending stale-class choice.
+
+These drafts pin the collected final27 seal selection. A genuinely renewed seal
+or new selection requires regenerated exact pins and fresh issuance, not a
+hash/clock substitution in an existing issued record. Both execute and audit use
+the same authentication and exact disjoint-membership checks. Native committed
+counts and import-rejected counts remain separate; together with terminal native
+exceptions they account for all 208 documents exactly once. Import dispositions
+have `processed:false`, no admitted records, no job and no receipt. Step-9
+exception material preserves the distinct variant; stale-policy exclusions remain
+rights-classified, not processed negatives or a rights override.
 
 ## Validating read-only audit
 

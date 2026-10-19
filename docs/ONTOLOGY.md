@@ -211,6 +211,21 @@ does not claim that they are the same legal instrument or case. In the recorded
 coverage snapshot, 208 documents formed 207 byte-identity groups. This is
 implementation/prototype tooling, not a published release assertion.
 
+Pre-processing **import rejections** are a separate `DocumentDisposition` variant,
+not native terminal exceptions or residual `StepReceipt`s. A pinned, issued owner
+decision binds the selected seal and frozen corpus/document/original byte identity
+to the exact registry, historical import manifest and import result. Both step-8
+execute and audit recompute the importer rule from authenticated inputs. The
+permanent-only decision permits `unsupported_mime` and `scope_mismatch`; the
+alternative additionally permits `source_policy_stale` only on the owner's explicit
+decision to dispose without processing, where registered discovery cannot be
+authenticated and the ordinary policy proof has expired. Drafts have empty
+`issuedAt` and authorize nothing. Processing the 22 policy-held originals instead
+remains possible: they then require native results/terminal exceptions, not import
+dispositions. Results, native terminal exceptions and import rejections must cover
+all 208 frozen documents exactly once. Import rejections admit no records and make
+no processing claim.
+
 This implements the frozen rebuild plan's original-evidence and typed-role intent
 ([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)
 and [§6](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#6-phases-effort-and-acceptance-gates)), not a relaxed output schema, score target or majority override.

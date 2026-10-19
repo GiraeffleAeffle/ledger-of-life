@@ -158,7 +158,7 @@ concepts:
       - Read-only seal/export reconstructs and authenticates the exact persisted v1 or v2 target and committed preparation ancestry; new preparation emits v2 only.
     code: [stadtstack-data/src/district-assessment-projection.ts, stadtstack-data/src/district-assessment.ts, stadtstack-data/src/district-assessment-jobs.ts]
   DocumentDisposition:
-    definition: A source-scoped terminal seal disposition for byte-identical frozen campaign documents; it accounts for duplicate members without admitting or merging their records.
+    definition: Source-scoped accounting of a frozen campaign document without a new admission claim; duplicate native outputs and authenticated pre-processing import rejections are distinct variants.
     reality: prototype
     relations: {disposes: source document, canonical_carrier: smallest documentId in the same municipality/sourceId/sourceSha256 group, pinned_to: canonical document and the duplicate's extraction receipt/output}
     invariants:
@@ -166,7 +166,10 @@ concepts:
       - The smallest documentId is the canonical native record carrier; every other member receives derived reasonCode duplicate_source_content.
       - The disposition binds the canonical document and the duplicate's own residual-extraction receipt and sole output artifact; authenticated seal membership includes both extraction pins.
       - A duplicate disposition is terminal accounting only: its records are excluded from admission and merging, not asserted to be the same legal instrument or case.
-    code: [stadtstack-data/src/district-duplicate-source-content.ts, stadtstack-data/src/district-queue-text-run.ts, stadtstack-data/src/r1-step8-governance.ts]
+      - Import rejections bind the issued owner decision, selected seal, frozen corpus/document/original bytes, exact registry and historical import manifest/result; consumers recompute the deciding importer rule.
+      - Permanent unsupported_mime and scope_mismatch reasons require a pinned issued decision; source_policy_stale additionally requires the explicit owner choice to dispose without processing, unauthenticable registered discovery and expired ordinary policy.
+      - An import rejection has no residual job or StepReceipt, no admitted records and no processing claim; results, terminal exceptions and import rejections exhaust the frozen campaign without overlap.
+    code: [stadtstack-data/src/district-duplicate-source-content.ts, stadtstack-data/src/district-queue-text-run.ts, stadtstack-data/src/r1-step8-governance.ts, stadtstack-data/src/r1-step8-import-dispositions.ts]
 
   Organization:
     definition: A public body, enterprise, cooperative or builder in a city Context; sourced Strausberg profiles describe products, participation channels, published opportunities and documented group membership. These independent organizations are separate from fictional test issuers.

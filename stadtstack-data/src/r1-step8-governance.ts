@@ -9,8 +9,11 @@ import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {assertCivicPolicyAuthority} from './civic-opt-out.ts';
 import {DuplicateSourceContentExceptionSchema,assertDuplicateSourceContentReceipt} from './district-duplicate-source-content.ts';
 import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
+import {ImportRejectionReasonSchema,ImportRejectionDispositionSchema,type ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
 
-export const Step8CampaignSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-v1'),sources:z.array(z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1),corpus:z.object({path:z.string().min(1),sha256:HashSchema}).strict(),documents:z.array(z.object({documentId:z.string().min(1),sha256:HashSchema,jobKey:HashSchema}).strict()).min(1)}).strict()).min(1)}).strict();
+const nativeCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256:HashSchema,jobKey:HashSchema}).strict();
+const importCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256:HashSchema,importDisposition:z.object({decisionSha256:HashSchema,reasonCode:ImportRejectionReasonSchema}).strict()}).strict();
+export const Step8CampaignSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-v1'),sources:z.array(z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1),corpus:z.object({path:z.string().min(1),sha256:HashSchema}).strict(),documents:z.array(z.union([nativeCampaignDocumentSchema,importCampaignDocumentSchema])).min(1)}).strict()).min(1)}).strict();
 export type Step8Campaign=z.infer<typeof Step8CampaignSchema>;
 export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>Promise<Uint8Array>,policy:CivicPolicyOptions){
  const campaign=Step8CampaignSchema.parse(raw),mode=(await assertCivicPolicyAuthority(policy)).mode,identities=new Set<string>(),jobs=new Set<string>();
@@ -22,17 +25,25 @@ export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>
   const corpus=loadFrozenCorpusBytes(await read(source.corpus.path),source.corpus.sha256),documents=new Map<string,string>();
   for(const document of corpus.documents){if(document.municipalityId!==source.municipalityId||document.sourceId!==source.sourceId||documents.has(document.id))throw Error('Campaign corpus contains another scope or duplicate document identity');documents.set(document.id,document.sha256);}
   if(source.documents.length!==documents.size||new Set(source.documents.map(document=>document.documentId)).size!==documents.size)throw Error('Campaign omits or duplicates frozen documents');
-  for(const document of source.documents){if(documents.get(document.documentId)!==document.sha256||jobs.has(document.jobKey))throw Error('Campaign document/job membership mismatch');jobs.add(document.jobKey);}
+  for(const document of source.documents){
+   if(documents.get(document.documentId)!==document.sha256)throw Error('Campaign document/job membership mismatch');
+   if('jobKey' in document){if(jobs.has(document.jobKey))throw Error('Campaign document/job membership mismatch');jobs.add(document.jobKey);}
+  }
  }
  return campaign;
 }
-export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string;reasonCode?:string}[]=[],steps:readonly {receipt:StepReceipt;sha256:string}[]=[]){
- const expected=source.documents.map(document=>canonicalJson([document.documentId,document.sha256,document.jobKey])).sort();
+export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string;reasonCode?:string}[]=[],steps:readonly {receipt:StepReceipt;sha256:string}[]=[],imports:readonly ImportRejectionDisposition[]=[]){
+ const expected=source.documents.map(document=>canonicalJson('jobKey' in document?[document.documentId,document.sha256,document.jobKey]:[document.documentId,document.sha256,'import_rejection',document.importDisposition.decisionSha256,document.importDisposition.reasonCode])).sort();
  const actual=results.map(result=>{if(result.corpusSha256!==source.corpus.sha256||result.result.municipalityId!==source.municipalityId)throw Error('Exported campaign source scope mismatch');return canonicalJson([result.documentId,result.result.sourceSha256,result.result.taskId]);}).sort();
  for(const exception of exceptions){if(exception.corpusSha256!==source.corpus.sha256||exception.municipalityId!==source.municipalityId||exception.sourceId!==source.sourceId)throw Error('Terminal campaign source scope mismatch');actual.push(canonicalJson([exception.documentId,exception.sourceSha256,exception.jobKey]));}actual.sort();
+ for(const raw of imports){
+  const disposition=ImportRejectionDispositionSchema.parse(raw);
+  if(disposition.corpusSha256!==source.corpus.sha256||disposition.municipalityId!==source.municipalityId||disposition.sourceId!==source.sourceId)throw Error('Import campaign source scope mismatch');
+  actual.push(canonicalJson([disposition.documentId,disposition.sourceSha256,'import_rejection',disposition.decision.sha256,disposition.reasonCode]));
+ }actual.sort();
  if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exported campaign document/job set mismatch');
- const groups=new Map<string,typeof source.documents>();
- for(const document of source.documents){const group=groups.get(document.sha256);if(group)group.push(document);else groups.set(document.sha256,[document]);}
+ const nativeDocuments=source.documents.filter(document=>'jobKey' in document),groups=new Map<string,typeof nativeDocuments>();
+ for(const document of nativeDocuments){const group=groups.get(document.sha256);if(group)group.push(document);else groups.set(document.sha256,[document]);}
  for(const group of groups.values()){
   const canonical=group.reduce((selected,document)=>document.documentId<selected.documentId?document:selected);
   if(group.length>1&&!results.some(result=>result.documentId===canonical.documentId))throw Error('Duplicate group lacks its canonical native document');
