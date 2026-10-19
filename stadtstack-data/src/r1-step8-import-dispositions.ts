@@ -16,6 +16,9 @@ import {registeredSourcePolicyApplies,sourcePolicyExpiresAt,MAX_POLICY_METADATA_
 import {ImportDispositionPinSchema as Pin,ImportDispositionDecisionSchema,type ImportDispositionDecision,type ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
 type Read=(pin:z.infer<typeof Pin>)=>Promise<Uint8Array>;
 const equal=(a:unknown,b:unknown,message:string)=>{if(canonicalJson(a)!==canonicalJson(b))throw Error(message);};
+const pinIdentity=(pin:z.infer<typeof Pin>)=>({path:pin.path,sha256:pin.sha256});
+// Native-frame byte counts are optional metadata; identity remains exact path/hash.
+const framePin=Pin.extend({bytes:z.number().int().nonnegative().max(128*1024*1024).optional()}).transform(pinIdentity);
 export function assertImportDispositionDecisionCurrent(decision:ImportDispositionDecision){
  const now=Date.now();if(Date.parse(decision.issuedAt)>now||Date.parse(decision.expiresAt)<=now||Date.parse(decision.issuedAt)>=Date.parse(decision.expiresAt))throw Error('Import disposition decision is future-issued or expired');
 }
@@ -30,14 +33,14 @@ export async function authenticateImportDispositions(options:{decision?:z.infer<
  const pinned=async(pin:z.infer<typeof Pin>,read:Read)=>{const bytes=Buffer.from(await read(pin));if(digest(bytes)!==pin.sha256)throw Error('Import disposition evidence pin mismatch');return bytes;};
  const json=async(pin:z.infer<typeof Pin>,read:Read)=>JSON.parse((await pinned(pin,read)).toString('utf8'));
  const decision=ImportDispositionDecisionSchema.parse(await json(options.decision,options.control));assertImportDispositionDecisionCurrent(decision);
- const issuance=z.object({selection:Pin}).passthrough().parse(await json(options.nativeSealSelection,options.control));
- equal(decision.nativeSealSelection,issuance.selection,'Import decision selects another native seal selection');equal(decision.catalogue,options.catalogue,'Import decision selects another catalogue');
- const selection=z.object({catalogue:Pin,seals:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),corpus:Pin,output:Pin}).passthrough()).min(1)}).passthrough().parse(await json(decision.nativeSealSelection,options.control));
+ const issuance=z.object({selection:framePin}).passthrough().parse(await json(options.nativeSealSelection,options.control));
+ equal(decision.nativeSealSelection,issuance.selection,'Import decision selects another native seal selection');equal(decision.catalogue,pinIdentity(options.catalogue),'Import decision selects another catalogue');
+ const selection=z.object({catalogue:framePin,seals:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),corpus:framePin,output:framePin}).passthrough()).min(1)}).passthrough().parse(await json(decision.nativeSealSelection,options.control));
  equal(selection.catalogue,decision.catalogue,'Import decision changes governed catalogue');
  const seen=new Set<string>(),sources=new Set<string>(),dispositions:ImportRejectionDisposition[]=[];
  for(const evidence of decision.sources){
   const identity=canonicalJson([evidence.municipalityId,evidence.sourceId]);if(sources.has(identity))throw Error('Duplicate import disposition source');sources.add(identity);
-  if(!options.seals.some(seal=>canonicalJson(seal.sealResult)===canonicalJson(evidence.sealResult)))throw Error('Import evidence belongs to an unselected seal');
+  if(!options.seals.some(seal=>canonicalJson(pinIdentity(seal.sealResult))===canonicalJson(evidence.sealResult)))throw Error('Import evidence belongs to an unselected seal');
   const governed=selection.seals.filter(seal=>seal.municipalityId===evidence.municipalityId&&seal.sourceId===evidence.sourceId);
   if(governed.length!==1)throw Error('Import evidence lacks exact governed source');
   equal(governed[0].output,evidence.sealResult,'Import evidence changes governed seal');equal(governed[0].corpus,evidence.corpus,'Import evidence changes governed corpus');
