@@ -1014,3 +1014,51 @@ Returned attestation, inventory and provenance-pin metadata are detached
 snapshots, not writable references into cached canonical authority. Caller
 mutation cannot change a later build/authentication in the same context; the
 reader capability itself remains the genuine unchanged-Core capability.
+
+## Integrated one-pass verification
+
+The final integrated focused run used Node24.21.0, `umask022`, one test file at
+a time, CPUs1–5 and nice10, with a fresh Unix-socket-only disposable PostgreSQL16
+cluster and isolated fixture authority:
+
+```sh
+taskset -c 1-5 nice -n 10 node --experimental-strip-types \
+  --test --test-concurrency=1 --test-reporter=tap \
+  test/r1-step8-provenance.test.ts \
+  test/district-publication-provenance.test.ts \
+  test/r1-step8.test.ts \
+  test/r1-step8-governance.test.ts \
+  test/district-residual-topology.test.ts \
+  test/r1-step8-staging.test.ts \
+  test/r1-step8-import-dispositions.test.ts \
+  test/r1-step8-audit-expiry.test.ts
+```
+
+Observed result: **30 tests,30 passed,0 failed/cancelled/skipped**,773.32s TAP
+duration (774.27s including disposable-cluster setup/teardown). The separate
+`taskset -c1-5 nice -n10 node_modules/.bin/tsc --noEmit` check exited0 in21.25s.
+All fourteen actual exported processing-contract functions were recomputed
+against `aceb0a658c48f2e683e79316f4ddd2d13689b36e`: **zero differences**.
+
+The run exercises genuine canonical producer reconstruction with two/three
+workers, whole-PID exit during a CPU-starved thread after parent/PG loss, exact
+Core inherited-fd mutex subprocess form under the offline guard, one canonical build per
+source through embedded audit/export, zero builder calls on insufficient pinned
+proof lifetime, all-member candidate/exact replay, real19-member0.3.2 staging,
+authenticated import rejection and the final standalone-audit expiry boundary.
+The short synthetic proofs are unchanged; their explicitly declared fixture
+planning estimate is ten minutes plus a sixty-second margin, not production's
+conservative default planning estimate.
+
+PostgreSQL stopped with exit0, its temporary directory was removed, and an actual
+`pgrep` found no test/fixture/reconstruction actors. Fixture subprocesses use
+`--test-isolation=none`, so a runner timeout cannot strand a hidden test child.
+The earlier timed-out isolated fixture was identified and removed; no production
+authority/CAS/DB data was changed.
+
+These are focused implementation checks, not a full `r1-verify.sh all` result or
+a successful production generation audit/publication. Final issued selection,
+genuine policy-renewed seals, any explicit owner import-disposition decision,
+step9's frozen value test and hosted-release authority remain separate gates.
+No direct before/after production reconstruction benchmark is claimed; retained
+pre-repack producer timings are historical proxies, not a measured final ETA.
