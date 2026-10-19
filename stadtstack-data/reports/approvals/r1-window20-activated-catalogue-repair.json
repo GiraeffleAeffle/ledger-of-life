@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "r1-window20-tooling-repair-v1",
+  "id": "r1-window20-activated-catalogue-repair",
+  "action": "repair-post-activation-catalogue-read",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-19T22:22:25.723Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "originalCandidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "repairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/activation-repair/manifest.json",
+    "sha256": "5b307eff89bb476d5a1dac68d001d435a8af1ba8ea53b6557540047b4a1d10f0"
+  },
+  "processingReview": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/processing-pin-5a9a14c.json",
+    "sha256": "40806499f4ebcf9f21912c32251bd01a4cbab5e21938bd3083809a4c4d68d6e6"
+  },
+  "activationEvidence": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/pin-5a9a14c105195043fda1c4f9aa8b9f6697e33c3d/activated.json",
+    "sha256": "0860094ad5365739b0c425625035c37f76f569983518b142a5c6306e31304c02"
+  },
+  "bounds": {
+    "extraPolicyRequests": 0,
+    "extraJobs": 0,
+    "extraSeals": 0,
+    "modelCalls": 0,
+    "paidMicroUsd": 0,
+    "processingRepin": false,
+    "mainHeadChange": false
+  },
+  "reason": "Additive reviewed operator repair only. Authenticate the old catalogue from the Main-confirmed activation plan and compare every live field except the two exact activated processing fields. Preserve the original candidate, authority, processing pin, runtime43 and all original tooling bytes. No new processing authority or renewed budget; all existing policy, queue, custody, time and identity checks remain mandatory."
+}
