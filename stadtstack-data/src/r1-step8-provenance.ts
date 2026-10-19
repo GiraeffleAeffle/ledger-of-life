@@ -42,6 +42,14 @@ interface ContextState {
 }
 const contexts=new WeakMap<WitnessedProvenanceContext,ContextState>();
 const pinKey=(pin:NativeProvenancePin)=>JSON.stringify([pin.path,pin.sha256]);
+/** Only scalar, explicit Unix-socket settings cross into the independent pool.
+ * pg-connection-string uses an empty string for an omitted URL port. */
+export function createCanonicalWitnessReadPool(configuration:Pool['options']){
+ const parsed=configuration.connectionString?parseConnectionString(configuration.connectionString):{};
+ const connection=z.object({host:z.string().refine(isAbsolute),database:z.string().min(1),user:z.string().min(1),port:z.coerce.number().int().min(1).max(65535)}).parse({host:parsed.host??configuration.host,database:parsed.database??configuration.database,user:parsed.user||configuration.user||userInfo().username,port:parsed.port||(configuration.port??5432)});
+ if(parsed.password||configuration.password)throw Error('Canonical native witnesses require local peer/trust authentication without credentials');
+ return new Pool({...connection,max:1,min:0,connectionTimeoutMillis:5000,statement_timeout:10000,query_timeout:10000,options:'-c default_transaction_read_only=on',application_name:'r1-native-seal-selection-readonly',password:async()=>{throw Error('Canonical witness password authentication prohibited');}});
+}
 function state(context:WitnessedProvenanceContext){const value=contexts.get(context);if(!value||value.finished)throw Error('Native provenance context unavailable or finished');return value;}
 async function readPrivate(pin:NativeProvenancePin,files:Map<string,FileRecord>,maxBytes=MAX_BYTES,publicControl=false){
  const actual=NativeProvenancePinSchema.parse(pin),before=await metadata(actual.path),cached=files.get(pinKey(actual));
@@ -116,12 +124,8 @@ export async function createWitnessedProvenanceContext(selectionPin:NativeProven
  if(authority.mode!=='isolated-fixture'&&(issuance.parentApproval.id!=='r1-nine-town-models-2026-10-13'||issuance.parentApproval.sha256!=='2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b'))throw Error('Native selection parent approval differs from frozen campaign');
  if(options.mode==='step8'&&candidates!==0||options.mode==='adoption'&&candidates!==1)throw Error('Native selection admission set differs from governed operation');
  if(authority.mode!=='isolated-fixture'&&selection.seals.length!==(options.mode==='adoption'?25:27))throw Error('Incomplete production native seal selection');
- const configuration=options.pool.options,parsed=configuration.connectionString?parseConnectionString(core.governance.step8SocketConnection(configuration.connectionString)):{};
- const connection=z.object({host:z.string().refine(isAbsolute),database:z.string().min(1),user:z.string().min(1),port:z.coerce.number().int().min(1).max(65535)}).parse({host:parsed.host??configuration.host,database:parsed.database??configuration.database,user:parsed.user||configuration.user||userInfo().username,port:parsed.port??configuration.port??5432});
- if(parsed.password||configuration.password)throw Error('Canonical native witnesses require local peer/trust authentication without credentials');
- // Never copy caller Client/stream/connection/hooks or DSN options: pg merges
- // DSN options after constructor options, which could otherwise undo read-only.
- const db=new Pool({...connection,max:1,min:0,connectionTimeoutMillis:5000,statement_timeout:10000,query_timeout:10000,options:'-c default_transaction_read_only=on',application_name:'r1-native-seal-selection-readonly',password:async()=>{throw Error('Canonical witness password authentication prohibited');}});
+ if(options.pool.options.connectionString)core.governance.step8SocketConnection(options.pool.options.connectionString);
+ const db=createCanonicalWitnessReadPool(options.pool.options);
  try{
   const fence=await core.audit.createReadOnlyManagedSourceAudit(bound),inventoryPin={path:join(resolve(bound.stateDir??core.civic.CIVIC_POLICY_STATE_DIR),'inventory.json'),sha256:fence.inventorySha256},epochFiles=new Map<string,FileRecord>();await readPrivate(inventoryPin,epochFiles,512*1024*1024);
   const value:ContextState={core,policy:bound,selection,selectionPin:{...issuance.selection,bytes:frameBytes.length},issuancePin:{...selectionPin,bytes:issuanceBytes.length},issuance,native:new Map(),files,db,steps:new Map(),fence,inventoryPin,inventoryStamp:epochFiles.get(pinKey(inventoryPin))!.stamp,finished:false};

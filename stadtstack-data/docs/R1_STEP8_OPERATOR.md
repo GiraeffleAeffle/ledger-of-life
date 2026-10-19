@@ -877,3 +877,9 @@ genuine canonical held queue receipts, including a real no-op binding witness.
 Tests cover ancillary forgery, exact-set/alias changes, unchanged-inode parent
 aliases, epoch changes and unchanged DB/inventory state. Merely enrolled
 native-looking synthetic JSON is deliberately not a positive fixture.
+
+The private witness pool accepts the ordinary
+`postgresql:///civic_r1?host=/var/run/postgresql` DSN: an omitted URL port
+normalizes to the configured port or PostgreSQL's default `5432`. Explicit
+nondefault ports are preserved; invalid zero ports are rejected. Caller Client
+constructors and DSN read-write GUC overrides are not inherited.
