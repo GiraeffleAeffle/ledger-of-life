@@ -142,14 +142,14 @@ the normal exact replay plus candidate loader still precede the passed gate.
 This avoids repeatedly loading/saving the entire authority inventory for every
 member without introducing a second inventory writer or relaxing Core checks.
 
-Observed size evidence from the real19-member candidate: final provenance
-**8,576,972bytes**,34inputs (19retained members,6native contribution artifacts,
+Observed size evidence from the real19-member, duplicate-original end-to-end
+fixture: final provenance **8,582,540bytes**,34inputs (19retained members,6native contribution artifacts,
 9aggregate/control inputs). The retained members keep all12,517bindings.
 Core accepted the native records artifact's complete two-binding producer set
 and refused a one-binding declaration with `CONTENT_PROVENANCE_MISMATCH`.
 A pretty-JSON wire-size model using the19 measured retained members,27 source
 cohorts, up to24HTTP originals per source-artifact row and213HTTP producers per
-aggregate row yields **10,885,948bytes**, below the unchanged16,777,216-byte guard.
+aggregate row yields **10,890,937bytes**, below the unchanged16,777,216-byte guard.
 This model assumes the observed URL/proof wire lengths; it is not a measurement
 of the later renewed production selection or permission to omit actual inputs.
 
@@ -257,9 +257,11 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   The latter must be a **new** real-directory generation below this package's
   `cache/`, with an existing real parent. It cannot contain an `out` or `release`
   path component. Existing/partial generations are rejected, not reused.
-  Preparation and replay use the disjoint sibling managed lanes
-  `OUTPUT_ROOT-preparation` and `OUTPUT_ROOT-replay`; nested registered roots are
-  never created inside the persistent candidate artifacts lane.
+  Preparation, replay computation and replay evidence use disjoint sibling lanes
+  `OUTPUT_ROOT-preparation`, `OUTPUT_ROOT-replay` and
+  `OUTPUT_ROOT-replay-artifacts`; the last is a fresh evidence CAS derived from
+  the pinned replay workspace. None is nested inside the persistent candidate
+  artifacts lane or the canonical source CAS.
 
 The input file is an operator control artifact: generate it from real completed
 seal results and admitted staging provenance, then independently pin its digest.
@@ -473,15 +475,51 @@ No new extraction or publication engine is introduced:
    provenance; the manifest alone is the expected comparison target.
 6. `knowledge:replay`'s `replayPipeline` reconstructs in a separate fresh leased
    workspace, verifies **every member digest and byte count**, and compares the
-   **manifest bytes, digest and ID**. It records actual artifact/proof metadata
-   in the isolated/same-host canonical audit DB and managed CAS. New execution
-   clocks are only in receipts, not substituted into publication artifacts.
+   **manifest bytes, digest and ID**. Actual artifact/proof metadata is recorded
+   in the isolated/same-host canonical audit DB and the separate fresh
+   `OUTPUT_ROOT-replay-artifacts` CAS, never rebound into the source CAS. New
+   execution clocks are only in receipts, not substituted into publication artifacts.
 7. `loadRelease(..., {mode: 'vm_candidate', policyOptions})` checks the candidate
    serving/read-view contracts and current policy. Only then is
    `OUTPUT_ROOT/release-gate.json` written with `status: "passed"`, exact directory,
    release ID, manifest SHA, replay receipt/audit hash and explicit checks.
    No gate file is issued on failure. It explicitly states
    `valueAccepted: false` and `hostedReleaseAuthorized: false`.
+
+### Replay evidence and reconstructible input pins
+
+The replay proof and its audit contain `stadtstack-replay-input-pins-v1`: exact
+receipt/provenance pins; every authenticated dependency's path, SHA, byte length
+and binding-set hash; all staging pins; expected manifest/member references;
+authenticated predecessor Git commit/directory/manifest/member pins; and runtime
+source/lock pins. Transitive CAS hashes remain in those pinned typed bodies,
+with their explicit source-CAS root and hash-path convention. This is a
+reconstructible input graph, not a fabricated trace of every OS file open.
+Prior Git remains **preload-only historical reconstruction evidence**, never
+independent general source admission.
+
+Persistence archives the proof and **all compared release members plus the
+manifest**, not duplicate staging or predecessor trees. Each artifact keeps its
+actual producer binding set, selected by the same pure member resolver used by
+candidate persistence. Duplicate output hashes combine all of their producers.
+Core's unchanged multi-entry write primitive records the exact per-artifact
+entries in one registered scratch/batch; audit metadata additionally records the
+producer-binding-set hash.
+
+The evidence CAS is atomically reserved as a new directory. Existing/partial
+evidence roots are refused. Canonical source CAS blobs are never rebound or
+changed by replay; the fixture snapshots shared empty control bytes **and their
+full binding entries** before and after execution. The acceptance reader derives
+the evidence root from the pinned workspace and has no source-CAS fallback.
+Neither byte-exact comparison, Core's exact binding checks nor the16MiB
+publication provenance guard is relaxed.
+
+`release-gate.json.phaseTimings` reports measured reconstruction, staging
+preparation/commit, audit/export, publication, candidate persistence, replay total,
+replay rebuild/persistence and final persistence/load intervals. The final gate
+JSON write itself is excluded, avoiding self-referential timing evidence. These
+are fixture/run measurements, not a certified27-source production ETA.
+
 
 Hand step 9 the exact `candidateDirectory`, `releaseId` and policy realm, not a
 mutable `out/` alias. Its actual MCP/value harness owns value acceptance.
@@ -1032,7 +1070,8 @@ Step8 input requires `nativeSealSelection` (the **issued-record** Pin).
 Optional per-seal `provenanceSupplement` now has the strict shape
 `{inventory: Pin, attestation: Pin, targets: Hash[]}`; a bare union pin is invalid.
 The read plan includes these controls. Audit and execute share authentication;
-replay receives the authenticated complete aggregate inventory.
+replay receives the complete authenticated publication/replay input inventory,
+without duplicating unrelated independent audit/exception artifacts.
 
 Standalone native staging uses `nativeSealSelection`, `nativeSealCatalogue`,
 `nativeCasRoot` and the canonical socket database. Optional explicitly supplied
@@ -1078,7 +1117,7 @@ reader capability itself remains the genuine unchanged-Core capability.
 
 ## Integrated one-pass verification
 
-The final integrated focused run used Node24.21.0, `umask022`, one test file at
+The earlier integrated focused run used Node24.21.0, `umask022`, one test file at
 a time, CPUs1–5 and nice10, with a fresh Unix-socket-only disposable PostgreSQL16
 cluster and isolated fixture authority:
 
@@ -1123,3 +1162,60 @@ genuine policy-renewed seals, any explicit owner import-disposition decision,
 step9's frozen value test and hosted-release authority remain separate gates.
 No direct before/after production reconstruction benchmark is claimed; retained
 pre-repack producer timings are historical proxies, not a measured final ETA.
+
+## Real19 staged handoff and isolated replay evidence verification
+
+After the custody cutover, the following authorized focused runs used the same
+Node24.21.0/PG16, `umask022`, CPUs1–5, nice10 and single-file concurrency:
+
+```sh
+taskset -c 1-5 nice -n 10 node --experimental-strip-types \
+  --test --test-concurrency=1 --test-reporter=tap \
+  test/replay-pipeline.test.ts test/r1-release-acceptance.test.ts \
+  test/r1-step8.test.ts test/r1-step8-provenance.test.ts
+
+taskset -c 1-5 nice -n 10 node --experimental-strip-types \
+  --test --test-concurrency=1 --test-reporter=tap \
+  test/district-residual-topology.test.ts
+
+taskset -c 1-5 nice -n 10 node --experimental-strip-types \
+  --test --test-concurrency=1 --test-reporter=tap \
+  test/r1-release-acceptance.test.ts test/r1-step8-staging.test.ts
+```
+
+Observed results, respectively: **56/56**, **2/2**, **25/25** passed, with no
+failures/cancellations/skips. The genuine native/duplicate run took338.37s;
+the final real19/acceptance run took3025.35s including disposable-cluster
+setup/teardown. This last fixture uses all19 authentic retained0.3.2 members
+and duplicate-byte originals, one actual canonical reconstruction per selected
+source during execute, all-member/manifest byte-exact replay, a passed step8
+gate, successful `loadStep8ExceptionBundle`, and rejection of campaign tampering.
+Both shared empty native controls retain byte-identical content and exactly the
+same complete source-CAS inventory binding sets before/after execute. Omitting
+a required original producer binding is refused by unchanged Core. Replay
+evidence cannot fall back to the source CAS.
+
+Measured execute intervals in that real19 fixture:
+
+| Interval | Seconds |
+| --- | ---: |
+| Canonical reconstruction | 15.580 |
+| Staging preparation | 27.192 |
+| Audit and export | 65.923 |
+| Staging commit | 111.054 |
+| Initial export persistence | 143.621 |
+| Publication | 248.783 |
+| Candidate persistence | 245.784 |
+| Replay total | 1267.934 |
+| Replay rebuild and exact comparison (within replay total) | 641.015 |
+| Replay evidence persistence (within replay total) | 357.045 |
+| Final persistence and candidate load | 255.130 |
+
+These measured fixture intervals are not a production27-source ETA; the replay
+subintervals must not be added again to replay total. The final gate JSON write
+is excluded. The separate final TypeScript check exited0 in20.80s, and all14
+actual exported processing-contract functions still match `aceb0a6` exactly.
+PostgreSQL stopped with exit0 and each temporary cluster was removed; the final
+process check found no remaining test, reconstruction or disposable-PG actor.
+No production state was written. The integration owner still runs the complete
+gate and independent reviews before production use.

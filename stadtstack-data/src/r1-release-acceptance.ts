@@ -1,6 +1,6 @@
 import {createHash} from 'node:crypto';
 import {readFile,lstat} from 'node:fs/promises';
-import {isAbsolute,join,resolve} from 'node:path';
+import {isAbsolute,join,resolve,dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
 import {HashSchema,canonicalJson} from './district-adapter-contract.ts';
@@ -11,6 +11,7 @@ import {ReasonCodeSchema,JobOutcomeSchema} from './district-step-receipt.ts';
 import {RELEASE_ACCEPTANCE_RULES,readCandidateMaterialContext,bindReleaseExceptionContext,type CandidateMaterialContext} from './r1-release-context.ts';
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 import {ImportRejectionDispositionSchema} from './r1-step8-import-disposition-contract.ts';
+import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from './replay-evidence-contract.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -289,10 +290,10 @@ export async function computeReleaseAcceptance(input:unknown){
   const receipt=record(await readAcceptancePin(gate.replayReceipt));
   const expectedRelease=AcceptancePinSchema.parse(receipt.expectedRelease);
   if(expectedRelease.sha256!==gate.manifestSha256)blockers.push('replay_expected_manifest_mismatch');
-  const casRoot=z.string().refine(isAbsolute).parse(receipt.casRoot);
+  const sourceCasRoot=z.string().refine(isAbsolute).parse(receipt.casRoot),casRoot=replayEvidenceCasRoot(z.string().min(1).parse(receipt.workspace),dirname(gate.replayReceipt.path));
   const auditPin={path:join(casRoot,'sha256',gate.replayAuditSha256.slice(0,2),gate.replayAuditSha256),sha256:gate.replayAuditSha256};
   const audit=record(await readAcceptancePin(auditPin)),comparison=record(audit.comparison);
-  if(audit.schemaVersion!=='district-replay-proof-audit-v1'||audit.receiptSha256!==gate.replayReceipt.sha256||comparison.releaseId!==gate.releaseId
+  if(audit.schemaVersion!=='district-replay-proof-audit-v1'||audit.artifactCasRoot!==casRoot||audit.receiptSha256!==gate.replayReceipt.sha256||comparison.releaseId!==gate.releaseId
     ||comparison.manifestSha256!==gate.manifestSha256||canonicalJson(comparison.files)!==canonicalJson(manifest.files))blockers.push('exact_replay_binding_failed');
   const artifactSchema=z.object({path:z.string(),sha256:HashSchema,storageKey:z.string()}).passthrough();
   const proofArtifacts=z.array(artifactSchema).parse(audit.artifacts).filter(artifact=>artifact.path==='proof.json');
@@ -303,6 +304,10 @@ export async function computeReleaseAcceptance(input:unknown){
   const execution=record(proof.execution);
   if(proof.schemaVersion!=='stadtstack-offline-replay-proof-v2'||execution.modelCalls!==0||execution.readinessCalls!==0||execution.liveFallback!=='forbidden'
     ||canonicalJson(proof.comparison)!==canonicalJson(audit.comparison))blockers.push('exact_replay_not_passed');
+  const inputs=ReplayEvidenceInputPinsSchema.parse(proof.inputs),provenance=AcceptancePinSchema.parse(receipt.privateProvenance),base=dirname(gate.replayReceipt.path);
+  if(canonicalJson(inputs)!==canonicalJson(audit.inputs)||inputs.receipt.path!==resolve(gate.replayReceipt.path)||inputs.receipt.sha256!==gate.replayReceipt.sha256
+    ||inputs.sourceCas.root!==sourceCasRoot||inputs.provenance.path!==resolve(base,provenance.path)||inputs.provenance.sha256!==provenance.sha256
+    ||inputs.expectedRelease.manifest.path!==resolve(base,expectedRelease.path)||inputs.expectedRelease.manifest.sha256!==expectedRelease.sha256)blockers.push('exact_replay_input_pins_failed');
   const value=valueVerdictSchema.parse(await readAcceptancePin(selected.valueVerdict));
   const pairs=value.gates.graphPairs.pairs,ids=['W03','W04','E03','B03','K03','M03','H03'];
   if(value.releaseId!==gate.releaseId)blockers.push('value_verdict_release_mismatch');

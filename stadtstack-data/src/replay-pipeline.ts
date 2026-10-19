@@ -40,8 +40,10 @@ import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
 import {insertR1MetadataSnapshot} from './district-jobs.ts';
 import {RepresentationDescriptorSchema} from './district-r1.ts';
 import {authenticatedHttpBinding} from './district-http-observation.ts';
-import {authenticatePublicationProvenance,type AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
+import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,type AuthenticatedPublicationProvenance,type PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
+import {derivedProducerBindings,producerBindingSetSha256,publicationMemberProducerBindings,type PublicationProducerGroups} from './publication-producer-bindings.ts';
+import {ReplayArtifactAuditSchema,ReplayEvidenceInputPinsSchema,replayEvidenceCasRoot,type ReplayEvidenceInputPins} from './replay-evidence-contract.ts';
 
 const Pin=z.object({path:z.string().min(1),sha256:hashSchema}).strict();
 const Identity=ModelEvidenceSchema;
@@ -114,57 +116,87 @@ interface ReplaySourceContext {
  provenance:AuthenticatedPublicationProvenance;
  policy:CivicPolicyOptions;
  bindings:SourceArtifactBinding[];
- cas:DistrictCas;
+ provenanceInputs:PrivatePublicationProvenance['inputs'];producerGroups:PublicationProducerGroups;inputPins:ReplayEvidenceInputPins;artifactCasRoot:string;
  pinned:(pin:ReplayPin,location?:string)=>Promise<Buffer>;
  provenanceSha256:string;
 }
 async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
  const policy:CivicPolicyOptions={...(receipt.policyStateDir?{stateDir:resolve(base,receipt.policyStateDir)}:{}),...(receipt.policyAuthorityId?{authorityId:receipt.policyAuthorityId}:{}),...(receipt.policyAuthoritySha256?{authoritySha256:receipt.policyAuthoritySha256}:{})};
  const provenance=await authenticatePublicationProvenance(resolve(base,receipt.privateProvenance.path),receipt.privateProvenance.sha256,policy);
+ const provenancePath=resolve(base,receipt.privateProvenance.path),inventory=privatePublicationProvenanceSchema.parse(JSON.parse((await readReplayPin(receipt.privateProvenance,base)).toString('utf8')));
+ const provenanceInputs=inventory.inputs.map(pin=>({...pin,path:resolve(dirname(provenancePath),pin.path)})),byPath=new Map(provenanceInputs.map(pin=>[pin.path,pin]));
+ const bindingsFor=(pins:readonly ReplayPin[])=>derivedProducerBindings(pins.flatMap(pin=>{const source=byPath.get(resolve(base,pin.path));if(!source||source.sha256!==pin.sha256)throw Error('Replay producer input lacks an exact authenticated pin');return source.bindings;}));
+ const knowledge=[receipt.registry,receipt.candidateRecords,receipt.candidateQuarantine,receipt.identityState,receipt.policyReceipts,...[receipt.textComposition,receipt.structuredRun,receipt.criticalAssessments,receipt.identityAssessments].filter((pin):pin is NonNullable<typeof pin>=>!!pin)];
+ const producerGroups:PublicationProducerGroups={knowledge:bindingsFor(knowledge),staging:new Map(receipt.staging.map(pin=>[pin.destination,bindingsFor([pin])])),whole:derivedProducerBindings(provenance.bindings),regional:bindingsFor(receipt.regionalPolicyReceipts?[receipt.regionalPolicyReceipts]:[])};
  const pinned=async(pin:ReplayPin,location=base)=>{
   const bytes=await provenance.read(resolve(location,pin.path));if(hash(bytes)!==pin.sha256)throw Error('Replay independent artifact pin mismatch');return bytes;
  };
- const cas=new DistrictCas(resolve(base,receipt.casRoot)),bindings=provenance.bindings;
+ const bindings=provenance.bindings;
  const descriptors=[];
  for(const pin of receipt.acquisitionDescriptors??[]){
   const descriptor=RepresentationDescriptorSchema.parse(JSON.parse((await pinned(pin)).toString('utf8')));
   const binding=authenticatedHttpBinding(descriptor.httpObservation,{url:descriptor.snapshot.url,sha256:descriptor.snapshot.sourceSha256,mimeType:descriptor.snapshot.mimeType,retrievedAt:descriptor.snapshot.retrievedAt,fetchedAt:descriptor.fetchedAt});
   descriptors.push(binding);
  }
- return {policy,pinned,bindings,cas,provenance,provenanceSha256:receipt.privateProvenance.sha256};
+ return {policy,pinned,bindings,provenance,provenanceInputs,producerGroups,provenanceSha256:receipt.privateProvenance.sha256};
 }
-const replayArtifactAuditSchema=z.object({schemaVersion:z.literal('district-replay-artifact-audit-v1'),path:z.string().min(1),sha256:hashSchema,bytes:z.number().int().nonnegative(),mimeType:z.string().min(1),kind:z.literal('derived'),storageKey:z.string().regex(/^sha256\/[a-f0-9]{2}\/[a-f0-9]{64}$/),inputBindingSha256:hashSchema}).strict();
-async function persistReplayArtifacts(context:ReplaySourceContext,receiptSha256:string,proof:{comparison:{releaseId:string;manifestSha256:string;files:DataRelease['files']};executedAt:string;completedAt:string;asOf:string;publicationInputsSha256:string}){
- const dsn=process.env.DATABASE_URL;if(!dsn)throw Error('Replay requires the private same-host canonical audit database');
+type LoadedPrior=Awaited<ReturnType<typeof loadPriorPublicationRelease>>;
+async function replayInputPins(receipt:ReplayReceipt,receiptPin:ReplayPin,receiptBytes:Buffer,base:string,source:Awaited<ReturnType<typeof authenticateReplayProvenance>>,expected:DataRelease,expectedBytes:Buffer,priors:LoadedPrior[]){
+ const byPath=new Map(source.provenanceInputs.map(pin=>[pin.path,pin]));
+ const filePin=async(pin:ReplayPin,location=base)=>{const path=resolve(location,pin.path),bytes=await readReplayPin({path,sha256:pin.sha256},location,true);return {path,sha256:pin.sha256,bytes:bytes.length};};
+ return ReplayEvidenceInputPinsSchema.parse({
+  schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:resolve(base,receipt.casRoot),hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
+  receipt:{path:resolve(receiptPin.path),sha256:receiptPin.sha256,bytes:receiptBytes.length},provenance:await filePin(receipt.privateProvenance),
+  dependencies:source.provenanceInputs.map(pin=>({path:pin.path,sha256:pin.sha256,bytes:pin.bytes,bindingsSha256:semanticHash([...pin.bindings].sort((a,b)=>canonicalJson(a).localeCompare(canonicalJson(b))))})),
+  staging:receipt.staging.map(pin=>{const path=resolve(base,pin.path),source=byPath.get(path);if(!source||source.sha256!==pin.sha256)throw Error('Replay staging input pin missing');return {destination:pin.destination,path,sha256:pin.sha256,bytes:source.bytes};}),
+  expectedRelease:{manifest:{path:resolve(base,receipt.expectedRelease.path),sha256:receipt.expectedRelease.sha256,bytes:expectedBytes.length},members:expected.files.map(pin=>({path:join(dirname(resolve(base,receipt.expectedRelease.path)),pin.path),sha256:pin.sha256,bytes:pin.bytes}))},
+  priorReleases:priors.map(prior=>{const directory=prior.priorRelease.directory??'out';return {gitCommit:prior.priorRelease.gitCommit,directory,releaseId:prior.priorRelease.releaseId,usage:'historical_change_reconstruction_only',manifest:{path:directory+'/release-manifest.json',sha256:prior.priorRelease.manifestSha256,bytes:prior.manifestBytes.length},members:prior.priorRelease.members.map(pin=>({...pin,path:directory+'/'+pin.path}))};}),
+  runtime:{packageLock:await filePin({path:'package-lock.json',sha256:receipt.runtime.packageLockSha256},root),sourceFiles:await Promise.all(receipt.runtime.sourceFiles.map(pin=>filePin(pin,root)))},
+ });
+}
+async function persistReplayArtifacts(context:ReplaySourceContext,receiptSha256:string,proof:{comparison:{releaseId:string;manifestSha256:string;files:DataRelease['files']};executedAt:string;completedAt:string;asOf:string;publicationInputsSha256:string;inputs:ReplayEvidenceInputPins}){
+ const started=performance.now(),dsn=process.env.DATABASE_URL;if(!dsn)throw Error('Replay requires the private same-host canonical audit database');
  const host=parseConnectionString(dsn).host??'';
  if(!/^postgres(?:ql)?:/.test(dsn)||!['localhost','127.0.0.1','::1','[::1]',''].includes(host)&&!isAbsolute(host))throw Error('Replay audit database must be same-host, not an external network dependency');
- const pool=guardDistrictPool(new Pool({connectionString:dsn,max:1,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-replay'}));
- const artifacts:z.infer<typeof replayArtifactAuditSchema>[]=[];
- const put=async(bytes:Buffer,mimeType='application/json')=>{
-  const sha256=hash(bytes),storageKey=`sha256/${sha256.slice(0,2)}/${sha256}`;
-  await context.scope.assertActive();
-  const artifact=await withManagedSourceWrite(context.cas.root,context.bindings.map(binding=>({...binding,relativePath:storageKey,contentSha256:sha256,independentAllowed:false})),()=>context.cas.put(bytes,{kind:'derived',mimeType}),context.policy);
-  if(artifact.sha256!==sha256)throw Error('Replay managed CAS byte mismatch');return artifact;
+ const pool=guardDistrictPool(new Pool({connectionString:dsn,max:1,connectionTimeoutMillis:5000,statement_timeout:10000,application_name:'stadtstack-r1-replay'})),cas=new DistrictCas(context.artifactCasRoot);
+ type Payload={bytes:Buffer;mimeType:string;bindings:SourceArtifactBinding[];storageKey:string};
+ const payloads=new Map<string,Payload>(),outputs:Array<{path:string;sha256:string;bytes:number;mimeType:string}>=[];
+ const add=(bytes:Buffer,mimeType:string,bindings:readonly SourceArtifactBinding[])=>{
+  if(bytes.length>cas.maxBytes)throw Error('Replay derived artifact exceeds private CAS byte bound');
+  const sha256=hash(bytes),previous=payloads.get(sha256),complete=derivedProducerBindings(bindings);if(!complete.length)throw Error('Replay artifact lacks actual producers');
+  if(previous){if(!previous.bytes.equals(bytes))throw Error('Replay CAS hash collision');previous.bindings=derivedProducerBindings([...previous.bindings,...complete]);}
+  else payloads.set(sha256,{bytes,mimeType,bindings:complete,storageKey:`sha256/${sha256.slice(0,2)}/${sha256}`});
+  return sha256;
  };
  try{
-  await privateFile(join(context.scope.directory,'proof.json'),encoded(proof),context.scope);
-  await initializeManagedAcquisitionLane(context.cas.root,{...context.policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
-  const visit=async(directory:string):Promise<void>=>{
-   for(const entry of (await readdir(directory,{withFileTypes:true})).sort((a,b)=>a.name.localeCompare(b.name))){
-    const path=join(directory,entry.name);
-    if(entry.isSymbolicLink())throw Error('Replay scratch cannot persist symlink artifacts');
-    if(entry.isDirectory()){await visit(path);continue;}
-    if(!entry.isFile()||artifacts.length>=512)throw Error('Replay scratch artifact inventory exceeds its governed bound');
-    await context.scope.assertActive();const stat=await lstat(path);if(stat.size>context.cas.maxBytes)throw Error('Replay derived artifact exceeds private CAS byte bound');
-    const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);let bytes:Buffer;try{bytes=await handle.readFile();}finally{await handle.close();}
-    const sha256=hash(bytes),audit=replayArtifactAuditSchema.parse({schemaVersion:'district-replay-artifact-audit-v1',path:relative(context.scope.directory,path),sha256,bytes:bytes.length,mimeType:entry.name.endsWith('.ts')?'text/typescript':'application/json',kind:'derived',storageKey:`sha256/${sha256.slice(0,2)}/${sha256}`,inputBindingSha256:context.provenanceSha256});
-    await insertR1MetadataSnapshot(pool,{kind:'replay_artifact',payload:audit});await put(bytes,audit.mimeType);await put(Buffer.from(canonicalJson(audit)));artifacts.push(audit);
-   }
-  };
-  await visit(context.scope.directory);
-  const audit=z.object({schemaVersion:z.literal('district-replay-proof-audit-v1'),receiptSha256:hashSchema,inputBindingSha256:hashSchema,publicationInputsSha256:hashSchema,executedAt:z.iso.datetime(),completedAt:z.iso.datetime(),asOf:z.string(),comparison:z.object({releaseId:hashSchema,manifestSha256:hashSchema,files:dataReleaseSchema.shape.files}).strict(),artifacts:z.array(replayArtifactAuditSchema)}).strict().parse({schemaVersion:'district-replay-proof-audit-v1',receiptSha256,inputBindingSha256:context.provenanceSha256,publicationInputsSha256:proof.publicationInputsSha256,executedAt:proof.executedAt,completedAt:proof.completedAt,asOf:proof.asOf,comparison:proof.comparison,artifacts});
-  const auditSha256=await insertR1MetadataSnapshot(pool,{kind:'replay_proof',payload:audit}),artifact=await put(Buffer.from(canonicalJson(audit)));if(artifact.sha256!==auditSha256)throw Error('Replay canonical audit/CAS mismatch');
-  return {auditSha256,auditStorageKey:artifact.storageKey,artifacts};
+  // Archive only compared outputs. Staging and preload-only prior bytes remain
+  // fully referenced by the proof's independently authenticated input pins.
+  if(proof.comparison.files.length+2>512)throw Error('Replay scratch artifact inventory exceeds its governed bound');
+  for(const pin of [...proof.comparison.files,{path:'release-manifest.json',sha256:proof.comparison.manifestSha256,bytes:context.inputPins.expectedRelease.manifest.bytes}]){
+   const path=join(context.scope.directory,'release',pin.path);await context.scope.assertActive();
+   const stat=await lstat(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.size>cas.maxBytes)throw Error('Replay output size/type rejected');
+   const handle=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);let bytes:Buffer;try{bytes=await handle.readFile();}finally{await handle.close();}
+   if(hash(bytes)!==pin.sha256||bytes.length!==pin.bytes)throw Error('Compared replay output changed before persistence');
+   const bindings=publicationMemberProducerBindings(pin.path,context.producerGroups),sha256=add(bytes,'application/json',bindings);
+   outputs.push({path:'release/'+pin.path,sha256,bytes:bytes.length,mimeType:'application/json'});
+  }
+  const proofBytes=encoded(proof),proofSha256=add(Buffer.from(proofBytes),'application/json',context.bindings);outputs.push({path:'proof.json',sha256:proofSha256,bytes:Buffer.byteLength(proofBytes),mimeType:'application/json'});
+  const artifacts=outputs.map(output=>ReplayArtifactAuditSchema.parse({schemaVersion:'district-replay-artifact-audit-v1',...output,kind:'derived',storageKey:payloads.get(output.sha256)!.storageKey,inputBindingSha256:context.provenanceSha256,producerBindingsSha256:producerBindingSetSha256(payloads.get(output.sha256)!.bindings)}));
+  for(const artifact of artifacts)add(Buffer.from(canonicalJson(artifact)),'application/json',payloads.get(artifact.sha256)!.bindings);
+  const audit={schemaVersion:'district-replay-proof-audit-v1',receiptSha256,inputBindingSha256:context.provenanceSha256,artifactCasRoot:cas.root,publicationInputsSha256:proof.publicationInputsSha256,executedAt:proof.executedAt,completedAt:proof.completedAt,asOf:proof.asOf,comparison:proof.comparison,inputs:proof.inputs,artifacts},auditBytes=Buffer.from(canonicalJson(audit)),auditSha256=add(auditBytes,'application/json',context.bindings);
+  // Atomic fresh namespace ownership prevents any existing authenticated source
+  // CAS blob (including shared empty controls) from being rebound or changed.
+  await mkdir(cas.root,{mode:0o700});const options={...context.policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const};
+  await initializeManagedAcquisitionLane(cas.root,options);
+  const rows=[...payloads.entries()],bindings=derivedProducerBindings(rows.flatMap(([,payload])=>payload.bindings));
+  await withManagedSourceScratch(cas.root,bindings.map(({independentAllowed:_,...binding})=>binding),async scope=>{
+   await scope.assertActive();
+   const entries=rows.flatMap(([sha256,payload])=>payload.bindings.map(binding=>({...binding,relativePath:payload.storageKey,contentSha256:sha256})));
+   await withManagedSourceWrite(cas.root,entries,async()=>{for(const [sha256,payload] of rows){const artifact=await cas.put(payload.bytes,{kind:'derived',mimeType:payload.mimeType});if(artifact.sha256!==sha256)throw Error('Replay managed CAS byte mismatch');}},context.policy);
+  },{...options,purpose:'artifact'});
+  for(const artifact of artifacts)if(await insertR1MetadataSnapshot(pool,{kind:'replay_artifact',payload:artifact})!==hash(canonicalJson(artifact)))throw Error('Replay artifact metadata hash mismatch');
+  if(await insertR1MetadataSnapshot(pool,{kind:'replay_proof',payload:audit})!==auditSha256)throw Error('Replay canonical audit/CAS mismatch');
+  return {auditSha256,auditStorageKey:payloads.get(auditSha256)!.storageKey,artifactCasRoot:cas.root,artifacts,durationMs:performance.now()-started};
  }finally{await pool.end();}
 }
 export function verifyReplayAnswer(raw:unknown):Answer{
@@ -329,7 +361,7 @@ function checkExtractionRun(run:Record<string,unknown>,validated:CompletedReplay
 
 type VerifiedTextReplay={registryBytes:Buffer;quarantine:unknown[];textGeneration:{generationAnswers:number;judgeAnswers:number;originalExtractionRunGeneratedAt:unknown}};
 async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,workspace:string,expectedBytes:Buffer,expected:DataRelease,context:ReplaySourceContext,receiptSha256:string,text?:VerifiedTextReplay){
- const executedAt=new Date().toISOString(),pinned=context.pinned;
+ const rebuildStarted=performance.now(),executedAt=new Date().toISOString(),pinned=context.pinned;
  const registryBytes=text?.registryBytes??await pinned(receipt.registry),candidateBytes=await pinned(receipt.candidateRecords),quarantineBytes=await pinned(receipt.candidateQuarantine),identityBytes=await pinned(receipt.identityState),sealBytes=await pinned(receipt.publicationInputs);
  const candidate=KnowledgeRecordsSchema.parse(JSON.parse(candidateBytes.toString('utf8')));
  const identity=z.object({identityAssertions:z.array(IdentityAssertionSchema),identityAdmissions:z.array(IdentityAdmissionSchema)}).strict().parse(JSON.parse(identityBytes.toString('utf8')));
@@ -356,7 +388,7 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
   if(!prior)throw Error('Replay requires its authenticated prepared predecessor directory');
   await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,prepared.publication);
   const actual=await verifyDataRelease(output),comparison=compareReplayRelease(expectedBytes,await readFile(join(output,'release-manifest.json')),actual);
-  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:receipt.priorRelease,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,...(text?{textGeneration:text.textGeneration}:{})};
+  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:receipt.priorRelease,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,inputs:context.inputPins,timings:{rebuildMs:performance.now()-rebuildStarted},...(text?{textGeneration:text.textGeneration}:{})};
   return {...proof,persistence:await persistReplayArtifacts(nested,receiptSha256,proof)};
  },{staging:receipt.staging.map(pin=>({destination:pin.destination,pin:{path:resolve(base,pin.path),sha256:pin.sha256}})),prior:{release:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id,cache:context.predecessors}});
 }
@@ -364,11 +396,11 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
 export async function replayPipeline(receiptPath:string,receiptSha256:string){
  const executedAt=new Date().toISOString(),base=dirname(resolve(receiptPath));
  hashSchema.parse(receiptSha256);
- const receipt=ReplayReceiptSchema.parse(JSON.parse((await readReplayPin({path:receiptPath,sha256:receiptSha256},process.cwd())).toString('utf8')));
+ const receiptPin={path:resolve(receiptPath),sha256:receiptSha256},receiptBytes=await readReplayPin(receiptPin,process.cwd()),receipt=ReplayReceiptSchema.parse(JSON.parse(receiptBytes.toString('utf8')));
  await checkRuntime(receipt);
- const workspace=resolve(base,receipt.workspace),cacheRoot=await realpath(cacheDir);
- if(!inside(cacheRoot,workspace)||inside(resolve(outDir),workspace))throw Error('Replay workspace must be a fresh directory beneath repository cache');
- await absent(workspace);
+ const workspace=resolve(base,receipt.workspace),artifactCasRoot=replayEvidenceCasRoot(receipt.workspace,base),cacheRoot=await realpath(cacheDir),sourceCasRoot=resolve(base,receipt.casRoot);
+ if(!inside(cacheRoot,workspace)||inside(resolve(outDir),workspace)||!inside(cacheRoot,artifactCasRoot)||artifactCasRoot===sourceCasRoot||inside(sourceCasRoot,artifactCasRoot)||inside(artifactCasRoot,sourceCasRoot))throw Error('Replay requires fresh isolated workspace/evidence roots beneath repository cache');
+ await absent(workspace);await absent(artifactCasRoot);
  // Existing parents must also be contained: lexical containment alone accepts symlinks.
  const parent=await realpath(dirname(workspace));if(parent!==cacheRoot&&!inside(cacheRoot,parent))throw Error('Replay workspace parent escapes repository cache');
  const source=await authenticateReplayProvenance(receipt,base),pinned=source.pinned;
@@ -378,8 +410,10 @@ export async function replayPipeline(receiptPath:string,receiptSha256:string){
  const cities=z.object({cities:z.array(z.object({id:z.string().regex(/^[a-z0-9-]+$/)}))}).parse(JSON.parse((await pinned(stagedCatalogue)).toString('utf8'))).cities.map(city=>city.id);
  const priorPaths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'],baseline=await loadPriorPublicationRelease(receipt.priorRelease,priorPaths,expected.generatedAt,expected.id);
  const predecessors=await preloadPriorPublicationReleases([{prior:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id},...Object.entries(receipt.legacyPreviousReleases??{}).map(([cityId,prior])=>({prior,paths:[`cities/${cityId}/signals.geojson`],targetGeneratedAt:baseline.manifest.generatedAt,targetReleaseId:baseline.manifest.id}))]);
+ const priors=[baseline];for(const [cityId,prior] of Object.entries(receipt.legacyPreviousReleases??{}))priors.push(await loadPriorPublicationRelease(prior,[`cities/${cityId}/signals.geojson`],baseline.manifest.generatedAt,baseline.manifest.id,predecessors));
+ const inputPins=await replayInputPins(receipt,receiptPin,receiptBytes,base,source,expected,expectedBytes,priors);
  return withManagedSourceScratch(workspace,source.bindings.map(({independentAllowed:_flag,...binding})=>binding),async scope=>{
- const context:ReplaySourceContext={...source,scope,predecessors},workspace=scope.directory;
+ const context:ReplaySourceContext={...source,scope,predecessors,inputPins,artifactCasRoot},workspace=scope.directory;
  if(receipt.mode!=='text_and_structured')return replayAdmittedPublication(receipt,base,workspace,expectedBytes,expected,context,receiptSha256);
  const registryBytes=await pinned(receipt.registry),registry=districtRegistrySchema.parse(JSON.parse(registryBytes.toString('utf8'))),textRegistryBytes=await pinned(receipt.textRegistry),indexBytes=await pinned(receipt.index);
  const manifestBytes=await pinned(receipt.corpusManifest);

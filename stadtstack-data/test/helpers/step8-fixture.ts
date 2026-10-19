@@ -28,6 +28,7 @@ import {assessmentQueueContract} from '../../src/district-assessment-jobs.ts';
 import {assessmentBJobContract} from '../../src/district-assessment-broker.ts';
 import {OMP_NATIVE_STREAM_VERSION,ompRunnerContractSha256,ompRunnerOutputContractSha256} from '../../src/district-omp-b-runner.ts';
 import type {AssessmentItemHoldPin} from '../../src/district-assessment-item-holds.ts';
+import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from '../../src/replay-evidence-contract.ts';
 
 /** Synthetic admitted text/native queue + authentic retained 0.3.2 core. No live
  * facts, independent assessments or production writes are claimed by this test. */
@@ -83,7 +84,7 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  const selectionValue={schemaVersion:'stadtstack-r1-native-seal-selection-v1',catalogue:activeCatalogue,seals:[{municipalityId:scope.municipalityId,sourceId:scope.sourceId,corpus:sealed.artifacts.crawl,output:{path:sealPath,sha256:digest(sealBytes)},admission:'published',queue:queueSelection}]};
  const {issueFixtureNativeSelection}=await import('./step8-provenance-fixture.ts');
  const nativeSealSelection=await issueFixtureNativeSelection(control,selectionValue);
- await mkdir(cacheDir,{recursive:true});const outputRoot=join(cacheDir,'step8-fixture-'+randomUUID());t.after(async()=>{for(const path of [outputRoot,outputRoot+'.claim',outputRoot+'-preparation',outputRoot+'-replay'])await rm(path,{recursive:true,force:true});});
+ await mkdir(cacheDir,{recursive:true});const outputRoot=join(cacheDir,'step8-fixture-'+randomUUID());t.after(async()=>{for(const path of [outputRoot,outputRoot+'.claim',outputRoot+'-preparation',outputRoot+'-replay',replayEvidenceCasRoot(outputRoot+'-replay',fixtureRoot)])await rm(path,{recursive:true,force:true});});
  const manifest=Step8InputSchema.parse({schemaVersion:'stadtstack-r1-step8-v1',reconstructionWorkers:1,reconstructionTiming:{estimatedDurationSeconds:600,expiryMarginSeconds:60},nativeSealSelection,currentGeneration,campaign:{path:campaignPath,sha256:campaignSha256},expectedSources:1,expectedDocuments:corpus.documents.length,seals:[{sealResult:{path:sealPath,sha256:digest(sealBytes)},...queueSelection}],structuredRunIds:[nativeReceipt.runId],registry:sealed.artifacts.registry,privateProvenance:{path:provenancePath,sha256:digest(provenanceBytes)},staging,priorRelease,asOf:clock.slice(0,10),clocks:{recordsGeneratedAt:clock,quarantineGeneratedAt:clock,coverageGeneratedAt:clock,qualityGeneratedAt:clock,manifestGeneratedAt:clock},casRoot:cas.root,outputRoot,policy});
  assert.deepEqual(step8ReadPlan(manifest).writes,[]);
  const oldDatabase=process.env.DATABASE_URL;process.env.DATABASE_URL=pool.options.connectionString!.replace('postgresql:///','postgresql://'+encodeURIComponent(userInfo().username)+'@/');
@@ -128,6 +129,9 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
   assert.equal(release.id,gate.releaseId);assert.equal(proof.comparison.releaseId,release.id);assert.equal(proof.comparison.manifestSha256,gate.manifestSha256);assert.deepEqual(proof.comparison.files,release.files);
   const receipt=JSON.parse(await readFile(join(outputRoot,'replay-receipt.json'),'utf8'));assert.equal(receipt.priorRelease.directory,'release');assert.equal(receipt.priorRelease.releaseId,priorRelease.releaseId);
   assert.ok(proof.persistence.artifacts.length>0);assert.equal(proof.execution.modelCalls,0);assert.equal(proof.execution.readinessCalls,0);
+  const inputPins=ReplayEvidenceInputPinsSchema.parse(proof.inputs);assert.equal(inputPins.provenance.sha256,receipt.privateProvenance.sha256);
+  assert.equal(proof.persistence.artifactCasRoot,replayEvidenceCasRoot(receipt.workspace,outputRoot));assert.notEqual(proof.persistence.artifactCasRoot,receipt.casRoot);
+  assert.ok(proof.persistence.artifacts.every((artifact:{path:string})=>artifact.path==='proof.json'||artifact.path.startsWith('release/')),'prior/staging bytes are pinned inputs, never copied again');
   const exceptions=JSON.parse(await readFile(gate.exceptionInventory.path,'utf8')),handoff=JSON.parse(await readFile(gate.step9Handoff.path,'utf8'));assert.equal(digest(await readFile(gate.exceptionInventory.path)),gate.exceptionInventory.sha256);assert.equal(exceptions.releaseId,gate.releaseId);assert.equal(exceptions.complete,true);assert.equal(exceptions.sourceDispositions.length,corpus.documents.length);assert.equal(exceptions.assessments.length,input.expectedAssessments??1);assert.deepEqual(handoff.exceptionInventory,gate.exceptionInventory);assert.equal(JSON.parse(await readFile(handoff.assessmentManifest.path,'utf8')).length,input.expectedAssessments??1);
   assert.deepEqual(exceptions.generationAuditEvidence,gate.generationAuditEvidence);const generation=JSON.parse(await readFile(gate.generationAuditEvidence.path,'utf8'));assert.equal(digest(await readFile(gate.generationAuditEvidence.path)),gate.generationAuditEvidence.sha256);
   assert.equal(generation.status,'compatible');assert.equal(generation.allowance.approvals.filter((pin:{path:string})=>/allowance/.test(pin.path)).length,5);assert.ok(generation.purgeAcknowledgements.length>0);assert.deepEqual(generation.currentGeneration,manifest.currentGeneration);

@@ -51,7 +51,7 @@ test('staging rejects enrolled-root overlap before creating directory or claim d
 });
 test('real retained 0.3.2 staging executes through exact replay, passed gate and exception handoff',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:3310000},async()=>{
  const {NODE_TEST_CONTEXT:_parent,...env}=process.env;
- const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1'},timeout:3300000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
+ const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1',R1_TEST_DUPLICATE_CONTENT:'1'},timeout:3300000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
   if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});throw error;
  });
  assert.match(result.stdout,/# fail 0/);
@@ -60,4 +60,5 @@ test('real retained 0.3.2 staging executes through exact replay, passed gate and
  const size=/^REAL_RETAINED_STEP8_PROVENANCE_SIZE (.+)$/m.exec(result.stdout);assert.ok(size);
  const evidence=JSON.parse(size[1]);assert.equal(evidence.retainedMembers,19);assert.ok(evidence.actualBytes<=16*1024*1024);
  console.log('REAL_RETAINED_STEP8_PROVENANCE_SIZE '+JSON.stringify(evidence));
+ const phases=/^REAL_RETAINED_STEP8_PHASE_TIMINGS (.+)$/m.exec(result.stdout);assert.ok(phases);console.log('REAL_RETAINED_STEP8_PHASE_TIMINGS '+phases[1]);
 });

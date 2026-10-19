@@ -12,6 +12,7 @@ import {FROZEN_R1_INPUTS} from '../src/pilot-value-audit.ts';
 import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
 import {RELEASE_ACCEPTANCE_RULES} from '../src/r1-release-context.ts';
 import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
+import {replayEvidenceCasRoot} from '../src/replay-evidence-contract.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
 const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
@@ -29,15 +30,22 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
   const manifestPin=await save('candidate/release-manifest.json',manifest),comparison={releaseId:manifest.id,manifestSha256:manifestPin.sha256,files};
   const campaign=await save('campaign.json',{schemaVersion:'stadtstack-r1-step8-campaign-v1',sources:[{municipalityId:'synthetic-town',sourceId:'website',corpus:{path:'/synthetic/corpus',sha256:h},documents:[{documentId:'document:fixture',sha256:h,jobKey:b}]}]});
   const currentGeneration={processingCommit:'a'.repeat(40),catalogue:campaign,processingReview:campaign,assessmentQueueContractSha256:h,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:h,runnerContractSha256:h,runnerOutputContractSha256:h,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
-  const casRoot=join(root,'cas');
-  const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot};
+  const casRoot=join(root,'cas'),workspace=join(root,'replay'),artifactCasRoot=replayEvidenceCasRoot(workspace,root);
+  const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot,workspace,privateProvenance:campaign};
   const receiptPin=await save('replay-receipt.json',receipt);
-  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden'},comparison};
+  const metadata=async(pin:{path:string;sha256:string})=>({...pin,bytes:(await readFile(pin.path)).length}),campaignMetadata=await metadata(campaign);
+  // Synthetic consumer-contract pins, not native replay/authority evidence.
+  const inputs={schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:casRoot,hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
+    receipt:await metadata(receiptPin),provenance:campaignMetadata,dependencies:[{...campaignMetadata,bindingsSha256:h}],staging:[{...campaignMetadata,destination:'catalogue.json'}],
+    expectedRelease:{manifest:await metadata(manifestPin),members:files.map(file=>({path:join(candidateDirectory,file.path),sha256:file.sha256,bytes:file.bytes}))},
+    priorReleases:[{gitCommit:'a'.repeat(40),directory:'release',releaseId:h,usage:'historical_change_reconstruction_only',manifest:{path:'release/release-manifest.json',sha256:h,bytes:0},members:[{path:'release/catalogue.json',sha256:h,bytes:0}]}],
+    runtime:{packageLock:campaignMetadata,sourceFiles:[campaignMetadata]}};
+  const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden'},comparison,inputs};
   const persistReplay=async()=>{
     const proofPin=await save('replay-proof.json',proof),storageKey=`sha256/${proofPin.sha256.slice(0,2)}/${proofPin.sha256}`;
-    await mkdir(dirname(join(casRoot,storageKey)),{recursive:true});await writeFile(join(casRoot,storageKey),await readFile(proofPin.path));
-    const audit={schemaVersion:'district-replay-proof-audit-v1',receiptSha256:receiptPin.sha256,comparison,artifacts:[{path:'proof.json',sha256:proofPin.sha256,storageKey}]};
-    const auditPin=await save('replay-audit.json',audit),auditPath=join(casRoot,'sha256',auditPin.sha256.slice(0,2),auditPin.sha256);
+    await mkdir(dirname(join(artifactCasRoot,storageKey)),{recursive:true});await writeFile(join(artifactCasRoot,storageKey),await readFile(proofPin.path));
+    const audit={schemaVersion:'district-replay-proof-audit-v1',receiptSha256:receiptPin.sha256,artifactCasRoot,comparison,inputs:proof.inputs,artifacts:[{path:'proof.json',sha256:proofPin.sha256,storageKey}]};
+    const auditPin=await save('replay-audit.json',audit),auditPath=join(artifactCasRoot,'sha256',auditPin.sha256.slice(0,2),auditPin.sha256);
     await mkdir(dirname(auditPath),{recursive:true});await writeFile(auditPath,await readFile(auditPin.path));return auditPin;
   };
   const parsedInventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign,complete:true,
@@ -96,6 +104,18 @@ test('whole release acceptance is immutable-input bound and option B defers only
   const changed={...selected,step8:{...selected.step8,exceptions:{...selected.step8.exceptions,sha256:'0'.repeat(64)}}};
   await assert.rejects(computeReleaseAcceptance(changed),/hash mismatch/);
   await assert.rejects(loadStep8ExceptionBundle(selected.step8,'0'.repeat(64)),/another release/);
+});
+
+test('acceptance binds replay input pins and never falls back to the canonical source CAS',async t=>{
+ const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));let selected=await f.seal();
+ const result=await computeReleaseAcceptance(selected),gate=JSON.parse(await readFile(selected.step8.gate.path,'utf8')),receipt=JSON.parse(await readFile(gate.replayReceipt.path,'utf8'));
+ const evidenceRoot=replayEvidenceCasRoot(receipt.workspace,dirname(gate.replayReceipt.path));assert.ok(result.replayAudit.path.startsWith(evidenceRoot+'/'));
+ const original=f.proof.inputs.provenance.sha256;f.proof.inputs.provenance.sha256=b;
+ const changed=await computeReleaseAcceptance(await f.seal());assert.equal(changed.accepted,false);assert.ok(changed.blockers.includes('exact_replay_input_pins_failed'));
+ f.proof.inputs.provenance.sha256=original;selected=await f.seal();
+ const current=await computeReleaseAcceptance(selected),sha256=current.replayAudit.sha256,sourceCopy=join(receipt.casRoot,'sha256',sha256.slice(0,2),sha256);
+ await mkdir(dirname(sourceCopy),{recursive:true});await writeFile(sourceCopy,await readFile(current.replayAudit.path),{mode:0o600});await rm(current.replayAudit.path);
+ await assert.rejects(computeReleaseAcceptance(selected),error=>error instanceof Error&&'code' in error&&error.code==='ENOENT');
 });
 
 test('acceptance requires the exact compatible generation audit and cannot substitute its policy or evidence',async t=>{

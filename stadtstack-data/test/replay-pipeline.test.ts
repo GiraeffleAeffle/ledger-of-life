@@ -21,6 +21,9 @@ import * as vocabulary from '../src/topic-vocabulary.ts';
 import * as models from '../src/district-model-contract.ts';
 import {semanticHash} from '../src/district-adapter-contract.ts';
 import {subscriptionInputWithinBound,MODEL_INPUT_BOUND_REASON} from '../src/district-model.ts';
+import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from '../src/replay-evidence-contract.ts';
+import {publicationMemberProducerBindings} from '../src/publication-producer-bindings.ts';
+import type {SourceArtifactBinding} from '../src/district-private-io.ts';
 
 // Entirely synthetic evidence. No private corpus, provider, readiness, external
 // document command, Git subprocess or network is needed by these unit tests.
@@ -278,4 +281,30 @@ test('private publication provenance is a closed proof inventory, never historic
  assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[]}]}).success,false);
  assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{path:pin.path,sha256:pin.sha256,bindings:[binding]}]}).success,false);
  assert.equal(privatePublicationProvenanceSchema.safeParse({...provenance,inputs:[{...pin,bindings:[{kind:'authenticated_git_snapshot',url:binding.url,purpose:'historical_change_reconstruction_only',snapshot:{gitCommit:'1'.repeat(40),path:'out/cities/synthetic-town/signals.geojson',blobOid:'2'.repeat(40),sha256:pin.sha256,bytes:1},independentAllowed:true}]}]}).success,false);
+});
+
+test('replay evidence uses a receipt-derived namespace and complete reconstructible input pins',()=>{
+ const pin={path:'/synthetic/input',sha256:hash('synthetic input'),bytes:1};
+ const inputs={schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:'/synthetic/source-cas',hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
+  receipt:pin,provenance:pin,dependencies:[{...pin,bindingsSha256:pin.sha256}],staging:[{...pin,destination:'catalogue.json'}],expectedRelease:{manifest:pin,members:[pin]},
+  priorReleases:[{gitCommit:'a'.repeat(40),directory:'release',releaseId:pin.sha256,usage:'historical_change_reconstruction_only',manifest:{...pin,path:'release/release-manifest.json'},members:[{...pin,path:'release/catalogue.json'}]}],
+  runtime:{packageLock:pin,sourceFiles:[pin]}};
+ assert.deepEqual(ReplayEvidenceInputPinsSchema.parse(inputs),inputs);
+ assert.throws(()=>ReplayEvidenceInputPinsSchema.parse({...inputs,priorReleases:[]}));
+ assert.throws(()=>ReplayEvidenceInputPinsSchema.parse({...inputs,staging:[]}));
+ assert.equal(replayEvidenceCasRoot('/synthetic/replay','/ignored'),'/synthetic/replay-artifacts');
+ assert.notEqual(replayEvidenceCasRoot('/synthetic/replay','/ignored'),inputs.sourceCas.root);
+});
+
+test('per-member replay producer declarations never fan city provenance into native outputs',()=>{
+ // Declarations only: this unit does not assert source rights or bypass Core.
+ const producer=(id:string):SourceArtifactBinding=>({kind:'http_observation',url:'https://example.invalid/'+id,sourceSha256:hash(id),observationId:'synthetic-'+id,receiptSha256:hash('observation '+id),independentAllowed:false});
+ const native=producer('native'),city=producer('city'),feed=producer('feed'),region=producer('region');
+ const groups={knowledge:[native],whole:[native,city,feed,region],regional:[],staging:new Map([['catalogue.json',[city]],['cities/strausberg/signals.geojson',[city]],['cities/strausberg/feed.json',[feed]],['core/strausberg-facts.json',[city]],['regions/brandenburg-mol/topics.json',[region]]])};
+ assert.deepEqual(publicationMemberProducerBindings('knowledge/records.json',groups),[native]);
+ assert.deepEqual(publicationMemberProducerBindings('cities/strausberg/signals.min.geojson',groups),[city]);
+ assert.equal(publicationMemberProducerBindings('cities/strausberg/feed.json',groups).length,2);
+ assert.deepEqual(publicationMemberProducerBindings('regions/brandenburg-mol/topics.json',groups),[region]);
+ assert.throws(()=>publicationMemberProducerBindings('cities/missing/signals.geojson',groups),/Missing release member producer/);
+ assert.throws(()=>publicationMemberProducerBindings('unrecognized.json',groups),/Unknown release member producer/);
 });

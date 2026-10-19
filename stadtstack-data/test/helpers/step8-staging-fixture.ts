@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFile,writeFile,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,relative} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import type {TestContext} from 'node:test';
 import type {Pool} from 'pg';
@@ -16,6 +16,8 @@ import {createWitnessedProvenanceContext} from '../../src/r1-step8-provenance.ts
 import {digest} from '../../src/district-adapter-contract.ts';
 import {loadStep8ExceptionBundle} from '../../src/r1-release-acceptance.ts';
 import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} from '../../src/district-publication-provenance.ts';
+import {readCivicPolicyInventory} from '../../src/civic-opt-out.ts';
+import {ReplayEvidenceInputPinsSchema,replayEvidenceCasRoot} from '../../src/replay-evidence-contract.ts';
 
 /** Real immutable 0.3.2 staging bytes, isolated authority/PG and synthetic native
  * assessment evidence from the existing topology fixture; no live claims. */
@@ -74,8 +76,16 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  const executionRoot=managedRoot+'-execution';
  t.after(async()=>{await rm(executionRoot,{recursive:true,force:true});await rm(executionRoot+'.claim',{force:true});});
  const executionRequest={...request,managedRoot:executionRoot},executionPath=join(fixtureRoot,'operator-controls','execution-assembly.json'),executionSha256=await writePrivateJson(executionPath,executionRequest);
+ const sealed=JSON.parse((await readFile(manifest.seals[0].sealResult.path)).toString('utf8')),sharedPins=[sealed.criticalInventory,sealed.criticalAdmissions] as Array<{path:string;sha256:string}>;
+ const sharedSnapshot=async()=>{
+  const inventory=await readCivicPolicyInventory(manifest.policy),cas=inventory.roots.find(root=>root.path===manifest.casRoot);assert.ok(cas);
+  return Promise.all(sharedPins.map(async pin=>{const bytes=await readFile(pin.path),entries=inventory.entries.filter(entry=>entry.rootId===cas.id&&entry.relativePath===relative(cas.path,pin.path)).sort((a,b)=>a.id.localeCompare(b.id));assert.equal(digest(bytes),pin.sha256);assert.ok(entries.length>=2,'genuine empty control is shared by both duplicate-URL producers');return {path:pin.path,bytes,entries};}));
+ };
+ const sharedBefore=await sharedSnapshot();
  const execution=Step8OperatorInputSchema.parse({...base,stagingAssembly:{path:executionPath,sha256:executionSha256}}),beforeExecute=canonicalBuildCount(),gate=await runStep8(execution,pool);
  assert.equal(gate.status,'passed');assert.equal(canonicalBuildCount()-beforeExecute,1,'operator execute reuses one canonical source pass');
+ assert.deepEqual(await sharedSnapshot(),sharedBefore,'source CAS shared blob bytes and complete binding sets are unchanged by replay persistence');
+ console.log('REAL_RETAINED_STEP8_PHASE_TIMINGS '+JSON.stringify(gate.phaseTimings));
  assert.notEqual(gate.campaign.path,manifest.campaign.path);assert.equal(gate.campaign.sha256,manifest.campaign.sha256);
  assert.ok(gate.stagingAssembly);
  const component=await readFile(gate.stagingAssembly.path);assert.equal(digest(component),gate.stagingAssembly.sha256);
@@ -88,6 +98,14 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  const gatePath=join(manifest.outputRoot,'release-gate.json'),gatePin={path:gatePath,sha256:digest(await readFile(gatePath))},handoffPins={gate:gatePin,exceptions:gate.exceptionInventory,handoff:gate.step9Handoff};
  const accepted=await loadStep8ExceptionBundle(handoffPins,gate.releaseId);assert.equal(accepted.gate.status,'passed');
  const replay=JSON.parse((await readFile(gate.replayReceipt.path)).toString('utf8')),provenanceBytes=await readFile(replay.privateProvenance.path),publication=privatePublicationProvenanceSchema.parse(JSON.parse(provenanceBytes.toString('utf8')));
+ const proof=JSON.parse((await readFile(join(manifest.outputRoot,'replay-proof.json'))).toString('utf8')),inputPins=ReplayEvidenceInputPinsSchema.parse(proof.inputs);
+ assert.equal(proof.persistence.artifactCasRoot,replayEvidenceCasRoot(replay.workspace,manifest.outputRoot));assert.notEqual(proof.persistence.artifactCasRoot,manifest.casRoot);
+ assert.equal(proof.persistence.artifacts.length,proof.comparison.files.length+2);
+ assert.ok(proof.persistence.artifacts.every((artifact:{path:string})=>artifact.path==='proof.json'||artifact.path.startsWith('release/')),'predecessor/staging trees are pinned, not re-archived');
+ assert.deepEqual(inputPins.dependencies.map(pin=>[pin.path,pin.sha256,pin.bytes]).sort(),publication.inputs.map(pin=>[pin.path,pin.sha256,pin.bytes]).sort());
+ assert.deepEqual(inputPins.staging.map(pin=>[pin.destination,pin.path,pin.sha256]).sort(),replay.staging.map((pin:{destination:string;path:string;sha256:string})=>[pin.destination,pin.path,pin.sha256]).sort());
+ assert.equal(inputPins.priorReleases[0].gitCommit,STEP8_PRIOR_RELEASE.gitCommit);assert.equal(inputPins.priorReleases[0].manifest.sha256,STEP8_PRIOR_RELEASE.manifestSha256);assert.ok(inputPins.priorReleases[0].members.length>=20);
+ assert.equal(inputPins.runtime.sourceFiles.length,replay.runtime.sourceFiles.length);assert.equal(inputPins.receipt.sha256,gate.replayReceipt.sha256);
  assert.equal(digest(provenanceBytes),replay.privateProvenance.sha256);assert.ok(provenanceBytes.length<=16*1024*1024,'unchanged Core provenance size guard');
  const composition=JSON.parse((await readFile(replay.textComposition.path)).toString('utf8')),artifactPaths=new Set<string>(composition.contributions.flatMap((entry:{artifacts:Record<string,{path:string}>})=>Object.values(entry.artifacts).map(pin=>pin.path)));
  const required=new Set<string>([...['registry','candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','criticalAssessments','textComposition','structuredRun','identityAssessments','regionalPolicyReceipts'].flatMap(role=>replay[role]?[replay[role].path]:[]),...replay.staging.map((pin:{path:string})=>pin.path),...artifactPaths]);
@@ -107,7 +125,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  // pin or binding is issued, authenticated, persisted or used as evidence.
  assert.equal(provenanceBytes.length,Buffer.byteLength(JSON.stringify(publication,null,2)+'\n'),'model uses the actual pretty-JSON wire encoding');
  const indentedBytes=(value:unknown,indent:number)=>Buffer.byteLength(JSON.stringify(value,null,2).split('\n').map(line=>' '.repeat(indent)+line).join('\n'));
- const rowBytes=(pin:(typeof publication.inputs)[number],httpMultiplier:number)=>indentedBytes(pin,4)+pin.bindings.filter(binding=>binding.kind==='http_observation').reduce((sum,binding)=>sum+(httpMultiplier-1)*(indentedBytes(binding,8)+2),0);
+ const rowBytes=(pin:(typeof publication.inputs)[number],httpTarget:number)=>{const http=pin.bindings.filter(binding=>binding.kind==='http_observation'),largest=http.reduce((max,binding)=>Math.max(max,indentedBytes(binding,8)+2),0);return indentedBytes(pin,4)+Math.max(0,httpTarget-http.length)*largest;};
  const retainedRows=publication.inputs.filter(pin=>stagingPaths.has(pin.path)),sourceRows=publication.inputs.filter(pin=>artifactPaths.has(pin.path)),aggregateRows=publication.inputs.filter(pin=>!stagingPaths.has(pin.path)&&!artifactPaths.has(pin.path));
  const envelopeBytes=provenanceBytes.length-publication.inputs.reduce((sum,pin)=>sum+rowBytes(pin,1),0)-2*Math.max(0,publication.inputs.length-1);
  const projectedRows=retainedRows.length+sourceRows.length*27+aggregateRows.length,projectedBytes=envelopeBytes+2*Math.max(0,projectedRows-1)+retainedRows.reduce((sum,pin)=>sum+rowBytes(pin,1),0)+27*sourceRows.reduce((sum,pin)=>sum+rowBytes(pin,24),0)+aggregateRows.reduce((sum,pin)=>sum+rowBytes(pin,213),0);
