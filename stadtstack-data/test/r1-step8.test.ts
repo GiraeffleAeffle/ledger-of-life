@@ -77,6 +77,12 @@ test('offline bootstrap denies providers, HTTP, DNS, TCP and arbitrary child pro
  assert.throws(()=>cp.fork('codex',[],{}),/offline guard/);
  const worker=require('node:path').resolve(${JSON.stringify(guard)},'../../src/r1-step8-reconstruction-worker.ts');
  assert.throws(()=>cp.fork(worker,[],{execPath:process.execPath,execArgv:['--import','operator-cache.mjs'],serialization:'advanced',stdio:['ignore','ignore','inherit','ipc']}),/offline guard/);
+ assert.throws(()=>cp.spawn('/usr/bin/flock',['/tmp/arbitrary-mutex','codex']),/offline guard/);
+ assert.throws(()=>cp.spawn('/usr/bin/flock',['--exclusive','--nonblock','3'],{stdio:['ignore','ignore','ignore',999999]}),/offline guard/);
+ const fs=require('node:fs'),path=require('node:path'),folder=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'step8-flock-')),mutex=path.join(folder,'inventory.break.lock'),fd=fs.openSync(mutex,'wx+',0o600);
+ assert.throws(()=>cp.spawn('/usr/bin/flock',['--exclusive','--nonblock','3'],{stdio:['ignore','ignore','ignore',fd],shell:true}),/offline guard/);
+ const locked=cp.spawn('/usr/bin/flock',['--exclusive','--nonblock','3'],{stdio:['ignore','ignore','ignore',fd]});
+ locked.once('close',code=>{try{assert.equal(code,0);}finally{fs.closeSync(fd);fs.rmSync(folder,{recursive:true,force:true});}});
  assert.equal(process.env.STADTSTACK_STEP8_OFFLINE,'1');`;
  await execute(process.execPath,['--require',guard,'-e',script]);
 });
