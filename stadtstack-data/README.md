@@ -1445,6 +1445,28 @@ is never truncated. The record always states `ownerReviewed:false` and
 candidate-critical or applicable source-rights decision, may remain pending
 after option-B acceptance.
 
+### Registered policy renewal without model replay
+
+`enqueue-policy-refresh` and its `policy_refresh` executor fetch only current
+robots/TDM policy endpoints, never the retained original body. Matching origin
+observations replace their original evidence positions in place; audit and
+body-specific findings (including XMP) retain their bytes and clocks. Policy
+changes or refusals remain holds. The exact `recordedPolicyIdentity` comparison
+in `recheckResidualPolicy` is unchanged.
+
+A committed refresh is used for offline continuation only **after the pinned
+original proof expires**. Seal-only renewal therefore waits until every selected
+original proof for that source has expired, then calls `seal-text-contribution`
+with the unchanged extraction/reconciliation/terminal selection. Fresh seals
+pin the genuine current admission receipts while preserving historical job,
+parser, model and assessment receipts; no import or model execution is required.
+
+This change affects the acquisition contract because it hashes `polite-fetch.ts`.
+The refresh receipt-codec contract, preparation/extraction and assessment
+contracts do not hash that file and remain unchanged. A new governed processing
+pin is still required; use one pin for all 27 reseals. Neither an updated pin nor
+a seal-only continuation resolves importer holds outside the selected seals.
+
 ## Consumers
 
 The owner's Stadtstack Projektatlas reads this `out/` snapshot for its optional city views via `GET /api/signals`, `GET /api/signals/<city>?kind=<kind>` (compact map data), and `GET /api/signals/<city>/<encoded-id>` (full record). Its existing `/api/atlas/<city>` and `/map` remain the pipeline's curated-project input, not pipeline output.

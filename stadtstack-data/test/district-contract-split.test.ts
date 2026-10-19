@@ -155,3 +155,13 @@ test('complete host-code manifest records actual per-file bytes and a canonical 
 test('native assessment operator entrypoint cannot invalidate acquisition observation identity',async()=>{
  assert.equal(await acquisitionContract(change('district-r1-assessment-cli.ts')),await acquisitionContract(hash));
 });
+
+test('policy refresh evidence-order fix changes only acquisition among all fourteen scoped contracts',async()=>{
+ for(const [name,{compute}] of Object.entries(contracts)){
+  const before=await compute(hash),after=await compute(change('polite-fetch.ts'));
+  if(name==='acquisition')assert.notDeepEqual(after,before);
+  else assert.deepEqual(after,before,name);
+ }
+ for(const compute of [parserIsolationContractSha256,ompRunnerContractSha256])assert.equal(await compute(change('polite-fetch.ts')),await compute(hash));
+ assert.equal((EXTRACTOR_SOURCE_FILES as readonly string[]).includes('polite-fetch.ts'),false);
+});
