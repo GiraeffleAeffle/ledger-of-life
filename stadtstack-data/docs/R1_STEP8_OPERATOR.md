@@ -264,6 +264,9 @@ exceptions they account for all 208 documents exactly once. Import dispositions
 have `processed:false`, no admitted records, no job and no receipt. Step-9
 exception material preserves the distinct variant; stale-policy exclusions remain
 rights-classified, not processed negatives or a rights override.
+Standalone audit re-reads the pinned issued decision after the authority/native
+epoch checks and immediately before reporting compatibility. A decision that
+expires during the audit blocks that report, just as it blocks execute.
 
 ## Validating read-only audit
 

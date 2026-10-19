@@ -22,6 +22,14 @@ const framePin=Pin.extend({bytes:z.number().int().nonnegative().max(128*1024*102
 export function assertImportDispositionDecisionCurrent(decision:ImportDispositionDecision){
  const now=Date.now();if(Date.parse(decision.issuedAt)>now||Date.parse(decision.expiresAt)<=now||Date.parse(decision.issuedAt)>=Date.parse(decision.expiresAt))throw Error('Import disposition decision is future-issued or expired');
 }
+/** Re-read exact issued control bytes and evaluate the real current clock. This
+ * final audit gate needs no source reads after the canonical epoch has closed. */
+export async function readCurrentImportDispositionDecision(pin:z.infer<typeof Pin>,read:Read){
+ const bytes=Buffer.from(await read(pin));
+ if(digest(bytes)!==pin.sha256)throw Error('Import disposition evidence pin mismatch');
+ const decision=ImportDispositionDecisionSchema.parse(JSON.parse(bytes.toString('utf8')));
+ assertImportDispositionDecisionCurrent(decision);return decision;
+}
 export function recomputePermanentImportRejection(registry:Parameters<typeof registeredImportScope>[0],document:CrawlDocument,scope:Parameters<typeof registeredImportScope>[2]){
  const selected=registeredImportScope(registry,document,scope);
  return { ...selected,reasonCode:!selected.withinOrigins?'scope_mismatch' as const:!residualMimeSupported(document.mimeType)?'unsupported_mime' as const:undefined};
@@ -32,7 +40,7 @@ export async function authenticateImportDispositions(options:{decision?:z.infer<
  if(!options.decision)return [];
  const pinned=async(pin:z.infer<typeof Pin>,read:Read)=>{const bytes=Buffer.from(await read(pin));if(digest(bytes)!==pin.sha256)throw Error('Import disposition evidence pin mismatch');return bytes;};
  const json=async(pin:z.infer<typeof Pin>,read:Read)=>JSON.parse((await pinned(pin,read)).toString('utf8'));
- const decision=ImportDispositionDecisionSchema.parse(await json(options.decision,options.control));assertImportDispositionDecisionCurrent(decision);
+ const decision=await readCurrentImportDispositionDecision(options.decision,options.control);
  const issuance=z.object({selection:framePin}).passthrough().parse(await json(options.nativeSealSelection,options.control));
  equal(decision.nativeSealSelection,issuance.selection,'Import decision selects another native seal selection');equal(decision.catalogue,pinIdentity(options.catalogue),'Import decision selects another catalogue');
  const selection=z.object({catalogue:framePin,seals:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),corpus:framePin,output:framePin}).passthrough()).min(1)}).passthrough().parse(await json(decision.nativeSealSelection,options.control));

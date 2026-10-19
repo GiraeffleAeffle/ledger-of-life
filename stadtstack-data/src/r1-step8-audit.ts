@@ -30,7 +30,7 @@ import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source
 import type {Step8Input} from './r1-step8.ts';
 import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,canonicalManagedSourceAudit,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 import {readPreparedStep8Campaign,readPreparedStep8Provenance,type PreparedStep8Staging} from './r1-step8-staging.ts';
-import {authenticateImportDispositions} from './r1-step8-import-dispositions.ts';
+import {authenticateImportDispositions,readCurrentImportDispositionDecision} from './r1-step8-import-dispositions.ts';
 import type {ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
 
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
@@ -220,6 +220,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  await attempt('authority-epoch',async()=>{await reader.finish();});
  await attempt('native-provenance-epoch',async()=>{if(borrowedContext)await provenanceContext.checkpoint();else{provenanceFinished=true;await provenanceContext.finish();}});
+ await attempt('import-disposition-current',async()=>{if(input.importDispositionDecision)await readCurrentImportDispositionDecision(input.importDispositionDecision,plain);});
  const report={schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:blockers.length?'blocked':'compatible',writes:[],network:false,providers:false,publicationExecuted:false,valueAccepted:false,
   currentGeneration:input.currentGeneration,campaign:input.campaign,sources,blockers,reads:[...new Map(reads.map(pin=>[pin.path,pin])).values()],authority:{...reader.authority,inventorySha256:reader.inventorySha256,optOutSnapshotSha256:reader.optOutSnapshotSha256},allowance,purgeAcknowledgements,predecessors};
  if(borrowedContext&&!blockers.length)auditRechecks.set(report,async()=>{
