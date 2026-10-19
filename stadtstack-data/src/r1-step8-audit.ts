@@ -6,7 +6,7 @@ import {canonicalJson,digest,HashSchema,semanticHash} from './district-adapter-c
 import {canonicalJobIdentity,type DistrictJobSpec} from './district-jobs.ts';
 import {StepReceiptSchema,encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
 import {DistrictCas,type CasPutOptions} from './district-cas.ts';
-import {Step8CampaignSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
+import {Step8CampaignSchema,Step8CampaignRelocationSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
 import {r1TextCompositionInputSchema} from './district-r1-text-composition.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
 import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} from './district-publication-provenance.ts';
@@ -28,7 +28,7 @@ import {auditStep8Allowance} from './r1-step8-allowance-audit.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException} from './district-terminal-exceptions.ts';
 import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source-content.ts';
 import type {Step8Input} from './r1-step8.ts';
-import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,canonicalManagedSourceAudit,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
+import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authenticateCanonicalSealProvenance,canonicalManagedSourceAudit,assertCanonicalEpochFinished,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
 import {readPreparedStep8Campaign,readPreparedStep8Provenance,type PreparedStep8Staging} from './r1-step8-staging.ts';
 import {authenticateImportDispositions,readCurrentImportDispositionDecision} from './r1-step8-import-dispositions.ts';
 import type {ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
@@ -37,6 +37,18 @@ const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message
 const pinSchema=z.object({path:z.string(),sha256:HashSchema}).passthrough();
 const auditRechecks=new WeakMap<object,()=>Promise<void>>();
 export async function recheckStep8Audit(report:object){const check=auditRechecks.get(report);if(!check)throw Error('Fresh audit recheck requires its trusted live result');await check();}
+const auditedCampaigns=new WeakMap<object,{pin:Step8Input['campaign'];bytes:Buffer;reportSha256:string;context:WitnessedProvenanceContext}>();
+/** Only a genuine compatible staging audit can authorize relocation. The source
+ * epoch must have finished, and unchanged Core authenticates the committed copy. */
+export async function relocateStep8AuditCampaign(report:Awaited<ReturnType<typeof auditStep8>>,campaign:Step8Input['campaign'],privateProvenance:Step8Input['privateProvenance'],policy:Step8Input['policy']){
+ const original=auditedCampaigns.get(report);
+ requireThat(original&&digest(canonicalJson(report))===original.reportSha256,'Campaign relocation requires its unchanged trusted staging audit');
+ assertCanonicalEpochFinished(original!.context);
+ const relocation=Step8CampaignRelocationSchema.parse({schemaVersion:'stadtstack-r1-step8-campaign-relocation-v1',from:original!.pin,to:campaign,verifiedSha256:digest(original!.bytes)});
+ const authenticated=await authenticatePublicationProvenance(privateProvenance.path,privateProvenance.sha256,policy),bytes=await authenticated.read(relocation.to.path);
+ requireThat(digest(bytes)===relocation.to.sha256&&bytes.equals(original!.bytes),'Committed campaign differs from authenticated audit bytes');
+ return {audit:{...report,campaign:relocation.to,campaignRelocation:relocation,reads:[...new Map([...report.reads,relocation.from,relocation.to].map(pin=>[pin.path,pin])).values()]},provenance:authenticated};
+}
 const itemPins=CriticalAssessmentInventorySchema.shape.records.element;
 const queueSchema=z.object({stepReceipts:z.array(z.object({spec:z.unknown(),receipt:StepReceiptSchema,sha256:HashSchema})),
  reconciliationJobKeys:z.array(HashSchema),assessments:z.array(z.object({jobKey:HashSchema,recordId:z.string(),outcome:z.string(),pins:itemPins.nullable()}).passthrough()),
@@ -64,6 +76,7 @@ export function assertStep8AdmissionProfile(policy:Step8Input['currentGeneration
  * bulk reads retain the lock-free inventory/objection epoch fence. */
 export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:WitnessedProvenanceContext,preparedStaging?:PreparedStep8Staging){
  const blockers:Array<{scope:string;message:string}>=[],sources:Array<Record<string,unknown>>=[],reads:Array<{path:string;sha256:string}>=[],originals=new Set<string>(),purgeAcknowledgements:unknown[]=[];
+ let campaignBytes:Buffer|undefined;
  const callRequirements:Array<{originalSha256:string;requestSha256:string;jobKey?:string;runId?:string}>=[];
  const predecessors:Array<Awaited<ReturnType<typeof loadPriorPublicationRelease>>['priorRelease']>=[];
  const plainPins=new Map<string,{path:string;sha256:string}>(),purgeStates:Array<{id:string;jobKey:string;rows:unknown[]}>=[];
@@ -91,7 +104,8 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
    assertStep8ProcessingPin(input.currentGeneration,catalogue,review);
    if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208,'Production requires the frozen 27-source campaign');
    if(reader.authority.mode!=='isolated-fixture')requireThat(canonicalJson([...input.structuredRunIds].sort())===canonicalJson([...STEP8_STRUCTURED_RUN_IDS].sort())&&canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires the five committed K1/K2 runs and authentic released 0.3.2 predecessor');
-   campaign=await authenticateStep8Campaign(JSON.parse((await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):managed(input.campaign))).toString('utf8')),async path=>reader.read(path),input.policy);
+   campaignBytes=await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):managed(input.campaign));
+   campaign=await authenticateStep8Campaign(JSON.parse(campaignBytes.toString('utf8')),async path=>reader.read(path),input.policy);
    requireThat(campaign.sources.length===input.expectedSources&&campaign.sources.reduce((n,source)=>n+source.documents.length,0)===input.expectedDocuments,'Campaign totals mismatch');
    requireThat(catalogue.rows.length===campaign.sources.length,'Catalogue source count mismatch');
    for(const source of campaign.sources){const row=catalogue.rows.find((row:{scope:{sourceId:string;municipalityId:string}})=>row.scope.sourceId===source.sourceId&&row.scope.municipalityId===source.municipalityId);requireThat(row,'Campaign source outside active catalogue');requireThat(canonicalJson(row.originals.map((document:{documentId:string;sha256:string})=>[document.documentId,document.sha256]).sort())===canonicalJson(source.documents.map(document=>[document.documentId,document.sha256]).sort()),'Catalogue document membership mismatch');}
@@ -223,6 +237,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  await attempt('import-disposition-current',async()=>{if(input.importDispositionDecision)await readCurrentImportDispositionDecision(input.importDispositionDecision,plain);});
  const report={schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:blockers.length?'blocked':'compatible',writes:[],network:false,providers:false,publicationExecuted:false,valueAccepted:false,
   currentGeneration:input.currentGeneration,campaign:input.campaign,sources,blockers,reads:[...new Map(reads.map(pin=>[pin.path,pin])).values()],authority:{...reader.authority,inventorySha256:reader.inventorySha256,optOutSnapshotSha256:reader.optOutSnapshotSha256},allowance,purgeAcknowledgements,predecessors};
+ if(borrowedContext&&preparedStaging&&!blockers.length&&campaignBytes)auditedCampaigns.set(report,{pin:{...input.campaign},bytes:Buffer.from(campaignBytes),reportSha256:digest(canonicalJson(report)),context:borrowedContext});
  if(borrowedContext&&!blockers.length)auditRechecks.set(report,async()=>{
   await provenanceContext.checkpoint();
   for(const pin of plainPins.values())requireThat(digest(await readFile(pin.path))===pin.sha256,'Audited operator control changed before managed writes');

@@ -4,7 +4,7 @@ import {isAbsolute,join,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {z} from 'zod';
 import {HashSchema,canonicalJson} from './district-adapter-contract.ts';
-import {classifyStep8Exception,Step8CampaignSchema} from './r1-step8-governance.ts';
+import {classifyStep8Exception,Step8CampaignSchema,Step8CampaignRelocationSchema} from './r1-step8-governance.ts';
 import {dataReleaseSchema,verifyDataRelease} from './data-release.ts';
 import {writeImmutable} from './district-assessment.ts';
 import {ReasonCodeSchema,JobOutcomeSchema} from './district-step-receipt.ts';
@@ -21,6 +21,7 @@ export type Step8AcceptancePins=z.infer<typeof Step8AcceptancePinsSchema>;
 const gateSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-gate-v1'),status:z.string(),releaseId:HashSchema,
   manifestSha256:HashSchema,candidateDirectory:z.string().refine(isAbsolute),campaign:AcceptancePinSchema,
   currentGeneration:Step8CurrentGenerationSchema,generationAuditEvidence:AcceptancePinSchema,
+  stagingAssembly:AcceptancePinSchema.optional(),
   exceptionInventory:AcceptancePinSchema,step9Handoff:AcceptancePinSchema,replayReceipt:AcceptancePinSchema,
   replayAuditSha256:HashSchema,checks:z.array(z.string()),generationNonce:z.string().min(1)}).passthrough();
 const handoffSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step9-handoff-v1'),releaseId:HashSchema,
@@ -227,12 +228,13 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
     'jobKey' in source?source.jobKey:['import_rejection',source.importDisposition.decision.sha256,source.importDisposition.reasonCode]])).sort();
   if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exception inventory omits or duplicates campaign documents');
   const generationAudit=z.object({schemaVersion:z.literal('stadtstack-r1-step8-read-only-audit-v1'),status:z.literal('compatible'),
-    currentGeneration:Step8CurrentGenerationSchema,campaign:AcceptancePinSchema,blockers:z.array(z.unknown()).length(0),
+    currentGeneration:Step8CurrentGenerationSchema,campaign:AcceptancePinSchema,campaignRelocation:Step8CampaignRelocationSchema.optional(),blockers:z.array(z.unknown()).length(0),
     writes:z.array(z.unknown()).length(0),network:z.literal(false),providers:z.literal(false),publicationExecuted:z.literal(false),
     sources:z.array(z.object({municipalityId:z.string(),sourceId:z.string(),corpusSha256:HashSchema,admittedRecordIds:z.array(z.string())}).passthrough()),
     allowance:z.object({schemaVersion:z.literal('stadtstack-r1-step8-allowance-evidence-v1')}).passthrough(),purgeAcknowledgements:z.array(z.unknown())}).passthrough().parse(await readAcceptancePin(gate.generationAuditEvidence));
   if(canonicalJson(generationAudit.currentGeneration)!==canonicalJson(gate.currentGeneration)||canonicalJson(generationAudit.campaign)!==canonicalJson(gate.campaign)
     ||!inventory.generationAuditEvidence||canonicalJson(inventory.generationAuditEvidence)!==canonicalJson(gate.generationAuditEvidence))throw Error('Current generation audit binding mismatch');
+  if(gate.stagingAssembly&&!generationAudit.campaignRelocation||generationAudit.campaignRelocation&&canonicalJson(generationAudit.campaignRelocation.to)!==canonicalJson(gate.campaign))throw Error('Current generation audit campaign relocation mismatch');
   const expectedSources=campaign.sources.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.corpus.sha256])).sort();
   if(canonicalJson(expectedSources)!==canonicalJson(generationAudit.sources.map(source=>canonicalJson([source.municipalityId,source.sourceId,source.corpusSha256])).sort()))throw Error('Current generation audit source coverage mismatch');
   for(const source of generationAudit.sources){

@@ -49,11 +49,15 @@ test('staging rejects enrolled-root overlap before creating directory or claim d
  await markManagedCacheInventoryComplete(ancestor,fixture.policy);
  assert.equal((await readCivicPolicyInventory(fixture.policy)).roots.find(root=>root.path===ancestor)?.complete,true,'ancestor remains complete after canonical reconciliation');
 });
-test('real retained 0.3.2 members collect and assemble through offline Step8 plan and read-only audit',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:910000},async()=>{
+test('real retained 0.3.2 staging executes through exact replay, passed gate and exception handoff',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:3310000},async()=>{
  const {NODE_TEST_CONTEXT:_parent,...env}=process.env;
- const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1'},timeout:900000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
+ const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1'},timeout:3300000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
   if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});throw error;
  });
  assert.match(result.stdout,/# fail 0/);
  assert.match(result.stdout,/REAL_RETAINED_STEP8_PLAN_AUDIT .*"members":19,"cities":8,"audit":"compatible","inventoryUnchanged":true,"dbUnchanged":true,"network":false,"providers":false/);
+ assert.match(result.stdout,/REAL_RETAINED_STEP8_EXECUTION_HANDOFF .*"members":19,"gate":"passed","bundleAccepted":true,"tamperRejected":true,"canonicalPasses":1/);
+ const size=/^REAL_RETAINED_STEP8_PROVENANCE_SIZE (.+)$/m.exec(result.stdout);assert.ok(size);
+ const evidence=JSON.parse(size[1]);assert.equal(evidence.retainedMembers,19);assert.ok(evidence.actualBytes<=16*1024*1024);
+ console.log('REAL_RETAINED_STEP8_PROVENANCE_SIZE '+JSON.stringify(evidence));
 });

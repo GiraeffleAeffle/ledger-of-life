@@ -15,6 +15,11 @@ const nativeCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256
 const importCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256:HashSchema,importDisposition:z.object({decisionSha256:HashSchema,reasonCode:ImportRejectionReasonSchema}).strict()}).strict();
 export const Step8CampaignSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-v1'),sources:z.array(z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1),corpus:z.object({path:z.string().min(1),sha256:HashSchema}).strict(),documents:z.array(z.union([nativeCampaignDocumentSchema,importCampaignDocumentSchema])).min(1)}).strict()).min(1)}).strict();
 export type Step8Campaign=z.infer<typeof Step8CampaignSchema>;
+const relocationPin=z.object({path:z.string().refine(isAbsolute),sha256:HashSchema}).strict();
+export const Step8CampaignRelocationSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-relocation-v1'),
+ from:relocationPin,to:relocationPin,verifiedSha256:HashSchema}).strict().refine(value=>
+ value.from.path!==value.to.path&&value.from.sha256===value.to.sha256&&value.to.sha256===value.verifiedSha256,
+ 'Campaign relocation must preserve the exact authenticated bytes');
 export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>Promise<Uint8Array>,policy:CivicPolicyOptions){
  const campaign=Step8CampaignSchema.parse(raw),mode=(await assertCivicPolicyAuthority(policy)).mode,identities=new Set<string>(),jobs=new Set<string>();
  const corpora=campaign.sources.map(source=>source.corpus.sha256);

@@ -8,12 +8,14 @@ import {root,cacheDir} from '../../src/common.ts';
 import {writePrivateJson} from '../../src/district-private-io.ts';
 import {runRetainedPublicationImportPlan} from '../../src/district-retained-import.ts';
 import {readCommittedReleaseFile} from '../../src/district-publication-predecessor.ts';
-import {authenticatePublicationProvenance} from '../../src/district-publication-provenance.ts';
 import {STEP8_PRIOR_RELEASE} from '../../src/r1-step8-current-policy.ts';
 import {buildStep8RetainedPlan,assembleStep8Staging,prepareStep8Staging,commitStep8Staging} from '../../src/r1-step8-staging.ts';
-import {Step8InputSchema,Step8OperatorInputSchema,step8ReadPlan,auditStep8Operator,type Step8Input} from '../../src/r1-step8.ts';
-import {auditStep8,recheckStep8Audit} from '../../src/r1-step8-audit.ts';
+import {Step8InputSchema,Step8OperatorInputSchema,step8ReadPlan,auditStep8Operator,runStep8,type Step8Input} from '../../src/r1-step8.ts';
+import {auditStep8,recheckStep8Audit,relocateStep8AuditCampaign} from '../../src/r1-step8-audit.ts';
 import {createWitnessedProvenanceContext} from '../../src/r1-step8-provenance.ts';
+import {digest} from '../../src/district-adapter-contract.ts';
+import {loadStep8ExceptionBundle} from '../../src/r1-release-acceptance.ts';
+import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} from '../../src/district-publication-provenance.ts';
 
 /** Real immutable 0.3.2 staging bytes, isolated authority/PG and synthetic native
  * assessment evidence from the existing topology fixture; no live claims. */
@@ -48,7 +50,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  await assert.rejects(readFile(join(managedRoot,'staging-component.json')),{code:'ENOENT'});
  assert.deepEqual(await readFile(join(manifest.policy.stateDir,'inventory.json')),beforeAudit);assert.deepEqual(await counts(),beforeCounts);
  const beforeShared=canonicalBuildCount(),context=await createWitnessedProvenanceContext(manifest.nativeSealSelection,manifest.policy,{pool,casRoot:manifest.casRoot,catalogue:manifest.currentGeneration.catalogue,mode:'step8',workers:1,timing:manifest.reconstructionTiming});
- const prepared=await prepareStep8Staging(request,pool,context);let finished=false,result:Awaited<ReturnType<typeof commitStep8Staging>>,audit:Awaited<ReturnType<typeof auditStep8>>;
+ const prepared=await prepareStep8Staging(request,pool,context);let finished=false,audit:Awaited<ReturnType<typeof auditStep8>>;
  try{
   await assert.rejects(commitStep8Staging(prepared),/successfully finished canonical source epoch/);
   assert.deepEqual(await readFile(join(manifest.policy.stateDir,'inventory.json')),beforeAudit);
@@ -60,17 +62,65 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
   try{await writeFile(manifest.currentGeneration.processingReview.path,Buffer.from('{}'));await assert.rejects(recheckStep8Audit(audit),/operator control changed/);}
   finally{await writeFile(manifest.currentGeneration.processingReview.path,reviewBytes);}
   await recheckStep8Audit(audit);
-  finished=true;await context.finish();result=await commitStep8Staging(prepared);
+  await assert.rejects(relocateStep8AuditCampaign(audit,{path:join(managedRoot,'campaign.json'),sha256:manifest.campaign.sha256},manifest.privateProvenance,manifest.policy),/successfully finished canonical source epoch/);
+  finished=true;await context.finish();
  }finally{try{if(!finished)await context.finish();}finally{await prepared.dispose();}}
- assert.equal(result.importedMembers,19);assert.equal(result.schemaVersion,'stadtstack-r1-step8-staging-result-v2');assert.equal(result.publicationExecuted,false);
- const provenance=await authenticatePublicationProvenance(result.inputs.privateProvenance.path,result.inputs.privateProvenance.sha256,manifest.policy);
- assert.deepEqual(await provenance.read(result.inputs.campaign.path),await readFile(manifest.campaign.path));
- const actual=Step8InputSchema.parse({...manifest,...result.inputs});
- assert.deepEqual(await counts(),beforeCounts);
+ console.log('REAL_RETAINED_STEP8_PLAN_AUDIT '+JSON.stringify({members:19,cities:8,audit:audit.status,inventoryUnchanged:true,dbUnchanged:true,network:false,providers:false}));
+ const target={path:join(managedRoot+'-execution','campaign.json'),sha256:manifest.campaign.sha256};
+ await assert.rejects(relocateStep8AuditCampaign({...audit},target,manifest.privateProvenance,manifest.policy),/trusted staging audit/);
+ await assert.rejects(relocateStep8AuditCampaign(audit,{...target,sha256:'0'.repeat(64)},manifest.privateProvenance,manifest.policy),/preserve the exact authenticated bytes/);
+ // Execute the actual operator union, not a manually substituted ready input:
+ // the committed campaign pin must survive the complete step9 exception loader.
+ const executionRoot=managedRoot+'-execution';
+ t.after(async()=>{await rm(executionRoot,{recursive:true,force:true});await rm(executionRoot+'.claim',{force:true});});
+ const executionRequest={...request,managedRoot:executionRoot},executionPath=join(fixtureRoot,'operator-controls','execution-assembly.json'),executionSha256=await writePrivateJson(executionPath,executionRequest);
+ const execution=Step8OperatorInputSchema.parse({...base,stagingAssembly:{path:executionPath,sha256:executionSha256}}),beforeExecute=canonicalBuildCount(),gate=await runStep8(execution,pool);
+ assert.equal(gate.status,'passed');assert.equal(canonicalBuildCount()-beforeExecute,1,'operator execute reuses one canonical source pass');
+ assert.notEqual(gate.campaign.path,manifest.campaign.path);assert.equal(gate.campaign.sha256,manifest.campaign.sha256);
+ assert.ok(gate.stagingAssembly);
+ const component=await readFile(gate.stagingAssembly.path);assert.equal(digest(component),gate.stagingAssembly.sha256);
+ const actual=Step8InputSchema.parse({...manifest,...JSON.parse(component.toString('utf8'))});
+ assert.equal(actual.staging.length,19);assert.deepEqual(await counts(),beforeCounts);
  for(const staged of actual.staging)assert.deepEqual(await readFile(staged.path),await readCommittedReleaseFile(STEP8_PRIOR_RELEASE.gitCommit,staged.destination,undefined,'release'));
  assert.equal(actual.staging.filter(pin=>pin.destination.endsWith('/feed.json')).length,8);
  assert.equal(actual.staging.filter(pin=>pin.destination.endsWith('/signals.geojson')).length,8);
- await assert.rejects(assembleStep8Staging(request),/already exists/);
- assert.equal(result.valueAccepted,false);assert.equal(result.hostedReleaseAuthorized,false);
- console.log('REAL_RETAINED_STEP8_PLAN_AUDIT '+JSON.stringify({members:19,cities:8,audit:audit.status,inventoryUnchanged:true,dbUnchanged:true,network:false,providers:false}));
+ await assert.rejects(assembleStep8Staging(executionRequest),/already exists/);
+ const gatePath=join(manifest.outputRoot,'release-gate.json'),gatePin={path:gatePath,sha256:digest(await readFile(gatePath))},handoffPins={gate:gatePin,exceptions:gate.exceptionInventory,handoff:gate.step9Handoff};
+ const accepted=await loadStep8ExceptionBundle(handoffPins,gate.releaseId);assert.equal(accepted.gate.status,'passed');
+ const replay=JSON.parse((await readFile(gate.replayReceipt.path)).toString('utf8')),provenanceBytes=await readFile(replay.privateProvenance.path),publication=privatePublicationProvenanceSchema.parse(JSON.parse(provenanceBytes.toString('utf8')));
+ assert.equal(digest(provenanceBytes),replay.privateProvenance.sha256);assert.ok(provenanceBytes.length<=16*1024*1024,'unchanged Core provenance size guard');
+ const composition=JSON.parse((await readFile(replay.textComposition.path)).toString('utf8')),artifactPaths=new Set<string>(composition.contributions.flatMap((entry:{artifacts:Record<string,{path:string}>})=>Object.values(entry.artifacts).map(pin=>pin.path)));
+ const required=new Set<string>([...['registry','candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','criticalAssessments','textComposition','structuredRun','identityAssessments','regionalPolicyReceipts'].flatMap(role=>replay[role]?[replay[role].path]:[]),...replay.staging.map((pin:{path:string})=>pin.path),...artifactPaths]);
+ assert.deepEqual(publication.inputs.map(pin=>pin.path).sort(),[...required].sort(),'complete and only actual publication/replay direct and lineage inputs');
+ const stagingPaths=new Set<string>(actual.staging.map(pin=>pin.path)),stagingProvenance=privatePublicationProvenanceSchema.parse(JSON.parse((await readFile(actual.privateProvenance.path)).toString('utf8')));
+ for(const pin of publication.inputs.filter(pin=>stagingPaths.has(pin.path)))assert.deepEqual(pin,stagingProvenance.inputs.find(source=>source.path===pin.path),'retained input keeps its complete exact binding set');
+ for(const role of ['candidateRecords','candidateQuarantine','identityState','policyReceipts','criticalAssessments','textComposition','structuredRun','publicationInputs']){
+  const pin=publication.inputs.find(pin=>pin.path===replay[role].path);assert.ok(pin);assert.ok(pin.bindings.every(binding=>binding.kind!=='retained_publication'),'unrelated retained rows do not fan out into native/control input '+role);
+ }
+ const records=publication.inputs.find(pin=>pin.path===replay.candidateRecords.path);assert.ok(records);
+ const requiredBinding=records.bindings.findIndex(binding=>binding.kind==='http_observation');assert.ok(requiredBinding>=0&&records.bindings.length>1);
+ const missing={...publication,inputs:publication.inputs.map(pin=>pin===records?{...pin,bindings:pin.bindings.filter((_,index)=>index!==requiredBinding)}:pin)},missingPath=join(fixtureRoot,'operator-controls','missing-producer-provenance.json'),missingSha256=await writePrivateJson(missingPath,missing);
+ await assert.rejects(authenticatePublicationProvenance(missingPath,missingSha256,manifest.policy),error=>error instanceof Error&&'code' in error&&error.code==='CONTENT_PROVENANCE_MISMATCH');
+ // Size projection only: retain the measured19 rows, repeat the source artifact
+ // row shape27 times with at most24 HTTP originals per source, and allow208
+ // document plus5 structured HTTP producers on each aggregate row. No projected
+ // pin or binding is issued, authenticated, persisted or used as evidence.
+ assert.equal(provenanceBytes.length,Buffer.byteLength(JSON.stringify(publication,null,2)+'\n'),'model uses the actual pretty-JSON wire encoding');
+ const indentedBytes=(value:unknown,indent:number)=>Buffer.byteLength(JSON.stringify(value,null,2).split('\n').map(line=>' '.repeat(indent)+line).join('\n'));
+ const rowBytes=(pin:(typeof publication.inputs)[number],httpMultiplier:number)=>indentedBytes(pin,4)+pin.bindings.filter(binding=>binding.kind==='http_observation').reduce((sum,binding)=>sum+(httpMultiplier-1)*(indentedBytes(binding,8)+2),0);
+ const retainedRows=publication.inputs.filter(pin=>stagingPaths.has(pin.path)),sourceRows=publication.inputs.filter(pin=>artifactPaths.has(pin.path)),aggregateRows=publication.inputs.filter(pin=>!stagingPaths.has(pin.path)&&!artifactPaths.has(pin.path));
+ const envelopeBytes=provenanceBytes.length-publication.inputs.reduce((sum,pin)=>sum+rowBytes(pin,1),0)-2*Math.max(0,publication.inputs.length-1);
+ const projectedRows=retainedRows.length+sourceRows.length*27+aggregateRows.length,projectedBytes=envelopeBytes+2*Math.max(0,projectedRows-1)+retainedRows.reduce((sum,pin)=>sum+rowBytes(pin,1),0)+27*sourceRows.reduce((sum,pin)=>sum+rowBytes(pin,24),0)+aggregateRows.reduce((sum,pin)=>sum+rowBytes(pin,213),0);
+ console.log('REAL_RETAINED_STEP8_PROVENANCE_SIZE '+JSON.stringify({actualBytes:provenanceBytes.length,actualInputs:publication.inputs.length,retainedMembers:retainedRows.length,retainedBindings:retainedRows.reduce((sum,pin)=>sum+pin.bindings.length,0),projected27SourceBytes:projectedBytes,projection:'fixture wire-size model;27 sources,19 actual retained members,24 HTTP originals/source row,213 HTTP producers/aggregate row; same URL/proof wire lengths; not a production gate'}));
+ const generation=JSON.parse((await readFile(gate.generationAuditEvidence.path)).toString('utf8'));
+ assert.deepEqual(generation.campaign,gate.campaign);assert.deepEqual(generation.campaignRelocation.from,manifest.campaign);assert.deepEqual(generation.campaignRelocation.to,gate.campaign);
+ const committedBytes=await readFile(gate.campaign.path);
+ try{
+  await writeFile(gate.campaign.path,Buffer.concat([committedBytes,Buffer.from('\n')]));
+  await assert.rejects(loadStep8ExceptionBundle(handoffPins,gate.releaseId),/hash mismatch/);
+  await assert.rejects(relocateStep8AuditCampaign(audit,gate.campaign,actual.privateProvenance,manifest.policy));
+ }
+ finally{await writeFile(gate.campaign.path,committedBytes);}
+ await loadStep8ExceptionBundle(handoffPins,gate.releaseId);
+ console.log('REAL_RETAINED_STEP8_EXECUTION_HANDOFF '+JSON.stringify({members:19,gate:gate.status,bundleAccepted:true,tamperRejected:true,canonicalPasses:1}));
 }

@@ -109,6 +109,26 @@ test('acceptance requires the exact compatible generation audit and cannot subst
  await assert.rejects(loadStep8ExceptionBundle({...selected.step8,gate:changedPolicy}),/generation audit binding mismatch/);
 });
 
+test('staged handoff preserves exact audit campaign equality and validates relocation evidence',async t=>{
+ const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));const selected=await f.seal();
+ const gate=JSON.parse(await readFile(selected.step8.gate.path,'utf8')),audit=JSON.parse(await readFile(gate.generationAuditEvidence.path,'utf8'));
+ const inventory=JSON.parse(await readFile(selected.step8.exceptions.path,'utf8')),handoff=JSON.parse(await readFile(selected.step8.handoff.path,'utf8'));
+ const from=await f.save('original-campaign.json',JSON.parse(await readFile(gate.campaign.path,'utf8'))),stagingAssembly=await f.save('staging-component.json',{fixture:'Synthetic consumer-contract evidence; not a real staging execution.'});
+ const relocation={schemaVersion:'stadtstack-r1-step8-campaign-relocation-v1',from,to:gate.campaign,verifiedSha256:gate.campaign.sha256};
+ let index=0;
+ const bind=async(patch:Record<string,unknown>)=>{
+  const prefix='relocation-'+index++,generationAuditEvidence=await f.save(prefix+'-audit.json',{...audit,...patch});
+  const exceptions=await f.save(prefix+'-exceptions.json',{...inventory,generationAuditEvidence}),nextHandoff=await f.save(prefix+'-handoff.json',{...handoff,exceptionInventory:exceptions});
+  const nextGate=await f.save(prefix+'-gate.json',{...gate,stagingAssembly,generationAuditEvidence,exceptionInventory:exceptions,step9Handoff:nextHandoff});
+  return {gate:nextGate,exceptions,handoff:nextHandoff};
+ };
+ await loadStep8ExceptionBundle(await bind({campaignRelocation:relocation}));
+ await assert.rejects(loadStep8ExceptionBundle(await bind({})),/campaign relocation mismatch/);
+ await assert.rejects(loadStep8ExceptionBundle(await bind({campaign:from,campaignRelocation:relocation})),/generation audit binding mismatch/);
+ for(const changed of [{...relocation,verifiedSha256:b},{...relocation,from:{...from,sha256:b}},{...relocation,to:{...gate.campaign,path:from.path+'-other'}}])
+  await assert.rejects(loadStep8ExceptionBundle(await bind({campaignRelocation:changed})));
+});
+
 test('passed technical gates never override candidate-affecting risks, unknown cases or applicable source policy',async t=>{
   const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
   const source=f.inventory.sourceDispositions[0];

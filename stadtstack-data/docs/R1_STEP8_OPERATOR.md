@@ -92,6 +92,67 @@ successfully, including segment/root validation, **before the first managed
 candidate/staging write**. Staging commit then authenticates current rights and
 bytes again through unchanged Core.
 
+Staging copies the campaign to its managed control root. Before persisting the
+generation audit, execute relocates its campaign pin using only the unchanged
+trusted in-process staging audit after successful source-epoch finish. Core
+authenticates the committed copy; its bytes must equal the audited snapshot.
+The persisted `stadtstack-r1-step8-campaign-relocation-v1` binding records the old
+pin, new pin and identical SHA256. The exception loader still requires exact
+audit/gate/inventory campaign-pin equality; staged gates additionally require a
+valid relocation binding targeting that exact campaign. Relocation changes no
+campaign membership, generation, policy verdict or audit status.
+
+Publication custody is producer-scoped, not the Cartesian product of every
+retained row and every newly generated artifact:
+
+- Text/native aggregates use their authenticated canonical source producer
+  closures; structured exports use their authenticated committed HTTP producers.
+  Each exported native receipt selects only its own committed input HTTP proofs.
+- Retained staging inputs keep their complete exact original binding sets.
+  Published city members use that city's signals/feed producers, core members use
+  the retained core/corpus producers, regional members retain their regional
+  inputs, and whole-release summaries retain the complete publication group.
+- Native dependency controls reference authenticated staging hashes, not copied
+  retained city record values. Those bytes remain separately and completely
+  pinned with their retained bindings; a control reference is not collection or
+  independent publication authority.
+- The publication inventory contains every direct publication/replay input and
+  every artifact referenced by each native text contribution (including optional
+  preparation plans). Independent audit/exception/handoff artifacts are retained
+  separately, not duplicated as publication data inputs. Hash-addressed policy,
+  assessment and structured dependencies still undergo their existing Core CAS
+  and committed-receipt checks.
+
+Neither the16MiB provenance guard nor any exact binding-set check is relaxed.
+In particular, canonical seal authentication and the complete witnessed union
+for shared empty critical artifacts are unchanged; projection happens only after
+those proofs pass. Omitting a required producer binding still yields Core's
+`CONTENT_PROVENANCE_MISMATCH`, rather than authorizing a smaller declared set.
+
+The publisher's prepared source scope is closed before outer candidate
+persistence. Its public members are snapshotted in memory after every manifest
+member's size/SHA is verified (the measured real19 fixture has55,073,022
+manifest-member bytes, plus its manifest/README). No private scope capability
+escapes. Final members are persisted using Core's existing
+multi-entry write transaction and one registered source scratch. Every target
+has its own producer entries; the scratch's union is not applied as each file's
+custody. Enrollment precedes temporary bytes, the generation claim is checked
+throughout, Core checks current opt-outs/authority on both sides of writes, and
+the normal exact replay plus candidate loader still precede the passed gate.
+This avoids repeatedly loading/saving the entire authority inventory for every
+member without introducing a second inventory writer or relaxing Core checks.
+
+Observed size evidence from the real19-member candidate: final provenance
+**8,576,972bytes**,34inputs (19retained members,6native contribution artifacts,
+9aggregate/control inputs). The retained members keep all12,517bindings.
+Core accepted the native records artifact's complete two-binding producer set
+and refused a one-binding declaration with `CONTENT_PROVENANCE_MISMATCH`.
+A pretty-JSON wire-size model using the19 measured retained members,27 source
+cohorts, up to24HTTP originals per source-artifact row and213HTTP producers per
+aggregate row yields **10,885,948bytes**, below the unchanged16,777,216-byte guard.
+This model assumes the observed URL/proof wire lengths; it is not a measurement
+of the later renewed production selection or permission to omit actual inputs.
+
 `audit` remains a standalone validating operation with its own canonical pass.
 Do **not** run it separately before a governed `execute` just to repeat the same
 expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry run.
