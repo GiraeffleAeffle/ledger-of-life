@@ -596,7 +596,10 @@ export class PoliteFetcher {
    const isOrigin=isOriginTdmEvidence;
    const oldOrigin=original.tdm.evidence.filter(isOrigin);
    if(!oldOrigin.length||JSON.stringify(oldOrigin.map(withoutClock))!==JSON.stringify(originEvidence.map(withoutClock)))throw new PoliteFetchError('tdm_reserved','TDMRep policy changed; original held');
-   const sourcePolicy={...original,robots:currentRobots,tdm:{...original.tdm,evidence:[...original.tdm.evidence.filter(row=>!isOrigin(row)),...originEvidence]}};
+   // Identity includes evidence order: renew origin clocks in their original
+   // positions without moving or rewriting retained body-specific findings.
+   let originIndex=0;
+   const sourcePolicy={...original,robots:currentRobots,tdm:{...original.tdm,evidence:original.tdm.evidence.map(row=>isOrigin(row)?originEvidence[originIndex++]:row)}};
    if(!effectiveSourcePermission(sourcePolicy,source))throw new PoliteFetchError('tdm_reserved','Current source policy refuses original');
    const clocks=[currentRobots.checkedAt,...originEvidence.map(row=>row.checkedAt)];
    if(clocks.some(clock=>!clock||!Number.isFinite(Date.parse(clock))||Date.parse(clock)>Date.now()))throw new PoliteFetchError('host_state_unsafe','Current policy clock is incomplete');

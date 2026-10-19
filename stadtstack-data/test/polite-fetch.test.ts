@@ -22,6 +22,7 @@ import {CrawlRequestEvidenceSchema,CrawlRequestEvidenceCaptureError} from '../sr
 import {ParserIsolationError,ParserIsolationReasonSchema} from '../src/district-parser-isolation.ts';
 import {largeBobInventory} from './fixtures/bob-inventory.ts';
 import {genesisOwnerAccountRoot} from '../src/genesis-owner-acquisition.ts';
+import {recordedPolicyIdentity} from '../src/district-policy-refresh.ts';
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});
@@ -863,6 +864,28 @@ test('current policy refresh uses actual 304 observations and never refetches th
  assert.equal(current.sourcePolicy.robots.sha256,oldPolicy.robots.sha256);assert.deepEqual(original.policy,oldPolicy);
  assert.deepEqual(await readFile(original.observationPath),originalBytes);
  assert.equal(Date.parse(current.expiresAt),Math.min(Date.parse(current.sourcePolicy.robots.checkedAt!),...current.sourcePolicy.tdm.evidence.map(row=>Date.parse(row.checkedAt!)))+3600000);
+});
+
+test('policy refresh preserves audit, origin absence, XMP evidence positions and retained clocks',async t=>{
+ const cache=await mkdtemp(join(tmpdir(),'polite-refresh-order-'));t.after(()=>rm(cache,{recursive:true,force:true}));t.after(()=>rm(cache+'-request-evidence',{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:cache});let refreshing=false;
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt')return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('User-agent: *\nAllow: /\n')};
+  if(url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(refreshing,false,'Refresh must not fetch the original');
+  return {status:200,headers:{'content-type':'text/plain'},body:Buffer.from('Synthetic original')};
+ });
+ const original=await fetcher.fetch('https://stadt.de/original'),policy=structuredClone(original.policy!);
+ const audit={url:original.url,locator:'Registered source audit',value:'retained',checkedAt:'2026-01-01T00:00:00.000Z'};
+ const xmp={url:original.url,locator:'PDF XMP TDM-Reservation',value:'0',checkedAt:'2026-01-01T00:00:00.000Z'};
+ policy.tdm.evidence=[audit,...policy.tdm.evidence,xmp];
+ const before=structuredClone(policy);refreshing=true;
+ const refreshed=await fetcher.refreshPolicyForOriginal(original,policy);
+ assert.deepEqual(refreshed.sourcePolicy.tdm.evidence.map(row=>row.locator),before.tdm.evidence.map(row=>row.locator));
+ assert.equal(refreshed.sourcePolicy.tdm.evidence[0],audit);
+ assert.equal(refreshed.sourcePolicy.tdm.evidence.at(-1),xmp);
+ assert.equal(recordedPolicyIdentity(refreshed.sourcePolicy),recordedPolicyIdentity(before));
+ assert.deepEqual(policy,before,'Original proof must remain immutable');
 });
 
 test('current 304 validators authenticate complete shared-body custody across hosts and repeated checks',async t=>{
