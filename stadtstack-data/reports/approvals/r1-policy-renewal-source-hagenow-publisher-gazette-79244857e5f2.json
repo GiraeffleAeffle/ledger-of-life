@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "r1-window20-inspected-continuation-v1",
+  "id": "r1-policy-renewal-source-hagenow-publisher-gazette-79244857e5f2",
+  "action": "continue-inspected-policy-renewal-source",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-20T14:47:01.537Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "candidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "sourceId": "hagenow-publisher-gazette",
+  "phase": "refresh",
+  "processingCommit": "5a9a14c105195043fda1c4f9aa8b9f6697e33c3d",
+  "inspection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/inspection-79244857e5f21f5969b17d314021823f0a38578cc1f505f3fd789916b5b35532.json",
+    "sha256": "753538b62eae3a85ed91bedff7835e2dafd5fb675a9b42d857210a82be17d707"
+  },
+  "inspectionIdentitySha256": "79244857e5f21f5969b17d314021823f0a38578cc1f505f3fd789916b5b35532",
+  "resolution": {
+    "action": "fresh_bounded_policy_authority",
+    "maxJobs": 1,
+    "maxPolicyRequests": 8
+  },
+  "requestBudget": {
+    "allocation": "additional-infrastructure-continuation",
+    "maxPolicyRequests": 8
+  },
+  "toolingRepairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/authorization-repair/manifest.json",
+    "sha256": "593afdf13d04691ebf13dc0aa6c00db4425e5a99a40f150ab8502da89f1e1047"
+  },
+  "bounds": {
+    "maxJobs": 1,
+    "maxPolicyRequests": 8,
+    "maxCoreReconciliations": 0,
+    "maxIdempotentEnqueueReplays": 1,
+    "maxIdempotentSeals": 0,
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0
+  },
+  "rules": "No blind replay. Closed genuine successful captures may be adopted. Enqueue/seal alone are idempotent; authorize is adopted from exact canonical rows or created once after absence proof. A started executor is never replayed: source-scoped infra holds require exact Core resume and fresh bounded authority; policy/refusal/unknown holds remain blocked. Dead leases require canonical reconciliation then new inspection/review. All original captures are retained."
+}
