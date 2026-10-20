@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "r1-window20-tooling-repair-v1",
+  "id": "r1-window20-source-authority-repair",
+  "action": "repair-source-specific-refresh-authorization",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-20T00:34:13.230Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "originalCandidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "repairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/authorization-repair/manifest.json",
+    "sha256": "593afdf13d04691ebf13dc0aa6c00db4425e5a99a40f150ab8502da89f1e1047"
+  },
+  "priorRepairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/activation-repair/manifest.json",
+    "sha256": "5b307eff89bb476d5a1dac68d001d435a8af1ba8ea53b6557540047b4a1d10f0"
+  },
+  "processingReview": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/processing-pin-5a9a14c.json",
+    "sha256": "40806499f4ebcf9f21912c32251bd01a4cbab5e21938bd3083809a4c4d68d6e6"
+  },
+  "bounds": {
+    "extraOriginals": 0,
+    "extraPolicyRequests": 0,
+    "unusedInitialSourceJobs": 165,
+    "unusedInitialSourceRequestCeiling": 1320,
+    "maxParallelSources": 3,
+    "modelCalls": 0,
+    "paidMicroUsd": 0,
+    "processingRepin": false,
+    "mainHeadChange": false
+  },
+  "rules": "Distinct genuine committed per-source record SHA for each Core authority; never reuse occupied base SHA. Read-only exact planned-key preparation, actual enqueue/spec equality before authorization, unchanged source-policy/custody/identity gates. Initial child grants partition the unused165-original/1320-request base allotment, not extra requests. Infrastructure continuations require separately inspected explicit additional bounds. Adopt exact unused canonical child authority after interruption. No production action before Main issuance; package CWD required."
+}
