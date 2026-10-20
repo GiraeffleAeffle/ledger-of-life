@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "r1-window20-inspected-continuation-v1",
+  "id": "r1-policy-renewal-source-parchim-gazette-eaf20392651b",
+  "action": "continue-inspected-policy-renewal-source",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-20T00:37:21.392Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "candidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "sourceId": "parchim-gazette",
+  "phase": "refresh",
+  "processingCommit": "5a9a14c105195043fda1c4f9aa8b9f6697e33c3d",
+  "inspection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/inspection-eaf20392651baee28606e5749b79c8b288160c0042e72d4c25d18a202cd5be68.json",
+    "sha256": "9b5a3a12262f50d17c63a1fd4ddb13d1cd6a4d95cf98a7a8f7d2418552cd6cd4"
+  },
+  "inspectionIdentitySha256": "eaf20392651baee28606e5749b79c8b288160c0042e72d4c25d18a202cd5be68",
+  "resolution": {
+    "action": "fresh_bounded_policy_authority",
+    "maxJobs": 2,
+    "maxPolicyRequests": 16
+  },
+  "requestBudget": {
+    "allocation": "unused-original-source-allotment",
+    "maxPolicyRequests": 16
+  },
+  "toolingRepairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/authorization-repair/manifest.json",
+    "sha256": "593afdf13d04691ebf13dc0aa6c00db4425e5a99a40f150ab8502da89f1e1047"
+  },
+  "bounds": {
+    "maxJobs": 2,
+    "maxPolicyRequests": 16,
+    "maxCoreReconciliations": 0,
+    "maxIdempotentEnqueueReplays": 1,
+    "maxIdempotentSeals": 0,
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0
+  },
+  "rules": "No blind replay. Closed genuine successful captures may be adopted. Enqueue/seal alone are idempotent; authorize is adopted from exact canonical rows or created once after absence proof. A started executor is never replayed: source-scoped infra holds require exact Core resume and fresh bounded authority; policy/refusal/unknown holds remain blocked. Dead leases require canonical reconciliation then new inspection/review. All original captures are retained."
+}

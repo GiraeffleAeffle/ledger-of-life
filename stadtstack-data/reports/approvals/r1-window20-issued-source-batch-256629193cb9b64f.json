@@ -1,0 +1,205 @@
+{
+  "schemaVersion": "r1-window20-issued-source-batch-v1",
+  "id": "r1-window20-issued-source-batch-256629193cb9b64f",
+  "candidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "processingCommit": "5a9a14c105195043fda1c4f9aa8b9f6697e33c3d",
+  "repairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/authorization-repair/manifest.json",
+    "sha256": "593afdf13d04691ebf13dc0aa6c00db4425e5a99a40f150ab8502da89f1e1047"
+  },
+  "batch": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/authorization-repair/batch-256629193cb9b64fad63a2fc09c85ede02f9faa5c3c5fe08e6606dd9cc57e432.json",
+    "sha256": "256629193cb9b64fad63a2fc09c85ede02f9faa5c3c5fe08e6606dd9cc57e432"
+  },
+  "records": [
+    {
+      "sourceId": "strausberg-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-strausberg-website-a93ea9db5ba7.json",
+        "sha256": "24efdbafcb81fe5e593094e1abd6f97dfd86485e180bbb0dc33bbdefc1e715dc"
+      }
+    },
+    {
+      "sourceId": "strausberg-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-strausberg-gazette-085bf21cb1d3.json",
+        "sha256": "ab43aebc40a6262843b570ba6f4d611c4763a0918fed025375b2d5f3c64cad20"
+      }
+    },
+    {
+      "sourceId": "hoppegarten-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-hoppegarten-website-74259e0ecda1.json",
+        "sha256": "c3bd54aefc6fb37527fb0d3706d6677e15608f6237ca354e9cf197077b20c56f"
+      }
+    },
+    {
+      "sourceId": "hoppegarten-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-hoppegarten-council-5e8f6e681bc8.json",
+        "sha256": "a85cd57e173d3ff7881262bef2be61cf34c0f0e0dfdb289494477c466ba559fb"
+      }
+    },
+    {
+      "sourceId": "hoppegarten-participation",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-hoppegarten-participation-9ef66232e0f8.json",
+        "sha256": "2b157559bcd92e6898263a26dc91ae66ec99d1635a4855058d0d72eec2313307"
+      }
+    },
+    {
+      "sourceId": "hoppegarten-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-hoppegarten-gazette-8947bac75a10.json",
+        "sha256": "e1a05b38ab6f9fe99448d135c01fd0630945460a65c4113c8628060763958aee"
+      }
+    },
+    {
+      "sourceId": "ruedersdorf-bei-berlin-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ruedersdorf-bei-berlin-website-868a4acbd8f5.json",
+        "sha256": "f2414ec73b013793d5750e82a55468c42762e4c049624a9fb7b3aa10d11fc04b"
+      }
+    },
+    {
+      "sourceId": "ruedersdorf-bei-berlin-participation",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ruedersdorf-bei-berlin-participation-392d797b5c43.json",
+        "sha256": "a10dae4339fbd98b45916148cd1c6a4c55b3600dadbe102a3e34536e56d08ea7"
+      }
+    },
+    {
+      "sourceId": "ratzeburg-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ratzeburg-website-c78389d14fe5.json",
+        "sha256": "068d79840af8886db6d4cda98104a5beff344ada7975e445012df4700a1b6b6a"
+      }
+    },
+    {
+      "sourceId": "ratzeburg-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ratzeburg-gazette-1c9e3a13581c.json",
+        "sha256": "143fde4c742251f4496fde5b96ba1ac1c2739d4cb56440ae97517a6a106d22ce"
+      }
+    },
+    {
+      "sourceId": "moelln-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-moelln-website-b78845cca48b.json",
+        "sha256": "2c43b8304c689bef94ce7570358494809f0ce57af572fb25ce1db7775285ff31"
+      }
+    },
+    {
+      "sourceId": "moelln-participation",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-moelln-participation-a85c27f0cf52.json",
+        "sha256": "6157b63618d607d18a53116cffa07840a335f1f824bc9cc09c831b152b8d177f"
+      }
+    },
+    {
+      "sourceId": "moelln-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-moelln-gazette-93fadcb7e383.json",
+        "sha256": "d450b5b08419d43a239558626935aee83dfe7d934d07161b4c627721e0c8097e"
+      }
+    },
+    {
+      "sourceId": "schwarzenbek-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-schwarzenbek-website-bb20924f8a61.json",
+        "sha256": "6fc4fd9736b8183fbaf17948727c5e2c7c50fe138fbc4c35167fc819cebe34a6"
+      }
+    },
+    {
+      "sourceId": "schwarzenbek-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-schwarzenbek-gazette-fd8bfb686c01.json",
+        "sha256": "8417d50099b69816dc4c23ad1dd43f21d3bbec28bbb545cc5890e9734a0505f7"
+      }
+    },
+    {
+      "sourceId": "ludwigslust-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ludwigslust-website-e74e4b9b63ad.json",
+        "sha256": "dd1fff24c597fa674789830d409e514c48e964e63a36126819bffad9ffba0764"
+      }
+    },
+    {
+      "sourceId": "ludwigslust-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ludwigslust-council-6d9472baf648.json",
+        "sha256": "8730bd9e258a131809a9ce080265f60143c1bc7eb6ecc5d8775aca25908b5d75"
+      }
+    },
+    {
+      "sourceId": "ludwigslust-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ludwigslust-gazette-4302a50d2a73.json",
+        "sha256": "1c29d77eb622d8b41c50a48c86272c1778ce9b29757a0ecb429a29684fad725c"
+      }
+    },
+    {
+      "sourceId": "parchim-website",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-parchim-website-57dcc5928071.json",
+        "sha256": "58014d50579fac18d1067a9f2a5ec5894b4a0b452cc602370747989844dc5e00"
+      }
+    },
+    {
+      "sourceId": "parchim-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-parchim-council-a8fc2b0e294f.json",
+        "sha256": "4182661a80b01278a3cd5000c4195b47b76a706f82c5b4d539f5e9b8e80f4d4c"
+      }
+    },
+    {
+      "sourceId": "parchim-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-parchim-gazette-eaf20392651b.json",
+        "sha256": "2d73eac3432db5811bdc9ef4e16d2be34ec347b7985eaf83e5fcc5cb24e5d22d"
+      }
+    },
+    {
+      "sourceId": "hagenow-publisher-gazette",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-hagenow-publisher-gazette-f3b91788659f.json",
+        "sha256": "937ecde618d98e89fce82313b5a188b1ac3dbc93df1e7c71385f137b54c003bc"
+      }
+    },
+    {
+      "sourceId": "strausberg-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-strausberg-council-8df0c534b622.json",
+        "sha256": "ed41ccc3013f77305dbbaaff816d2cb71b473b661f28e262ed8a9556a41948d4"
+      }
+    },
+    {
+      "sourceId": "ruedersdorf-bei-berlin-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ruedersdorf-bei-berlin-council-e9970d713717.json",
+        "sha256": "f5f9da122af7be87300e49f817b80af30ab4109729d5a0ffacf7dd1bb2397fa7"
+      }
+    },
+    {
+      "sourceId": "ratzeburg-participation",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-ratzeburg-participation-9cfc87eba7e5.json",
+        "sha256": "f9775087f7d4aeedd97bce632694be779198d7b335fc2d0bc3a02d2bf6b39409"
+      }
+    },
+    {
+      "sourceId": "moelln-council",
+      "record": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-window20-authorities/stadtstack-data/reports/approvals/r1-policy-renewal-source-moelln-council-d262b1f77618.json",
+        "sha256": "2d612a3482c0957aafc2ffbd2ffabcea0848037c0e5052cc9da64a02b3ab6a84"
+      }
+    }
+  ]
+}
