@@ -1,0 +1,74 @@
+{
+  "schemaVersion": "r1-window20-reseal-wall-amendment-v1",
+  "id": "r1-window20-measured-reseal-wall",
+  "action": "extend-measured-source-reseal-child-wall",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-20T15:19:35.988Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "baseAuthority": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/reports/approvals/r1-registered-policy-renewal-2026-10-20-v2.json",
+    "sha256": "c1d919d0b3a4beac35bbd26f01505197b6dbffb4eb40e58e3dbc59668b1654a1"
+  },
+  "originalCandidate": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/candidate.json",
+    "sha256": "5f266b8c73e0fb93344985838f8f611a67374edb91193b710628509eec0f6c6b"
+  },
+  "processingReview": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/processing-pin-5a9a14c.json",
+    "sha256": "40806499f4ebcf9f21912c32251bd01a4cbab5e21938bd3083809a4c4d68d6e6"
+  },
+  "repairManifest": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/reseal-wall-review/manifest.json",
+    "sha256": "a06ad1ae5edf718a6fc1f73d15de706724cf4db7e14172850199d033d48ad3d9"
+  },
+  "measuredLimits": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window20/reseal-wall-review/limits.json",
+    "sha256": "ce5a978f2bb2f4f2a9bcd976b680b599382e662e8257dcea0ee763815363e2de"
+  },
+  "bounds": {
+    "maxParallelSources": 2,
+    "termToKillGraceSeconds": 180,
+    "maximumChildWallSeconds": 22500,
+    "sourceChildWallSeconds": {
+      "hagenow-publisher-gazette": 22500,
+      "hoppegarten-council": 10800,
+      "hoppegarten-gazette": 10800,
+      "hoppegarten-participation": 10800,
+      "hoppegarten-website": 10800,
+      "ludwigslust-council": 10800,
+      "ludwigslust-gazette": 12600,
+      "ludwigslust-website": 10800,
+      "moelln-council": 10800,
+      "moelln-gazette": 10800,
+      "moelln-participation": 10800,
+      "moelln-website": 10800,
+      "parchim-council": 10800,
+      "parchim-gazette": 10800,
+      "parchim-website": 10800,
+      "ratzeburg-gazette": 10800,
+      "ratzeburg-participation": 10800,
+      "ratzeburg-website": 10800,
+      "ruedersdorf-bei-berlin-council": 10800,
+      "ruedersdorf-bei-berlin-participation": 10800,
+      "ruedersdorf-bei-berlin-website": 10800,
+      "schwarzenbek-gazette": 10800,
+      "schwarzenbek-website": 10800,
+      "strausberg-council": 10800,
+      "strausberg-gazette": 11700,
+      "strausberg-planning": 11700,
+      "strausberg-website": 10800
+    },
+    "extraOriginals": 0,
+    "extraPolicyRequests": 0,
+    "extraModels": 0,
+    "extraImports": 0,
+    "paidMicroUsd": 0,
+    "mainHeadChange": false,
+    "processingRepin": false
+  },
+  "rules": "Only the external seal-text-contribution child wall budget changes. Source cap=max(10800,ceil(2*selected historical successful child seconds/900)*900), exact27 sources, only four increases. Never bypass old-proof expiry, current refreshed policy, receipt/identity, source custody or admission checks. No executor/model/import/network rerun. Existing genuine failed seal captures require new inspected Main-issued idempotent seal-only continuation; no blind retry or synthetic completion. Historical measurements are evidence, not a promised post-repack duration."
+}
