@@ -221,8 +221,19 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   import-rejection decision. Omission enables no importer exceptions. An unissued
   draft, expired/future record, changed reason or changed evidence is refused.
   This pin is common to ready and staging-assembly invocations.
-- `structuredRunIds`: the committed K1/K2 runs listed below. They are exported
-  together, not merged by title or relabeled as text-model work.
+- `structuredRunIds`: the exact ordered parser/discovery run IDs in the issued
+  `structuredSelection` control. An acquisition run is never a structured export.
+  The runs are exported together, not merged by title or relabeled as text-model work.
+- `structuredSelection: {path, sha256}` is optional only for the explicit isolated
+  fixture realm; production requires an independently pinned issued
+  `stadtstack-r1-step8-structured-selection-v1` record. It pins every selected
+  parser receipt, its source/municipality, the issued renewal action and the genuine
+  renewed owner decision. No compiled historical run-ID list or mutable “latest”
+  proof lookup can substitute for this control. All selected original/supporting
+  policy proofs must survive the same reconstruction horizon before any canonical
+  builder starts. The refusal-only validator is
+  `scripts/r1-step8-structured-precheck.mjs`; it also rejects stale attempts,
+  acquisition-only selections, legacy output codecs and missing/overlapping pages.
 - `registry: {path, sha256}`: the admitted registry artifact against which the
   selected native runs are exported; native checked-source evidence produces
   a new bound registry artifact, preserving the originals.
@@ -411,15 +422,42 @@ lock-free; authoritative declared-binding checks may acquire Core read locks.
 
 ### Native runs found read-only in the canonical DB
 
-The explicit `BEGIN READ ONLY` query found these exact committed run IDs:
+The explicit `BEGIN READ ONLY` inventory identified the following **historical**
+runs. This table is not an execution selection:
 
-| Lane | Run ID |
+| Lane / actual step | Run ID |
 | --- | --- |
-| K1 | `3fe33cb6-fb63-4151-b56d-e94271c0d0af` |
-| K2 PEGELONLINE | `6a60345b-850c-4130-9105-aa6b89e99cf3` |
-| K2 PEGELONLINE | `f311d068-1f14-47f2-856f-d3213098821a` |
-| K2 PEGELONLINE | `5f582f17-d494-4fd5-8aea-a6c7a2a22dcc` |
-| K2 PEGELONLINE | `329d949b-e87f-4942-98d2-767188cf1947` |
+| K1 `structured_parse` | `3fe33cb6-fb63-4151-b56d-e94271c0d0af` |
+| K2 `acquire_representation` — not exportable | `6a60345b-850c-4130-9105-aa6b89e99cf3` |
+| K2 `structured_parse`, page 0–1565 | `f311d068-1f14-47f2-856f-d3213098821a` |
+| K2 `structured_parse`, page 1565–3129 | `5f582f17-d494-4fd5-8aea-a6c7a2a22dcc` |
+| K2 `structured_parse`, page 3129–3816 | `329d949b-e87f-4942-98d2-767188cf1947` |
+
+The three K2 parse pages are already the acquisition's successors; adding another
+“replacement fifth run” would duplicate evidence. Their original policy
+`2272404a…` expired `2026-10-13T11:25:27.535Z`, and their legacy v1 outputs lack
+the current mapping contract. K1 policy `4d26208b…` expires
+`2026-10-21T19:56:51.150Z`. Neither cohort can survive a new 13-hour pass unchanged.
+
+The no-Core-change renewal path is two genuinely authorized fresh acquisitions
+of the same exact K1/K2 requests, followed by fresh parses of their committed
+representations and every PEGEL output page. Both roots are already in
+`registered-source-policy.ts`'s reviewed registry scopes; unchanged acquisition
+can therefore issue seven-day proofs from genuine current policy evidence.
+Rechecking an expired original does not renew it. The existing `policy_refresh`
+job is a crawl-corpus/residual-original mechanism, not a structured descriptor
+renewal API; `exportRun` implements no implicit current-proof lookup.
+
+Original K1/K2 request/job approvals expired and their data-request allowances
+were consumed. The nine-town model approval #81 does **not** expand to these
+non-corpus originals. A genuine renewed exact request decision is required;
+autonomous release permission is not a new source-fetch approval.
+
+The private reviewed proposal, read-only inventory, unissued action/owner drafts,
+Main-only executor and issuance commands are in
+`/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/RUNBOOK.md`.
+All drafts leave `issuedAt` empty; only Main issues records in a separate
+authority worktree. No renewed production run IDs or receipts are asserted here.
 
 ### Authentic live 0.3.2 predecessor
 
