@@ -119,6 +119,12 @@ and MCP_KNOWLEDGE_MUNICIPALITY for runtime acceptance.
 MCP_RELEASE_VERSION must equal the approved package version. No path/tag fallback.
 The dispatcher executes smoke.py exported from MCP_APPROVED_SHA into fresh private
 evidence before resource mutation. MCP_SMOKE_EVIDENCE is rejected, not trusted.
+Release validates existing hash records with the approved shared Node policy before
+Namespace/Secret mutation. First use the private token CLI: set-limits max 300 8
+and set-limits buzz 300 8; retain both existing digests and all other 60/4 profiles.
+Missing tokens are an error, never created by deployment. Configuration activates
+only via the hashed tokenSecretRevision restart; token-profiles.json records
+nonsecret effective limits. Local smoke uses disposable credentials only.
 Stop the filtered viewer first and restore it after this session cleans up.
 EOF
 }
@@ -184,7 +190,7 @@ if [[ "${mode}" != '--diff-only' ]]; then
 fi
 [[ -t 0 ]] || fail 'run it from an interactive terminal; changes need typed confirmations'
 
-for command_name in age docker gh git helm nc pgrep python3 tar; do require_command "${command_name}"; done
+for command_name in age docker gh git helm nc node pgrep python3 tar; do require_command "${command_name}"; done
 : "${MCP_RELEASE_REPO:?Explicit isolated release checkout required}"
 release_repo="${MCP_RELEASE_REPO}"
 [[ "${release_repo}" == /* && -d "${release_repo}" && ! -L "${release_repo}" ]] ||

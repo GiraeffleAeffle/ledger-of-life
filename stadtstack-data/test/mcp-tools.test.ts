@@ -18,8 +18,8 @@ test('released MCP contract retains core evidence, separates times and fact/sour
   try {
     assert.equal(client.getServerVersion()?.version,MCP_RELEASE_VERSION);
     const tools=await client.listTools();
-    assert.equal(tools.tools.length,19);
-    for(const name of ['list_topics','get_source','compare_topic','similar','entity_search','graph_neighbors','graph_path'])assert.ok(tools.tools.some(tool=>tool.name===name));
+    assert.equal(tools.tools.length,20);
+    for(const name of ['list_topics','get_source','compare_topic','similar','entity_search','graph_neighbors','graph_path','export_records'])assert.ok(tools.tools.some(tool=>tool.name===name));
     const before=Date.now();
     const result=await client.callTool({name:'get_core_bundle',arguments:{}});
     const envelope=envelopeSchema.parse(result.structuredContent);
@@ -94,7 +94,7 @@ test('normalized three-district release exposes qualifying and zero-gated towns 
     const compared=z.object({releaseId:z.string(),cities:z.array(z.object({cityId:z.string(),recordCount:z.number(),coverage:z.unknown()}))}).parse(comparison.data);
     assert.equal(compared.releaseId,release.dataManifest.id);assert.deepEqual(compared.cities.map(city=>city.cityId),cityIds);
     const similarity=envelopeSchema.parse((await client.callTool({name:'similar',arguments:{id:target.id,limit:50}})).structuredContent);
-    const similar=z.object({releaseId:z.string(),method:z.object({model:z.null(),version:z.literal('district-similarity-v1')}),items:z.array(recordSchema)}).parse(similarity.data);
+    const similar=z.object({releaseId:z.string(),method:z.object({model:z.null(),version:z.literal('district-similarity-v2')}),items:z.array(z.object({id:z.string(),cityId:z.string(),memberRecordIds:z.array(z.string()).min(1),sourceIds:z.array(z.string())}).passthrough())}).parse(similarity.data);
     assert.equal(similar.releaseId,release.dataManifest.id);assert.ok(similar.items.every(item=>item.cityId!==target.cityId));
     const source=envelopeSchema.parse((await client.callTool({name:'get_source',arguments:{sourceId:target.sourceIds[0]}})).structuredContent);
     assert.equal(z.object({registrySourceId:z.string()}).parse(source.data).registrySourceId.length>0,true);
@@ -131,4 +131,45 @@ test('graph MCP tools are read-only, source-bound and reject unbounded or ambigu
       assert.equal('modality' in pathData,false);
     }
   }finally{await client.close();await mcp.close();}
+});
+
+test('0.3.1 heat comparisons, bulk export and quarantine coverage share the released evidence',async()=>{
+ const release=await loadRelease(),mcp=server({release}),client=new Client({name:'patch-031-regression',version:'1'});
+ const [clientTransport,serverTransport]=InMemoryTransport.createLinkedPair();
+ await mcp.connect(serverTransport);await client.connect(clientTransport);
+ try{
+  const cityIds=['strausberg','hoppegarten','ruedersdorf-bei-berlin'],topic='waermeplanung';
+  const compared=z.object({method:z.object({version:z.literal('district-comparison-v2')}),cities:z.array(z.object({cityId:z.string(),sourceBackedRecordCount:z.number(),sourceBackedCaseCount:z.number(),cases:z.array(z.object({eligibleRecordIds:z.array(z.string()),furthestSupportedStage:z.string().nullable(),furthestSupportedDate:z.string().nullable()}).passthrough())}).passthrough())}).parse((await client.callTool({name:'compare_topic',arguments:{topic,cityIds}})).structuredContent);
+  for(const cityId of cityIds){
+   const page=z.object({items:z.array(z.object({id:z.string(),caseId:z.string(),comparisonEligible:z.literal(true)})),nextCursor:z.null()}).parse((await client.callTool({name:'search_topics',arguments:{topic,cityIds:[cityId],limit:50,fields:['id','caseId','comparisonEligible']}})).structuredContent);
+   assert.ok(page.items.length>0,`${cityId} heat evidence must not disappear`);
+   const comparison=compared.cities.find(city=>city.cityId===cityId)!;
+   assert.equal(comparison.sourceBackedRecordCount,page.items.length);
+   assert.equal(comparison.sourceBackedCaseCount,new Set(page.items.map(item=>item.caseId)).size);
+   const members=new Set(comparison.cases.flatMap(item=>item.eligibleRecordIds));
+   assert.ok(page.items.every(item=>members.has(item.id)));
+   assert.ok(comparison.cases.some(item=>item.furthestSupportedStage));
+   if(cityId==='hoppegarten'||cityId==='strausberg')assert.ok(comparison.cases.every(item=>item.furthestSupportedDate===null),'Unbound/publication dates are not stage dates');
+   if(cityId==='ruedersdorf-bei-berlin')assert.ok(comparison.cases.some(item=>item.furthestSupportedStage==='adopted'&&item.furthestSupportedDate==='2025-07-22'));
+  }
+  const exportPage=z.object({releaseId:z.string(),items:z.array(z.object({id:z.string(),caseId:z.string(),sourceIds:z.array(z.string()),originalRecord:z.unknown()}).passthrough()),sources:z.array(z.object({id:z.string(),url:z.string()}).passthrough()),totalRecords:z.number(),totalCases:z.number(),nextCursor:z.string().nullable()}).passthrough();
+  const first=exportPage.parse((await client.callTool({name:'export_records',arguments:{municipality:'strausberg',limit:1}})).structuredContent);
+  assert.equal(first.releaseId,release.dataManifest.id);assert.equal(first.items.length,1);assert.ok(first.items[0].originalRecord);
+  assert.ok(first.totalCases<=first.totalRecords);assert.ok(first.nextCursor);
+  assert.ok(first.items[0].sourceIds.every(id=>first.sources.some(source=>source.id===id)));
+  const next=exportPage.parse((await client.callTool({name:'export_records',arguments:{municipality:'strausberg',limit:1,cursor:first.nextCursor}})).structuredContent);
+  assert.notEqual(next.items[0].id,first.items[0].id);
+  assert.equal((await client.callTool({name:'export_records',arguments:{municipality:'hoppegarten',limit:1,cursor:first.nextCursor}})).isError,true);
+  assert.equal((await client.callTool({name:'export_records',arguments:{limit:51}})).isError,true);
+  assert.equal((await client.callTool({name:'export_records',arguments:{topic:'not-a-topic'}})).isError,true);
+  const coverage=z.object({accounting:z.object({registryMunicipalities:z.number(),attemptedMunicipalities:z.number()}),districts:z.array(z.object({id:z.string(),municipalitiesRegistered:z.number(),municipalitiesAttempted:z.number()}).passthrough()),municipalities:z.array(z.object({id:z.string(),publishedRecords:z.number(),quarantinedRecords:z.number(),quarantineReasons:z.object({categories:z.array(z.object({reason:z.string(),count:z.number()})),failedDeterministicChecks:z.array(z.object({id:z.string(),count:z.number()}))})}).passthrough())}).passthrough();
+  const status=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'get_release_status',arguments:{}})).structuredContent).knowledgeCoverage;
+  const cities=z.object({knowledgeCoverage:coverage}).parse((await client.callTool({name:'list_cities',arguments:{}})).structuredContent).knowledgeCoverage;
+  assert.deepEqual(status.accounting,cities.accounting);assert.equal(status.accounting.registryMunicipalities,319);assert.equal(status.accounting.attemptedMunicipalities,9);
+  const mol=status.districts.find(district=>district.id==='maerkisch-oderland')!;
+  assert.equal(mol.municipalitiesRegistered,45);assert.equal(mol.municipalitiesAttempted,3);
+  const strausberg=status.municipalities.find(city=>city.id==='strausberg')!;
+  assert.equal(strausberg.publishedRecords,39);assert.equal(strausberg.quarantinedRecords,384);
+  assert.ok(strausberg.quarantineReasons.categories.some(reason=>reason.reason==='missing_sourced_date'&&reason.count>0));
+ }finally{await client.close();await mcp.close();}
 });

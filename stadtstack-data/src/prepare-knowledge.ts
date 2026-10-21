@@ -5,7 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {districtRegistrySchema} from './district-registry.ts';
 import {validateKnowledgeRelease} from './district-schema.ts';
 import {authorizedPilotCorpusSchema} from './district-corpus.ts';
-import {buildDistrictCoverage,crawlSummarySchema,knowledgePublicationHold} from './district-publication.ts';
+import {buildDistrictCoverage,crawlSummarySchema,knowledgePublicationHold,knowledgePublicationQuarantineCase,projectDistrictCoverage} from './district-publication.ts';
 import {assertPublicUrls} from './publication-quality.ts';
 import {cacheDir,root,save,hash} from './common.ts';
 
@@ -29,7 +29,7 @@ for(const record of knowledge.records){
 const publicationHolds=knowledge.records.flatMap(record=>{const hold=knowledgePublicationHold(record);return hold?[{record,hold}]:[];});
 const withheldIds=new Set(publicationHolds.map(({record})=>record.id));
 if(!Array.isArray(quarantine.cases))throw Error('Missing actual extraction quarantine evidence');
-for(const {record,hold} of publicationHolds)quarantine.cases.push({municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:record.extraction.inputSha256,reason:`Publication withheld: ${hold.reasons.join(', ')}`,recordId:record.id});
+for(const {record,hold} of publicationHolds)quarantine.cases.push(knowledgePublicationQuarantineCase(record,hold));
 knowledge.records=knowledge.records.filter(record=>!withheldIds.has(record.id));
 await save(options.publicationQuarantinePath??join(cacheDir,'knowledge-publication-quarantine.json'),JSON.stringify({schemaVersion:'stadtstack-publication-quarantine-v1',records:publicationHolds.map(({record,hold})=>({id:record.id,municipalityId:record.municipalityId,...hold}))},null,2)+'\n');
 for(const district of registry.districts){
@@ -40,7 +40,7 @@ if(!knowledge.records.length)throw Error('No passing knowledge records');
 const coverage=buildDistrictCoverage(registry,crawlInput,knowledge.records,quarantine,extractionRun,options.coverageGeneratedAt);
 assertPublicUrls({registry,records:knowledge,coverage});
 for(const [name,data] of [['registry',registry],['records',knowledge],['coverage',coverage]] as const)await save(join(options.stagingDir??join(cacheDir,'staging','knowledge'),name+'.json'),JSON.stringify(data,null,2)+'\n');
-return {schemaVersion:knowledge.schemaVersion,records:knowledge.records.length,municipalities:coverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:coverage.districts.map(district=>({id:district.id,municipalitiesWithRecords:district.municipalitiesWithRecords,municipalitiesWithDatedStages:district.municipalitiesWithDatedStages,records:district.publishedRecords,quarantined:district.quarantinedRecords})),municipalityCoverage:coverage.municipalities.map(city=>({id:city.id,status:city.status,publishedRecords:city.publishedRecords,datedStagedRecords:city.datedStagedRecords}))};
+return {schemaVersion:knowledge.schemaVersion,records:knowledge.records.length,municipalities:coverage.accounting.publishedMunicipalities,accounting:coverage.accounting,districts:coverage.districts.map(district=>({id:district.id,municipalitiesRegistered:district.municipalitiesRegistered,municipalitiesConfigured:district.municipalitiesConfigured,municipalitiesChecked:district.municipalitiesChecked,municipalitiesAttempted:district.municipalitiesAttempted,municipalitiesWithRecords:district.municipalitiesWithRecords,municipalitiesWithDatedStages:district.municipalitiesWithDatedStages,records:district.publishedRecords,quarantined:district.quarantinedRecords})),municipalityCoverage:projectDistrictCoverage(coverage).municipalities};
 }
 if(process.argv[1]&&await realpath(process.argv[1]).then(entry=>import.meta.url===pathToFileURL(entry).href,()=>false)){
  const {values}=parseArgs({options:{registry:{type:'string',default:join(root,'sources','district-registry.json')},index:{type:'string',default:join(cacheDir,'pilot-coverage-completion','index-authorized.json')},records:{type:'string',default:join(cacheDir,'district-joint','records.json')},quarantine:{type:'string',default:join(cacheDir,'district-joint','quarantine.json')},'extraction-run':{type:'string',default:join(cacheDir,'district-joint','extraction-run.json')},'minimum-per-district':{type:'string',default:'1'}}});

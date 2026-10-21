@@ -1,11 +1,24 @@
 {
-  "schemaVersion": "stadtstack-district-coverage-v2",
-  "generatedAt": "2026-10-11T09:25:12.545Z",
+  "schemaVersion": "stadtstack-district-coverage-v3",
+  "generatedAt": "2026-10-11T12:13:04.472Z",
+  "accounting": {
+    "registryMunicipalities": 319,
+    "configuredMunicipalities": 9,
+    "checkedMunicipalities": 9,
+    "runSelectedMunicipalities": 9,
+    "preparedMunicipalities": 9,
+    "attemptedMunicipalities": 9,
+    "publishedMunicipalities": 9,
+    "checkedWithoutPublishedMunicipalities": 0,
+    "unvisitedMunicipalities": 310
+  },
   "districts": [
     {
       "id": "maerkisch-oderland",
       "ags": "12064",
       "municipalitiesRegistered": 45,
+      "municipalitiesConfigured": 3,
+      "municipalitiesChecked": 3,
       "municipalitiesAttempted": 3,
       "municipalitiesWithRecords": 3,
       "municipalitiesWithDatedStages": 3,
@@ -17,6 +30,8 @@
       "id": "herzogtum-lauenburg",
       "ags": "01053",
       "municipalitiesRegistered": 132,
+      "municipalitiesConfigured": 3,
+      "municipalitiesChecked": 3,
       "municipalitiesAttempted": 3,
       "municipalitiesWithRecords": 3,
       "municipalitiesWithDatedStages": 3,
@@ -28,6 +43,8 @@
       "id": "ludwigslust-parchim",
       "ags": "13076",
       "municipalitiesRegistered": 142,
+      "municipalitiesConfigured": 3,
+      "municipalitiesChecked": 3,
       "municipalitiesAttempted": 3,
       "municipalitiesWithRecords": 3,
       "municipalitiesWithDatedStages": 3,
@@ -41,14 +58,110 @@
       "id": "strausberg",
       "ags": "12064472",
       "districtId": "maerkisch-oderland",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 476,
       "publishedRecords": 39,
       "datedStagedRecords": 37,
       "quarantinedRecords": 384,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 142
+          },
+          {
+            "reason": "faithfulness_gate_failed",
+            "count": 8
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 55
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 87
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 90
+          },
+          {
+            "reason": "preparation_failed",
+            "count": 3
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "case_identity",
+            "count": 1
+          },
+          {
+            "id": "critical_stage_promotion",
+            "count": 3
+          },
+          {
+            "id": "document_date",
+            "count": 3
+          },
+          {
+            "id": "entity_labels",
+            "count": 21
+          },
+          {
+            "id": "exact_quotes",
+            "count": 52
+          },
+          {
+            "id": "graph_mentions",
+            "count": 39
+          },
+          {
+            "id": "graph_modality",
+            "count": 2
+          },
+          {
+            "id": "graph_relations",
+            "count": 5
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 26
+          },
+          {
+            "id": "location_labels",
+            "count": 6
+          },
+          {
+            "id": "municipality",
+            "count": 27
+          },
+          {
+            "id": "stage",
+            "count": 9
+          },
+          {
+            "id": "stage_date",
+            "count": 2
+          },
+          {
+            "id": "stage_history",
+            "count": 5
+          },
+          {
+            "id": "summary_numbers",
+            "count": 21
+          },
+          {
+            "id": "title",
+            "count": 13
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 420,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 57,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 360,
         "unavailableAttemptedDocumentGroups": 0
@@ -63,6 +176,15 @@
           "documentCount": 215,
           "publishedRecords": 30,
           "quarantinedRecords": 3,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "preparation_failed",
+                "count": 3
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -102,6 +224,10 @@
           "documentCount": 1,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -121,6 +247,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -148,6 +278,96 @@
           "documentCount": 77,
           "publishedRecords": 37,
           "quarantinedRecords": 375,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 137
+              },
+              {
+                "reason": "faithfulness_gate_failed",
+                "count": 8
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 55
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 87
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 89
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "case_identity",
+                "count": 1
+              },
+              {
+                "id": "critical_stage_promotion",
+                "count": 1
+              },
+              {
+                "id": "document_date",
+                "count": 3
+              },
+              {
+                "id": "entity_labels",
+                "count": 21
+              },
+              {
+                "id": "exact_quotes",
+                "count": 49
+              },
+              {
+                "id": "graph_mentions",
+                "count": 38
+              },
+              {
+                "id": "graph_modality",
+                "count": 2
+              },
+              {
+                "id": "graph_relations",
+                "count": 5
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 26
+              },
+              {
+                "id": "location_labels",
+                "count": 6
+              },
+              {
+                "id": "municipality",
+                "count": 27
+              },
+              {
+                "id": "stage",
+                "count": 9
+              },
+              {
+                "id": "stage_date",
+                "count": 2
+              },
+              {
+                "id": "stage_history",
+                "count": 5
+              },
+              {
+                "id": "summary_numbers",
+                "count": 20
+              },
+              {
+                "id": "title",
+                "count": 13
+              }
+            ]
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -175,6 +395,36 @@
           "documentCount": 183,
           "publishedRecords": 2,
           "quarantinedRecords": 6,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 5
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 2
+              },
+              {
+                "id": "exact_quotes",
+                "count": 3
+              },
+              {
+                "id": "graph_mentions",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 16,
@@ -211,14 +461,90 @@
       "id": "hoppegarten",
       "ags": "12064227",
       "districtId": "maerkisch-oderland",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 19,
       "publishedRecords": 37,
       "datedStagedRecords": 37,
       "quarantinedRecords": 76,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 25
+          },
+          {
+            "reason": "faithfulness_gate_failed",
+            "count": 2
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 5
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 2
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 40
+          },
+          {
+            "reason": "preparation_failed",
+            "count": 2
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "entity_labels",
+            "count": 3
+          },
+          {
+            "id": "exact_quotes",
+            "count": 10
+          },
+          {
+            "id": "graph_mentions",
+            "count": 5
+          },
+          {
+            "id": "graph_modality",
+            "count": 1
+          },
+          {
+            "id": "graph_relations",
+            "count": 1
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 4
+          },
+          {
+            "id": "location_labels",
+            "count": 1
+          },
+          {
+            "id": "municipality",
+            "count": 6
+          },
+          {
+            "id": "stage",
+            "count": 1
+          },
+          {
+            "id": "summary_numbers",
+            "count": 1
+          },
+          {
+            "id": "title",
+            "count": 4
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 18,
+        "runSelectedDocumentGroups": 18,
+        "preparedDocumentGroups": 16,
         "attemptedDocumentGroups": 18,
         "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
@@ -233,6 +559,15 @@
           "documentCount": 1,
           "publishedRecords": 0,
           "quarantinedRecords": 2,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "no_supported_case",
+                "count": 2
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -252,6 +587,15 @@
           "documentCount": 1,
           "publishedRecords": 0,
           "quarantinedRecords": 1,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "no_supported_case",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -271,6 +615,80 @@
           "documentCount": 13,
           "publishedRecords": 37,
           "quarantinedRecords": 63,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 25
+              },
+              {
+                "reason": "faithfulness_gate_failed",
+                "count": 2
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 5
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 2
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 27
+              },
+              {
+                "reason": "preparation_failed",
+                "count": 2
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "entity_labels",
+                "count": 3
+              },
+              {
+                "id": "exact_quotes",
+                "count": 10
+              },
+              {
+                "id": "graph_mentions",
+                "count": 5
+              },
+              {
+                "id": "graph_modality",
+                "count": 1
+              },
+              {
+                "id": "graph_relations",
+                "count": 1
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 4
+              },
+              {
+                "id": "location_labels",
+                "count": 1
+              },
+              {
+                "id": "municipality",
+                "count": 6
+              },
+              {
+                "id": "stage",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 1
+              },
+              {
+                "id": "title",
+                "count": 4
+              }
+            ]
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -290,6 +708,15 @@
           "documentCount": 4,
           "publishedRecords": 0,
           "quarantinedRecords": 10,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "no_supported_case",
+                "count": 10
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -306,14 +733,106 @@
       "id": "ruedersdorf-bei-berlin",
       "ags": "12064428",
       "districtId": "maerkisch-oderland",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 257,
       "publishedRecords": 37,
       "datedStagedRecords": 34,
       "quarantinedRecords": 314,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 78
+          },
+          {
+            "reason": "faithfulness_gate_failed",
+            "count": 1
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 56
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 74
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 101
+          },
+          {
+            "reason": "nonpublic_evidence_url",
+            "count": 1
+          },
+          {
+            "reason": "preparation_failed",
+            "count": 3
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 2
+          },
+          {
+            "id": "document_date",
+            "count": 22
+          },
+          {
+            "id": "entity_labels",
+            "count": 5
+          },
+          {
+            "id": "exact_quotes",
+            "count": 11
+          },
+          {
+            "id": "graph_mentions",
+            "count": 6
+          },
+          {
+            "id": "graph_modality",
+            "count": 2
+          },
+          {
+            "id": "graph_relations",
+            "count": 4
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 3
+          },
+          {
+            "id": "municipality",
+            "count": 32
+          },
+          {
+            "id": "stage",
+            "count": 3
+          },
+          {
+            "id": "stage_date",
+            "count": 1
+          },
+          {
+            "id": "stage_history",
+            "count": 2
+          },
+          {
+            "id": "summary_numbers",
+            "count": 8
+          },
+          {
+            "id": "title",
+            "count": 8
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 183,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 57,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 123,
         "unavailableAttemptedDocumentGroups": 0
@@ -328,6 +847,10 @@
           "documentCount": 27,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -367,6 +890,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -394,6 +921,96 @@
           "documentCount": 209,
           "publishedRecords": 37,
           "quarantinedRecords": 314,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 78
+              },
+              {
+                "reason": "faithfulness_gate_failed",
+                "count": 1
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 56
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 74
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 101
+              },
+              {
+                "reason": "nonpublic_evidence_url",
+                "count": 1
+              },
+              {
+                "reason": "preparation_failed",
+                "count": 3
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 2
+              },
+              {
+                "id": "document_date",
+                "count": 22
+              },
+              {
+                "id": "entity_labels",
+                "count": 5
+              },
+              {
+                "id": "exact_quotes",
+                "count": 11
+              },
+              {
+                "id": "graph_mentions",
+                "count": 6
+              },
+              {
+                "id": "graph_modality",
+                "count": 2
+              },
+              {
+                "id": "graph_relations",
+                "count": 4
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 3
+              },
+              {
+                "id": "municipality",
+                "count": 32
+              },
+              {
+                "id": "stage",
+                "count": 3
+              },
+              {
+                "id": "stage_date",
+                "count": 1
+              },
+              {
+                "id": "stage_history",
+                "count": 2
+              },
+              {
+                "id": "summary_numbers",
+                "count": 8
+              },
+              {
+                "id": "title",
+                "count": 8
+              }
+            ]
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -421,6 +1038,10 @@
           "documentCount": 21,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -457,14 +1078,78 @@
       "id": "ratzeburg",
       "ags": "01053100",
       "districtId": "herzogtum-lauenburg",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 743,
       "publishedRecords": 14,
       "datedStagedRecords": 12,
       "quarantinedRecords": 124,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 19
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 24
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 2
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 46
+          },
+          {
+            "reason": "preparation_failed",
+            "count": 33
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 3
+          },
+          {
+            "id": "entity_labels",
+            "count": 3
+          },
+          {
+            "id": "exact_quotes",
+            "count": 6
+          },
+          {
+            "id": "graph_mentions",
+            "count": 7
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 3
+          },
+          {
+            "id": "location_labels",
+            "count": 1
+          },
+          {
+            "id": "stage_history",
+            "count": 1
+          },
+          {
+            "id": "summary_numbers",
+            "count": 4
+          },
+          {
+            "id": "title",
+            "count": 6
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 336,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 27,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 276,
         "unavailableAttemptedDocumentGroups": 0
@@ -479,6 +1164,19 @@
           "documentCount": 305,
           "publishedRecords": 14,
           "quarantinedRecords": 35,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "no_supported_case",
+                "count": 2
+              },
+              {
+                "reason": "preparation_failed",
+                "count": 33
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 14,
@@ -518,6 +1216,10 @@
           "documentCount": 2,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -545,6 +1247,10 @@
           "documentCount": 133,
           "publishedRecords": 1,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 4,
@@ -584,6 +1290,64 @@
           "documentCount": 303,
           "publishedRecords": 14,
           "quarantinedRecords": 89,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 19
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 24
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 2
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 44
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 3
+              },
+              {
+                "id": "entity_labels",
+                "count": 3
+              },
+              {
+                "id": "exact_quotes",
+                "count": 6
+              },
+              {
+                "id": "graph_mentions",
+                "count": 7
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 3
+              },
+              {
+                "id": "location_labels",
+                "count": 1
+              },
+              {
+                "id": "stage_history",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 4
+              },
+              {
+                "id": "title",
+                "count": 6
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 14,
@@ -623,6 +1387,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -639,14 +1407,86 @@
       "id": "moelln",
       "ags": "01053090",
       "districtId": "herzogtum-lauenburg",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 465,
       "publishedRecords": 28,
       "datedStagedRecords": 23,
       "quarantinedRecords": 80,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 31
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 25
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 10
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 14
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 9
+          },
+          {
+            "id": "document_date",
+            "count": 1
+          },
+          {
+            "id": "entity_labels",
+            "count": 6
+          },
+          {
+            "id": "exact_quotes",
+            "count": 5
+          },
+          {
+            "id": "graph_mentions",
+            "count": 9
+          },
+          {
+            "id": "graph_relations",
+            "count": 2
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 4
+          },
+          {
+            "id": "location_labels",
+            "count": 1
+          },
+          {
+            "id": "stage",
+            "count": 1
+          },
+          {
+            "id": "stage_history",
+            "count": 3
+          },
+          {
+            "id": "summary_numbers",
+            "count": 6
+          },
+          {
+            "id": "title",
+            "count": 5
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 254,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 60,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 194,
         "unavailableAttemptedDocumentGroups": 0
@@ -661,6 +1501,10 @@
           "documentCount": 234,
           "publishedRecords": 27,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -688,6 +1532,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -715,6 +1563,32 @@
           "documentCount": 4,
           "publishedRecords": 1,
           "quarantinedRecords": 17,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 2
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 11
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 4
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "location_labels",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -734,6 +1608,72 @@
           "documentCount": 227,
           "publishedRecords": 27,
           "quarantinedRecords": 63,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 29
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 14
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 6
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 14
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 9
+              },
+              {
+                "id": "document_date",
+                "count": 1
+              },
+              {
+                "id": "entity_labels",
+                "count": 6
+              },
+              {
+                "id": "exact_quotes",
+                "count": 5
+              },
+              {
+                "id": "graph_mentions",
+                "count": 9
+              },
+              {
+                "id": "graph_relations",
+                "count": 2
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 4
+              },
+              {
+                "id": "stage",
+                "count": 1
+              },
+              {
+                "id": "stage_history",
+                "count": 3
+              },
+              {
+                "id": "summary_numbers",
+                "count": 5
+              },
+              {
+                "id": "title",
+                "count": 5
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -761,6 +1701,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -777,14 +1721,74 @@
       "id": "schwarzenbek",
       "ags": "01053116",
       "districtId": "herzogtum-lauenburg",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 27,
       "publishedRecords": 12,
       "datedStagedRecords": 11,
       "quarantinedRecords": 34,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 7
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 4
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 23
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "entity_labels",
+            "count": 1
+          },
+          {
+            "id": "exact_quotes",
+            "count": 2
+          },
+          {
+            "id": "graph_mentions",
+            "count": 2
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 2
+          },
+          {
+            "id": "municipality",
+            "count": 1
+          },
+          {
+            "id": "stage",
+            "count": 1
+          },
+          {
+            "id": "stage_date",
+            "count": 1
+          },
+          {
+            "id": "stage_history",
+            "count": 1
+          },
+          {
+            "id": "summary_numbers",
+            "count": 1
+          },
+          {
+            "id": "title",
+            "count": 1
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 27,
+        "runSelectedDocumentGroups": 27,
+        "preparedDocumentGroups": 27,
         "attemptedDocumentGroups": 27,
         "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
@@ -799,6 +1803,15 @@
           "documentCount": 1,
           "publishedRecords": 0,
           "quarantinedRecords": 1,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "no_supported_case",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -818,6 +1831,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -845,6 +1862,48 @@
           "documentCount": 6,
           "publishedRecords": 0,
           "quarantinedRecords": 16,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 3
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 1
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 12
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "entity_labels",
+                "count": 1
+              },
+              {
+                "id": "graph_mentions",
+                "count": 1
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 1
+              },
+              {
+                "id": "municipality",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 1
+              },
+              {
+                "id": "title",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -884,6 +1943,48 @@
           "documentCount": 20,
           "publishedRecords": 12,
           "quarantinedRecords": 17,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 4
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 3
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 10
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "exact_quotes",
+                "count": 2
+              },
+              {
+                "id": "graph_mentions",
+                "count": 1
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 1
+              },
+              {
+                "id": "stage",
+                "count": 1
+              },
+              {
+                "id": "stage_date",
+                "count": 1
+              },
+              {
+                "id": "stage_history",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -923,6 +2024,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -939,14 +2044,86 @@
       "id": "ludwigslust",
       "ags": "13076090",
       "districtId": "ludwigslust-parchim",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 594,
       "publishedRecords": 35,
       "datedStagedRecords": 35,
       "quarantinedRecords": 111,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 37
+          },
+          {
+            "reason": "faithfulness_gate_failed",
+            "count": 2
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 24
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 8
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 40
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 19
+          },
+          {
+            "id": "document_date",
+            "count": 2
+          },
+          {
+            "id": "entity_labels",
+            "count": 4
+          },
+          {
+            "id": "exact_quotes",
+            "count": 4
+          },
+          {
+            "id": "graph_mentions",
+            "count": 6
+          },
+          {
+            "id": "graph_relations",
+            "count": 1
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 6
+          },
+          {
+            "id": "municipality",
+            "count": 2
+          },
+          {
+            "id": "stage_history",
+            "count": 1
+          },
+          {
+            "id": "summary_numbers",
+            "count": 5
+          },
+          {
+            "id": "title",
+            "count": 3
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 304,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 60,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 244,
         "unavailableAttemptedDocumentGroups": 0
@@ -961,6 +2138,10 @@
           "documentCount": 299,
           "publishedRecords": 34,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 89,
@@ -1000,6 +2181,10 @@
           "documentCount": 1,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1019,6 +2204,20 @@
           "documentCount": 1,
           "publishedRecords": 1,
           "quarantinedRecords": 1,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "judge_critical_claims",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -1052,6 +2251,76 @@
           "documentCount": 293,
           "publishedRecords": 34,
           "quarantinedRecords": 110,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 36
+              },
+              {
+                "reason": "faithfulness_gate_failed",
+                "count": 2
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 24
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 8
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 40
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 19
+              },
+              {
+                "id": "document_date",
+                "count": 2
+              },
+              {
+                "id": "entity_labels",
+                "count": 4
+              },
+              {
+                "id": "exact_quotes",
+                "count": 4
+              },
+              {
+                "id": "graph_mentions",
+                "count": 6
+              },
+              {
+                "id": "graph_relations",
+                "count": 1
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 5
+              },
+              {
+                "id": "municipality",
+                "count": 2
+              },
+              {
+                "id": "stage_history",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 5
+              },
+              {
+                "id": "title",
+                "count": 3
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 93,
@@ -1088,14 +2357,82 @@
       "id": "parchim",
       "ags": "13076108",
       "districtId": "ludwigslust-parchim",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 2600,
       "publishedRecords": 18,
       "datedStagedRecords": 17,
       "quarantinedRecords": 87,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 35
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 19
+          },
+          {
+            "reason": "missing_sourced_date",
+            "count": 18
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 15
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 1
+          },
+          {
+            "id": "entity_labels",
+            "count": 7
+          },
+          {
+            "id": "exact_quotes",
+            "count": 9
+          },
+          {
+            "id": "graph_mentions",
+            "count": 9
+          },
+          {
+            "id": "graph_modality",
+            "count": 1
+          },
+          {
+            "id": "graph_relations",
+            "count": 3
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 9
+          },
+          {
+            "id": "stage",
+            "count": 1
+          },
+          {
+            "id": "stage_history",
+            "count": 2
+          },
+          {
+            "id": "summary_numbers",
+            "count": 8
+          },
+          {
+            "id": "title",
+            "count": 2
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 2565,
+        "runSelectedDocumentGroups": 60,
+        "preparedDocumentGroups": 60,
         "attemptedDocumentGroups": 60,
         "pendingDocumentGroups": 2505,
         "unavailableAttemptedDocumentGroups": 0
@@ -1110,6 +2447,20 @@
           "documentCount": 1263,
           "publishedRecords": 1,
           "quarantinedRecords": 1,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "exact_quotes",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 4,
@@ -1149,6 +2500,72 @@
           "documentCount": 1335,
           "publishedRecords": 17,
           "quarantinedRecords": 85,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 33
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 19
+              },
+              {
+                "reason": "missing_sourced_date",
+                "count": 18
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 15
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 1
+              },
+              {
+                "id": "entity_labels",
+                "count": 6
+              },
+              {
+                "id": "exact_quotes",
+                "count": 8
+              },
+              {
+                "id": "graph_mentions",
+                "count": 8
+              },
+              {
+                "id": "graph_modality",
+                "count": 1
+              },
+              {
+                "id": "graph_relations",
+                "count": 3
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 9
+              },
+              {
+                "id": "stage",
+                "count": 1
+              },
+              {
+                "id": "stage_history",
+                "count": 2
+              },
+              {
+                "id": "summary_numbers",
+                "count": 8
+              },
+              {
+                "id": "title",
+                "count": 2
+              }
+            ]
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -1188,6 +2605,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -1208,6 +2629,24 @@
           "documentCount": 2,
           "publishedRecords": 0,
           "quarantinedRecords": 1,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 1
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "entity_labels",
+                "count": 1
+              },
+              {
+                "id": "graph_mentions",
+                "count": 1
+              }
+            ]
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1224,14 +2663,78 @@
       "id": "hagenow",
       "ags": "13076060",
       "districtId": "ludwigslust-parchim",
-      "selectedForSlice": true,
+      "checked": true,
       "status": "gated_records",
       "documents": 12,
       "publishedRecords": 8,
       "datedStagedRecords": 7,
       "quarantinedRecords": 233,
+      "quarantineReasons": {
+        "categories": [
+          {
+            "reason": "deterministic_gate_failed",
+            "count": 15
+          },
+          {
+            "reason": "invalid_structured_output",
+            "count": 8
+          },
+          {
+            "reason": "no_supported_case",
+            "count": 210
+          }
+        ],
+        "failedDeterministicChecks": [
+          {
+            "id": "critical_stage_promotion",
+            "count": 3
+          },
+          {
+            "id": "entity_labels",
+            "count": 1
+          },
+          {
+            "id": "exact_quotes",
+            "count": 6
+          },
+          {
+            "id": "graph_mentions",
+            "count": 3
+          },
+          {
+            "id": "graph_modality",
+            "count": 1
+          },
+          {
+            "id": "graph_relations",
+            "count": 5
+          },
+          {
+            "id": "judge_critical_claims",
+            "count": 2
+          },
+          {
+            "id": "municipality",
+            "count": 3
+          },
+          {
+            "id": "stage_date",
+            "count": 1
+          },
+          {
+            "id": "summary_numbers",
+            "count": 2
+          },
+          {
+            "id": "title",
+            "count": 2
+          }
+        ]
+      },
       "extraction": {
         "fetchedDocumentGroups": 12,
+        "runSelectedDocumentGroups": 12,
+        "preparedDocumentGroups": 12,
         "attemptedDocumentGroups": 12,
         "pendingDocumentGroups": 0,
         "unavailableAttemptedDocumentGroups": 0
@@ -1246,6 +2749,68 @@
           "documentCount": 12,
           "publishedRecords": 8,
           "quarantinedRecords": 233,
+          "quarantineReasons": {
+            "categories": [
+              {
+                "reason": "deterministic_gate_failed",
+                "count": 15
+              },
+              {
+                "reason": "invalid_structured_output",
+                "count": 8
+              },
+              {
+                "reason": "no_supported_case",
+                "count": 210
+              }
+            ],
+            "failedDeterministicChecks": [
+              {
+                "id": "critical_stage_promotion",
+                "count": 3
+              },
+              {
+                "id": "entity_labels",
+                "count": 1
+              },
+              {
+                "id": "exact_quotes",
+                "count": 6
+              },
+              {
+                "id": "graph_mentions",
+                "count": 3
+              },
+              {
+                "id": "graph_modality",
+                "count": 1
+              },
+              {
+                "id": "graph_relations",
+                "count": 5
+              },
+              {
+                "id": "judge_critical_claims",
+                "count": 2
+              },
+              {
+                "id": "municipality",
+                "count": 3
+              },
+              {
+                "id": "stage_date",
+                "count": 1
+              },
+              {
+                "id": "summary_numbers",
+                "count": 2
+              },
+              {
+                "id": "title",
+                "count": 2
+              }
+            ]
+          },
           "coverage": {
             "state": "complete",
             "pendingCount": 0,
@@ -1265,6 +2830,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
@@ -1292,6 +2861,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "blocked",
             "pendingCount": 0,
@@ -1319,6 +2892,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 2,
@@ -1358,6 +2935,10 @@
           "documentCount": 0,
           "publishedRecords": 0,
           "quarantinedRecords": 0,
+          "quarantineReasons": {
+            "categories": [],
+            "failedDeterministicChecks": []
+          },
           "coverage": {
             "state": "partial",
             "pendingCount": 1,
