@@ -1342,6 +1342,13 @@ never count as a result packet. Parent nonce/shard/cardinality/epoch checks rema
 the first actual observed failure is retained rather than replaced by a lower-
 indexed sibling's subsequent abort.
 
+Sibling `parent-stop` stderr is not the rejected original diagnostic. The
+parallel ancillary-forgery fixture retains the original sanitized diagnostic in
+assertion failures and corrupts each selected witness's own seal only. It keeps
+that witness's genuine source, generation, queue and recorded history unchanged;
+a foreign base seal can instead refuse inside an earlier Core validation and
+cannot establish which ancillary check or source-frame location was exercised.
+
 Both process and reconstruction-thread heaps retain their existing1024MiB caps.
 `ERR_WORKER_OUT_OF_MEMORY` is a Node worker-heap error and need not produce a
 Linux/system OOM event. It is not proof that any particular unexplained historical

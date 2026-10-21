@@ -78,7 +78,10 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   finally{await parallel.finish();}
  }
  for(const badIndex of [0,1]){
-  const badParallel=await issueFixtureNativeSelection(control,{...parallelFrame,seals:parallelFrame.seals.map((entry,index)=>index!==badIndex?entry:{...entry,output:forgedOutput})},'parallel-bad-source-'+badIndex);
+  // Corrupt only this worker's ancillary role, not its source/generation/history.
+  // A foreign base seal can fail an earlier Core validation for another reason.
+  const original=input.witnesses[badIndex].sealed,corruptedOutput=await control('parallel-bad-source-'+badIndex+'-seal.json',{...original,criticalInventory:{...original.criticalInventory,sha256:'f'.repeat(64)}});
+  const badParallel=await issueFixtureNativeSelection(control,{...parallelFrame,seals:parallelFrame.seals.map((entry,index)=>index!==badIndex?entry:{...entry,output:corruptedOutput})},'parallel-bad-source-'+badIndex);
   await assert.rejects(createWitnessedProvenanceContext(badParallel,policy,{...options,catalogue:parallelCatalogue,workers:2}),(error:unknown)=>{
    assert.ok(error instanceof Error);assert.match(error.message,new RegExp(`worker=${badIndex} .*sourceIndex=${badIndex}`));
    const diagnostic=CanonicalWorkerDiagnosticSchema.parse(JSON.parse(error.message.split('R1_CANONICAL_WORKER ')[1]));
