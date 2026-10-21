@@ -1219,3 +1219,50 @@ PostgreSQL stopped with exit0 and each temporary cluster was removed; the final
 process check found no remaining test, reconstruction or disposable-PG actor.
 No production state was written. The integration owner still runs the complete
 gate and independent reviews before production use.
+
+## Canonical worker failure diagnostics
+
+Fork stderr is inherited by the governed command. Supervisor failures emit one
+bounded `R1_CANONICAL_WORKER` JSON line synchronously before whole-PID exit and
+attempt a bounded100ms IPC flush. Reasons distinguish parent stop/disconnection,
+signal, database/heartbeat failure, worker-thread error/exit, invalid/duplicate
+result and IPC/supervisor failure. Error metadata contains only a validated runtime
+code, allowlisted name, fixed classification and up to4 relative source/builtin
+frame locations: never arbitrary error messages, PostgreSQL detail, source bodies,
+requests, URLs or connection configuration.
+
+`R1_CANONICAL_PROGRESS` lines record parent worker index/PID, exact shard indices,
+opening/source-started/source-completed/finishing/serialization phase and validated
+source routing IDs. These progress events do not authorize source results and
+never count as a result packet. Parent nonce/shard/cardinality/epoch checks remain;
+the first actual observed failure is retained rather than replaced by a lower-
+indexed sibling's subsequent abort.
+
+Both process and reconstruction-thread heaps retain their existing1024MiB caps.
+`ERR_WORKER_OUT_OF_MEMORY` is a Node worker-heap error and need not produce a
+Linux/system OOM event. It is not proof that any particular unexplained historical
+exit was an OOM. The previous supervisor discarded its underlying error before
+`process.exit(1)`; a legacy generic1/null exit alone cannot establish its cause,
+last source or original failing shard after the fact.
+
+When construction of the canonical context rejects, `runStep8` has not reserved
+the candidate/staging generation or begun managed publication/replay persistence.
+Confirm actual destinations, inventory epoch/lock/leases and canonical DB sessions/
+metadata before deciding recovery. Old unrelated partial leases are not evidence
+that this attempt created scratch; never run blanket recovery merely to clear a
+generic error. No new execute follows automatically: Main approves fresh output
+destinations and rechecks current proof/epoch gates after inspection.
+
+Focused diagnostics verification used Node24.21.0, CPUs2–7, nice10, umask022,
+one test file at a time and a fresh socket-only disposable PG16 cluster:
+`test/r1-step8-worker-diagnostics.test.ts`, `test/r1-step8-provenance.test.ts` and
+`test/district-residual-topology.test.ts`: **15/15 passed**, no failures,
+cancellations or skips,366.95s including cluster setup/teardown. This includes a
+real Node worker heap error using a bounded16MiB nested fixture, safe error/exit/
+success IPC, parent/PG-loss whole-PID cleanup, actual two/three-worker canonical
+source reconstruction and original-failure retention for either shard index.
+The genuine native and duplicate-source Step8 publication/replay fixtures remain
+green. TypeScript exited0; all14 actual processing-contract exports match the
+active `5a9a14c` pin exactly. Disposable PG stopped exit0 and its directory was
+removed. These focused checks do not establish the cause of the historical
+production exit or authorize a new production execute.

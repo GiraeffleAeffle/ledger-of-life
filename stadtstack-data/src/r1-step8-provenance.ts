@@ -12,6 +12,7 @@ import {userInfo,tmpdir} from 'node:os';
 import type {TextRunContribution} from './text-run-lineage.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import type {PrivatePublicationProvenance,AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
+import {CanonicalWorkerProgressSchema,CanonicalWorkerDiagnosticSchema,canonicalWorkerDiagnostic,formatCanonicalWorkerDiagnostic,type CanonicalWorkerProgress} from './r1-step8-worker-diagnostics.ts';
 
 const Hash=z.string().regex(/^[a-f0-9]{64}$/),MAX_BYTES=128*1024*1024;
 export const NativeProvenancePinSchema=z.object({path:z.string().refine(path=>isAbsolute(path)&&resolve(path)===path),sha256:Hash,bytes:z.number().int().nonnegative().max(MAX_BYTES).optional()}).strict();
@@ -224,7 +225,7 @@ async function checkpoint(value:ContextState){
  }
  await assertCurrent(value);
 }
-async function reconstruct(value:ContextState,indices:readonly number[]){
+async function reconstruct(value:ContextState,indices:readonly number[],report?:(index:number,phase:'source-started'|'source-completed')=>void){
  const {core}=value;
  class ReadOnlyCas extends core.cas.DistrictCas {
   override async read(hash:string){core.adapter.HashSchema.parse(hash);return value.fence.read(join(this.root,'sha256',hash.slice(0,2),hash),hash);}
@@ -232,6 +233,7 @@ async function reconstruct(value:ContextState,indices:readonly number[]){
  }
  const cas=new ReadOnlyCas(value.casRoot);
  for(const index of indices){
+  report?.(index,'source-started');
   // Hold a real checked-out client throughout reconstruction. Pool.query(BEGIN)
   // alone releases it to the idle reaper and cannot guarantee a transaction.
   const client=await value.db.connect(),query=value.db.query,connect=value.db.connect;
@@ -250,6 +252,7 @@ async function reconstruct(value:ContextState,indices:readonly number[]){
    await client.query('COMMIT');
   }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}
   finally{Object.defineProperty(value.db,'query',{value:query,configurable:true,writable:true});Object.defineProperty(value.db,'connect',{value:connect,configurable:true,writable:true});client.release();}
+  report?.(index,'source-completed');
  }
 }
 const WorkerRequestSchema=z.object({
@@ -265,45 +268,61 @@ type WorkerPacket={nonce:string;epoch:string;native:Array<[number,NativeRecord]>
 export async function reconstructCanonicalWorkerRequest(raw:unknown){
  if(isMainThread||!parentPort||process.env.STADTSTACK_STEP8_OFFLINE!=='1')throw Error('Canonical reconstruction requires its offline worker thread');
  const stop=new AbortController(),onClose=()=>stop.abort();parentPort.once('close',onClose);
- let value:ContextState|undefined,carrier:Pool|undefined,nonce='',reply:WorkerPacket|{nonce:string;error:string};
+ let value:ContextState|undefined,carrier:Pool|undefined,nonce='',progress:CanonicalWorkerProgress|undefined,reply:WorkerPacket|{nonce:string;error:string};
  try{
   const request=WorkerRequestSchema.parse(raw);nonce=request.nonce;
+  const report=(phase:CanonicalWorkerProgress['phase'],index?:number)=>{progress={schemaVersion:'stadtstack-r1-canonical-progress-v1',nonce,phase,...(index===undefined?{}:{index})};parentPort!.postMessage(progress);};
+  report('opening-context');
   carrier=new Pool(request.connection);value=await openContextState(request.issuance,request.policy,{...request.options,pool:carrier});
   const live=value;
   await live.core.civic.withCivicPolicyShutdown(async()=>{
    if(epochIdentity(live)!==request.epoch||new Set(request.indices).size!==request.indices.length||request.indices.some(index=>index>=live.selection.seals.length))throw Error('Canonical worker epoch or selection shard differs');
-   await reconstruct(live,request.indices);await checkpoint(live);await live.fence.finish();
+   await reconstruct(live,request.indices,(index,phase)=>report(phase,index));report('finishing-epoch');await checkpoint(live);await live.fence.finish();
   },stop.signal);
+  report('serializing-result');
   reply={nonce,epoch:epochIdentity(live),native:request.indices.map(index=>[index,nativeRecord(live,live.selection.seals[index].output)]),steps:[...live.steps.values()],files:[...live.files].map(([key,file])=>({pin:{path:JSON.parse(key)[0],sha256:digest(file.bytes),bytes:file.bytes.length},stamp:file.stamp}))};
- }catch(error){reply={nonce,error:error instanceof Error?error.message:String(error)};}
+ }catch(error){if(!nonce)throw error;reply={nonce,error:formatCanonicalWorkerDiagnostic(canonicalWorkerDiagnostic(nonce,'canonical-error',progress,error))};}
  finally{if(value){value.finished=true;await value.db.end();}await carrier?.end();parentPort.removeListener('close',onClose);}
  return reply;
 }
 async function reconstructParallel(value:ContextState,options:ContextOptions,workers:number){
  const children:ChildProcess[]=[],jobs:Array<Promise<WorkerPacket>>=[],nonce=randomUUID(),epoch=epochIdentity(value),entry=fileURLToPath(new URL('./r1-step8-reconstruction-worker.ts',import.meta.url));
- const abort=()=>{for(const child of children)if(child.connected)child.send({stop:true},()=>{});};
- let launchError:unknown;
+ let launchError:unknown,firstFailure:Error|undefined,stopping=false;
+ const abort=()=>{stopping=true;for(const child of children)if(child.connected)child.send({stop:true},()=>{});};
  try{
   for(let worker=0;worker<Math.min(workers,value.selection.seals.length);worker++){
    const indices=value.selection.seals.flatMap((_seal,index)=>index%workers===worker?[index]:[]),db=value.db.options;
    const child=fork(entry,[],{execPath:process.execPath,execArgv:['--experimental-strip-types','--max-old-space-size=1024','--require',fileURLToPath(new URL('../scripts/r1-step8-offline.cjs',import.meta.url))],serialization:'advanced',stdio:['ignore','ignore','inherit','ipc'],env:{...process.env,NODE_OPTIONS:''}});children.push(child);
    jobs.push(new Promise<WorkerPacket>((accept,reject)=>{
-    let packet:WorkerPacket|undefined,failure:Error|undefined;
+    let packet:WorkerPacket|undefined,failure:Error|undefined,progress:CanonicalWorkerProgress|undefined;
+    const label=()=>`worker=${worker} pid=${child.pid??'unavailable'} shard=${indices.join(',')} phase=${progress?.phase??'not-reported'} sourceIndex=${progress?.index??'none'}`;
+    const failed=(error:Error)=>{failure??=error;if(!stopping&&!firstFailure)firstFailure=error;abort();};
     child.on('message',(message:unknown)=>{
+     if(failure)return;
      const candidate=message as WorkerPacket&{error?:string};
-     if(packet||failure||!candidate||candidate.nonce!==nonce){failure=new Error('Canonical worker IPC identity or cardinality rejected');abort();return;}
-     if(candidate.error!==undefined){failure=new Error(candidate.error);abort();return;}
-     if(candidate.epoch!==epoch||!Array.isArray(candidate.native)||candidate.native.length!==indices.length||candidate.native.some(([index],offset)=>index!==indices[offset])){failure=new Error('Canonical worker returned another epoch or ordered shard');abort();return;}
+     if(!candidate||typeof candidate!=='object'||candidate.nonce!==nonce){failed(new Error(`${label()}: Canonical worker IPC identity rejected`));return;}
+     const event=CanonicalWorkerProgressSchema.safeParse(message);
+     if(event.success){
+      if(packet||event.data.index!==undefined&&!indices.includes(event.data.index)){failed(new Error(`${label()}: Canonical worker progress shard/cardinality rejected`));return;}
+      progress=event.data;const selected=progress.index===undefined?undefined:value.selection.seals[progress.index],safeId=(id:string)=>/^[a-z0-9-]{1,80}$/.test(id);
+      process.stderr.write('R1_CANONICAL_PROGRESS '+JSON.stringify({worker,pid:child.pid,shard:indices,...event.data,...(selected&&safeId(selected.municipalityId)&&safeId(selected.sourceId)?{municipalityId:selected.municipalityId,sourceId:selected.sourceId}:{})})+'\n');return;
+     }
+     const diagnostic=CanonicalWorkerDiagnosticSchema.safeParse(message);
+     if(diagnostic.success){if(diagnostic.data.index!==undefined&&!indices.includes(diagnostic.data.index)){failed(new Error(`${label()}: Canonical worker diagnostic shard rejected`));return;}failed(new Error(`${label()}: ${formatCanonicalWorkerDiagnostic(diagnostic.data)}`));return;}
+     if(packet){failed(new Error(`${label()}: Canonical worker result cardinality rejected`));return;}
+     if(candidate.error!==undefined){failed(new Error(`${label()}: ${candidate.error}`));return;}
+     if(candidate.epoch!==epoch||!Array.isArray(candidate.native)||candidate.native.length!==indices.length||candidate.native.some(([index],offset)=>index!==indices[offset])){failed(new Error(`${label()}: Canonical worker returned another epoch or ordered shard`));return;}
      packet=candidate;
     });
-    child.on('error',error=>{failure=error;abort();});
-    child.once('close',(code,signal)=>{if(failure||code!==0||signal||!packet){abort();reject(failure??new Error(`Canonical worker exited without a complete result (${code}/${signal})`));}else accept(packet);});
-    child.send({schemaVersion:'stadtstack-r1-canonical-worker-v1',nonce,issuance:value.issuancePin,policy:value.policy,options:{casRoot:value.casRoot,catalogue:options.catalogue,mode:options.mode,coreRoot:value.coreRoot,...(options.importDispositionDecision?{importDispositionDecision:options.importDispositionDecision}:{})},connection:{host:db.host,database:db.database,user:db.user,port:db.port},indices,epoch},error=>{if(error){failure=error;abort();}});
+    child.on('error',error=>failed(new Error(`${label()}: ${formatCanonicalWorkerDiagnostic(canonicalWorkerDiagnostic(nonce,'ipc-send-failed',progress,error))}`)));
+    child.once('close',(code,signal)=>{if(failure||code!==0||signal||!packet){const error=failure??new Error(`${label()}: Canonical worker exited without a complete result (${code}/${signal})`);if(!failure)failed(error);reject(error);}else accept(packet);});
+    child.send({schemaVersion:'stadtstack-r1-canonical-worker-v1',nonce,issuance:value.issuancePin,policy:value.policy,options:{casRoot:value.casRoot,catalogue:options.catalogue,mode:options.mode,coreRoot:value.coreRoot,...(options.importDispositionDecision?{importDispositionDecision:options.importDispositionDecision}:{})},connection:{host:db.host,database:db.database,user:db.user,port:db.port},indices,epoch},error=>{if(error)failed(new Error(`${label()}: ${formatCanonicalWorkerDiagnostic(canonicalWorkerDiagnostic(nonce,'ipc-send-failed',progress,error))}`));});
    }));
   }
  }catch(error){launchError=error;abort();}
  const settled=await Promise.allSettled(jobs);
  if(launchError)throw launchError;
+ if(firstFailure)throw firstFailure;
  const rejected=settled.find(result=>result.status==='rejected');if(rejected?.status==='rejected')throw rejected.reason;
  const packets=settled.map(result=>(result as PromiseFulfilledResult<WorkerPacket>).value),ordered=new Map<number,NativeRecord>();
  for(const packet of packets){

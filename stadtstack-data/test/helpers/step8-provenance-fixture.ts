@@ -11,6 +11,7 @@ import type {DistrictCas} from '../../src/district-cas.ts';
 import type {sealQueueTextContribution} from '../../src/district-queue-text-run.ts';
 import {createWitnessedProvenanceContext,assertCanonicalSealSelection,buildProvenanceSupplement,authenticateSupplement,authenticateSealProvenance,authenticateCanonicalSealProvenance,exportCanonicalTextContribution,type NativeProvenancePin} from '../../src/r1-step8-provenance.ts';
 import {loadR1TextCompositionInput} from '../../src/district-r1-text-composition.ts';
+import {CanonicalWorkerDiagnosticSchema} from '../../src/r1-step8-worker-diagnostics.ts';
 
 type Control=(name:string,value:unknown)=>Promise<{path:string;sha256:string}>;
 export async function issueFixtureNativeSelection<T extends {catalogue:NativeProvenancePin}>(control:Control,frame:T,name='native-selection'){
@@ -76,8 +77,15 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   try{assert.equal(parallel.reconstructionWorkers,workers);await assertCanonicalSealSelection(parallel,parallelFrame.seals.map(entry=>({output:entry.output,queue:entry.queue})));await parallel.checkpoint();}
   finally{await parallel.finish();}
  }
- const badParallel=await issueFixtureNativeSelection(control,{...parallelFrame,seals:parallelFrame.seals.map((entry,index)=>index?entry:{...entry,output:forgedOutput})},'parallel-bad-source');
- await assert.rejects(createWitnessedProvenanceContext(badParallel,policy,{...options,catalogue:parallelCatalogue,workers:2}),/differs from canonical|canonical source scope/,'one worker failure rejects the entire result batch');
+ for(const badIndex of [0,1]){
+  const badParallel=await issueFixtureNativeSelection(control,{...parallelFrame,seals:parallelFrame.seals.map((entry,index)=>index!==badIndex?entry:{...entry,output:forgedOutput})},'parallel-bad-source-'+badIndex);
+  await assert.rejects(createWitnessedProvenanceContext(badParallel,policy,{...options,catalogue:parallelCatalogue,workers:2}),(error:unknown)=>{
+   assert.ok(error instanceof Error);assert.match(error.message,new RegExp(`worker=${badIndex} .*sourceIndex=${badIndex}`));
+   const diagnostic=CanonicalWorkerDiagnosticSchema.parse(JSON.parse(error.message.split('R1_CANONICAL_WORKER ')[1]));
+   assert.equal(diagnostic.reason,'canonical-error');assert.equal(diagnostic.phase,'source-started');assert.equal(diagnostic.index,badIndex);assert.ok(diagnostic.error?.frames.some(frame=>frame.startsWith('src/r1-step8-provenance.ts:')));
+   return true;
+  },'one worker failure rejects the entire batch with its original source, not a sibling abort');
+ }
  assert.deepEqual(await readFile(join(policy.stateDir!,'inventory.json')),beforeInventory);assert.deepEqual(await counts(),beforeCounts);
  const cached=await createWitnessedProvenanceContext(issued,policy,options),path=entries[2].output.path,parent=dirname(path),moved=parent+'-moved';
  await rename(parent,moved);await symlink(moved,parent);
