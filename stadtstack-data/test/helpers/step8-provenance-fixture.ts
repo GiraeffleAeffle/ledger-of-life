@@ -82,7 +82,7 @@ export async function exerciseCanonicalProvenance(t:TestContext,input:{pool:Pool
   await assert.rejects(createWitnessedProvenanceContext(badParallel,policy,{...options,catalogue:parallelCatalogue,workers:2}),(error:unknown)=>{
    assert.ok(error instanceof Error);assert.match(error.message,new RegExp(`worker=${badIndex} .*sourceIndex=${badIndex}`));
    const diagnostic=CanonicalWorkerDiagnosticSchema.parse(JSON.parse(error.message.split('R1_CANONICAL_WORKER ')[1]));
-   assert.equal(diagnostic.reason,'canonical-error');assert.equal(diagnostic.phase,'source-started');assert.equal(diagnostic.index,badIndex);assert.ok(diagnostic.error?.frames.some(frame=>frame.startsWith('src/r1-step8-provenance.ts:')));
+   assert.equal(diagnostic.reason,'canonical-error');assert.equal(diagnostic.phase,'source-started');assert.equal(diagnostic.index,badIndex);assert.ok(diagnostic.error?.frames.some(frame=>frame.startsWith('src/r1-step8-provenance.ts:')),JSON.stringify(diagnostic));
    return true;
   },'one worker failure rejects the entire batch with its original source, not a sibling abort');
  }
