@@ -116,10 +116,11 @@ retained row and every newly generated artifact:
   retained city record values. Those bytes remain separately and completely
   pinned with their retained bindings; a control reference is not collection or
   independent publication authority.
-- The publication inventory contains every direct publication/replay input and
+- Two disjoint inventories contain every direct publication/replay input and
   every artifact referenced by each native text contribution (including optional
-  preparation plans). Independent audit/exception/handoff artifacts are retained
-  separately, not duplicated as publication data inputs. Hash-addressed policy,
+  preparation plans). The primary inventory contains native/control inputs;
+  the staging inventory contains the exact retained members. Independent
+  audit/exception/handoff artifacts remain separate. Hash-addressed policy,
   assessment and structured dependencies still undergo their existing Core CAS
   and committed-receipt checks.
 
@@ -142,16 +143,77 @@ the normal exact replay plus candidate loader still precede the passed gate.
 This avoids repeatedly loading/saving the entire authority inventory for every
 member without introducing a second inventory writer or relaxing Core checks.
 
-Observed size evidence from the real19-member, duplicate-original end-to-end
-fixture: final provenance **8,582,540bytes**,34inputs (19retained members,6native contribution artifacts,
-9aggregate/control inputs). The retained members keep all12,517bindings.
-Core accepted the native records artifact's complete two-binding producer set
-and refused a one-binding declaration with `CONTENT_PROVENANCE_MISMATCH`.
-A pretty-JSON wire-size model using the19 measured retained members,27 source
-cohorts, up to24HTTP originals per source-artifact row and213HTTP producers per
-aggregate row yields **10,890,937bytes**, below the unchanged16,777,216-byte guard.
-This model assumes the observed URL/proof wire lengths; it is not a measurement
-of the later renewed production selection or permission to omit actual inputs.
+Historical, pre-partition real19 fixture measurement: one-source provenance was
+8,582,540bytes with34inputs and12,517retained bindings. Its old27-source scaling
+model was not a production gate and must not authorize the renewed campaign.
+The actual27-source native corpus metadata alone exceeded16MiB before family
+normalization; even normalized fixed publication inputs left insufficient
+headroom for the generated aggregates. The governed cutover therefore partitions
+metadata, not evidence, and computes the current input's complete bounds below.
+
+### Automatic static pre-pass and two-inventory publication
+
+Both `audit` and `execute` run `requireStep8Preflight` **before** constructing the
+expensive canonical context. `scripts/r1-step8-precheck.mjs` performs the same
+read-only refusal pass independently:
+
+```sh
+node --experimental-strip-types --require ./scripts/r1-step8-offline.cjs \
+  ./scripts/r1-step8-precheck.mjs /absolute/input.json ACTUAL_INPUT_SHA256
+```
+
+It inspects the exact campaign/catalogue/review/seal controls, all native and
+staging input metadata, current managed binding sets, authentic retained member
+bytes, issued structured selection and committed receipts, and the pinned policy
+proofs through the estimated pass end plus margin. Reads are fenced by the
+existing lock-free authority/inventory/segment/objection epoch; no authority
+locks, reconstruction, provider, network, CAS write or metadata export occurs.
+A blocked report cannot authorize execution.
+
+Registry families may be reduced only by unchanged Core's existing rule:
+same configuration SHA and identical complete endpoint-digest set. Select the
+lexically smallest complete descriptor deterministically; keep every
+non-equivalent family and **all** non-registry/HTTP bindings. Each resulting
+inventory is authenticated independently by unchanged Core. No native seal,
+existing CAS blob,16MiB guard, codec or witnessed shared-content union is changed.
+Original campaign corpus paths remain valid: provide a separately reviewed
+control-only inventory for those actual paths, rather than substituting CAS paths
+or uniting all native inventories into an unrelated staging artifact. The
+optional `--emit-control-inventory` emits an unissued private metadata proposal
+only; it never grants rights, writes authority or repairs a missing declared
+binding.
+
+The preparation/commit and publication/replay partitions are disjoint and
+exhaustive. Missing input, duplicate/overlapping input, conflicting bytes or
+missing required binding refuses. Exact fixed metadata and retained19-member
+wire sizes are computed before the pass. All nine generated publication rows
+have conservative bounds from their actual producer sets and output paths,
+64-character SHA width and the existing512MiB artifact-length cap. **Each**
+inventory must remain strictly below16MiB minus a1MiB safety margin. Execute
+checks actual publication sizes against that independent bound again.
+
+Replay receipts pin `privateProvenance`, `stagingProvenance` and the complete
+`provenanceInputs` set. Proof/audit pins cover both inventories; replay
+authenticates both again and compares every release member and the manifest
+byte-for-byte. The private step9 handoff adds
+`provenanceInventories: {primary, staging}`; the exception/acceptance loader checks
+these against the receipt and exact replay proof. Ops must retain both private
+metadata files with the bundle. Public release members, manifest format,
+candidate serving loader and hosted MCP query interfaces are unchanged.
+Standalone publisher callers must now supply both
+`--private-provenance`/`--private-provenance-sha256` and
+`--staging-provenance`/`--staging-provenance-sha256`. Standalone knowledge
+preparation without external staging still uses its genuine primary inventory.
+
+Runtime and processing identities are separate: the reviewed operator HEAD may
+advance beyond `5a9a14c105195043fda1c4f9aa8b9f6697e33c3d`, while the input's
+`currentGeneration.processingCommit`, catalogue and confirmed processing review
+stay at that campaign pin. `assertStep8ProcessingPin` checks those authenticated
+controls, not equality with runtime HEAD. All14 processing contracts and the
+sealed extraction archive's source/cache-context files must remain byte-identical.
+The receipt pins the actual new runtime sources separately. Keep that reviewed
+runtime HEAD frozen throughout precheck/build/replay; never relabel the campaign
+processing commit to the operator commit.
 
 `audit` remains a standalone validating operation with its own canonical pass.
 Do **not** run it separately before a governed `execute` just to repeat the same
@@ -238,11 +300,13 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   selected native runs are exported; native checked-source evidence produces
   a new bound registry artifact, preserving the originals.
 - `privateProvenance: {path, sha256}`: existing
-  `stadtstack-private-publication-provenance-v1` inventory for every external
-  staging/control member. This is the existing managed provenance contract,
-  not a path-based permission assertion. Seal inventories are authenticated and
-  combined with it. Original native raw bytes, policy receipts and parser outputs
-  must already be in managed CAS with their actual custody.
+  `stadtstack-private-publication-provenance-v1` inventory for external
+  campaign/corpus/registry/optional controls.
+- `stagingProvenance: {path, sha256}`: a separate inventory of precisely the
+  declared non-knowledge staging inputs. Both use the unchanged managed
+  provenance contract, not path-based permission. They must be disjoint and
+  exhaustive. Native seal inventories are authenticated separately; all original
+  native bytes, policy receipts and parser outputs must already have real custody.
 - `staging`: independently pinned `{path, sha256, destination}` for precisely
   `catalogue.json`, `regions/brandenburg-mol/topics.json`,
   `core/strausberg-facts.json`, and **each staged catalogue city's**
@@ -393,9 +457,9 @@ Historical failed/ambiguous calls are counted, never refunded or renumbered.
 Only authorized base-48 A/C calls may use the 24-per-original / 100-cohort
 supplement. Native B purge-ack payloads are checked against their actual lease,
 request, response, runner/image and completion clocks, not merely their presence.
-Production additionally requires the exact five native runs and released 0.3.2
-predecessor below, and all selected source/corpus/document/original memberships
-must equal the independently pinned frozen allowance cohort.
+Production additionally requires the independently issued exact current K1/K2
+structured selection and authentic released0.3.2 predecessor. All selected
+source/corpus/document/original memberships must equal the pinned frozen cohort.
 
 `execute` runs this audit **before** claiming or creating a candidate generation.
 On success it writes supplementary managed `audit/current-generation.json`
@@ -1004,10 +1068,10 @@ is then copied byte-for-byte through existing `writeManagedSourceArtifact` as a
 derivative with its authentic contributing corpus bindings and
 `independentAllowed:false`. Registry and optional controls are **not** enrolled
 from a bare operator file; they must already be readable with real managed
-bindings in the supplied provenance. The aggregate provenance includes all
-required corpora, registry, optional inputs, exact retained copies and the managed
-campaign. Retained copies are checked against both authentic member bytes and
-their actual retained-publication inventory bindings.
+bindings in the supplied provenance. The primary control inventory includes all
+required corpora, registry, optional inputs and the managed campaign; the separate
+staging inventory keeps every retained copy and its complete binding set.
+Retained copies are checked against authentic bytes and actual custody.
 
 The assembly root must be fresh beneath this package's real cache directory.
 Both the root and its claim must be disjoint from all enrolled managed roots;
@@ -1015,14 +1079,16 @@ the existing read-only inventory API checks this before any reservation and agai
 immediately before claim creation. Refusal leaves no nested directory/claim
 debris and preserves ancestor inventory completeness.
 Atomic generation reservation plus sibling `.claim` fencing prevents concurrent
-assemblers mixing outputs. Assembly writes only `campaign.json`,
-`private-publication-provenance.json` and `staging-component.json` in that new
-managed control root. Its stdout pins the component and returns `inputs`:
-`campaign`, `registry`, `privateProvenance`, exact `staging`, and supplied optional
-pins. Merge those **input fields**, not the result envelope, into the complete
-Step8 input, recompute its independent digest, then run plan → discover → audit
-→ execute as above. Revalidate all dependencies after assembly; a changed or
-revoked file fails closed. Existing/partial roots are never repaired or reused.
+assemblers mixing outputs. Assembly writes `campaign.json`,
+`private-publication-provenance.json`, `staging-publication-provenance.json` and
+`staging-component.json` in that new managed control root. Its stdout pins the
+component and returns `inputs`: `campaign`, `registry`, `privateProvenance`,
+`stagingProvenance`, exact `staging`, and supplied optional pins. Merge those
+**input fields**, not the result envelope, into a ready input and recompute its
+digest; the preferred one-command assembly invocation does this itself.
+Execute embeds precheck and validating audit; do not repeat its canonical pass
+with a separate audit merely as a prerequisite. Changed/revoked dependencies
+fail closed. Existing/partial roots are never repaired or reused.
 The result envelope is `stadtstack-r1-step8-staging-result-v2`, whose
 `publicationExecuted:false` distinguishes staging writes from candidate
 publication. No v1 result compatibility shim is retained.
@@ -1304,3 +1370,78 @@ green. TypeScript exited0; all14 actual processing-contract exports match the
 active `5a9a14c` pin exactly. Disposable PG stopped exit0 and its directory was
 removed. These focused checks do not establish the cause of the historical
 production exit or authorize a new production execute.
+
+## Two-inventory publication cutover verification
+
+The authorized focused checks used Node24.21.0, `umask022`, CPUs2–7,
+nice10, one test process at a time and fresh Unix-socket-only disposable PG16
+clusters. No production authority/CAS/database writes, network or model calls
+were performed. All14 exported processing fingerprints matched the5a9a14c
+baseline exactly; `node ./node_modules/typescript/bin/tsc --noEmit` exited0.
+
+The clean final unit/supervisor group passed **86/86**, with zero skips or
+cancellations. Its command was:
+
+```sh
+taskset -c 2-7 nice -n 10 node --experimental-strip-types \
+  --experimental-test-module-mocks --test --test-concurrency=1 \
+  --test-reporter=tap \
+  test/publication-provenance-partition.test.ts \
+  test/r1-step8-publication-bounds.test.ts \
+  test/r1-canonical-query-queue.test.ts \
+  test/r1-step8-structured-precheck.test.mjs \
+  test/prepare-knowledge.test.ts test/publish.test.ts \
+  test/replay-pipeline.test.ts test/r1-release-acceptance.test.ts \
+  test/r1-step8.test.ts test/r1-step8-provenance.test.ts \
+  test/r1-step8-worker-diagnostics.test.ts \
+  test/district-publication-provenance.test.ts
+```
+
+Using the same resource controls and disposable-PG setup, the native/duplicate
+topology group passed **2/2**, and `test/r1-step8-staging.test.ts` passed
+**3/3**, including the complete real19 flow through compatible audit, publication,
+every-member/manifest exact replay, candidate loader, exception handoff and
+tamper refusal. Existing shared empty CAS blobs **and a pre-existing genuine
+structured receipt** retained identical bytes and complete binding sets.
+Missing HTTP/non-equivalent registry proof, omitted/overlapping partition input,
+and incomplete operator runtime source inventory remain refusals.
+
+The measured real19 fixture retains all12,517bindings in its staging inventory:
+**6,564,614bytes/19inputs**. Its primary inventory is **21,044bytes/15inputs**;
+the independent pre-pass upper bound was21,089bytes. Both unchanged Core readers
+accepted the inventories. Native queue/assessment data in this fixture is
+explicitly synthetic; the retained0.3.2 members are authentic.
+
+Measured execute subphases in that fixture, not production estimates:
+
+| Phase | Seconds |
+| --- | ---: |
+| Automatic static pre-pass | 4.41 |
+| Canonical reconstruction | 15.88 |
+| Staging preparation | 26.51 |
+| Embedded audit/export | 66.11 |
+| Staging commit | 114.52 |
+| Initial export persistence | 192.84 |
+| Publication | 300.66 |
+| Candidate persistence | 296.75 |
+| Exact replay total | 1,360.48 |
+| Replay rebuild (inside total) | 716.56 |
+| Replay persistence (inside total) | 367.78 |
+| Final persistence and candidate load | 262.74 |
+
+The production precheck was exercised read-only against the pinned oldw1 input
+(`f5ea79ff…`) and the actual27 seals/194 native inputs/19 retained copies.
+Its95.37s report inspected155 fixed publication inputs and bounded all9 generated
+rows: primary **12,765,118bytes upper bound**, staging **6,564,861bytes exact**,
+each below the15,728,640-byte exclusive safety threshold. Prepared control
+inventories were9,230,539/6,564,861bytes; committed controls
+9,642,652/6,564,861bytes. This is current-input sizing, not source-count scaling.
+The old input correctly refused before reconstruction: its supplied inventories
+omit all27 original-path corpus controls and it has no issued current structured
+selection. A reviewed original-path control inventory and genuinely renewed,
+independently issued structured selection are required for a fresh retry.
+
+These checks are step8 fixture/static evidence, not a production candidate,
+frozen value-test result, hosted approval or claim that Main's full integration
+gate has run. Every owned disposable PG cluster was stopped and removed; the
+post-run process search found no owned fixture/worker/PG actor.

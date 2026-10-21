@@ -103,7 +103,8 @@ test('prepared publication readers bind native structured outputs and staged pin
  for(const [name,value] of Object.entries({registry,records:knowledge,quarantine,structured,policy:{records:[{recordId:records[0].id,receipts:[{sourceUrl:url,sourceSha256,receiptSha256:receipt.sha256}]}]},catalogue:{synthetic:'pinned staging'}}))artifacts.set(`${name}.json`,Buffer.from(JSON.stringify(value)));
  const binding={kind:'prepared_source' as const,url,sourceSha256,observationId:'synthetic-native-lease',receiptSha256:hash('synthetic prepared receipt'),independentAllowed:true},pins=[];
  for(const [name,bytes] of artifacts){const path=join(inputRoot,name);await writeManagedSourceArtifact(context.managedRoot,path,bytes,[binding],{...context.policy,decisionId:context.decisionId,kind:'artifacts'});pins.push({path,sha256:hash(bytes),bytes:bytes.length,bindings:[binding]});}
- const privateProvenancePath=join(context.root,'provenance.json'),encoded=JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins});await writeFile(privateProvenancePath,encoded);
+ const cataloguePath=join(inputRoot,'catalogue.json'),privateProvenancePath=join(context.root,'provenance.json'),encoded=JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins.filter(pin=>pin.path!==cataloguePath)});await writeFile(privateProvenancePath,encoded);
+ const stagingProvenancePath=join(context.root,'staging-provenance.json'),stagingEncoded=JSON.stringify({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:pins.filter(pin=>pin.path===cataloguePath)});await writeFile(stagingProvenancePath,stagingEncoded);
  const options={registry:join(inputRoot,'registry.json'),records:join(inputRoot,'records.json'),quarantine:join(inputRoot,'quarantine.json'),structuredRun:join(inputRoot,'structured.json'),policyReceipts:join(inputRoot,'policy.json'),privateProvenance:{path:privateProvenancePath,sha256:hash(encoded)},outputRoot:join(context.root,'prepared-publication'),casRoot:cas.root,policyStateDir:context.policy.stateDir,policyAuthorityId:context.policy.authorityId,policyAuthoritySha256:context.policy.authoritySha256,coverageGeneratedAt:at};
  let expiredPath='';
  const ended=await withPreparedKnowledge(options,async prepared=>{
@@ -120,7 +121,7 @@ test('prepared publication readers bind native structured outputs and staged pin
   prepared.outputPins[0].sha256=hash('tampered output pin');
   await writeFile(expiredPath,'tampered');await assert.rejects(prepared.publication.read(expiredPath));
   return prepared.publication;
- },{staging:[{destination:'catalogue.json',pin:{path:join(inputRoot,'catalogue.json'),sha256:hash(artifacts.get('catalogue.json')!)}}]});
+ },{stagingProvenance:{path:stagingProvenancePath,sha256:hash(stagingEncoded)},staging:[{destination:'catalogue.json',pin:{path:cataloguePath,sha256:hash(artifacts.get('catalogue.json')!)}}]});
  assert.throws(()=>assertAuthenticatedPreparedPublication(ended));
  await assert.rejects(ended.read(expiredPath));
 });

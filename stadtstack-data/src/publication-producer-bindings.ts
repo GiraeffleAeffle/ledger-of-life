@@ -1,10 +1,11 @@
-import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
+import {semanticHash} from './district-adapter-contract.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
+import {normalizePublicationBindings} from './publication-binding-normalization.ts';
 
 /** Producer declarations only. Every caller must still authenticate the inputs
  * and use the unchanged Core source-write/complete-binding boundaries. */
 export function derivedProducerBindings(bindings:readonly SourceArtifactBinding[]):SourceArtifactBinding[]{
- return [...new Map(bindings.map(binding=>{const value={...binding,independentAllowed:false};return [canonicalJson(value),value] as const;})).entries()].sort(([a],[b])=>a.localeCompare(b)).map(([,binding])=>binding);
+ return normalizePublicationBindings(bindings.map(binding=>({...binding,independentAllowed:false})));
 }
 export function producerBindingSetSha256(bindings:readonly SourceArtifactBinding[]){return semanticHash(derivedProducerBindings(bindings));}
 export interface PublicationProducerGroups {

@@ -12,6 +12,7 @@ import {RELEASE_ACCEPTANCE_RULES,readCandidateMaterialContext,bindReleaseExcepti
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 import {ImportRejectionDispositionSchema} from './r1-step8-import-disposition-contract.ts';
 import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from './replay-evidence-contract.ts';
+import {publicationPartitionSha256} from './publication-provenance-partition.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -26,7 +27,7 @@ const gateSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-gate-v1'
   exceptionInventory:AcceptancePinSchema,step9Handoff:AcceptancePinSchema,replayReceipt:AcceptancePinSchema,
   replayAuditSha256:HashSchema,checks:z.array(z.string()),generationNonce:z.string().min(1)}).passthrough();
 const handoffSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step9-handoff-v1'),releaseId:HashSchema,
-  candidateDirectory:z.string().refine(isAbsolute),exceptionInventory:AcceptancePinSchema,assessmentManifest:AcceptancePinSchema,policy:z.unknown()}).strict();
+  candidateDirectory:z.string().refine(isAbsolute),exceptionInventory:AcceptancePinSchema,assessmentManifest:AcceptancePinSchema,provenanceInventories:z.object({primary:AcceptancePinSchema,staging:AcceptancePinSchema}).strict(),policy:z.unknown()}).strict();
 const classificationSchema=z.object({critical:z.boolean(),rights:z.boolean(),disagreement:z.boolean(),terminal:z.boolean().optional()}).strict();
 const nativeDispositionSchema=z.object({municipalityId:z.string(),sourceId:z.string(),documentId:z.string(),sourceSha256:HashSchema,jobKey:HashSchema,
   admittedRecordIds:z.array(z.string()),cases:z.array(z.unknown()),classification:classificationSchema,assessments:z.array(z.unknown()),
@@ -222,6 +223,9 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
   if(gate.releaseId!==handoff.releaseId||gate.releaseId!==inventory.releaseId||gate.candidateDirectory!==handoff.candidateDirectory
     ||canonicalJson(gate.exceptionInventory)!==canonicalJson(pins.exceptions)||canonicalJson(handoff.exceptionInventory)!==canonicalJson(pins.exceptions)
     ||canonicalJson(gate.step9Handoff)!==canonicalJson(pins.handoff)||canonicalJson(gate.campaign)!==canonicalJson(inventory.campaign))throw Error('Step8 gate/inventory/handoff binding mismatch');
+  const replayControl=record(await readAcceptancePin(gate.replayReceipt));
+  if(canonicalJson(handoff.provenanceInventories)!==canonicalJson({primary:replayControl.privateProvenance,staging:replayControl.stagingProvenance}))throw Error('Step8 handoff provenance inventories differ from replay');
+  await readAcceptancePin(handoff.provenanceInventories.primary);await readAcceptancePin(handoff.provenanceInventories.staging);
   const campaign=Step8CampaignSchema.parse(await readAcceptancePin(gate.campaign));
   const expected=campaign.sources.flatMap(source=>source.documents.map(document=>canonicalJson([source.municipalityId,source.sourceId,document.documentId,document.sha256,
     'jobKey' in document?document.jobKey:['import_rejection',document.importDisposition.decisionSha256,document.importDisposition.reasonCode]]))).sort();
@@ -304,10 +308,14 @@ export async function computeReleaseAcceptance(input:unknown){
   const execution=record(proof.execution);
   if(proof.schemaVersion!=='stadtstack-offline-replay-proof-v2'||execution.modelCalls!==0||execution.readinessCalls!==0||execution.liveFallback!=='forbidden'
     ||canonicalJson(proof.comparison)!==canonicalJson(audit.comparison))blockers.push('exact_replay_not_passed');
-  const inputs=ReplayEvidenceInputPinsSchema.parse(proof.inputs),provenance=AcceptancePinSchema.parse(receipt.privateProvenance),base=dirname(gate.replayReceipt.path);
+  const inputs=ReplayEvidenceInputPinsSchema.parse(proof.inputs),provenance=AcceptancePinSchema.parse(receipt.privateProvenance),stagingProvenance=AcceptancePinSchema.parse(receipt.stagingProvenance),base=dirname(gate.replayReceipt.path);
   if(canonicalJson(inputs)!==canonicalJson(audit.inputs)||inputs.receipt.path!==resolve(gate.replayReceipt.path)||inputs.receipt.sha256!==gate.replayReceipt.sha256
     ||inputs.sourceCas.root!==sourceCasRoot||inputs.provenance.path!==resolve(base,provenance.path)||inputs.provenance.sha256!==provenance.sha256
+    ||inputs.stagingProvenance.path!==resolve(base,stagingProvenance.path)||inputs.stagingProvenance.sha256!==stagingProvenance.sha256
+    ||audit.inputBindingSha256!==publicationPartitionSha256({...provenance,path:resolve(base,provenance.path)},{...stagingProvenance,path:resolve(base,stagingProvenance.path)})
     ||inputs.expectedRelease.manifest.path!==resolve(base,expectedRelease.path)||inputs.expectedRelease.manifest.sha256!==expectedRelease.sha256)blockers.push('exact_replay_input_pins_failed');
+  const requiredInputs=z.array(AcceptancePinSchema).parse(receipt.provenanceInputs).map(pin=>[resolve(base,pin.path),pin.sha256]).sort();
+  if(canonicalJson(requiredInputs)!==canonicalJson(inputs.dependencies.map(pin=>[pin.path,pin.sha256]).sort()))blockers.push('exact_replay_provenance_partition_failed');
   const value=valueVerdictSchema.parse(await readAcceptancePin(selected.valueVerdict));
   const pairs=value.gates.graphPairs.pairs,ids=['W03','W04','E03','B03','K03','M03','H03'];
   if(value.releaseId!==gate.releaseId)blockers.push('value_verdict_release_mismatch');

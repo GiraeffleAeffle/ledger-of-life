@@ -15,6 +15,7 @@ import {randomUUID} from 'node:crypto';
 import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {initializeManagedAcquisitionLane,readCivicPolicyInventory,markManagedCacheInventoryComplete,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {assembleStep8Staging} from '../src/r1-step8-staging.ts';
+import {PROVENANCE_LIMIT_BYTES,PROVENANCE_SAFETY_MARGIN_BYTES} from '../src/publication-provenance-partition.ts';
 
 const execute=promisify(execFile);
 test('offline retained-plan CLI derives every authentic 0.3.2 non-knowledge member and embedded declaration',async()=>{
@@ -58,7 +59,8 @@ test('real retained 0.3.2 staging executes through exact replay, passed gate and
  assert.match(result.stdout,/REAL_RETAINED_STEP8_PLAN_AUDIT .*"members":19,"cities":8,"audit":"compatible","inventoryUnchanged":true,"dbUnchanged":true,"network":false,"providers":false/);
  assert.match(result.stdout,/REAL_RETAINED_STEP8_EXECUTION_HANDOFF .*"members":19,"gate":"passed","bundleAccepted":true,"tamperRejected":true,"canonicalPasses":1/);
  const size=/^REAL_RETAINED_STEP8_PROVENANCE_SIZE (.+)$/m.exec(result.stdout);assert.ok(size);
- const evidence=JSON.parse(size[1]);assert.equal(evidence.retainedMembers,19);assert.ok(evidence.actualBytes<=16*1024*1024);
+ const evidence=JSON.parse(size[1]);assert.equal(evidence.retainedMembers,19);for(const bytes of [evidence.primaryBytes,evidence.stagingBytes])assert.ok(bytes<PROVENANCE_LIMIT_BYTES-PROVENANCE_SAFETY_MARGIN_BYTES);
  console.log('REAL_RETAINED_STEP8_PROVENANCE_SIZE '+JSON.stringify(evidence));
  const phases=/^REAL_RETAINED_STEP8_PHASE_TIMINGS (.+)$/m.exec(result.stdout);assert.ok(phases);console.log('REAL_RETAINED_STEP8_PHASE_TIMINGS '+phases[1]);
+ const bound=/^REAL_RETAINED_STEP8_PREPASS_BOUND (.+)$/m.exec(result.stdout);assert.ok(bound);const projected=JSON.parse(bound[1]);assert.equal(projected.pass,true);assert.ok(evidence.primaryBytes<=projected.primaryUpperBoundBytes);assert.equal(evidence.stagingBytes,projected.stagingExactBytes);console.log('REAL_RETAINED_STEP8_PREPASS_BOUND '+bound[1]);
 });

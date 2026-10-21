@@ -15,6 +15,9 @@ import {authenticateStep8Campaign,reserveStep8Generation} from './r1-step8-gover
 import {STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {requiredReplayStaging} from './replay-pipeline.ts';
 import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,ReconstructionWorkersSchema,ReconstructionTimingSchema,createWitnessedProvenanceContext,authenticateCanonicalSealProvenance,canonicalOutputForProvenance,assertCanonicalEpochFinished,assertCanonicalContextInputs,type WitnessedProvenanceContext} from './r1-step8-provenance.ts';
+import {normalizePublicationBindings,normalizePublicationPin} from './publication-binding-normalization.ts';
+import {partitionPublicationInputs,provenanceBytes,authenticatePublicationPartition} from './publication-provenance-partition.ts';
+import {assertStep8ProvenanceSizes} from './r1-step8-publication-bounds.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Absolute input path required'),sha256:HashSchema}).strict();
 const Policy=z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict();
@@ -61,7 +64,7 @@ export async function buildStep8RetainedPlan(publicationRoot:string,managedRoot=
  return RetainedPublicationImportPlanSchema.parse({schemaVersion:'stadtstack-retained-import-plan-v1',managedRoot:resolve(managedRoot),imports});
 }
 
-type StagingInputs={campaign:z.infer<typeof Pin>;registry:z.infer<typeof Pin>;privateProvenance:z.infer<typeof Pin>;staging:Array<z.infer<typeof Pin>&{destination:string}>;identityAssessments?:z.infer<typeof Pin>;criticalAssessments?:z.infer<typeof Pin>;regionalPolicyReceipts?:z.infer<typeof Pin>};
+type StagingInputs={campaign:z.infer<typeof Pin>;registry:z.infer<typeof Pin>;privateProvenance:z.infer<typeof Pin>;stagingProvenance:z.infer<typeof Pin>;staging:Array<z.infer<typeof Pin>&{destination:string}>;identityAssessments?:z.infer<typeof Pin>;criticalAssessments?:z.infer<typeof Pin>;regionalPolicyReceipts?:z.infer<typeof Pin>};
 export interface PreparedStep8Staging {readonly inputs:StagingInputs;dispose():Promise<void>}
 type PreparedState={input:z.infer<typeof Step8StagingAssemblySchema>;output:string;campaignBytes:Buffer;campaignBindings:SourceArtifactBinding[];bindings:SourceArtifactBinding[];selected:Map<string,InventoryPin>;controls:string;inputs:StagingInputs;context?:WitnessedProvenanceContext;ownsContext:boolean;contextFinished:boolean;committed:boolean;disposed:boolean};
 const preparations=new WeakMap<PreparedStep8Staging,PreparedState>();
@@ -99,7 +102,7 @@ export async function prepareStep8Staging(raw:unknown,pool?:Pool,borrowedContext
    for(const pin of inventory.inputs){
     const path=resolve(dirname(control.path),pin.path),old=inventories.get(path),normalized={...pin,path};
     if(old&&(old.pin.sha256!==pin.sha256||old.pin.bytes!==pin.bytes))throw Error('Conflicting authenticated input inventory');
-    inventories.set(path,{pin:old?{...normalized,bindings:uniqueBindings([...old.pin.bindings,...pin.bindings])}:normalized,read:()=>provenance.read(path)});
+    inventories.set(path,{pin:normalizePublicationPin(old?{...normalized,bindings:uniqueBindings([...old.pin.bindings,...pin.bindings])}:normalized),read:()=>provenance.read(path)});
    }
   }
   const selected=new Map<string,InventoryPin>(),managed=async(pin:{path:string;sha256?:string})=>{
@@ -109,7 +112,7 @@ export async function prepareStep8Staging(raw:unknown,pool?:Pool,borrowedContext
   const campaignBytes=await readFile(input.campaign.path);if(digest(campaignBytes)!==input.campaign.sha256)throw Error('Campaign operator pin mismatch');
   const campaign=await authenticateStep8Campaign(JSON.parse(campaignBytes.toString('utf8')),path=>managed({path}),policy);
   for(const source of campaign.sources)await managed(source.corpus);
-  const campaignBindings=uniqueBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
+  const campaignBindings=normalizePublicationBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
   await managed(input.registry);for(const pin of [input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts])if(pin)await managed(pin);
   const staging:StagingInputs['staging']=[];
   for(const member of plan.imports){
@@ -120,11 +123,13 @@ export async function prepareStep8Staging(raw:unknown,pool?:Pool,borrowedContext
    const pin={path,sha256:digest(bytes),bytes:bytes.length,bindings:authenticated.bindings};selected.set(path,pin);staging.push({path,sha256:pin.sha256,destination:member.memberPath});
   }
   await context?.checkpoint();
-  const bindings=uniqueBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
+  const bindings=normalizePublicationBindings([...selected.values()].flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
   controls=await mkdtemp(join(tmpdir(),'stadtstack-step8-staging-'));
-  const bytes=encoded(privatePublicationProvenanceSchema.parse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[...selected.values()]})),path=join(controls,'verified-input-provenance.json');
-  await writeFile(path,bytes,{mode:0o600,flag:'wx'});
-  const inputs:StagingInputs={campaign:input.campaign,registry:input.registry,privateProvenance:{path,sha256:digest(bytes)},staging,...(input.identityAssessments?{identityAssessments:input.identityAssessments}:{}),...(input.criticalAssessments?{criticalAssessments:input.criticalAssessments}:{}),...(input.regionalPolicyReceipts?{regionalPolicyReceipts:input.regionalPolicyReceipts}:{})};
+  const partition=partitionPublicationInputs([...selected.values()],staging.map(pin=>pin.path));
+  const bytes=provenanceBytes(partition.primary),path=join(controls,'verified-input-provenance.json'),stageBytes=provenanceBytes(partition.staging),stagePath=join(controls,'verified-staging-provenance.json');
+  assertStep8ProvenanceSizes('prepared staging',bytes.length,stageBytes.length);
+  await writeFile(path,bytes,{mode:0o600,flag:'wx'});await writeFile(stagePath,stageBytes,{mode:0o600,flag:'wx'});
+  const inputs:StagingInputs={campaign:input.campaign,registry:input.registry,privateProvenance:{path,sha256:digest(bytes)},stagingProvenance:{path:stagePath,sha256:digest(stageBytes)},staging,...(input.identityAssessments?{identityAssessments:input.identityAssessments}:{}),...(input.criticalAssessments?{criticalAssessments:input.criticalAssessments}:{}),...(input.regionalPolicyReceipts?{regionalPolicyReceipts:input.regionalPolicyReceipts}:{})};
   const prepared:PreparedStep8Staging=Object.freeze({get inputs(){return structuredClone(preparation(prepared).inputs);},async dispose(){
    const live=preparations.get(prepared);if(!live||live.disposed)return;live.disposed=true;
    try{if(live.ownsContext&&live.context&&!live.contextFinished){live.contextFinished=true;await live.context.finish();}}finally{await rm(live.controls,{recursive:true,force:true});}
@@ -142,8 +147,10 @@ export async function readPreparedStep8Campaign(prepared:PreparedStep8Staging,pi
 }
 
 export async function readPreparedStep8Provenance(prepared:PreparedStep8Staging,pin:z.infer<typeof Pin>){
- const live=preparation(prepared);if(!same(pin,live.inputs.privateProvenance))throw Error('Prepared provenance control pin differs');
- const expected=encoded(privatePublicationProvenanceSchema.parse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[...live.selected.values()]})),bytes=await readFile(pin.path);
+ const live=preparation(prepared),partition=partitionPublicationInputs([...live.selected.values()],live.inputs.staging.map(pin=>pin.path));
+ const selected=same(pin,live.inputs.privateProvenance)?partition.primary:same(pin,live.inputs.stagingProvenance)?partition.staging:undefined;
+ if(!selected)throw Error('Prepared provenance control pin differs');
+ const expected=provenanceBytes(selected),bytes=await readFile(pin.path);
  if(!bytes.equals(expected)||digest(bytes)!==pin.sha256)throw Error('Prepared provenance control changed');return bytes;
 }
 
@@ -154,7 +161,7 @@ export async function commitStep8Staging(prepared:PreparedStep8Staging){
  await readPreparedStep8Campaign(prepared,input.campaign);
  // Re-authenticate exact current rights and bytes after closing the source epoch,
  // before the first managed write. No historical audit/cache grants permission.
- const source=await authenticatePublicationProvenance(live.inputs.privateProvenance.path,live.inputs.privateProvenance.sha256,policy);
+ const source=await authenticatePublicationPartition(live.inputs.privateProvenance,live.inputs.stagingProvenance,policy);source.assertCoverage([...live.selected.values()]);
  for(const pin of live.selected.values())await source.read(pin.path);
  await assertStagingRootsDisjoint(output,policy);const claim=await reserveStep8Generation(output);live.committed=true;
  const write=async(name:string,bytes:Buffer,contributors=bindings)=>{
@@ -162,9 +169,12 @@ export async function commitStep8Staging(prepared:PreparedStep8Staging){
  };
  const campaignPin=await write('campaign.json',campaignBytes,campaignBindings),selected=new Map(live.selected);
  selected.set(campaignPin.path,{...campaignPin,bytes:campaignBytes.length,bindings:campaignBindings});
- const provenance=privatePublicationProvenanceSchema.parse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[...selected.values()]}),privateProvenance=await write('private-publication-provenance.json',encoded(provenance));
- const authenticated=await authenticatePublicationProvenance(privateProvenance.path,privateProvenance.sha256,policy);for(const pin of provenance.inputs)await authenticated.read(pin.path);
- const component={...live.inputs,campaign:campaignPin,privateProvenance},componentPin=await write('staging-component.json',encoded(component));
+ const partition=partitionPublicationInputs([...selected.values()],live.inputs.staging.map(pin=>pin.path));
+ const contributors=(pins:InventoryPin[])=>normalizePublicationBindings(pins.flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false}))));
+ const primaryBytes=provenanceBytes(partition.primary),stageBytes=provenanceBytes(partition.staging);assertStep8ProvenanceSizes('committed staging',primaryBytes.length,stageBytes.length);
+ const privateProvenance=await write('private-publication-provenance.json',primaryBytes,contributors(partition.primary)),stagingProvenance=await write('staging-publication-provenance.json',stageBytes,contributors(partition.staging));
+ const authenticated=await authenticatePublicationPartition(privateProvenance,stagingProvenance,policy);authenticated.assertCoverage([...selected.values()]);for(const pin of selected.values())await authenticated.read(pin.path);
+ const component={...live.inputs,campaign:campaignPin,privateProvenance,stagingProvenance},componentPin=await write('staging-component.json',encoded(component));
  return {schemaVersion:'stadtstack-r1-step8-staging-result-v2',component:componentPin,inputs:component,retainedPlan:input.retainedPlan,importedMembers:component.staging.length,publicationExecuted:false,valueAccepted:false,hostedReleaseAuthorized:false};
 }
 

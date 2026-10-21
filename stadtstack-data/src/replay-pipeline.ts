@@ -40,10 +40,11 @@ import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
 import {insertR1MetadataSnapshot} from './district-jobs.ts';
 import {RepresentationDescriptorSchema} from './district-r1.ts';
 import {authenticatedHttpBinding} from './district-http-observation.ts';
-import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,type AuthenticatedPublicationProvenance,type PrivatePublicationProvenance} from './district-publication-provenance.ts';
+import type {AuthenticatedPublicationProvenance,PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import type {SourceArtifactBinding} from './district-private-io.ts';
 import {derivedProducerBindings,producerBindingSetSha256,publicationMemberProducerBindings,type PublicationProducerGroups} from './publication-producer-bindings.ts';
 import {ReplayArtifactAuditSchema,ReplayEvidenceInputPinsSchema,replayEvidenceCasRoot,type ReplayEvidenceInputPins} from './replay-evidence-contract.ts';
+import {authenticatePublicationPartition,publicationPartitionSha256} from './publication-provenance-partition.ts';
 
 const Pin=z.object({path:z.string().min(1),sha256:hashSchema}).strict();
 const Identity=ModelEvidenceSchema;
@@ -59,7 +60,7 @@ export const ReplayClocksSchema=z.object({recordsGeneratedAt:z.iso.datetime(),qu
  * is recommended; this receipt does not assert that the operating system provided it.
  */
 const ReplayCommonSchema=z.object({
- schemaVersion:z.literal('stadtstack-offline-replay-v2'),registry:Pin,candidateRecords:Pin,candidateQuarantine:Pin,identityState:Pin,publicationInputs:Pin,policyReceipts:Pin,privateProvenance:Pin,acquisitionDescriptors:z.array(Pin).optional(),textComposition:Pin.optional(),identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),casRoot:z.string().min(1),policyStateDir:z.string().min(1).optional(),policyAuthorityId:z.string().min(1).optional(),policyAuthoritySha256:hashSchema.optional(),
+ schemaVersion:z.literal('stadtstack-offline-replay-v2'),registry:Pin,candidateRecords:Pin,candidateQuarantine:Pin,identityState:Pin,publicationInputs:Pin,policyReceipts:Pin,privateProvenance:Pin,stagingProvenance:Pin,provenanceInputs:z.array(Pin).min(1),acquisitionDescriptors:z.array(Pin).optional(),textComposition:Pin.optional(),identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),casRoot:z.string().min(1),policyStateDir:z.string().min(1).optional(),policyAuthorityId:z.string().min(1).optional(),policyAuthoritySha256:hashSchema.optional(),
  structuredRun:Pin.optional(),clocks:ReplayClocksSchema,
  staging:z.array(Pin.extend({destination:stagePath}).strict()).min(1),
  priorRelease:priorReleaseSchema,legacyPreviousReleases:z.record(z.string().regex(/^[a-z0-9-]+$/),priorReleaseSchema).optional(),expectedRelease:Pin,
@@ -122,23 +123,26 @@ interface ReplaySourceContext {
 }
 async function authenticateReplayProvenance(receipt:ReplayReceipt,base:string){
  const policy:CivicPolicyOptions={...(receipt.policyStateDir?{stateDir:resolve(base,receipt.policyStateDir)}:{}),...(receipt.policyAuthorityId?{authorityId:receipt.policyAuthorityId}:{}),...(receipt.policyAuthoritySha256?{authoritySha256:receipt.policyAuthoritySha256}:{})};
- const provenance=await authenticatePublicationProvenance(resolve(base,receipt.privateProvenance.path),receipt.privateProvenance.sha256,policy);
- const provenancePath=resolve(base,receipt.privateProvenance.path),inventory=privatePublicationProvenanceSchema.parse(JSON.parse((await readReplayPin(receipt.privateProvenance,base)).toString('utf8')));
- const provenanceInputs=inventory.inputs.map(pin=>({...pin,path:resolve(dirname(provenancePath),pin.path)})),byPath=new Map(provenanceInputs.map(pin=>[pin.path,pin]));
+ const primaryPin={path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},stagingPin={path:resolve(base,receipt.stagingProvenance.path),sha256:receipt.stagingProvenance.sha256};
+ const partition=await authenticatePublicationPartition(primaryPin,stagingPin,policy),provenance=partition.primary;
+ partition.assertCoverage(receipt.provenanceInputs.map(pin=>({path:resolve(base,pin.path),sha256:pin.sha256})));
+ const stagePaths=new Set(receipt.staging.map(pin=>resolve(base,pin.path)));
+ if(partition.stagingInputs.length!==stagePaths.size||partition.stagingInputs.some(pin=>!stagePaths.has(pin.path)))throw Error('Replay staging provenance partition differs from required staging');
+ const provenanceInputs=partition.inputs,byPath=new Map(provenanceInputs.map(pin=>[pin.path,pin]));
  const bindingsFor=(pins:readonly ReplayPin[])=>derivedProducerBindings(pins.flatMap(pin=>{const source=byPath.get(resolve(base,pin.path));if(!source||source.sha256!==pin.sha256)throw Error('Replay producer input lacks an exact authenticated pin');return source.bindings;}));
  const knowledge=[receipt.registry,receipt.candidateRecords,receipt.candidateQuarantine,receipt.identityState,receipt.policyReceipts,...[receipt.textComposition,receipt.structuredRun,receipt.criticalAssessments,receipt.identityAssessments].filter((pin):pin is NonNullable<typeof pin>=>!!pin)];
- const producerGroups:PublicationProducerGroups={knowledge:bindingsFor(knowledge),staging:new Map(receipt.staging.map(pin=>[pin.destination,bindingsFor([pin])])),whole:derivedProducerBindings(provenance.bindings),regional:bindingsFor(receipt.regionalPolicyReceipts?[receipt.regionalPolicyReceipts]:[])};
+ const producerGroups:PublicationProducerGroups={knowledge:bindingsFor(knowledge),staging:new Map(receipt.staging.map(pin=>[pin.destination,bindingsFor([pin])])),whole:derivedProducerBindings(partition.bindings),regional:bindingsFor(receipt.regionalPolicyReceipts?[receipt.regionalPolicyReceipts]:[])};
  const pinned=async(pin:ReplayPin,location=base)=>{
-  const bytes=await provenance.read(resolve(location,pin.path));if(hash(bytes)!==pin.sha256)throw Error('Replay independent artifact pin mismatch');return bytes;
+  const bytes=await partition.read(resolve(location,pin.path));if(hash(bytes)!==pin.sha256)throw Error('Replay independent artifact pin mismatch');return bytes;
  };
- const bindings=provenance.bindings;
+ const bindings=partition.bindings;
  const descriptors=[];
  for(const pin of receipt.acquisitionDescriptors??[]){
   const descriptor=RepresentationDescriptorSchema.parse(JSON.parse((await pinned(pin)).toString('utf8')));
   const binding=authenticatedHttpBinding(descriptor.httpObservation,{url:descriptor.snapshot.url,sha256:descriptor.snapshot.sourceSha256,mimeType:descriptor.snapshot.mimeType,retrievedAt:descriptor.snapshot.retrievedAt,fetchedAt:descriptor.fetchedAt});
   descriptors.push(binding);
  }
- return {policy,pinned,bindings,provenance,provenanceInputs,producerGroups,provenanceSha256:receipt.privateProvenance.sha256};
+ return {policy,pinned,bindings,provenance,provenanceInputs,producerGroups,provenanceSha256:publicationPartitionSha256(primaryPin,stagingPin)};
 }
 type LoadedPrior=Awaited<ReturnType<typeof loadPriorPublicationRelease>>;
 async function replayInputPins(receipt:ReplayReceipt,receiptPin:ReplayPin,receiptBytes:Buffer,base:string,source:Awaited<ReturnType<typeof authenticateReplayProvenance>>,expected:DataRelease,expectedBytes:Buffer,priors:LoadedPrior[]){
@@ -146,7 +150,7 @@ async function replayInputPins(receipt:ReplayReceipt,receiptPin:ReplayPin,receip
  const filePin=async(pin:ReplayPin,location=base)=>{const path=resolve(location,pin.path),bytes=await readReplayPin({path,sha256:pin.sha256},location,true);return {path,sha256:pin.sha256,bytes:bytes.length};};
  return ReplayEvidenceInputPinsSchema.parse({
   schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:resolve(base,receipt.casRoot),hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
-  receipt:{path:resolve(receiptPin.path),sha256:receiptPin.sha256,bytes:receiptBytes.length},provenance:await filePin(receipt.privateProvenance),
+  receipt:{path:resolve(receiptPin.path),sha256:receiptPin.sha256,bytes:receiptBytes.length},provenance:await filePin(receipt.privateProvenance),stagingProvenance:await filePin(receipt.stagingProvenance),
   dependencies:source.provenanceInputs.map(pin=>({path:pin.path,sha256:pin.sha256,bytes:pin.bytes,bindingsSha256:semanticHash([...pin.bindings].sort((a,b)=>canonicalJson(a).localeCompare(canonicalJson(b))))})),
   staging:receipt.staging.map(pin=>{const path=resolve(base,pin.path),source=byPath.get(path);if(!source||source.sha256!==pin.sha256)throw Error('Replay staging input pin missing');return {destination:pin.destination,path,sha256:pin.sha256,bytes:source.bytes};}),
   expectedRelease:{manifest:{path:resolve(base,receipt.expectedRelease.path),sha256:receipt.expectedRelease.sha256,bytes:expectedBytes.length},members:expected.files.map(pin=>({path:join(dirname(resolve(base,receipt.expectedRelease.path)),pin.path),sha256:pin.sha256,bytes:pin.bytes}))},
@@ -338,17 +342,21 @@ export function compareReplayRelease(expectedBytes:Uint8Array,actualBytes:Uint8A
  return {releaseId:actual.id,manifestSha256:hash(actualBytes),files:actual.files};
 }
 export function requiredReplayStaging(cities:string[]):string[]{return ['catalogue.json','regions/brandenburg-mol/topics.json','core/strausberg-facts.json',...cities.flatMap(id=>[`cities/${id}/signals.geojson`,`cities/${id}/feed.json`])].sort();}
+const step8RuntimeOperatorSources=['scripts/r1-step8.ts','scripts/r1-step8.sh','scripts/r1-step8-offline.cjs','scripts/r1-step8-precheck.mjs','scripts/r1-step8-structured-precheck.mjs'];
+/** One inventory definition for both governed receipt production and replay.
+ * Standalone replay has no operator entrypoints; any governed script commits to
+ * the entire group, never a partial or arbitrary implementation-source set. */
+export async function requiredReplayRuntimeSources(includeOperator:boolean){
+ const sources=(await readdir(join(root,'src'),{withFileTypes:true})).filter(item=>item.isFile()&&item.name.endsWith('.ts')).map(item=>'src/'+item.name);
+ return [...sources,'regional/taxonomy.mjs','package.json',...(includeOperator?step8RuntimeOperatorSources:[])].sort();
+}
 async function checkRuntime(receipt:ReplayReceipt){
  const runtime=receipt.runtime;
  requireEqual([process.versions.node,process.versions.icu,process.versions.unicode],[runtime.node,runtime.icu,runtime.unicode],'Replay Node/ICU/Unicode version mismatch');
  const locale=Intl.DateTimeFormat().resolvedOptions();
  requireEqual([locale.locale,locale.timeZone],[runtime.locale,runtime.timeZone],'Replay publication locale/timezone mismatch');
  if(hash(await readFile(join(root,'package-lock.json')))!==runtime.packageLockSha256)throw Error('Replay dependency lock mismatch');
- const sources=(await readdir(join(root,'src'),{withFileTypes:true})).filter(item=>item.isFile()&&item.name.endsWith('.ts')).map(item=>'src/'+item.name);
- // Standalone replay has no operator bootstrap; governed step-8 receipts bind
- // the complete entrypoint/guard trio, never a partial or arbitrary script set.
- const operator=['scripts/r1-step8.ts','scripts/r1-step8.sh','scripts/r1-step8-offline.cjs'];
- const required=[...sources,'regional/taxonomy.mjs','package.json',...(runtime.sourceFiles.some(pin=>operator.includes(pin.path))?operator:[])].sort();
+ const required=await requiredReplayRuntimeSources(runtime.sourceFiles.some(pin=>step8RuntimeOperatorSources.includes(pin.path)));
  requireEqual(runtime.sourceFiles.map(pin=>pin.path).sort(),required,'Replay implementation source inventory mismatch');
  for(const pin of runtime.sourceFiles)await readReplayPin(pin,root);
 }
@@ -386,11 +394,11 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  return withPreparedKnowledge({registry:resolve(base,receipt.registry.path),records:resolve(base,receipt.candidateRecords.path),quarantine:resolve(base,receipt.candidateQuarantine.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},outputRoot:resolve(base,receipt.workspace),casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,coverageGeneratedAt:receipt.clocks.coverageGeneratedAt},async prepared=>{
   const nested:ReplaySourceContext={...context,scope:prepared.scope},output=join(prepared.scope.directory,'release'),prior=prepared.publication.priorDirectory;
   if(!prior)throw Error('Replay requires its authenticated prepared predecessor directory');
-  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,prepared.publication);
+  await publish({stagingDir:prepared.stagingDir,outDir:output,asOf:original.asOf,priorRelease:receipt.priorRelease,legacyPreviousReleases:receipt.legacyPreviousReleases,offlineReplay:true,priorCityRoot:prior,publicationInputs:resolve(base,receipt.publicationInputs.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,regionalPolicyReceipts:receipt.regionalPolicyReceipts?resolve(base,receipt.regionalPolicyReceipts.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},stagingProvenance:{path:resolve(base,receipt.stagingProvenance.path),sha256:receipt.stagingProvenance.sha256},casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,qualityGeneratedAt:receipt.clocks.qualityGeneratedAt,manifestGeneratedAt:receipt.clocks.manifestGeneratedAt},context.predecessors,prepared.publication);
   const actual=await verifyDataRelease(output),comparison=compareReplayRelease(expectedBytes,await readFile(join(output,'release-manifest.json')),actual);
   const proof={schemaVersion:'stadtstack-offline-replay-proof-v2',mode:receipt.mode,executedAt,completedAt:new Date().toISOString(),execution:{modelCalls:0,readinessCalls:0,liveFallback:'forbidden',networkIsolation:'external; not asserted by this proof'},historicalClocks:receipt.clocks,asOf:original.asOf,priorRelease:receipt.priorRelease,publicationInputsSha256:receipt.publicationInputs.sha256,knowledge:prepared.summary,comparison,inputs:context.inputPins,timings:{rebuildMs:performance.now()-rebuildStarted},...(text?{textGeneration:text.textGeneration}:{})};
   return {...proof,persistence:await persistReplayArtifacts(nested,receiptSha256,proof)};
- },{staging:receipt.staging.map(pin=>({destination:pin.destination,pin:{path:resolve(base,pin.path),sha256:pin.sha256}})),prior:{release:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id,cache:context.predecessors}});
+ },{stagingProvenance:{path:resolve(base,receipt.stagingProvenance.path),sha256:receipt.stagingProvenance.sha256},staging:receipt.staging.map(pin=>({destination:pin.destination,pin:{path:resolve(base,pin.path),sha256:pin.sha256}})),prior:{release:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id,cache:context.predecessors}});
 }
 
 export async function replayPipeline(receiptPath:string,receiptSha256:string){

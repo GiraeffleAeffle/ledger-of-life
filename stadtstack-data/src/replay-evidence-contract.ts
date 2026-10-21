@@ -11,7 +11,7 @@ const gitPin=z.object({path:gitPath,sha256:HashSchema,bytes:z.number().int().non
 export const ReplayEvidenceInputPinsSchema=z.object({
  schemaVersion:z.literal('stadtstack-replay-input-pins-v1'),
  sourceCas:z.object({root:z.string().refine(isAbsolute),hashPath:z.literal('sha256/<first-two-hex>/<sha256>'),references:z.literal('hash references in the pinned dependencies')}).strict(),
- receipt:pin,provenance:pin,
+ receipt:pin,provenance:pin,stagingProvenance:pin,
  dependencies:z.array(pin.extend({bindingsSha256:HashSchema}).strict()).min(1),
  staging:z.array(pin.extend({destination:gitPath}).strict()).min(1),
  expectedRelease:z.object({manifest:pin,members:z.array(pin).min(1)}).strict(),

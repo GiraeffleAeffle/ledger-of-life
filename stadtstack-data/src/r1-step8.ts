@@ -8,18 +8,18 @@ import {DistrictJobStore} from './district-jobs.ts';
 import {exportRun} from './district-r1.ts';
 import {QueueTextSealInputSchema} from './district-queue-text-run.ts';
 import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
-import {authenticatePublicationProvenance,privatePublicationProvenanceSchema,type PrivatePublicationProvenance} from './district-publication-provenance.ts';
+import type {PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import {publicationPolicyReceiptInventorySchema} from './district-publication-policy.ts';
 import {CriticalAssessmentInventorySchema} from './district-critical-assessment-contract.ts';
 import {districtRegistrySchema} from './district-registry.ts';
 import {withPreparedKnowledge} from './prepare-knowledge.ts';
 import {publish} from './publish.ts';
 import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases} from './district-publication-predecessor.ts';
-import {ReplayClocksSchema,ReplayReceiptSchema,readReplayPin,requiredReplayStaging,replayPipeline} from './replay-pipeline.ts';
+import {ReplayClocksSchema,ReplayReceiptSchema,readReplayPin,requiredReplayStaging,requiredReplayRuntimeSources,replayPipeline} from './replay-pipeline.ts';
 import {verifyDataRelease} from './data-release.ts';
 import {loadRelease} from './mcp-release.ts';
 import {writeManagedSourceArtifact,type SourceArtifactBinding} from './district-private-io.ts';
-import {assertCivicPolicyAuthority,CIVIC_ACQUISITION_DECISION_ID,assertSourceHostsNotOptedOut,initializeManagedAcquisitionLane,withManagedSourceScratch,withManagedSourceWrite} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority,assertManagedSourceBindings,CIVIC_ACQUISITION_DECISION_ID,assertSourceHostsNotOptedOut,initializeManagedAcquisitionLane,withManagedSourceScratch,withManagedSourceWrite} from './civic-opt-out.ts';
 import {root,cacheDir} from './common.ts';
 import {authenticateStep8Campaign,assertStep8ExportMembership,reserveStep8Generation,classifyStep8Exception} from './r1-step8-governance.ts';
 import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
@@ -30,6 +30,10 @@ import {Step8StagingAssemblySchema,prepareStep8Staging,commitStep8Staging,readPr
 import {authenticateImportDispositions} from './r1-step8-import-dispositions.ts';
 import {publicationMemberProducerBindings} from './publication-producer-bindings.ts';
 import {replayEvidenceCasRoot} from './replay-evidence-contract.ts';
+import {normalizePublicationBindings,normalizePublicationPin} from './publication-binding-normalization.ts';
+import {authenticatePublicationPartition,partitionPublicationInputs,provenanceBytes} from './publication-provenance-partition.ts';
+import {requireStep8Preflight} from './r1-step8-preflight.ts';
+import {assertStep8ProvenanceSizes} from './r1-step8-publication-bounds.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Operator paths must be absolute'),sha256:HashSchema}).strict();
 const sealSchema=z.object({compositionArtifactSha256:HashSchema,privateProvenance:Pin.passthrough(),policyInventory:Pin.passthrough(),criticalInventory:Pin.passthrough()}).passthrough();
@@ -41,7 +45,7 @@ export const Step8InputSchema=z.object({
  seals:z.array(QueueTextSealInputSchema.safeExtend({sealResult:Pin,provenanceSupplement:ProvenanceSupplementSelectionSchema.optional()})).min(1),
  nativeSealSelection:NativeProvenancePinSchema,reconstructionWorkers:ReconstructionWorkersSchema,reconstructionTiming:ReconstructionTimingSchema,
  importDispositionDecision:Pin.optional(),
- structuredRunIds:z.array(z.uuid()).min(1),registry:Pin,privateProvenance:Pin,
+ structuredRunIds:z.array(z.uuid()).min(1),structuredSelection:Pin.optional(),registry:Pin,privateProvenance:Pin,stagingProvenance:Pin,
  staging:z.array(Pin.extend({destination:z.string().min(1)}).strict()).min(1),
  identityAssessments:Pin.optional(),criticalAssessments:Pin.optional(),regionalPolicyReceipts:Pin.optional(),
  priorRelease:priorReleaseSchema,legacyPreviousReleases:z.record(z.string(),priorReleaseSchema).optional(),
@@ -50,19 +54,19 @@ export const Step8InputSchema=z.object({
  policy:z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict(),
 }).strict();
 export type Step8Input=z.infer<typeof Step8InputSchema>;
-const Step8AssemblyExecutionSchema=Step8InputSchema.omit({campaign:true,registry:true,privateProvenance:true,staging:true,identityAssessments:true,criticalAssessments:true,regionalPolicyReceipts:true}).extend({stagingAssembly:Pin});
+const Step8AssemblyExecutionSchema=Step8InputSchema.omit({campaign:true,registry:true,privateProvenance:true,stagingProvenance:true,staging:true,identityAssessments:true,criticalAssessments:true,regionalPolicyReceipts:true}).extend({stagingAssembly:Pin});
 export const Step8OperatorInputSchema=z.union([Step8InputSchema,Step8AssemblyExecutionSchema]);
 export type Step8OperatorInput=z.infer<typeof Step8OperatorInputSchema>;
 const encoded=(value:unknown)=>Buffer.from(JSON.stringify(value,null,2)+'\n');
 const inside=(parent:string,path:string)=>{const child=relative(parent,path);return !!child&&!child.startsWith('..')&&!isAbsolute(child);};
-const uniqueBindings=(bindings:SourceArtifactBinding[])=>[...new Map(bindings.map(binding=>[canonicalJson(binding),binding])).values()];
+const uniqueBindings=normalizePublicationBindings;
 
 /** This is deliberately a plan, not a policy admission, cache export or job execution. */
 export function step8ReadPlan(input:Step8OperatorInput){
- const staging='stagingAssembly' in input?{stagingAssembly:input.stagingAssembly}:{campaign:input.campaign,registry:input.registry,privateProvenance:input.privateProvenance,staging:input.staging,identityAssessments:input.identityAssessments,criticalAssessments:input.criticalAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts};
+ const staging='stagingAssembly' in input?{stagingAssembly:input.stagingAssembly}:{campaign:input.campaign,registry:input.registry,privateProvenance:input.privateProvenance,stagingProvenance:input.stagingProvenance,staging:input.staging,identityAssessments:input.identityAssessments,criticalAssessments:input.criticalAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts};
  return {schemaVersion:'stadtstack-r1-step8-read-plan-v1',writes:[],network:false,providers:false,
   reconstruction:{passes:1,workers:input.reconstructionWorkers,timing:input.reconstructionTiming,workerBudgetBytes:1.5*1024**3,reserveBytes:4*1024**3,minimumMemAvailableBytes:(input.reconstructionWorkers*1.5+4)*1024**3,transport:'trusted child IPC; no passed-result files'},
-  reads:{...staging,seals:input.seals,structuredRunIds:input.structuredRunIds,currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,nativeSealSelection:input.nativeSealSelection,importDispositionDecision:input.importDispositionDecision,
+  reads:{...staging,seals:input.seals,structuredRunIds:input.structuredRunIds,structuredSelection:input.structuredSelection,currentGeneration:input.currentGeneration,allowance:STEP8_ALLOWANCE_READ_PLAN,nativeSealSelection:input.nativeSealSelection,importDispositionDecision:input.importDispositionDecision,
    casRoot:input.casRoot,policy:input.policy,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,host:['/proc/meminfo'],
    database:['district_pipeline.jobs','district_pipeline.step_receipts','district_pipeline.artifacts','district_pipeline.r1_codex_documents','district_pipeline.r1_codex_call_intents','district_pipeline.r1_codex_call_authorizations','district_pipeline.r1_codex_allowance_intents','district_pipeline.preauthorizations','district_pipeline.assessment_bridge_leases'],
    transitive:'Every pinned assembly/retained member, seal provenance member, queue dependency, original policy/HTTP observation, generation archive, model answer, A/B/C receipt and native parser output; no provider cache miss fallback.'},
@@ -82,7 +86,9 @@ async function resolveStep8OperatorInput(invocation:Step8OperatorInput,pool:Pool
 
 /** Standalone audit owns exactly one pass and never commits prepared staging. */
 export async function auditStep8Operator(raw:unknown,pool:Pool){
- const invocation=Step8OperatorInputSchema.parse(raw),context=await createWitnessedProvenanceContext(invocation.nativeSealSelection,invocation.policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
+ const invocation=Step8OperatorInputSchema.parse(raw);
+ await requireStep8Preflight(invocation,pool);
+ const context=await createWitnessedProvenanceContext(invocation.nativeSealSelection,invocation.policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
  let prepared:PreparedStep8Staging|undefined;
  try{const resolved=await resolveStep8OperatorInput(invocation,pool,context);prepared=resolved.prepared;return await auditStep8(resolved.input,pool,context,prepared);}
  finally{try{await context.finish();}finally{await prepared?.dispose();}}
@@ -99,7 +105,9 @@ export async function runStep8(raw:unknown,pool:Pool){
  try{await lstat(output);throw Error('Step8 candidate root already exists; use a fresh generation');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
  const parent=await realpath(dirname(output));if(parent!==await realpath(cacheDir)&&!inside(await realpath(cacheDir),parent))throw Error('Candidate parent escapes cache');
  await assertCivicPolicyAuthority(policy);
- const phaseTimings:Record<string,number>={},reconstructionStarted=performance.now();
+ const phaseTimings:Record<string,number>={},preflightStarted=performance.now();
+ const preflight=await requireStep8Preflight(invocation,pool);
+ phaseTimings.preflightMs=performance.now()-preflightStarted;const reconstructionStarted=performance.now();
  const provenanceContext=await createWitnessedProvenanceContext(invocation.nativeSealSelection,policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
  phaseTimings.reconstructionMs=performance.now()-reconstructionStarted;
  let provenanceFinished=false,preparedStaging:PreparedStep8Staging|undefined;
@@ -110,12 +118,11 @@ export async function runStep8(raw:unknown,pool:Pool){
  let generationAudit=await auditStep8(input,pool,provenanceContext,preparedStaging);
  if(generationAudit.status!=='compatible')throw Error('Step8 read-only generation audit blocked: '+JSON.stringify(generationAudit.blockers));
  const claim=await reserveStep8Generation(output);
- let external=await authenticatePublicationProvenance(input.privateProvenance.path,input.privateProvenance.sha256,policy);
- const inventory=privatePublicationProvenanceSchema.parse(JSON.parse((await readReplayPin(input.privateProvenance,process.cwd())).toString('utf8')));
+ let external=await authenticatePublicationPartition(input.privateProvenance,input.stagingProvenance,policy);
  for(const pin of [input.registry,...input.staging,input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts])if(pin&&digest(await external.read(pin.path))!==pin.sha256)throw Error('Operator input differs from its independent pin');
  const pins=new Map<string,PrivatePublicationProvenance['inputs'][number]>();
- const addInventory=(entries:PrivatePublicationProvenance['inputs'],base:string)=>{for(const entry of entries){const pin={...entry,path:resolve(base,entry.path)},old=pins.get(pin.path);if(old&&(old.sha256!==pin.sha256||old.bytes!==pin.bytes))throw Error('Conflicting independent provenance pin');pins.set(pin.path,old?{...pin,bindings:uniqueBindings([...old.bindings,...pin.bindings])}:pin);}};
- addInventory(inventory.inputs,dirname(resolve(input.privateProvenance.path)));
+ const addInventory=(entries:PrivatePublicationProvenance['inputs'],base:string)=>{for(const entry of entries){const pin={...entry,path:resolve(base,entry.path)},old=pins.get(pin.path);if(old&&(old.sha256!==pin.sha256||old.bytes!==pin.bytes))throw Error('Conflicting independent provenance pin');pins.set(pin.path,normalizePublicationPin(old?{...pin,bindings:[...old.bindings,...pin.bindings]}:pin));}};
+ addInventory(external.inputs,process.cwd());
  const producerBindings=(paths:Iterable<string>)=>uniqueBindings([...paths].flatMap(path=>{const pin=pins.get(path);if(!pin)throw Error('Missing authenticated producer pin: '+path);return pin.bindings.map(binding=>({...binding,independentAllowed:false}));}));
  const textProducerPaths=new Set<string>(),compositionArtifactPaths=new Set<string>(),assessmentProducers=new Map<string,string[]>();
  const campaignBytes=await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):external.read(input.campaign.path));if(digest(campaignBytes)!==input.campaign.sha256)throw Error('Campaign independent pin mismatch');
@@ -175,8 +182,8 @@ export async function runStep8(raw:unknown,pool:Pool){
  let stagingAssemblyResult;
  if(preparedStaging){
   stagingAssemblyResult=await commitStep8Staging(preparedStaging);input={...input,...stagingAssemblyResult.inputs};
-  const relocated=await relocateStep8AuditCampaign(generationAudit,input.campaign,input.privateProvenance,policy);generationAudit=relocated.audit;external=relocated.provenance;
-  const inventory=privatePublicationProvenanceSchema.parse(JSON.parse((await readReplayPin(input.privateProvenance,process.cwd())).toString('utf8')));addInventory(inventory.inputs,dirname(input.privateProvenance.path));
+  const relocated=await relocateStep8AuditCampaign(generationAudit,input.campaign,input.privateProvenance,input.stagingProvenance,policy);generationAudit=relocated.audit;external=relocated.provenance;
+  addInventory(external.inputs,process.cwd());
  }
  phaseTimings.stagingCommitMs=performance.now()-stagingCommitStarted;const initialPersistenceStarted=performance.now();
  // Native aggregates depend on their actual native producer closure, never on
@@ -215,9 +222,19 @@ export async function runStep8(raw:unknown,pool:Pool){
  if(input.structuredRunIds.some(runId=>!native.receipts.some(row=>row.receipt.runId===runId)))throw Error('A selected native run has no committed structured receipt');
  const nativeBindings=uniqueBindings(native.bindings.map(binding=>({...binding,independentAllowed:false}))),knowledgeBindings=uniqueBindings([...textBindings,...nativeBindings,...producerBindings([input.identityAssessments?.path,input.criticalAssessments?.path].filter((path):path is string=>!!path))]);
  // Export committed native receipts to the same managed CAS contract used by the CLI.
- for(const row of native.receipts){await claim.assertOwned();const bytes=Buffer.from(canonicalJson(row.receipt));if(digest(bytes)!==row.sha256)throw Error('Native receipt digest mismatch');const bindings=nativeBindings.filter(binding=>binding.kind==='http_observation'&&row.receipt.inputHashes.includes(binding.receiptSha256));if(!bindings.length)throw Error('Native receipt lacks its exact producer bindings');await writeManagedSourceArtifact(cas.root,join(cas.root,'sha256',row.sha256.slice(0,2),row.sha256),bytes,bindings,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});await claim.assertOwned();}
+ for(const row of native.receipts){
+  await claim.assertOwned();const bytes=Buffer.from(canonicalJson(row.receipt));if(digest(bytes)!==row.sha256)throw Error('Native receipt digest mismatch');
+  const bindings=nativeBindings.filter(binding=>binding.kind==='http_observation'&&row.receipt.inputHashes.includes(binding.receiptSha256));if(!bindings.length)throw Error('Native receipt lacks its exact producer bindings');
+  const path=join(cas.root,'sha256',row.sha256.slice(0,2),row.sha256);let exists=false;
+  try{await lstat(path);exists=true;}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+  if(exists){await assertManagedSourceBindings(path,bindings,policy);if(!(await cas.read(row.sha256)).equals(bytes))throw Error('Existing native receipt CAS bytes differ');}
+  else await writeManagedSourceArtifact(cas.root,path,bytes,bindings,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+  await claim.assertOwned();
+ }
  const sourceDispositionInventory=await write('source-dispositions.json',{schemaVersion:'stadtstack-r1-step8-source-dispositions-v1',status:'authenticated_not_released',generationNonce:claim.nonce,campaign:input.campaign,complete:true,sourceDispositions},textBindings);
- const generationAuditEvidence=await write('audit/current-generation.json',generationAudit,auditBindings);
+ const evidenceBindings=uniqueBindings([...auditBindings,...nativeBindings]);
+ const generationAuditEvidence=await write('audit/current-generation.json',generationAudit,evidenceBindings);
+ const preflightEvidence=await write('audit/publication-preflight.json',preflight,evidenceBindings);
  const registry=await write('inputs/registry.json',null,uniqueBindings([...nativeBindings,...producerBindings([input.registry.path])]),native.registryBytes),structuredRun=await write('inputs/structured-run.json',native.run,nativeBindings);
  const composition=r1TextCompositionInputSchema.parse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:input.clocks.recordsGeneratedAt,approvedRunOrder:compositions.flatMap(item=>item.approvedRunOrder),admissions:compositions.flatMap(item=>item.admissions),contributions:compositions.flatMap(item=>item.contributions)});
  const context=buildR1TextCompositionContext(await loadR1TextCompositionInput(composition,pin=>readReplayPin(pin,process.cwd())));
@@ -228,8 +245,16 @@ export async function runStep8(raw:unknown,pool:Pool){
  if(input.criticalAssessments){const bytes=await external.read(input.criticalAssessments.path);if(digest(bytes)!==input.criticalAssessments.sha256)throw Error('Critical inventory pin mismatch');criticalInventories.push(CriticalAssessmentInventorySchema.parse(JSON.parse(bytes.toString('utf8'))));}
  const criticalAssessments=await write('inputs/critical.json',CriticalAssessmentInventorySchema.parse({records:criticalInventories.flatMap(item=>item.records)}),uniqueBindings([...textBindings,...producerBindings(input.criticalAssessments?[input.criticalAssessments.path]:[])]));
  const publicationPaths=[registry,structuredRun,textComposition,candidateRecords,candidateQuarantine,identityState,policyReceipts,criticalAssessments,...input.staging,...[input.identityAssessments,input.regionalPolicyReceipts].filter((pin):pin is NonNullable<typeof pin>=>!!pin)].map(pin=>pin.path).concat([...compositionArtifactPaths]);
- const saveProvenance=(publicationInputs?:{path:string;sha256:string})=>{const paths=new Set([...publicationPaths,...(publicationInputs?[publicationInputs.path]:[])]),inputs=[...paths].sort().map(path=>{const pin=pins.get(path);if(!pin)throw Error('Missing required publication/replay input: '+path);return pin;});return write('inputs/provenance.json',privatePublicationProvenanceSchema.parse({schemaVersion:'stadtstack-private-publication-provenance-v1',inputs}),producerBindings(paths));};
- let privateProvenance=await saveProvenance();
+ const saveProvenance=async(publicationInputs?:{path:string;sha256:string})=>{
+  const paths=new Set([...publicationPaths,...(publicationInputs?[publicationInputs.path]:[])]),inputs=[...paths].sort().map(path=>{const pin=pins.get(path);if(!pin)throw Error('Missing required publication/replay input: '+path);return pin;});
+  const partition=partitionPublicationInputs(inputs,input.staging.map(pin=>pin.path)),primaryBytes=provenanceBytes(partition.primary),stageBytes=provenanceBytes(partition.staging);
+  assertStep8ProvenanceSizes('publication',primaryBytes.length,stageBytes.length);
+  if(primaryBytes.length>preflight.publicationBounds.primaryUpperBoundBytes||stageBytes.length!==preflight.publicationBounds.stagingExactBytes)throw Error('Actual publication provenance exceeds or differs from the independent pre-pass bound');
+  const privateProvenance=await write('inputs/provenance.json',undefined,producerBindings(partition.primary.map(pin=>pin.path)),primaryBytes);
+  const stagingProvenance=await write('inputs/staging-provenance.json',undefined,producerBindings(partition.staging.map(pin=>pin.path)),stageBytes);
+  return {privateProvenance,stagingProvenance,provenanceInputs:inputs.map(({path,sha256})=>({path,sha256}))};
+ };
+ let {privateProvenance,stagingProvenance,provenanceInputs}=await saveProvenance();
  const cataloguePin=input.staging.find(pin=>pin.destination==='catalogue.json');if(!cataloguePin)throw Error('Staged catalogue required');
  const catalogue=JSON.parse((await external.read(cataloguePin.path)).toString('utf8')),cities=z.array(z.string()).parse(catalogue.cities.map((city:{id:string})=>city.id));
  if(canonicalJson(input.staging.map(pin=>pin.destination).sort())!==canonicalJson(requiredReplayStaging(cities)))throw Error('Complete unique non-knowledge staging inventory required');
@@ -241,7 +266,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  phaseTimings.initialExportPersistenceMs=performance.now()-initialPersistenceStarted;const publicationStarted=performance.now();
  const published=await withPreparedKnowledge(preparation,async prepared=>{
   const scratchOutput=join(prepared.scope.directory,'candidate');
-  const manifest=await publish({stagingDir:prepared.stagingDir,outDir:scratchOutput,asOf:input.asOf,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,priorCityRoot:prepared.publication.priorDirectory,policyReceipts:policyReceipts.path,textComposition:textComposition.path,structuredRun:structuredRun.path,criticalAssessments:criticalAssessments.path,identityAssessments:input.identityAssessments?.path,regionalPolicyReceipts:input.regionalPolicyReceipts?.path,privateProvenance,casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,qualityGeneratedAt:input.clocks.qualityGeneratedAt,manifestGeneratedAt:input.clocks.manifestGeneratedAt},predecessors,prepared.publication);
+  const manifest=await publish({stagingDir:prepared.stagingDir,outDir:scratchOutput,asOf:input.asOf,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,priorCityRoot:prepared.publication.priorDirectory,policyReceipts:policyReceipts.path,textComposition:textComposition.path,structuredRun:structuredRun.path,criticalAssessments:criticalAssessments.path,identityAssessments:input.identityAssessments?.path,regionalPolicyReceipts:input.regionalPolicyReceipts?.path,privateProvenance,casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,qualityGeneratedAt:input.clocks.qualityGeneratedAt,manifestGeneratedAt:input.clocks.manifestGeneratedAt, stagingProvenance}, predecessors,prepared.publication);
   await verifyDataRelease(scratchOutput);
   const exceptionInventory={schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign:input.campaign,sourceDispositionInventory,generationAuditEvidence,complete:true,sourceDispositions,native:{coverage:native.run.coverage,fieldHolds:native.fieldHolds},preparation:{publicationQuarantine:prepared.publicationQuarantine,criticalHolds:prepared.summary.criticalHolds,classification:classifyStep8Exception(prepared.publicationQuarantine)},assessments:auditAssessments};
   const groups={knowledge:knowledgeBindings,whole:producerBindings(publicationPaths),staging:new Map(input.staging.map(pin=>[pin.destination,producerBindings([pin.path])])),regional:producerBindings(input.regionalPolicyReceipts?[input.regionalPolicyReceipts.path]:[])};
@@ -257,7 +282,7 @@ export async function runStep8(raw:unknown,pool:Pool){
   // publication/replay inputs with their complete original binding sets.
   const publicationInputsBytes=files.find(file=>file.name==='release/knowledge/publication-inputs.json')?.bytes;if(!publicationInputsBytes)throw Error('Publication descriptor missing from verified manifest');
   return {manifest,exceptionInventory,files,publicationInputsBytes};
- },{staging:input.staging.map(pin=>({destination:pin.destination,pin})),prior:{release:input.priorRelease,paths:priorPaths,targetGeneratedAt:input.clocks.manifestGeneratedAt,targetReleaseId:'',cache:predecessors}});
+ },{stagingProvenance,staging:input.staging.map(pin=>({destination:pin.destination,pin})),prior:{release:input.priorRelease,paths:priorPaths,targetGeneratedAt:input.clocks.manifestGeneratedAt,targetReleaseId:'',cache:predecessors}});
  phaseTimings.publicationMs=performance.now()-publicationStarted;const candidatePersistenceStarted=performance.now();
  // Only verified public bytes leave the prepared scope. It is disposed before
  // outer managed writes; Core rechecks their exact live producers at persistence.
@@ -267,10 +292,10 @@ export async function runStep8(raw:unknown,pool:Pool){
   for(const [index,entry] of auditAssessments.entries()){const row:Record<string,string>={};for(const role of ['item','A','B','C'] as const){const bytes=await readFile(entry[role]),path=join(output,`audit/${index}-${role}.json`);if(digest(bytes)!==entry[role].split('/').at(-1))throw Error('Assessment handoff artifact hash mismatch');const producers=assessmentProducers.get(entry.recordId);if(!producers)throw Error('Missing assessment producer scope');await write(`audit/${index}-${role}.json`,null,producerBindings(producers),bytes);row[role]=path;}auditManifest.push(row);}
   await write('audit/assessments.json',auditManifest,textBindings);
  await writeBatch(published.files);
- const publicationInputs=await write('inputs/publication-inputs.json',null,knowledgeBindings,published.publicationInputsBytes);privateProvenance=await saveProvenance(publicationInputs);
+ const publicationInputs=await write('inputs/publication-inputs.json',null,knowledgeBindings,published.publicationInputsBytes);({privateProvenance,stagingProvenance,provenanceInputs}=await saveProvenance(publicationInputs));
  const pinFor=(name:string)=>{const pin=pins.get(join(output,name));if(!pin)throw Error('Missing persisted step8 artifact');return {path:pin.path,sha256:pin.sha256};};
- const locale=Intl.DateTimeFormat().resolvedOptions(),sourceFiles=(await readdir(join(root,'src'),{withFileTypes:true})).filter(file=>file.isFile()&&file.name.endsWith('.ts')).map(file=>'src/'+file.name).concat(['regional/taxonomy.mjs','package.json','scripts/r1-step8.ts','scripts/r1-step8.sh','scripts/r1-step8-offline.cjs']).sort();
- const receipt=ReplayReceiptSchema.parse({schemaVersion:'stadtstack-offline-replay-v2',mode:'retained_text_composition',registry,candidateRecords,candidateQuarantine,identityState,publicationInputs:pinFor('inputs/publication-inputs.json'),policyReceipts,criticalAssessments,identityAssessments:input.identityAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts,privateProvenance,textComposition,structuredRun,clocks:input.clocks,staging:input.staging,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,expectedRelease:pinFor('release/release-manifest.json'),casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,workspace:output+'-replay',runtime:{node:process.versions.node,icu:process.versions.icu,unicode:process.versions.unicode,locale:locale.locale,timeZone:locale.timeZone,packageLockSha256:digest(await readFile(join(root,'package-lock.json'))),sourceFiles:await Promise.all(sourceFiles.map(async path=>({path,sha256:digest(await readFile(join(root,path)))})))}});
+ const locale=Intl.DateTimeFormat().resolvedOptions(),sourceFiles=await requiredReplayRuntimeSources(true);
+ const receipt=ReplayReceiptSchema.parse({schemaVersion:'stadtstack-offline-replay-v2',mode:'retained_text_composition',registry,candidateRecords,candidateQuarantine,identityState,publicationInputs:pinFor('inputs/publication-inputs.json'),policyReceipts,criticalAssessments,identityAssessments:input.identityAssessments,regionalPolicyReceipts:input.regionalPolicyReceipts,privateProvenance,stagingProvenance,textComposition,structuredRun,clocks:input.clocks,staging:input.staging,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,expectedRelease:pinFor('release/release-manifest.json'),casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,workspace:output+'-replay',runtime:{node:process.versions.node,icu:process.versions.icu,unicode:process.versions.unicode,locale:locale.locale,timeZone:locale.timeZone,packageLockSha256:digest(await readFile(join(root,'package-lock.json'))),sourceFiles:await Promise.all(sourceFiles.map(async path=>({path,sha256:digest(await readFile(join(root,path)))})))}, provenanceInputs});
  const allPublicationBindings=producerBindings([...publicationPaths,publicationInputs.path]),replayReceipt=await write('replay-receipt.json',receipt,allPublicationBindings);
  phaseTimings.candidatePersistenceMs=performance.now()-candidatePersistenceStarted;const replayStarted=performance.now(),proof=await replayPipeline(replayReceipt.path,replayReceipt.sha256);
  phaseTimings.replayTotalMs=performance.now()-replayStarted;phaseTimings.replayRebuildMs=proof.timings.rebuildMs;phaseTimings.replayPersistenceMs=proof.persistence.durationMs;const finalPersistenceStarted=performance.now();
@@ -278,9 +303,9 @@ export async function runStep8(raw:unknown,pool:Pool){
  await write('replay-proof.json',proof,allPublicationBindings);
  const admitted=await loadRelease(candidateDirectory,{mode:'vm_candidate',policyOptions:policy});
  const exceptions=pinFor('exception-inventory.json'),assessmentManifestPin=pinFor('audit/assessments.json');
- const handoff=await write('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest:assessmentManifestPin,policy},allPublicationBindings);
+ const handoff=await write('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest:assessmentManifestPin,provenanceInventories:{primary:privateProvenance,staging:stagingProvenance},policy},allPublicationBindings);
  phaseTimings.finalPersistenceAndLoadMs=performance.now()-finalPersistenceStarted;
- const gate={schemaVersion:'stadtstack-r1-step8-gate-v1',status:'passed',releaseId:manifest.id,manifestSha256:pinFor('release/release-manifest.json').sha256,candidateDirectory,campaign:input.campaign,generationNonce:claim.nonce,currentGeneration:input.currentGeneration,generationAuditEvidence,exceptionInventory:exceptions,step9Handoff:handoff,exports,nativeProvenanceSupplements,stagingAssembly:stagingAssemblyResult?.component,reconstruction:{canonicalPasses:1,sources:provenanceContext.witnesses,workers:provenanceContext.reconstructionWorkers},structuredRunIds:input.structuredRunIds,asOf:input.asOf,replayReceipt,replayAuditSha256:proof.persistence.auditSha256,phaseTimings,checks:['current assessment generation','allowance accounting','native B purge acknowledgments','exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'],knowledgeRecords:admitted.knowledge.records.length,valueAccepted:false,hostedReleaseAuthorized:false};
+ const gate={schemaVersion:'stadtstack-r1-step8-gate-v1',status:'passed',releaseId:manifest.id,manifestSha256:pinFor('release/release-manifest.json').sha256,candidateDirectory,campaign:input.campaign,generationNonce:claim.nonce,currentGeneration:input.currentGeneration,generationAuditEvidence,exceptionInventory:exceptions,step9Handoff:handoff,exports,nativeProvenanceSupplements,stagingAssembly:stagingAssemblyResult?.component,reconstruction:{canonicalPasses:1,sources:provenanceContext.witnesses,workers:provenanceContext.reconstructionWorkers},structuredRunIds:input.structuredRunIds,asOf:input.asOf,replayReceipt,replayAuditSha256:proof.persistence.auditSha256,phaseTimings,checks:['current assessment generation','allowance accounting','native B purge acknowledgments','exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'],knowledgeRecords:admitted.knowledge.records.length,valueAccepted:false,hostedReleaseAuthorized:false,preflightEvidence};
  await write('release-gate.json',gate,allPublicationBindings);return gate;
  }finally{try{if(!provenanceFinished)await provenanceContext.finish();}finally{await preparedStaging?.dispose();}}
 }
@@ -294,5 +319,5 @@ export async function discoverStep8Plan(repository:string,driverRoot:string,pool
  const client=await pool.connect();let runs;
  try{await client.query('BEGIN READ ONLY');runs=await client.query<{run_id:string;receipts:string}>(`SELECT run_id,count(*)::text AS receipts FROM district_pipeline.step_receipts WHERE run_id::text LIKE ANY($1::text[]) GROUP BY run_id ORDER BY run_id`,[['6a60345b%','f311d068%','5f582f17%','329d949b%','3fe33cb6%']]);await client.query('COMMIT');}catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
  const bytes=await readFile(join(repositoryPath,'release/release-manifest.json')),manifest=JSON.parse(bytes.toString('utf8'));
- return {schemaVersion:'stadtstack-r1-step8-production-plan-v1',readOnly:true,writes:[],network:false,providers:false,selectionValidated:false,repository:repositoryPath,driverRoot:driverPath,structuredRuns:runs.rows,sealedSources:sealResults.sort((a,b)=>a.path.localeCompare(b.path)),allowance:STEP8_ALLOWANCE_READ_PLAN,authenticPriorRelease:{gitCommit:'57bddbbd8b84b0634229ad9cd45b689bda7271ea',directory:'release',manifestSha256:digest(bytes),releaseId:manifest.id},wouldRead:[join(driverPath,'catalogue.json'),join(repositoryPath,'cache/districts/cas'),join(repositoryPath,'cache/districts/r1-operator'),join(repositoryPath,'release'),'/home/max/stadtstack-ops/STATUS_0.3.2.md','explicit staged catalogue/city feeds/signals/regional topics','independently pinned current-generation processing review and allowance/cohort approvals','independently pinned source provenance and current policy/identity/critical controls','Git predecessor members and authentic legacy predecessor change state','same-host canonical jobs, step receipts, call accounting and authorizations'],missing:['No independently pinned, explicitly selected complete 27-source manifest was supplied to discovery; historical seal files are candidates only. No publication or replay was attempted.'],requires:'Complete pinned Step8InputSchema manifest, including one graph asOf, clocks and full non-knowledge staging/provenance. This discovery is not execution approval or a passing release gate.'};
+ return {schemaVersion:'stadtstack-r1-step8-production-plan-v1',readOnly:true,writes:[],network:false,providers:false,selectionValidated:false,repository:repositoryPath,driverRoot:driverPath,structuredRuns:runs.rows,sealedSources:sealResults.sort((a,b)=>a.path.localeCompare(b.path)),allowance:STEP8_ALLOWANCE_READ_PLAN,authenticPriorRelease:{gitCommit:'57bddbbd8b84b0634229ad9cd45b689bda7271ea',directory:'release',manifestSha256:digest(bytes),releaseId:manifest.id},wouldRead:[join(driverPath,'catalogue.json'),join(repositoryPath,'cache/districts/cas'),join(repositoryPath,'cache/districts/r1-operator'),join(repositoryPath,'release'),'/home/max/stadtstack-ops/STATUS_0.3.2.md','explicit staged catalogue/city feeds/signals/regional topics','independently pinned current-generation processing review and allowance/cohort approvals','independently pinned source provenance and current policy/identity/critical controls','Git predecessor members and authentic legacy predecessor change state','same-host canonical jobs, step receipts, call accounting and authorizations'],missing:['No independently pinned, explicitly selected complete 27-source manifest was supplied to discovery; historical seal files are candidates only. No publication or replay was attempted.'],requires:'Complete pinned Step8InputSchema manifest, including one graph asOf, clocks and full non-knowledge staging/provenance. This discovery is not execution approval or a passing release gate.',structuredRunsMeaning:'historical inventory only; includes acquisition; current execution requires the independently issued exact structured selection'};
 }

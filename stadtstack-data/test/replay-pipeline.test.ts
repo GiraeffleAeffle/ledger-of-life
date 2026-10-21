@@ -4,7 +4,7 @@ import {mkdtemp,writeFile,rm,symlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {hash,outDir} from '../src/common.ts';
-import {ReplayReceiptSchema,ReplayClocksSchema,ScopedGenerationArchiveSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging} from '../src/replay-pipeline.ts';
+import {ReplayReceiptSchema,ReplayClocksSchema,ScopedGenerationArchiveSchema,verifyReplayAnswer,verifyGenerationArchive,verifyCachedGeneration,replayAnswerBinding,compareReplayRelease,readReplayPin,requiredReplayStaging,requiredReplayRuntimeSources} from '../src/replay-pipeline.ts';
 import {privatePublicationProvenanceSchema} from '../src/district-publication-provenance.ts';
 import {readCommittedReleaseFile} from '../src/district-publication-predecessor.ts';
 import type {HistoricalGeneration,ReplayReceipt} from '../src/replay-pipeline.ts';
@@ -195,12 +195,12 @@ test('pinned input reader rejects changed bytes and target-output reuse includin
 
 test('receipt requires exact clocks, full private/public prerequisites and has no live execution option',()=>{
  const pin={path:'synthetic-input.json',sha256:hash('synthetic pin')};
- const receipt:ReplayReceipt={schemaVersion:'stadtstack-offline-replay-v2',mode:'text_and_structured',textComposition:pin,candidateRecords:pin,candidateQuarantine:pin,identityState:pin,publicationInputs:pin,policyReceipts:pin,privateProvenance:pin,casRoot:'cas',textRegistry:pin,corpusManifest:pin,corpusIndexes:[{name:'original',rawRoot:'raw'}],rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay'};
+ const receipt:ReplayReceipt = {schemaVersion:'stadtstack-offline-replay-v2',mode:'text_and_structured',textComposition:pin,candidateRecords:pin,candidateQuarantine:pin,identityState:pin,publicationInputs:pin,policyReceipts:pin,privateProvenance:pin,casRoot:'cas',textRegistry:pin,corpusManifest:pin,corpusIndexes:[{name:'original',rawRoot:'raw'}],rawRoot:'raw',registry:pin,index:pin,frozen:pin,deltas:[],generationContract:pin,answers:[],modelIdentities:[identity],extractionRun:pin,clocks,staging:[{...pin,destination:'catalogue.json'}],priorRelease:{gitCommit:'a'.repeat(40),manifestSha256:hash('prior manifest'),releaseId:hash('prior release')},expectedRelease:pin,runtime:{node:'synthetic',icu:'synthetic',unicode:'synthetic',locale:'de-DE',timeZone:'Europe/Berlin',packageLockSha256:hash('lock'),sourceFiles:[pin]},workspace:'cache/synthetic-fresh-replay',stagingProvenance:pin,provenanceInputs:[pin]}
  assert.deepEqual(ReplayReceiptSchema.parse(receipt),receipt);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,allowLiveModel:true}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,coreEvidence:[]}),/Unrecognized/);
  assert.throws(()=>ReplayReceiptSchema.parse({...receipt,priorRelease:undefined}),/Invalid/);
- for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','textComposition','textRegistry','corpusIndexes'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
+ for(const field of ['candidateRecords','candidateQuarantine','identityState','publicationInputs','policyReceipts','privateProvenance','stagingProvenance','provenanceInputs','textComposition','textRegistry','corpusIndexes'])assert.throws(()=>ReplayReceiptSchema.parse({...receipt,[field]:undefined}));
  const {textRegistry,corpusManifest,corpusIndexes,rawRoot,index,frozen,deltas,generationContract,answers,modelIdentities,extractionRun,...common}=receipt;
  const native={...common,mode:'structured_only',structuredRun:pin};
  assert.equal(ReplayReceiptSchema.parse(native).mode,'structured_only');
@@ -286,7 +286,7 @@ test('private publication provenance is a closed proof inventory, never historic
 test('replay evidence uses a receipt-derived namespace and complete reconstructible input pins',()=>{
  const pin={path:'/synthetic/input',sha256:hash('synthetic input'),bytes:1};
  const inputs={schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:'/synthetic/source-cas',hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
-  receipt:pin,provenance:pin,dependencies:[{...pin,bindingsSha256:pin.sha256}],staging:[{...pin,destination:'catalogue.json'}],expectedRelease:{manifest:pin,members:[pin]},
+  receipt:pin,provenance:pin,stagingProvenance:pin,dependencies:[{...pin,bindingsSha256:pin.sha256}],staging:[{...pin,destination:'catalogue.json'}],expectedRelease:{manifest:pin,members:[pin]},
   priorReleases:[{gitCommit:'a'.repeat(40),directory:'release',releaseId:pin.sha256,usage:'historical_change_reconstruction_only',manifest:{...pin,path:'release/release-manifest.json'},members:[{...pin,path:'release/catalogue.json'}]}],
   runtime:{packageLock:pin,sourceFiles:[pin]}};
  assert.deepEqual(ReplayEvidenceInputPinsSchema.parse(inputs),inputs);
@@ -307,4 +307,10 @@ test('per-member replay producer declarations never fan city provenance into nat
  assert.deepEqual(publicationMemberProducerBindings('regions/brandenburg-mol/topics.json',groups),[region]);
  assert.throws(()=>publicationMemberProducerBindings('cities/missing/signals.geojson',groups),/Missing release member producer/);
  assert.throws(()=>publicationMemberProducerBindings('unrecognized.json',groups),/Unknown release member producer/);
+});
+
+test('governed receipt production and replay require the same complete operator source inventory',async()=>{
+ const standalone=await requiredReplayRuntimeSources(false),governed=await requiredReplayRuntimeSources(true),base=new Set(standalone);
+ assert.deepEqual(governed.filter(path=>!base.has(path)),['scripts/r1-step8-offline.cjs','scripts/r1-step8-precheck.mjs','scripts/r1-step8-structured-precheck.mjs','scripts/r1-step8.sh','scripts/r1-step8.ts']);
+ assert.equal(new Set(governed).size,governed.length);assert.deepEqual(governed,[...governed].sort());
 });

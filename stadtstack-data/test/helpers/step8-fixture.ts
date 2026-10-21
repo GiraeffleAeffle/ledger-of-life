@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {readFile,mkdir,rm} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,resolve} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {createRequire} from 'node:module';
 import type {TestContext} from 'node:test';
@@ -29,6 +29,7 @@ import {assessmentBJobContract} from '../../src/district-assessment-broker.ts';
 import {OMP_NATIVE_STREAM_VERSION,ompRunnerContractSha256,ompRunnerOutputContractSha256} from '../../src/district-omp-b-runner.ts';
 import type {AssessmentItemHoldPin} from '../../src/district-assessment-item-holds.ts';
 import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from '../../src/replay-evidence-contract.ts';
+import {partitionPublicationInputs,provenanceBytes as partitionBytes} from '../../src/publication-provenance-partition.ts';
 
 /** Synthetic admitted text/native queue + authentic retained 0.3.2 core. No live
  * facts, independent assessments or production writes are claimed by this test. */
@@ -77,7 +78,11 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  const processingReview=await control('processing-review.json',{activation:'confirmed',to:{commit:processingCommit},contracts:{current:{assessmentQueue:queueContract},assessmentBJobContract:BContract,ompRunnerContract:runnerContractSha256,ompRunnerOutputContract:runnerOutputContractSha256}});
  const activeCatalogue=await control('active-catalogue.json',{processingCodeRevision:processingCommit.slice(0,7),processingPinReview:processingReview,rows:[{scope,index:sealed.artifacts.crawl,originals:corpus.documents.map((document:{id:string;sha256:string})=>({documentId:document.id,sha256:document.sha256}))}]});
  const currentGeneration={processingCommit,catalogue:activeCatalogue,processingReview,assessmentQueueContractSha256:queueContract,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:BContract,runnerContractSha256,runnerOutputContractSha256,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
- const provenanceBytes=Buffer.from(canonicalJson(provenance)),provenancePath=join(fixtureRoot,'provenance.json');await writeManagedSourceArtifact(fixtureRoot,provenancePath,provenanceBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
+ const controlPaths=new Set([campaignPath,sealed.artifacts.crawl.path,sealed.artifacts.registry.path,...staging.map(pin=>pin.path)].map(path=>resolve(path)));
+ const partition=partitionPublicationInputs(provenance.inputs.filter(pin=>controlPaths.has(resolve(pin.path))),staging.map(pin=>pin.path));
+ const provenanceBytes=partitionBytes(partition.primary),provenancePath=join(fixtureRoot,'provenance.json'),stagingProvenancePath=join(fixtureRoot,'staging-provenance.json'),stagingProvenanceBytes=partitionBytes(partition.staging);
+ await writeManagedSourceArtifact(fixtureRoot,provenancePath,provenanceBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
+ await writeManagedSourceArtifact(fixtureRoot,stagingProvenancePath,stagingProvenanceBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
  const sealBytes=Buffer.from(canonicalJson(sealed)),sealPath=join(fixtureRoot,'seal-result.json');await writeManagedSourceArtifact(fixtureRoot,sealPath,sealBytes,[{...binding,independentAllowed:false}],{...policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
  const legacySealPin=input.legacyGeneration?await control('historical-haiku-seal-result.json',input.legacyGeneration.sealed):undefined;
  const queueSelection=input.sealInput??{jobKeys:[input.jobKey],reconciliationJobKeys:[input.reconcileKey]};
@@ -85,7 +90,7 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  const {issueFixtureNativeSelection}=await import('./step8-provenance-fixture.ts');
  const nativeSealSelection=await issueFixtureNativeSelection(control,selectionValue);
  await mkdir(cacheDir,{recursive:true});const outputRoot=join(cacheDir,'step8-fixture-'+randomUUID());t.after(async()=>{for(const path of [outputRoot,outputRoot+'.claim',outputRoot+'-preparation',outputRoot+'-replay',replayEvidenceCasRoot(outputRoot+'-replay',fixtureRoot)])await rm(path,{recursive:true,force:true});});
- const manifest=Step8InputSchema.parse({schemaVersion:'stadtstack-r1-step8-v1',reconstructionWorkers:1,reconstructionTiming:{estimatedDurationSeconds:600,expiryMarginSeconds:60},nativeSealSelection,currentGeneration,campaign:{path:campaignPath,sha256:campaignSha256},expectedSources:1,expectedDocuments:corpus.documents.length,seals:[{sealResult:{path:sealPath,sha256:digest(sealBytes)},...queueSelection}],structuredRunIds:[nativeReceipt.runId],registry:sealed.artifacts.registry,privateProvenance:{path:provenancePath,sha256:digest(provenanceBytes)},staging,priorRelease,asOf:clock.slice(0,10),clocks:{recordsGeneratedAt:clock,quarantineGeneratedAt:clock,coverageGeneratedAt:clock,qualityGeneratedAt:clock,manifestGeneratedAt:clock},casRoot:cas.root,outputRoot,policy});
+ const manifest=Step8InputSchema.parse({schemaVersion:'stadtstack-r1-step8-v1',reconstructionWorkers:1,reconstructionTiming:{estimatedDurationSeconds:600,expiryMarginSeconds:60},nativeSealSelection,currentGeneration,campaign:{path:campaignPath,sha256:campaignSha256},expectedSources:1,expectedDocuments:corpus.documents.length,seals:[{sealResult:{path:sealPath,sha256:digest(sealBytes)},...queueSelection}],structuredRunIds:[nativeReceipt.runId],registry:sealed.artifacts.registry,privateProvenance:{path:provenancePath,sha256:digest(provenanceBytes)},staging,priorRelease,asOf:clock.slice(0,10),clocks:{recordsGeneratedAt:clock,quarantineGeneratedAt:clock,coverageGeneratedAt:clock,qualityGeneratedAt:clock,manifestGeneratedAt:clock},casRoot:cas.root,outputRoot,policy,stagingProvenance:{path:stagingProvenancePath,sha256:digest(stagingProvenanceBytes)}});
  assert.deepEqual(step8ReadPlan(manifest).writes,[]);
  const oldDatabase=process.env.DATABASE_URL;process.env.DATABASE_URL=pool.options.connectionString!.replace('postgresql:///','postgresql://'+encodeURIComponent(userInfo().username)+'@/');
  // Deliberate phase boundary: setup/extraction have completed. Exercise the
@@ -113,8 +118,10 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
    const next=await authenticateSealProvenance(manifest.seals[0].sealResult,undefined,policy,metadataContext);
    assert.equal(canonicalJson(next.inventory),expectedInventory);assert.equal(next.originalProvenance.sha256,sealed.privateProvenance.sha256,'ordinary return metadata is not mutable cached authority');
   }finally{await metadataContext.finish();}
-  await assert.rejects(auditStep8({...manifest,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/witness identity or order differs/);
-  await assert.rejects(auditStep8({...manifest,nativeSealSelection:malformedSelection,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/privateProvenance differs from canonical producer/);
+  const beforeInvalidSelection=input.canonicalBuildCount();
+  await assert.rejects(auditStep8({...manifest,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/Seal selection pin mismatch/);
+  await assert.rejects(auditStep8({...manifest,nativeSealSelection:malformedSelection,seals:[{...manifest.seals[0],sealResult:malformedSealPin}]},pool),/CONTENT_PROVENANCE_MISMATCH/);
+  assert.equal(input.canonicalBuildCount(),beforeInvalidSelection,'static selection and complete-binding failures refuse before canonical reconstruction');
   assert.equal(preflight.status,'compatible',JSON.stringify(preflight.blockers));assert.deepEqual(preflight.writes,[]);assert.equal(preflight.publicationExecuted,false);
   assert.deepEqual(await readFile(join(policy.stateDir!,'inventory.json')),inventoryBefore);assert.deepEqual((await counts()).rows,beforeCounts);await assert.rejects(readFile(join(outputRoot,'release-gate.json')),{code:'ENOENT'});
   if(legacySealPin&&input.legacyGeneration){

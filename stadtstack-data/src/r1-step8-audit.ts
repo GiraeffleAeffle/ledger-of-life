@@ -9,7 +9,7 @@ import {DistrictCas,type CasPutOptions} from './district-cas.ts';
 import {Step8CampaignSchema,Step8CampaignRelocationSchema,authenticateStep8Campaign,assertStep8ExportMembership} from './r1-step8-governance.ts';
 import {r1TextCompositionInputSchema} from './district-r1-text-composition.ts';
 import {authenticateTextRunContribution,type TextRunContribution} from './text-run-lineage.ts';
-import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} from './district-publication-provenance.ts';
+import {privatePublicationProvenanceSchema} from './district-publication-provenance.ts';
 import {publicationPolicyReceiptInventorySchema} from './district-publication-policy.ts';
 import {PolicyReceiptSchema,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {ResidualExtractionSchema} from './district-residual-jobs.ts';
@@ -23,7 +23,7 @@ import {authenticateScopedGeneration,verifyCachedGeneration,verifyReplayAnswer,r
 import {ModelEvidenceSchema} from './district-model-contract.ts';
 import {StructuredJobResultSchema} from './district-structured-jobs.ts';
 import {loadPriorPublicationRelease} from './district-publication-predecessor.ts';
-import {assertStep8ProcessingPin,assertStep8NativeBStep,STEP8_STRUCTURED_RUN_IDS,STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
+import {assertStep8ProcessingPin,assertStep8NativeBStep,authenticateStep8StructuredSelection,STEP8_PRIOR_RELEASE} from './r1-step8-current-policy.ts';
 import {auditStep8Allowance} from './r1-step8-allowance-audit.ts';
 import {TerminalDocumentExceptionSchema,TerminalAssessmentExceptionSchema,loadTerminalException} from './district-terminal-exceptions.ts';
 import {DuplicateSourceContentExceptionSchema} from './district-duplicate-source-content.ts';
@@ -32,6 +32,8 @@ import {createWitnessedProvenanceContext,assertCanonicalSealSelection,authentica
 import {readPreparedStep8Campaign,readPreparedStep8Provenance,type PreparedStep8Staging} from './r1-step8-staging.ts';
 import {authenticateImportDispositions,readCurrentImportDispositionDecision} from './r1-step8-import-dispositions.ts';
 import type {ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
+import {authenticatePublicationPartition} from './publication-provenance-partition.ts';
+import {requireStep8Preflight} from './r1-step8-preflight.ts';
 
 const requireThat=(value:unknown,message:string)=>{if(!value)throw Error(message);};
 const pinSchema=z.object({path:z.string(),sha256:HashSchema}).passthrough();
@@ -40,12 +42,12 @@ export async function recheckStep8Audit(report:object){const check=auditRechecks
 const auditedCampaigns=new WeakMap<object,{pin:Step8Input['campaign'];bytes:Buffer;reportSha256:string;context:WitnessedProvenanceContext}>();
 /** Only a genuine compatible staging audit can authorize relocation. The source
  * epoch must have finished, and unchanged Core authenticates the committed copy. */
-export async function relocateStep8AuditCampaign(report:Awaited<ReturnType<typeof auditStep8>>,campaign:Step8Input['campaign'],privateProvenance:Step8Input['privateProvenance'],policy:Step8Input['policy']){
+export async function relocateStep8AuditCampaign(report:Awaited<ReturnType<typeof auditStep8>>,campaign:Step8Input['campaign'],privateProvenance:Step8Input['privateProvenance'],stagingProvenance:Step8Input['stagingProvenance'],policy:Step8Input['policy']){
  const original=auditedCampaigns.get(report);
  requireThat(original&&digest(canonicalJson(report))===original.reportSha256,'Campaign relocation requires its unchanged trusted staging audit');
  assertCanonicalEpochFinished(original!.context);
  const relocation=Step8CampaignRelocationSchema.parse({schemaVersion:'stadtstack-r1-step8-campaign-relocation-v1',from:original!.pin,to:campaign,verifiedSha256:digest(original!.bytes)});
- const authenticated=await authenticatePublicationProvenance(privateProvenance.path,privateProvenance.sha256,policy),bytes=await authenticated.read(relocation.to.path);
+ const authenticated=await authenticatePublicationPartition(privateProvenance,stagingProvenance,policy),bytes=await authenticated.read(relocation.to.path);
  requireThat(digest(bytes)===relocation.to.sha256&&bytes.equals(original!.bytes),'Committed campaign differs from authenticated audit bytes');
  return {audit:{...report,campaign:relocation.to,campaignRelocation:relocation,reads:[...new Map([...report.reads,relocation.from,relocation.to].map(pin=>[pin.path,pin])).values()]},provenance:authenticated};
 }
@@ -82,6 +84,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
  const plainPins=new Map<string,{path:string;sha256:string}>(),purgeStates:Array<{id:string;jobKey:string;rows:unknown[]}>=[];
  const attempt=async(scope:string,work:()=>Promise<void>)=>{try{await work();}catch(error){blockers.push({scope,message:error instanceof Error?error.message:String(error)});}};
  const plain=async(pin:{path:string;sha256:string})=>{const bytes=await readFile(pin.path);requireThat(digest(bytes)===pin.sha256,'Operator control pin mismatch: '+pin.path);reads.push(pin);plainPins.set(pin.path,{...pin});return bytes;};
+ if(!borrowedContext)await requireStep8Preflight(input,pool);
  const provenanceContext=borrowedContext??await createWitnessedProvenanceContext(input.nativeSealSelection,input.policy,{pool,casRoot:input.casRoot,catalogue:input.currentGeneration.catalogue,mode:'step8',workers:input.reconstructionWorkers,timing:input.reconstructionTiming,importDispositionDecision:input.importDispositionDecision});
  let provenanceFinished=!!borrowedContext;
  try{
@@ -103,7 +106,11 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
    const catalogue=JSON.parse((await plain(input.currentGeneration.catalogue)).toString('utf8')),review=JSON.parse((await plain(input.currentGeneration.processingReview)).toString('utf8'));
    assertStep8ProcessingPin(input.currentGeneration,catalogue,review);
    if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208,'Production requires the frozen 27-source campaign');
-   if(reader.authority.mode!=='isolated-fixture')requireThat(canonicalJson([...input.structuredRunIds].sort())===canonicalJson([...STEP8_STRUCTURED_RUN_IDS].sort())&&canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires the five committed K1/K2 runs and authentic released 0.3.2 predecessor');
+   if(reader.authority.mode!=='isolated-fixture'){
+    requireThat(input.structuredSelection,'Production requires an issued exact structured selection');
+    await authenticateStep8StructuredSelection({selection:input.structuredSelection!,runIds:input.structuredRunIds,readControl:plain});
+    requireThat(canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires authentic released 0.3.2 predecessor');
+   }
    campaignBytes=await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):managed(input.campaign));
    campaign=await authenticateStep8Campaign(JSON.parse(campaignBytes.toString('utf8')),async path=>reader.read(path),input.policy);
    requireThat(campaign.sources.length===input.expectedSources&&campaign.sources.reduce((n,source)=>n+source.documents.length,0)===input.expectedDocuments,'Campaign totals mismatch');
@@ -213,15 +220,20 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
   await attempt('complete-source-selection',async()=>{requireThat(seen.size===input.expectedSources&&sources.reduce((n,source)=>n+Number(source.documents),0)===input.expectedDocuments,'Incomplete current-generation source audit');});
   await attempt('complete-import-dispositions',async()=>{requireThat(sources.reduce((count,source)=>count+(source.importDispositions as ImportRejectionDisposition[]).length,0)===importDispositions.length,'Unused import disposition');});
   await attempt('external-inputs',async()=>{
-   const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await (preparedStaging?readPreparedStep8Provenance(preparedStaging,input.privateProvenance):managed(input.privateProvenance))).toString('utf8')));for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(input.privateProvenance.path),pin.path)});
-   const authenticated=await authenticatePublicationProvenance(input.privateProvenance.path,input.privateProvenance.sha256,input.policy);for(const pin of provenance.inputs)await authenticated.read(resolve(dirname(input.privateProvenance.path),pin.path));
+   for(const selected of [input.privateProvenance,input.stagingProvenance]){
+    const provenance=privatePublicationProvenanceSchema.parse(JSON.parse((await (preparedStaging?readPreparedStep8Provenance(preparedStaging,selected):managed(selected))).toString('utf8')));
+    for(const pin of provenance.inputs)await managed({...pin,path:resolve(dirname(selected.path),pin.path)});
+   }
+   const authenticated=await authenticatePublicationPartition(input.privateProvenance,input.stagingProvenance,input.policy);
+   authenticated.assertCoverage([...(preparedStaging?[]:[input.campaign]),...campaign!.sources.map(source=>source.corpus),input.registry,...input.staging,...[input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts].filter((pin):pin is {path:string;sha256:string}=>!!pin)]);
+   for(const pin of authenticated.inputs)await authenticated.read(pin.path);
    const cataloguePin=input.staging.find(pin=>pin.destination==='catalogue.json');requireThat(cataloguePin,'Staged catalogue missing');const catalogue=JSON.parse((await managed(cataloguePin!)).toString('utf8')),cities=z.array(z.string()).parse(catalogue.cities.map((city:{id:string})=>city.id));requireThat(canonicalJson(input.staging.map(pin=>pin.destination).sort())===canonicalJson(requiredReplayStaging(cities)),'Incomplete/duplicate staging inventory');
    for(const pin of [input.registry,...input.staging,input.identityAssessments,input.criticalAssessments,input.regionalPolicyReceipts])if(pin)await managed(pin);
    const baseline=await loadPriorPublicationRelease(input.priorRelease,[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'],input.clocks.manifestGeneratedAt);predecessors.push(baseline.priorRelease);
    for(const pin of input.staging.filter(pin=>pin.destination.startsWith('core/')))requireThat((await managed(pin)).equals(baseline.files.get(pin.destination)!),'Staged core differs from authentic released core');
    for(const [city,prior] of Object.entries(input.legacyPreviousReleases??{}))predecessors.push((await loadPriorPublicationRelease(prior,[`cities/${city}/signals.geojson`],baseline.manifest.generatedAt,baseline.manifest.id)).priorRelease);
   });
-  await attempt('structured-runs',async()=>{requireThat(new Set(input.structuredRunIds).size===input.structuredRunIds.length,'Duplicate structured run');for(const run of input.structuredRunIds){const rows=(await client.query("SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE r.run_id=$1 AND j.step='structured_parse' AND r.outcome IN ('succeeded','no_supported_case','held_quality')",[run])).rows;requireThat(rows.length,'Selected structured run lacks committed outputs');for(const row of rows){const receipt=encodeStepReceipt(row.receipt);requireThat(receipt.sha256===row.receipt_sha256&&canonicalJobIdentity(row.spec).jobKey===receipt.receipt.jobKey,'Structured receipt custody mismatch');for(const hash of receipt.receipt.outputHashes){const result=StructuredJobResultSchema.parse(await json(hash));await cas.read(result.sourceSha256);for(const source of result.supportingSources){await cas.read(source.sha256);const proof=PolicyReceiptSchema.parse(await json(source.policyReceiptSha256));await recheckPolicyReceipt(proof,{...input.policy,evaluationAt:new Date().toISOString()});}const proof=PolicyReceiptSchema.parse(await json(result.policyReceiptSha256));await recheckPolicyReceipt(proof,{...input.policy,evaluationAt:new Date().toISOString()});}}}});
+  await attempt('structured-runs',async()=>{requireThat(new Set(input.structuredRunIds).size===input.structuredRunIds.length,'Duplicate structured run');for(const run of input.structuredRunIds){const rows=(await client.query("SELECT j.spec,r.receipt,r.receipt_sha256 FROM district_pipeline.jobs j JOIN district_pipeline.step_receipts r ON r.job_id=j.id WHERE r.run_id=$1 AND j.step IN ('structured_parse','structured_discover') AND r.outcome IN ('succeeded','no_supported_case','held_quality')",[run])).rows;requireThat(rows.length,'Selected structured run lacks committed outputs');for(const row of rows){const receipt=encodeStepReceipt(row.receipt);requireThat(receipt.sha256===row.receipt_sha256&&canonicalJobIdentity(row.spec).jobKey===receipt.receipt.jobKey,'Structured receipt custody mismatch');for(const hash of receipt.receipt.outputHashes){const result=StructuredJobResultSchema.parse(await json(hash));await cas.read(result.sourceSha256);for(const source of result.supportingSources){await cas.read(source.sha256);const proof=PolicyReceiptSchema.parse(await json(source.policyReceiptSha256));await recheckPolicyReceipt(proof,{...input.policy,evaluationAt:new Date().toISOString()});}const proof=PolicyReceiptSchema.parse(await json(result.policyReceiptSha256));await recheckPolicyReceipt(proof,{...input.policy,evaluationAt:new Date().toISOString()});}}}});
   await attempt('allowance-accounting',async()=>{
    const accounting=await auditStep8Allowance(client,[...originals],json);allowance=accounting;
    if(reader.authority.mode!=='isolated-fixture'){

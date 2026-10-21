@@ -21,9 +21,12 @@ async function stagedFixture(directory:string,t:{after:(callback:()=>Promise<voi
  await initializeManagedAcquisitionLane(context.managedRoot,{...context.policy,decisionId:context.decisionId,kind:'artifacts'});
  await mkdir(stagingDir,{recursive:true});
  await writeManagedSourceArtifact(context.managedRoot,cataloguePath,catalogueBytes,[binding],{...context.policy,decisionId:context.decisionId,kind:'artifacts'});
- const inventory={schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path:relative(directory,cataloguePath),sha256:hash(catalogueBytes),bytes:catalogueBytes.length,bindings:[binding]}]};
- await writeFile(privateProvenance,JSON.stringify(inventory));
- return {stagingDir,privateProvenance:{path:privateProvenance,sha256:hash(JSON.stringify(inventory))},policyStateDir:context.policy.stateDir,policyAuthorityId:context.policy.authorityId,policyAuthoritySha256:context.policy.authoritySha256};
+ const knowledgePath=join(stagingDir,'knowledge','preparation.json'),knowledgeBytes=Buffer.from('{"syntheticFixture":true}');
+ await writeManagedSourceArtifact(context.managedRoot,knowledgePath,knowledgeBytes,[binding],{...context.policy,decisionId:context.decisionId,kind:'artifacts'});
+ const inventory={schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path:relative(directory,knowledgePath),sha256:hash(knowledgeBytes),bytes:knowledgeBytes.length,bindings:[binding]}]};
+ const stagingInventory={schemaVersion:'stadtstack-private-publication-provenance-v1',inputs:[{path:relative(directory,cataloguePath),sha256:hash(catalogueBytes),bytes:catalogueBytes.length,bindings:[binding]}]},stagingProvenance=join(directory,'staging-provenance.json');
+ await writeFile(privateProvenance,JSON.stringify(inventory));await writeFile(stagingProvenance,JSON.stringify(stagingInventory));
+ return {stagingDir,privateProvenance:{path:privateProvenance,sha256:hash(JSON.stringify(inventory))},stagingProvenance:{path:stagingProvenance,sha256:hash(JSON.stringify(stagingInventory))},policyStateDir:context.policy.stateDir,policyAuthorityId:context.policy.authorityId,policyAuthoritySha256:context.policy.authoritySha256};
 }
 
 const at='2026-10-11T09:25:14.000Z',manifestAt='2026-10-11T09:25:14.460Z';
@@ -39,6 +42,7 @@ test('publication replay requires explicit quality and manifest clocks without o
   assert.throws(()=>PublicationOptionsSchema.parse({...options,asOf:undefined}));
   assert.throws(()=>PublicationOptionsSchema.parse({...options,priorRelease:undefined}));
   assert.throws(()=>PublicationOptionsSchema.parse({...options,privateProvenance:undefined}),/privateProvenance/);
+  assert.throws(()=>PublicationOptionsSchema.parse({...options,stagingProvenance:undefined}),/stagingProvenance/);
   assert.deepEqual(await publicationInput('catalogue.json',options),{generatedAt:'2026-10-11T03:46:26.421Z',cities:[]});
  }finally{await rm(directory,{recursive:true,force:true});}
 });
@@ -57,8 +61,9 @@ test('genuine input provenance does not authorize structurally supplied staging 
  try{
   const fixture=await stagedFixture(directory,t),options:PublicationOptions={...prerequisites,...fixture,outDir:join(directory,'release'),priorCityRoot:join(directory,'prior'),qualityGeneratedAt:at,manifestGeneratedAt:manifestAt};
   const provenance=await authenticatePublicationProvenance(fixture.privateProvenance.path,fixture.privateProvenance.sha256,{stateDir:fixture.policyStateDir,authorityId:fixture.policyAuthorityId,authoritySha256:fixture.policyAuthoritySha256});
+  const stagingProvenance=await authenticatePublicationProvenance(fixture.stagingProvenance.path,fixture.stagingProvenance.sha256,{stateDir:fixture.policyStateDir,authorityId:fixture.policyAuthorityId,authoritySha256:fixture.policyAuthoritySha256});
   let reads=0;
-  const supplied={provenance,stagingDir:fixture.stagingDir,priorDirectory:options.priorCityRoot,read:async()=>{reads++;return Buffer.from('{}');},readStaging:async()=>{reads++;return Buffer.from('{}');},readPrior:async()=>{reads++;return Buffer.from('{}');}};
+  const supplied={provenance,stagingProvenance,stagingDir:fixture.stagingDir,priorDirectory:options.priorCityRoot,read:async()=>{reads++;return Buffer.from('{}');},readStaging:async()=>{reads++;return Buffer.from('{}');},readPrior:async()=>{reads++;return Buffer.from('{}');}};
   await assert.rejects(publish(options,undefined,supplied as AuthenticatedPreparedPublication));
   assert.equal(reads,0);
  }finally{await rm(directory,{recursive:true,force:true});}

@@ -13,6 +13,7 @@ import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
 import {RELEASE_ACCEPTANCE_RULES} from '../src/r1-release-context.ts';
 import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 import {replayEvidenceCasRoot} from '../src/replay-evidence-contract.ts';
+import {publicationPartitionSha256} from '../src/publication-provenance-partition.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
 const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
@@ -31,12 +32,13 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
   const campaign=await save('campaign.json',{schemaVersion:'stadtstack-r1-step8-campaign-v1',sources:[{municipalityId:'synthetic-town',sourceId:'website',corpus:{path:'/synthetic/corpus',sha256:h},documents:[{documentId:'document:fixture',sha256:h,jobKey:b}]}]});
   const currentGeneration={processingCommit:'a'.repeat(40),catalogue:campaign,processingReview:campaign,assessmentQueueContractSha256:h,projectionVersion:'assessment-source-record-v2',B:{jobContractSha256:h,runnerContractSha256:h,runnerOutputContractSha256:h,nativeStreamVersion:OMP_NATIVE_STREAM_VERSION,thinking:'medium',receiptVersion:'assessment-receipt-v2',selector:'anthropic/claude-sonnet-5-5',transport:'vm-omp'}};
   const casRoot=join(root,'cas'),workspace=join(root,'replay'),artifactCasRoot=replayEvidenceCasRoot(workspace,root);
-  const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot,workspace,privateProvenance:campaign};
+  const stagingProvenance=await save('staging-provenance.json',{fixture:'Synthetic consumer-contract pin; not native replay or authority evidence.'});
+  const receipt={schemaVersion:'stadtstack-offline-replay-v2',expectedRelease:manifestPin,casRoot,workspace,privateProvenance:campaign,stagingProvenance,provenanceInputs:[campaign]};
   const receiptPin=await save('replay-receipt.json',receipt);
   const metadata=async(pin:{path:string;sha256:string})=>({...pin,bytes:(await readFile(pin.path)).length}),campaignMetadata=await metadata(campaign);
   // Synthetic consumer-contract pins, not native replay/authority evidence.
   const inputs={schemaVersion:'stadtstack-replay-input-pins-v1',sourceCas:{root:casRoot,hashPath:'sha256/<first-two-hex>/<sha256>',references:'hash references in the pinned dependencies'},
-    receipt:await metadata(receiptPin),provenance:campaignMetadata,dependencies:[{...campaignMetadata,bindingsSha256:h}],staging:[{...campaignMetadata,destination:'catalogue.json'}],
+    receipt:await metadata(receiptPin),provenance:campaignMetadata,stagingProvenance:await metadata(stagingProvenance),dependencies:[{...campaignMetadata,bindingsSha256:h}],staging:[{...campaignMetadata,destination:'catalogue.json'}],
     expectedRelease:{manifest:await metadata(manifestPin),members:files.map(file=>({path:join(candidateDirectory,file.path),sha256:file.sha256,bytes:file.bytes}))},
     priorReleases:[{gitCommit:'a'.repeat(40),directory:'release',releaseId:h,usage:'historical_change_reconstruction_only',manifest:{path:'release/release-manifest.json',sha256:h,bytes:0},members:[{path:'release/catalogue.json',sha256:h,bytes:0}]}],
     runtime:{packageLock:campaignMetadata,sourceFiles:[campaignMetadata]}};
@@ -44,7 +46,7 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
   const persistReplay=async()=>{
     const proofPin=await save('replay-proof.json',proof),storageKey=`sha256/${proofPin.sha256.slice(0,2)}/${proofPin.sha256}`;
     await mkdir(dirname(join(artifactCasRoot,storageKey)),{recursive:true});await writeFile(join(artifactCasRoot,storageKey),await readFile(proofPin.path));
-    const audit={schemaVersion:'district-replay-proof-audit-v1',receiptSha256:receiptPin.sha256,artifactCasRoot,comparison,inputs:proof.inputs,artifacts:[{path:'proof.json',sha256:proofPin.sha256,storageKey}]};
+    const audit={schemaVersion:'district-replay-proof-audit-v1',receiptSha256:receiptPin.sha256,inputBindingSha256:publicationPartitionSha256(campaign,stagingProvenance),artifactCasRoot,comparison,inputs:proof.inputs,artifacts:[{path:'proof.json',sha256:proofPin.sha256,storageKey}]};
     const auditPin=await save('replay-audit.json',audit),auditPath=join(artifactCasRoot,'sha256',auditPin.sha256.slice(0,2),auditPin.sha256);
     await mkdir(dirname(auditPath),{recursive:true});await writeFile(auditPath,await readFile(auditPin.path));return auditPin;
   };
@@ -81,7 +83,7 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
       sources:[{municipalityId:'synthetic-town',sourceId:'website',corpusSha256:h,admittedRecordIds:[...new Set(inventory.sourceDispositions.flatMap(source=>source.admittedRecordIds))].sort()}],allowance:{schemaVersion:'stadtstack-r1-step8-allowance-evidence-v1'},purgeAcknowledgements:[]});
     inventory.generationAuditEvidence=generationAuditEvidence;
     const exceptions=await save('exception-inventory.json',inventory),assessmentManifest=await save('assessments.json',auditManifest);
-    const handoff=await save('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest,policy:{}});
+    const handoff=await save('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest,provenanceInventories:{primary:campaign,staging:stagingProvenance},policy:{}});
     const audit=await persistReplay();
     const gate=await save('release-gate.json',{schemaVersion:'stadtstack-r1-step8-gate-v1',...gateState,releaseId:manifest.id,manifestSha256:manifestPin.sha256,candidateDirectory,campaign,
       currentGeneration,generationAuditEvidence,exceptionInventory:exceptions,step9Handoff:handoff,replayReceipt:receiptPin,replayAuditSha256:audit.sha256,generationNonce:'synthetic-generation'});

@@ -13,6 +13,7 @@ import type {TextRunContribution} from './text-run-lineage.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import type {PrivatePublicationProvenance,AuthenticatedPublicationProvenance} from './district-publication-provenance.ts';
 import {CanonicalWorkerProgressSchema,CanonicalWorkerDiagnosticSchema,canonicalWorkerDiagnostic,formatCanonicalWorkerDiagnostic,type CanonicalWorkerProgress} from './r1-step8-worker-diagnostics.ts';
+import {createCanonicalQueryQueue} from './r1-canonical-query-queue.ts';
 
 const Hash=z.string().regex(/^[a-f0-9]{64}$/),MAX_BYTES=128*1024*1024;
 export const NativeProvenancePinSchema=z.object({path:z.string().refine(path=>isAbsolute(path)&&resolve(path)===path),sha256:Hash,bytes:z.number().int().nonnegative().max(MAX_BYTES).optional()}).strict();
@@ -237,11 +238,12 @@ async function reconstruct(value:ContextState,indices:readonly number[],report?:
   // Hold a real checked-out client throughout reconstruction. Pool.query(BEGIN)
   // alone releases it to the idle reaper and cannot guarantee a transaction.
   const client=await value.db.connect(),query=value.db.query,connect=value.db.connect;
+  const serial=createCanonicalQueryQueue((...args)=>Reflect.apply(client.query,client,args) as Promise<unknown>);let completed=false;
   try{
    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
    const transaction=(await client.query("SELECT current_setting('transaction_read_only') AS read_only,current_setting('transaction_isolation') AS isolation")).rows[0];
    if(transaction.read_only!=='on'||transaction.isolation!=='repeatable read')throw Error('Canonical reconstruction requires an actual READ ONLY repeatable-read client');
-   Object.defineProperty(value.db,'query',{value:client.query.bind(client),configurable:true,writable:true});
+   Object.defineProperty(value.db,'query',{value:serial.query,configurable:true,writable:true});
    Object.defineProperty(value.db,'connect',{value:()=>{throw Error('Nested reconstruction client checkout prohibited');},configurable:true,writable:true});
    const selected=value.selection.seals[index];
    if(value.fence.authority.mode==='isolated-fixture'){
@@ -249,9 +251,17 @@ async function reconstruct(value:ContextState,indices:readonly number[],report?:
     // may reissue this existing Core fixture capability for its exact pinned bytes.
     await core.corpus.withFixtureAuthorizedCorpus(await value.fence.read(selected.corpus.path,selected.corpus.sha256),value.policy,()=>canonicalSeal(value,selected,cas));
    }else await canonicalSeal(value,selected,cas);
-   await client.query('COMMIT');
-  }catch(error){await client.query('ROLLBACK').catch(()=>{});throw error;}
-  finally{Object.defineProperty(value.db,'query',{value:query,configurable:true,writable:true});Object.defineProperty(value.db,'connect',{value:connect,configurable:true,writable:true});client.release();}
+   await serial.close();await client.query('COMMIT');completed=true;
+  }finally{
+   await serial.close();
+   // A rejected Promise.all may still have asynchronous branches. Keep their
+   // facade closed after failure rather than letting them escape the snapshot.
+   if(completed){Object.defineProperty(value.db,'query',{value:query,configurable:true,writable:true});Object.defineProperty(value.db,'connect',{value:connect,configurable:true,writable:true});}
+   // Destroy an unsuccessful checkout: a client-side query timeout need not mean
+   // its wire query has finished. Disconnect aborts this READ ONLY transaction;
+   // issuing ROLLBACK on that potentially busy client would reintroduce overlap.
+   client.release(completed?undefined:true);
+  }
   report?.(index,'source-completed');
  }
 }

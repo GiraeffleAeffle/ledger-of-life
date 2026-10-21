@@ -25,6 +25,7 @@ import {authenticatePublicationProvenance,type AuthenticatedPublicationProvenanc
 import {writeManagedSourceArtifact} from './district-private-io.ts';
 import {readCivicOptOutSnapshot,withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceScratch} from './civic-opt-out.ts';
 import {loadPriorPublicationRelease,type PriorRelease,type PriorReleaseCache} from './district-publication-predecessor.ts';
+import {authenticatePublicationPartition,type PublicationPin} from './publication-provenance-partition.ts';
 const preparedBindingSchema=z.object({kind:z.literal('prepared_source'),url:z.url(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),observationId:z.string().min(1),receiptSha256:z.string().regex(/^[a-f0-9]{64}$/),independentAllowed:z.boolean()}).strict();
 export const knowledgePreparedSourcePinSchema=z.object({path:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/),bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(preparedBindingSchema).min(1)}).strict();
 export type KnowledgePreparedSourcePin=z.infer<typeof knowledgePreparedSourcePinSchema>;
@@ -33,6 +34,7 @@ export type PrepareKnowledgeOptions={registry:string;textComposition?:string;rec
 export interface PreparedKnowledgeSummary {schemaVersion:string;records:number;textModelRecords:number;structuredRecords:number;criticalHolds:readonly {recordId:string;reason:string}[];municipalities:number;accounting:DistrictCoverage['accounting'];districts:DistrictCoverage['districts'];municipalityCoverage:Array<Pick<DistrictCoverage['municipalities'][number],'id'|'status'|'checked'|'publishedRecords'|'textModelRecords'|'structuredRecords'|'datedStagedRecords'|'quarantinedRecords'|'quarantineReasons'|'extraction'>>;dependencies:PublicationDependency[]}
 export interface AuthenticatedPreparedPublication {
  readonly provenance:AuthenticatedPublicationProvenance;
+ readonly stagingProvenance:AuthenticatedPublicationProvenance|undefined;
  readonly stagingDir:string;
  readonly priorDirectory:string|undefined;
  read(path:string):Promise<Buffer>;
@@ -42,6 +44,7 @@ export function assertAuthenticatedPreparedPublication(value:AuthenticatedPrepar
  if(!preparedPublications.has(value))throw Error('Publication requires an authenticated preparation lease capability');
 }
 export type PreparedPublicationInputs={
+ stagingProvenance:PublicationPin;
  staging:readonly {destination:string;pin:{path:string;sha256:string}}[];
  prior?:{release:PriorRelease;paths:readonly string[];targetGeneratedAt:string;targetReleaseId:string;cache:PriorReleaseCache};
 };
@@ -150,7 +153,10 @@ export async function prepareKnowledge(options:PrepareKnowledgeOptions){
 /** The consumer runs inside a real nested canonical lease; no caller scope/boolean is accepted. */
 export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,consume:(prepared:{summary:PreparedKnowledgeSummary;publicationQuarantine:{schemaVersion:string;records:unknown[]};stagingDir:string;scope:ManagedSourceScratch;outputPins:Array<{path:string;sha256:string;bytes:number}>;publication:AuthenticatedPreparedPublication})=>Promise<T>,publicationInputs?:PreparedPublicationInputs):Promise<T>{
  const provenance=await preparationInputs(options),policy=preparationPolicy(options),outputRoot=resolve(options.outputRoot??join(cacheDir,'districts','r1-knowledge-preparation'));
- return withManagedSourceScratch(outputRoot,provenance.bindings.map(({independentAllowed:_flag,...binding})=>binding),async scope=>{
+ const partition=publicationInputs?await authenticatePublicationPartition(options.privateProvenance!,publicationInputs.stagingProvenance,policy):undefined;
+ if(partition)partition.assertCoverage([...partition.primaryInputs,...publicationInputs!.staging.map(entry=>entry.pin)]);
+ const scopeBindings=partition?.bindings??provenance.bindings;
+ return withManagedSourceScratch(outputRoot,scopeBindings.map(({independentAllowed:_flag,...binding})=>binding),async scope=>{
   const assertActive=scope.assertActive.bind(scope),leaseDirectory=scope.directory;
   const prepared=await assembleKnowledge(options,provenance),stagingDir=join(leaseDirectory,'staging'),outputPins=prepared.outputs.map(output=>({path:join(stagingDir,output.path),sha256:hash(output.bytes),bytes:output.bytes.length}));
   const handoffPath=join(stagingDir,'knowledge/preparation-inputs.json'),handoffBytes=Buffer.from(JSON.stringify(prepared.handoff,null,2)+'\n');
@@ -164,7 +170,7 @@ export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,c
    publicationStagingPathSchema.parse(entry.destination);
    if(entry.destination.startsWith('knowledge/'))throw Error('External staging cannot replace authenticated knowledge preparation');
    const path=join(stagingDir,entry.destination);if(pins.has(path))throw Error('Duplicate prepared publication staging member');
-   const bytes=await provenance.read(entry.pin.path);if(hash(bytes)!==entry.pin.sha256)throw Error('Prepared publication staging independent pin mismatch');
+   const bytes=await partition!.read(entry.pin.path);if(hash(bytes)!==entry.pin.sha256)throw Error('Prepared publication staging independent pin mismatch');
    pins.set(path,{sha256:entry.pin.sha256,bytes:bytes.length});await write(path,bytes);
   }
   let priorDirectory:string|undefined;
@@ -174,7 +180,7 @@ export async function withPreparedKnowledge<T>(options:PrepareKnowledgeOptions,c
    for(const [member,bytes] of baseline.files){const path=join(priorDirectory,member);pins.set(path,{sha256:hash(bytes),bytes:bytes.length});await write(path,bytes);}
   }
   let active=true;
-  const publication:AuthenticatedPreparedPublication=Object.freeze({provenance,stagingDir,priorDirectory,async read(path:string){
+  const publication:AuthenticatedPreparedPublication=Object.freeze({provenance,stagingProvenance:partition?.staging,stagingDir,priorDirectory,async read(path:string){
    if(!active)throw Error('Prepared publication lease has ended');
    await assertActive();const absolute=resolve(path),pin=pins.get(absolute);
    if(!pin||await realpath(absolute)!==absolute)throw Error('Publication input lacks its authenticated preparation output pin');
