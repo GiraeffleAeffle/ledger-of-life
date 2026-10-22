@@ -697,6 +697,31 @@ are inferred from the synthetic fixture. Separate tests exercise the closed
 operator plan, offline guard, distinct `release/` vs `out/` authentication and
 cache separation, missing prerequisites and target-as-predecessor rejection.
 
+The complete **19-member** retained fixture is a mandatory exclusive phase of
+`scripts/r1-verify.sh tests|all`, after the ordinary file-concurrency2 phase.
+It runs alone with file concurrency1; both phases run even if ordinary tests
+fail. Their receipts are `tests-TIMESTAMP.tap` and `integration-TIMESTAMP.tap`.
+All nineteen authentic members, exact manifest/member replay, binding-set
+checks, passed gate and exception-loader/tamper assertions remain mandatory.
+
+Only this long-running fixture configures the genuine reviewed
+`strausberg-planning` registered scope in its isolated registry, with explicitly
+synthetic source bytes and origin-bound policy observations. The normal import
+path issues seven-day receipts; the fixture asserts their exact expiry and
+registered eligibility. It never edits an issued receipt or freezes time.
+Its independently issued isolated selection lasts four hours, and its declared
+planning estimate is90minutes plus10minutes margin. Ordinary one-hour source
+proofs, short fixture selections and expiry-refusal tests are unchanged.
+
+The subprocess safety bound is90minutes, with SIGTERM then bounded60-second
+SIGKILL escalation and a120-second outer cleanup margin. This is not a speed
+acceptance threshold and changes no production validity/check limit.
+`REAL_RETAINED_STEP8_PHASE` records are forwarded live for setup, native import/
+queue, retained planning/import, audits, execution, loader/evidence and tamper
+refusal. A subprocess failure retains bounded exit-code/signal/killed/elapsed
+metadata and the last phase. Completed runs still report actual execution
+subphase timings; these fixture measurements are not a production ETA.
+
 The operator's actual offline bootstrap is installed at the build/replay phase
 boundary after fixture extraction. Its code and both operator entrypoints are
 runtime-pinned in the replay receipt. The native byte-count fixture retains its

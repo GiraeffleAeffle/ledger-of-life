@@ -16,6 +16,7 @@ import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
 import {initializeManagedAcquisitionLane,readCivicPolicyInventory,markManagedCacheInventoryComplete,CIVIC_ACQUISITION_DECISION_ID} from '../src/civic-opt-out.ts';
 import {assembleStep8Staging} from '../src/r1-step8-staging.ts';
 import {PROVENANCE_LIMIT_BYTES,PROVENANCE_SAFETY_MARGIN_BYTES} from '../src/publication-provenance-partition.ts';
+import {STAGING_FIXTURE_CHILD_MS,STAGING_FIXTURE_KILL_GRACE_MS,STAGING_FIXTURE_OUTER_MS,parseStagingFixturePhase,stagingFixtureFailure,type StagingFixturePhase} from './helpers/step8-staging-runtime.ts';
 
 const execute=promisify(execFile);
 test('offline retained-plan CLI derives every authentic 0.3.2 non-knowledge member and embedded declaration',async()=>{
@@ -50,11 +51,21 @@ test('staging rejects enrolled-root overlap before creating directory or claim d
  await markManagedCacheInventoryComplete(ancestor,fixture.policy);
  assert.equal((await readCivicPolicyInventory(fixture.policy)).roots.find(root=>root.path===ancestor)?.complete,true,'ancestor remains complete after canonical reconciliation');
 });
-test('real retained 0.3.2 staging executes through exact replay, passed gate and exception handoff',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:3310000},async()=>{
- const {NODE_TEST_CONTEXT:_parent,...env}=process.env;
- const result=await execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1',R1_TEST_DUPLICATE_CONTENT:'1'},timeout:3300000,maxBuffer:8*1024*1024}).catch((error:unknown)=>{
-  if(error instanceof Error&&'stdout' in error)throw new Error(error.message+'\n'+String(error.stdout),{cause:error});throw error;
+test('real retained 0.3.2 staging executes through exact replay, passed gate and exception handoff',{skip:!process.env.DISTRICT_TEST_DATABASE_URL,timeout:STAGING_FIXTURE_OUTER_MS},async()=>{
+ const {NODE_TEST_CONTEXT:_parent,...env}=process.env,started=performance.now();
+ const execution=execute(process.execPath,['--experimental-strip-types','--experimental-test-module-mocks','--test','--test-isolation=none','--test-reporter=tap',fileURLToPath(new URL('./fixtures/residual-production-topology.ts',import.meta.url))],{env:{...env,R1_TEST_STEP8_STAGING:'1',R1_TEST_DUPLICATE_CONTENT:'1'},timeout:STAGING_FIXTURE_CHILD_MS,maxBuffer:8*1024*1024});
+ let pending='',lastPhase:StagingFixturePhase|undefined;
+ execution.child.stdout?.on('data',(chunk:Buffer)=>{
+  const lines=(pending+chunk.toString('utf8')).split('\n');pending=lines.pop()!.slice(-512);
+  for(const line of lines){const phase=parseStagingFixturePhase(line);if(phase){lastPhase=phase;console.log('REAL_RETAINED_STEP8_PHASE '+JSON.stringify(phase));}}
  });
+ // execFile sends SIGTERM at the child bound. Escalate a stuck cleanup before
+ // the outer test can time out and leave a source-bearing child behind.
+ const escalation=setTimeout(()=>{if(execution.child.exitCode===null&&execution.child.signalCode===null)execution.child.kill('SIGKILL');},STAGING_FIXTURE_CHILD_MS+STAGING_FIXTURE_KILL_GRACE_MS);escalation.unref();
+ const result=await execution.catch((error:unknown)=>{
+  const details=stagingFixtureFailure(error,performance.now()-started,lastPhase),stdout=error instanceof Error&&'stdout' in error?String(error.stdout):'';
+  throw new Error('Retained staging fixture failed '+JSON.stringify(details)+'\n'+stdout,{cause:error});
+ }).finally(()=>clearTimeout(escalation));
  assert.match(result.stdout,/# fail 0/);
  assert.match(result.stdout,/REAL_RETAINED_STEP8_PLAN_AUDIT .*"members":19,"cities":8,"audit":"compatible","inventoryUnchanged":true,"dbUnchanged":true,"network":false,"providers":false/);
  assert.match(result.stdout,/REAL_RETAINED_STEP8_EXECUTION_HANDOFF .*"members":19,"gate":"passed","bundleAccepted":true,"tamperRejected":true,"canonicalPasses":1/);

@@ -19,6 +19,7 @@ import {privatePublicationProvenanceSchema,authenticatePublicationProvenance} fr
 import {readCivicPolicyInventory} from '../../src/civic-opt-out.ts';
 import {ReplayEvidenceInputPinsSchema,replayEvidenceCasRoot} from '../../src/replay-evidence-contract.ts';
 import {PROVENANCE_SAFETY_MARGIN_BYTES,PROVENANCE_LIMIT_BYTES,provenanceBytes as inventoryBytes} from '../../src/publication-provenance-partition.ts';
+import {markStagingFixturePhase} from './step8-staging-runtime.ts';
 
 /** Real immutable 0.3.2 staging bytes, isolated authority/PG and synthetic native
  * assessment evidence from the existing topology fixture; no live claims. */
@@ -30,16 +31,19 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  await assert.rejects(readFile(nativeReceiptPin.path),{code:'ENOENT'});
  await writeManagedSourceArtifact(manifest.casRoot,nativeReceiptPin.path,nativeBytes,nativeRow.spec.selector.sourceBindings.map((binding:SourceArtifactBinding)=>({...binding,independentAllowed:false})),{...manifest.policy,decisionId:'owner-2026-10-11-public-civic-sources',kind:'artifacts'});
  const inventoryBefore=await readFile(join(manifest.policy.stateDir,'inventory.json'));
+ markStagingFixturePhase('retained-plan','started');
  const plan=await buildStep8RetainedPlan(join(root,'release'),join(fixtureRoot,'real-retained-copies'));
  assert.equal(plan.imports.length,19);
  assert.deepEqual(await readFile(join(manifest.policy.stateDir,'inventory.json')),inventoryBefore,'retained-plan is read-only');
  const planPath=join(fixtureRoot,'operator-controls','retained-plan.json'),planSha256=await writePrivateJson(planPath,plan);
+ markStagingFixturePhase('retained-plan','completed');markStagingFixturePhase('retained-import','started');
  const collected=await runRetainedPublicationImportPlan(plan,manifest.policy);
  assert.equal(collected.length,19);
  for(const copy of collected){
   assert.deepEqual(await readFile(copy.path),await readCommittedReleaseFile(STEP8_PRIOR_RELEASE.gitCommit,copy.publication.memberPath,undefined,'release'));
   assert.ok(copy.bindings.length);assert.ok(copy.bindings.every(binding=>binding.kind==='retained_publication'&&binding.independentAllowed===false));
  }
+ markStagingFixturePhase('retained-import','completed');
  const managedRoot=join(cacheDir,'step8-staging-fixture-'+randomUUID());
  t.after(async()=>{await rm(managedRoot,{recursive:true,force:true});await rm(managedRoot+'.claim',{force:true});});
  const request={schemaVersion:'stadtstack-r1-step8-staging-assembly-v1',retainedPlan:{path:planPath,sha256:planSha256},provenances:[{path:sourceProvenance.path,sha256:sourceProvenance.sha256}],campaign:manifest.campaign,registry:manifest.registry,managedRoot,policy:manifest.policy};
@@ -54,10 +58,12 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  const beforeAudit=await readFile(join(manifest.policy.stateDir,'inventory.json')),beforeCounts=await counts(),assemblyPath=join(fixtureRoot,'operator-controls','assembly.json'),assemblySha256=await writePrivateJson(assemblyPath,request);
  const {campaign:_,registry:__,privateProvenance:___,staging:____,stagingProvenance:_____,...base}=manifest,operator=Step8OperatorInputSchema.parse({...base,stagingAssembly:{path:assemblyPath,sha256:assemblySha256}});
  assert.deepEqual(step8ReadPlan(operator).writes,[]);
+ markStagingFixturePhase('standalone-audit','started');
  const beforeStandalone=canonicalBuildCount(),operatorAudit=await auditStep8Operator(operator,pool);
  assert.equal(operatorAudit.status,'compatible',JSON.stringify(operatorAudit.blockers));assert.equal(canonicalBuildCount()-beforeStandalone,1,'standalone operator audit owns one canonical pass');
  await assert.rejects(readFile(join(managedRoot,'staging-component.json')),{code:'ENOENT'});
  assert.deepEqual(await readFile(join(manifest.policy.stateDir,'inventory.json')),beforeAudit);assert.deepEqual(await counts(),beforeCounts);
+ markStagingFixturePhase('standalone-audit','completed');markStagingFixturePhase('embedded-audit','started');
  const beforeShared=canonicalBuildCount(),context=await createWitnessedProvenanceContext(manifest.nativeSealSelection,manifest.policy,{pool,casRoot:manifest.casRoot,catalogue:manifest.currentGeneration.catalogue,mode:'step8',workers:1,timing:manifest.reconstructionTiming});
  const prepared=await prepareStep8Staging(request,pool,context);let finished=false,audit:Awaited<ReturnType<typeof auditStep8>>;
  try{
@@ -74,6 +80,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
   await assert.rejects(relocateStep8AuditCampaign(audit,{path:join(managedRoot,'campaign.json'),sha256:manifest.campaign.sha256},manifest.privateProvenance,manifest.stagingProvenance,manifest.policy),/successfully finished canonical source epoch/);
   finished=true;await context.finish();
  }finally{try{if(!finished)await context.finish();}finally{await prepared.dispose();}}
+ markStagingFixturePhase('embedded-audit','completed');
  console.log('REAL_RETAINED_STEP8_PLAN_AUDIT '+JSON.stringify({members:19,cities:8,audit:audit.status,inventoryUnchanged:true,dbUnchanged:true,network:false,providers:false}));
  const target={path:join(managedRoot+'-execution','campaign.json'),sha256:manifest.campaign.sha256};
  await assert.rejects(relocateStep8AuditCampaign({...audit},target,manifest.privateProvenance,manifest.stagingProvenance,manifest.policy),/trusted staging audit/);
@@ -89,9 +96,11 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
   return Promise.all(sharedPins.map(async pin=>{const bytes=await readFile(pin.path),entries=inventory.entries.filter(entry=>entry.rootId===cas.id&&entry.relativePath===relative(cas.path,pin.path)).sort((a,b)=>a.id.localeCompare(b.id));assert.equal(digest(bytes),pin.sha256);assert.ok(entries.length>=pin.minimumBindings,'genuine pre-existing blob retains all actual producers');return {path:pin.path,bytes,entries};}));
  };
  const sharedBefore=await sharedSnapshot();
+ markStagingFixturePhase('execute','started');
  const execution=Step8OperatorInputSchema.parse({...base,stagingAssembly:{path:executionPath,sha256:executionSha256}}),beforeExecute=canonicalBuildCount(),gate=await runStep8(execution,pool);
  assert.equal(gate.status,'passed');assert.equal(canonicalBuildCount()-beforeExecute,1,'operator execute reuses one canonical source pass');
  assert.deepEqual(await sharedSnapshot(),sharedBefore,'source CAS shared blob bytes and complete binding sets are unchanged by replay persistence');
+ markStagingFixturePhase('execute','completed');markStagingFixturePhase('loader-and-evidence','started');
  console.log('REAL_RETAINED_STEP8_PHASE_TIMINGS '+JSON.stringify(gate.phaseTimings));
  assert.notEqual(gate.campaign.path,manifest.campaign.path);assert.equal(gate.campaign.sha256,manifest.campaign.sha256);
  assert.ok(gate.stagingAssembly);
@@ -138,6 +147,7 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  console.log('REAL_RETAINED_STEP8_PROVENANCE_SIZE '+JSON.stringify({primaryBytes:provenanceBytes.length,stagingBytes:retainedBytes.length,primaryInputs:primary.inputs.length,stagingInputs:retained.inputs.length,retainedMembers:19,retainedBindings:retained.inputs.reduce((sum,pin)=>sum+pin.bindings.length,0),generatedInputs:primary.inputs.filter(pin=>!artifactPaths.has(pin.path)).map(pin=>({path:relative(manifest.outputRoot,pin.path),bytes:pin.bytes,bindings:pin.bindings.length,inventoryWireBytes:Buffer.byteLength(JSON.stringify(pin))})),projection:'production precheck uses all27 actual sealed input pins and actual19 retained members; this fixture receipt contains measured values only'}));
  const generation=JSON.parse((await readFile(gate.generationAuditEvidence.path)).toString('utf8'));
  assert.deepEqual(generation.campaign,gate.campaign);assert.deepEqual(generation.campaignRelocation.from,manifest.campaign);assert.deepEqual(generation.campaignRelocation.to,gate.campaign);
+ markStagingFixturePhase('loader-and-evidence','completed');markStagingFixturePhase('tamper-refusal','started');
  const committedBytes=await readFile(gate.campaign.path);
  try{
   await writeFile(gate.campaign.path,Buffer.concat([committedBytes,Buffer.from('\n')]));
@@ -146,5 +156,6 @@ export async function exerciseRealRetainedStaging(t:TestContext,manifest:Step8In
  }
  finally{await writeFile(gate.campaign.path,committedBytes);}
  await loadStep8ExceptionBundle(handoffPins,gate.releaseId);
+ markStagingFixturePhase('tamper-refusal','completed');
  console.log('REAL_RETAINED_STEP8_EXECUTION_HANDOFF '+JSON.stringify({members:19,gate:gate.status,bundleAccepted:true,tamperRejected:true,canonicalPasses:1}));
 }

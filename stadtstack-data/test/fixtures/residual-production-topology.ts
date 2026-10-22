@@ -13,14 +13,17 @@ import {stripTypeScriptTypes} from 'node:module';
 import type {ParserSourceContext,ParserSandbox} from '../../src/district-parser-isolation.ts';
 import type {AssessmentPassInput,AssessmentOutput} from '../../src/district-assessment.ts';
 import type {ModelAnswer,ModelEvidence} from '../../src/district-model-contract.ts';
+import {markStagingFixturePhase} from '../helpers/step8-staging-runtime.ts';
 
 // Module seams exist only in this --experimental-test-module-mocks child. Every
 // source-bearing parser/model operation still uses real isolated-authority scopes.
-// Static project imports cannot work here: parser/model mocks must be installed
+// Static Core imports cannot work here: parser/model mocks must be installed
 // before loading the real queue-handler dependency graph.
 test('enrolled artifacts CAS survives real preparation/extraction and fixture A/B/C/seal/export',async t=>{
  const {digest:contractDigest,semanticHash}=await import('../../src/district-adapter-contract.ts');
  const duplicateMode=process.env.R1_TEST_DUPLICATE_CONTENT==='1';
+ const longStaging=process.env.R1_TEST_STEP8_STAGING==='1';
+ markStagingFixturePhase('fixture-setup','started');
  let extractionGeneration=0,preparationGeneration=0,toolProbes=0;
  // Module loading boundary: contract/archive readers see the same explicitly
  // synthetic source edit; physical checkout bytes are never changed by a test.
@@ -137,18 +140,25 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
  try{
   await migrateDistrictJobs(pool);const store=new DistrictJobStore(pool);
   const value=operatorRegistryFixtureValue(),city=value.municipalities[0];city.id='strausberg';city.ags='12064472';city.name='Synthetic Strausberg fixture';value.inventory[0].ags=city.ags;
-  const now=new Date(Date.now()-1000).toISOString(),source=city.sources.find(row=>row.id==='website')!;source.checkState='checked';source.checkedAt=now;source.evidence=[{url:source.url!,locator:'Synthetic source configuration',sha256:digest('synthetic topology source'),retrievedAt:now}];
+  if(longStaging){
+   // Real reviewed registration, synthetic bytes/evidence, isolated authority.
+   // The ordinary importer, not a patched receipt or clock, grants seven days.
+   const configuredCity=JSON.parse(await readFile(new URL('../../sources/district-registry.json',import.meta.url),'utf8')).municipalities.find((row:{id:string})=>row.id===city.id),configured=configuredCity.sources.find((row:{id:string})=>row.id==='strausberg-planning');
+   assert.ok(configured);Object.assign(city.sources.find(row=>row.id==='website')!,structuredClone(configured));
+   city.seedDocuments=structuredClone(configuredCity.seedDocuments.filter((seed:{sourceId:string})=>seed.sourceId===configured.id));
+  }
+  const now=new Date(Date.now()-1000).toISOString(),source=city.sources.find(row=>row.id===(longStaging?'strausberg-planning':'website'))!;source.checkState='checked';source.checkedAt=now;source.evidence=[{url:source.url!,locator:'Synthetic source configuration',sha256:digest('synthetic topology source'),retrievedAt:now}];
   if(!duplicateMode)for(const id of ['witness-alpha','witness-beta'])city.sources.push({...structuredClone(source),id});
   const registry=await createOperatorRegistryFixture(t,{context:fixture,value,label:'topology-registry'}),rawRoot=join(root,'raw'),indexRoot=join(root,'index'),cas=new DistrictCas(join(root,'cas'));
   // This is the production topology: the whole CAS, not its hash subdirectory,
   // is enrolled as artifacts before any real residual queue handler runs.
   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[cas.root,'artifacts']] as const)await civic.initializeManagedAcquisitionLane(path,{...policy,decisionId:civic.CIVIC_ACQUISITION_DECISION_ID,kind});
-  const scope={publisherId:'synthetic-fixture-publisher',sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:'synthetic-topology'},text='Synthetic Strausberg fixture hat den Plan am 13.10.2026 als Satzung beschlossen. Stand: 13.10.2026.',body=Buffer.from(text),sha256=digest(body),originalUrl='https://example.org/topology-original',observationId=Date.now()+'-'+randomUUID()+'.json',observationPath=join(rawRoot,'observations',observationId);
-  const sourcePolicy={robots:{state:'allowed',url:'https://example.org/robots.txt',sha256:digest('synthetic robots'),checkedAt:now},tdm:{state:'not_declared',evidence:[{url:'https://example.org/.well-known/tdmrep.json',locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt:now}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'},observationBytes=Buffer.from(JSON.stringify({url:originalUrl,method:'GET',checkedAt:now,retrievedAt:now,state:'fetched',status:200,sha256,bytes:body.length,mimeType:'text/plain',policy:sourcePolicy})+'\n');
+  const scope={publisherId:'synthetic-fixture-publisher',sourceId:source.id,municipalityId:city.id,ags:city.ags,tenant:null,observationWindow:'synthetic-topology'},text='Synthetic Strausberg fixture hat den Plan am 13.10.2026 als Satzung beschlossen. Stand: 13.10.2026.',body=Buffer.from(text),sha256=digest(body),documentRoot=longStaging?source.url!:'https://example.org/',originalUrl=new URL('topology-original',documentRoot).href,observationId=Date.now()+'-'+randomUUID()+'.json',observationPath=join(rawRoot,'observations',observationId);
+  const sourcePolicy={robots:{state:'allowed',url:new URL('/robots.txt',originalUrl).href,sha256:digest('synthetic robots'),checkedAt:now},tdm:{state:'not_declared',evidence:[{url:new URL('/.well-known/tdmrep.json',originalUrl).href,locator:'TDMRep standardized location HTTP absence',value:'404',checkedAt:now}]},access:'public',legalClassification:'not_assessed',publication:'facts_with_attribution_only'},observationBytes=Buffer.from(JSON.stringify({url:originalUrl,method:'GET',checkedAt:now,retrievedAt:now,state:'fetched',status:200,sha256,bytes:body.length,mimeType:'text/plain',policy:sourcePolicy})+'\n');
   const binding={kind:'http_observation' as const,url:originalUrl,sourceSha256:sha256,observationId,receiptSha256:digest(observationBytes)},bodyPath=join(rawRoot,'sha256',sha256);
   await civic.withManagedSourceWrite(rawRoot,[{...binding,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true}],async()=>{await mkdir(join(rawRoot,'sha256'),{recursive:true,mode:0o700});await mkdir(join(rawRoot,'observations'),{recursive:true,mode:0o700});await writeFile(bodyPath,body,{mode:0o600});await writeFile(observationPath,observationBytes,{mode:0o600});},policy);
   const document={id:'synthetic-topology-original',municipalityId:city.id,ags:city.ags,districtId:city.districtId,sourceId:source.id,url:originalUrl,sha256,mimeType:'text/plain',retrievedAt:now,checkedAt:now,status:200,observationPath,documentDate:null,localPath:relative(indexRoot,bodyPath),adapter:'synthetic-topology-fixture',metadata:{}};
-  const duplicateUrl='https://example.org/topology-duplicate',duplicateObservationId=Date.now()+'-'+randomUUID()+'.json',duplicateObservationPath=join(rawRoot,'observations',duplicateObservationId),duplicateObservationBytes=Buffer.from(JSON.stringify({...JSON.parse(observationBytes.toString('utf8')),url:duplicateUrl})+'\n');
+  const duplicateUrl=new URL('topology-duplicate',documentRoot).href,duplicateObservationId=Date.now()+'-'+randomUUID()+'.json',duplicateObservationPath=join(rawRoot,'observations',duplicateObservationId),duplicateObservationBytes=Buffer.from(JSON.stringify({...JSON.parse(observationBytes.toString('utf8')),url:duplicateUrl})+'\n');
   const duplicateBinding={...binding,url:duplicateUrl,observationId:duplicateObservationId,receiptSha256:digest(duplicateObservationBytes)},duplicateDocument={...document,id:'zz-synthetic-topology-duplicate',url:duplicateUrl,observationPath:duplicateObservationPath},documents=duplicateMode?[document,duplicateDocument]:[document];
   if(duplicateMode)await civic.withManagedSourceWrite(rawRoot,[binding,duplicateBinding].map(item=>({...item,relativePath:'sha256/'+sha256,contentSha256:sha256,independentAllowed:true})),async()=>{await writeFile(bodyPath,body,{mode:0o600});await writeFile(duplicateObservationPath,duplicateObservationBytes,{mode:0o600});},policy);
   const indexBytes=Buffer.from(JSON.stringify({schemaVersion:'stadtstack-crawl-index-v1',generatedAt:now,documents,checks:[{municipalityId:city.id,sourceId:source.id,checkState:'checked',checkedAt:now,documentCount:documents.length,coverage:{state:'partial',pendingCount:0,runnableCount:0,blockedCount:0,scope:'Synthetic bounded topology fixture',sourceCoverage:'not_assessed'}}]})+'\n'),indexHash=digest(indexBytes),indexPath=join(indexRoot,'index.json');
@@ -160,8 +170,19 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
   const complete=async()=>{const receipt=await civic.recoverManagedSourceScratch(policy);assert.equal(receipt.status,'complete',canonicalJson(receipt));const inventory=JSON.parse(await readFile(join(policy.stateDir!,'inventory.json'),'utf8'));assert.equal(inventory.roots.find((entry:{path:string})=>entry.path===cas.root).complete,true);return inventory;};
   const authorize=(jobKey:string,phase='initial')=>store.authorize({approvalSha256:digest('Synthetic topology authorization '+jobKey+' '+phase),approvedBy:'synthetic-fixture-owner',expiresAt:new Date(Date.now()+60000).toISOString(),jobKeys:[jobKey],ags:[scope.ags],maxJobs:1,maxElapsedMs:60000,category:'development'});
   const run=async(jobKey:string,handlers:Parameters<typeof runDistrictJobs>[0]['handlers'])=>{const result=await runDistrictJobs({store,cas,handlers,authorizationId:await authorize(jobKey),ownerPresent:true,maxJobs:1,maxElapsedMs:60000});assert.equal(result.state,'completed',canonicalJson(result));await complete();return result;};
+  markStagingFixturePhase('fixture-setup','completed');
   await withFixtureAuthorizedCorpus(indexBytes,policy,async()=>{
+   markStagingFixturePhase('native-import','started');
    const imported=await importCrawlCorpusForResidual(store,cas,manifest);assert.deepEqual(imported.holds,[]);assert.equal(imported.jobs.length,duplicateMode?2:1);
+   if(longStaging){
+    const {PolicyReceiptSchema}=await import('../../src/district-policy-receipt.ts'),{REGISTERED_SOURCE_POLICY_VALIDITY_MS}=await import('../../src/registered-source-policy.ts');
+    for(const job of imported.jobs){
+     const proof=PolicyReceiptSchema.parse(JSON.parse((await cas.read(job.policyReceiptSha256)).toString('utf8')));
+     assert.equal(proof.scope.sourceId,source.id);assert.ok(proof.registeredSourceEligibility);
+     assert.equal(Date.parse(proof.expiresAt),Date.parse(now)+REGISTERED_SOURCE_POLICY_VALIDITY_MS,'normal registered import owns the complete seven-day proof');
+    }
+   }
+   markStagingFixturePhase('native-import','completed');markStagingFixturePhase('native-queue','started');
    const handlers=residual.residualJobHandlersFor(pool),preparationKey=await residual.enqueueResidualPreparation(store,cas,imported.jobs[0]);
    const semanticBefore=await residual.residualJobContract();hostGeneration++;
    assert.deepEqual(await residual.residualJobContract(),semanticBefore);
@@ -333,6 +354,7 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
     const combinedInput={...duplicateInput,assessmentItemHolds:[duplicateItemHold]},combinedSeal=await sealQueueTextContribution(pool,cas,combinedInput);
     assert.equal(combinedSeal.records,1);assert.equal(combinedSeal.assessmentItemHolds[0].recordIds[0],originalOutput.result.records[0].id);
     assert.ok(combinedSeal.terminalDocumentExceptions[0].reasonCode==='duplicate_source_content'&&combinedSeal.terminalDocumentExceptions[0].excludedAssessmentJobKeys.includes(heldPreparation));
+    markStagingFixturePhase('native-queue','completed');
     const calls=modelCalls,probes=toolProbes;
     await exerciseStep8(t,{pool,cas,policy,canonicalBuildCount,fixtureRoot:join(root,'duplicate-generation'),sealed:combinedSeal,jobKey:extractionKey,reconcileKey,sealInput:combinedInput,documentJobKeys:{[document.id]:extractionKey,[duplicateDocument.id]:duplicateExtraction},scope,binding:{...binding,independentAllowed:true},policyReceiptSha256:imported.jobs[0].policyReceiptSha256,body,retrievedAt:now}).catch((error:unknown)=>{throw new Error('Duplicate step 8 fixture: '+inspect(error,{depth:10}),{cause:error});});
     assert.equal(modelCalls,calls);assert.equal(toolProbes,probes);

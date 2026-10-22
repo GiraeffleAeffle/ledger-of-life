@@ -30,6 +30,7 @@ import {OMP_NATIVE_STREAM_VERSION,ompRunnerContractSha256,ompRunnerOutputContrac
 import type {AssessmentItemHoldPin} from '../../src/district-assessment-item-holds.ts';
 import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from '../../src/replay-evidence-contract.ts';
 import {partitionPublicationInputs,provenanceBytes as partitionBytes} from '../../src/publication-provenance-partition.ts';
+import {STAGING_FIXTURE_SELECTION_MS,STAGING_FIXTURE_PLANNING} from './step8-staging-runtime.ts';
 
 /** Synthetic admitted text/native queue + authentic retained 0.3.2 core. No live
  * facts, independent assessments or production writes are claimed by this test. */
@@ -88,9 +89,10 @@ export async function exerciseStep8(t:TestContext,input:{pool:Pool;cas:DistrictC
  const queueSelection=input.sealInput??{jobKeys:[input.jobKey],reconciliationJobKeys:[input.reconcileKey]};
  const selectionValue={schemaVersion:'stadtstack-r1-native-seal-selection-v1',catalogue:activeCatalogue,seals:[{municipalityId:scope.municipalityId,sourceId:scope.sourceId,corpus:sealed.artifacts.crawl,output:{path:sealPath,sha256:digest(sealBytes)},admission:'published',queue:queueSelection}]};
  const {issueFixtureNativeSelection}=await import('./step8-provenance-fixture.ts');
- const nativeSealSelection=await issueFixtureNativeSelection(control,selectionValue);
+ const longStaging=process.env.R1_TEST_STEP8_STAGING==='1';
+ const nativeSealSelection=await issueFixtureNativeSelection(control,selectionValue,'native-selection',longStaging?STAGING_FIXTURE_SELECTION_MS:3600000);
  await mkdir(cacheDir,{recursive:true});const outputRoot=join(cacheDir,'step8-fixture-'+randomUUID());t.after(async()=>{for(const path of [outputRoot,outputRoot+'.claim',outputRoot+'-preparation',outputRoot+'-replay',replayEvidenceCasRoot(outputRoot+'-replay',fixtureRoot)])await rm(path,{recursive:true,force:true});});
- const manifest=Step8InputSchema.parse({schemaVersion:'stadtstack-r1-step8-v1',reconstructionWorkers:1,reconstructionTiming:{estimatedDurationSeconds:600,expiryMarginSeconds:60},nativeSealSelection,currentGeneration,campaign:{path:campaignPath,sha256:campaignSha256},expectedSources:1,expectedDocuments:corpus.documents.length,seals:[{sealResult:{path:sealPath,sha256:digest(sealBytes)},...queueSelection}],structuredRunIds:[nativeReceipt.runId],registry:sealed.artifacts.registry,privateProvenance:{path:provenancePath,sha256:digest(provenanceBytes)},staging,priorRelease,asOf:clock.slice(0,10),clocks:{recordsGeneratedAt:clock,quarantineGeneratedAt:clock,coverageGeneratedAt:clock,qualityGeneratedAt:clock,manifestGeneratedAt:clock},casRoot:cas.root,outputRoot,policy,stagingProvenance:{path:stagingProvenancePath,sha256:digest(stagingProvenanceBytes)}});
+ const manifest=Step8InputSchema.parse({schemaVersion:'stadtstack-r1-step8-v1',reconstructionWorkers:1,reconstructionTiming:longStaging?STAGING_FIXTURE_PLANNING:{estimatedDurationSeconds:600,expiryMarginSeconds:60},nativeSealSelection,currentGeneration,campaign:{path:campaignPath,sha256:campaignSha256},expectedSources:1,expectedDocuments:corpus.documents.length,seals:[{sealResult:{path:sealPath,sha256:digest(sealBytes)},...queueSelection}],structuredRunIds:[nativeReceipt.runId],registry:sealed.artifacts.registry,privateProvenance:{path:provenancePath,sha256:digest(provenanceBytes)},staging,priorRelease,asOf:clock.slice(0,10),clocks:{recordsGeneratedAt:clock,quarantineGeneratedAt:clock,coverageGeneratedAt:clock,qualityGeneratedAt:clock,manifestGeneratedAt:clock},casRoot:cas.root,outputRoot,policy,stagingProvenance:{path:stagingProvenancePath,sha256:digest(stagingProvenanceBytes)}});
  assert.deepEqual(step8ReadPlan(manifest).writes,[]);
  const oldDatabase=process.env.DATABASE_URL;process.env.DATABASE_URL=pool.options.connectionString!.replace('postgresql:///','postgresql://'+encodeURIComponent(userInfo().username)+'@/');
  // Deliberate phase boundary: setup/extraction have completed. Exercise the
