@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "stadtstack-r1-step8-structured-selection-v1",
+  "id": "r1-step8-structured-selection-19a5fb8677b5",
+  "issuedBy": "R1 VM lead under exact renewed owner approval and post-stop security release; stage authorities only in the separate authority worktree for actual canonical job keys",
+  "issuedAt": "2026-10-22T03:48:49.171Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "renewalAuthority": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-renewal-2026-10-21-v2.json",
+    "sha256": "80e56910909b47d7aeaf4d26bbf63c30a99e0dd41aeac112b2573e417163232c"
+  },
+  "ownerDecision": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-renewal-owner-decision-2026-10-21-v2.json",
+    "sha256": "7b1c38c9b8c91e26e71d8cd01b6c2351d5c5c62c3edb87b6173153485b59a56c"
+  },
+  "executionEvidence": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/continuation-20261022/rest/execution-19a5fb8677b510377e26710edbd24b6e5fc146b02d5b21bbd8d2d61d133c008f/execution-evidence.json",
+    "sha256": "aa94f20ec7cba718573a324e7d9b67052ae0d534b60b67d7398d13158e459e5c"
+  },
+  "runIds": [
+    "4a6de77e-0ab8-4340-91d1-486601e169e8",
+    "68363b34-ad1a-4ab4-a21e-4bfe909d2630",
+    "0aaec95b-d865-409e-a97b-9540c83cc0e4",
+    "b8051fde-6dbb-4c97-ba34-8a06e116218e"
+  ],
+  "receipts": [
+    {
+      "runId": "4a6de77e-0ab8-4340-91d1-486601e169e8",
+      "sha256": "4ac7113c4c8ace4e1599044ff6bc27dc7a2ec3e3315a1d3453045e397cc468a8",
+      "step": "structured_parse",
+      "municipalityId": "strausberg",
+      "sourceId": "regionalstatistik-genesis"
+    },
+    {
+      "runId": "68363b34-ad1a-4ab4-a21e-4bfe909d2630",
+      "sha256": "4d233d0afe97a5cad954547978a3c0861309fc91009f6e4d52d02cb90ce3c652",
+      "step": "structured_parse",
+      "municipalityId": "hagenow",
+      "sourceId": "pegelonline"
+    },
+    {
+      "runId": "0aaec95b-d865-409e-a97b-9540c83cc0e4",
+      "sha256": "e3b631c19d1673c100c4b10636dfd225589a292e32f46718aa7451418ae8ee86",
+      "step": "structured_parse",
+      "municipalityId": "hagenow",
+      "sourceId": "pegelonline"
+    },
+    {
+      "runId": "b8051fde-6dbb-4c97-ba34-8a06e116218e",
+      "sha256": "106a17b90626db5d76fd9a1dca16b3696415434daa06636f73f07d26865620b3",
+      "step": "structured_parse",
+      "municipalityId": "hagenow",
+      "sourceId": "pegelonline"
+    }
+  ]
+}
