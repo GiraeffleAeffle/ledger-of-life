@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-step8-structured-renewal-owner-decision-2026-10-21-v2",
+  "issuedAt": "2026-10-22T00:02:46.806Z",
+  "approver": "Max (owner)",
+  "ownerStatementsVerbatim": [
+    "You said you need a short ok?",
+    "Ok"
+  ],
+  "request": {
+    "action": "fresh-exact-k1-k2-acquisition-and-structured-parse-for-step8",
+    "actionDraftSha256": "6621c20aa11c700d1d695fd67828e45e0210c78441446978fb910ff03dda4d97",
+    "acquisition": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/acquisition.json",
+      "sha256": "8596bf0c7ada8657d25bb707bbe76a0abdf79c846f0b847c5e1ed8e660c4ea6a"
+    },
+    "bounds": {
+      "maxAcquisitionJobs": 2,
+      "maxParseJobs": 5,
+      "maxPegelPages": 4,
+      "maxJobs": 7,
+      "maxRequestsPerAcquisition": 8,
+      "maxRequests": 16,
+      "maxDataRequests": 2,
+      "maxModelCalls": 0,
+      "paidMicroUsd": 0,
+      "maxElapsedMs": 3600000,
+      "sharedServiceMaxInFlight": 1,
+      "minStartIntervalMs": 2500
+    },
+    "expiresAt": "2026-10-25T21:59:59Z",
+    "reason": "K1 and K2 original acquisition/job authority expired and requests consumed; #81 is not authority for these two non-corpus native acquisitions"
+  },
+  "approved": true
+}
