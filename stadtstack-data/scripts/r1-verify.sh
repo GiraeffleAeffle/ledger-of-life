@@ -40,7 +40,10 @@ cleanup() {
   "$PG_BIN/pg_ctl" -D "$test_pg/data" -m fast stop >/dev/null 2>&1 || true
   rm -rf -- "$test_pg"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+# Cancellation is not a failed ordinary test: never launch the exclusive phase.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 "$PG_BIN/initdb" -D "$test_pg/data" --auth-local=trust --auth-host=reject --no-locale >"$log_root/initdb-$stamp.log" 2>&1
 "$PG_BIN/pg_ctl" -D "$test_pg/data" -l "$test_pg/postgres.log" -o "-h '' -k $test_pg -p 55432" -w start >/dev/null
 export DISTRICT_TEST_DATABASE_URL="postgresql:///postgres?host=$test_pg&port=55432"
