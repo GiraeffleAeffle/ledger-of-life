@@ -42,7 +42,8 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
 });
 // Preparation/extraction/residual, policy-refresh and parser-output identities
 // retain the authenticated campaign baseline. Acquisition advances only through
-// the window20 polite-fetch evidence-order fix (in-place origin substitution).
+// the window20 polite-fetch evidence-order fix and the 2026-10-22 identity-only
+// response-encoding security fix (SS-01, CVE-2026-111497).
 // Private proposition v2, compact provider encoding v3, item holds, native Sonnet
 // and renewable ownership advance assessment pins; inventory detachment advances
 // security-review pins only.
@@ -52,5 +53,5 @@ test('terminal sealing preserves upstream identities while acquisition and asses
  assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2');
  assert.equal(await ompRunnerOutputContractSha256(),'0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361');
  assert.equal(await parserIsolationContractSha256(),'287e701cdbddef1c22b2d202b54983467651eccfe43ead8cb67365ead00a4942');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
- assert.equal(await acquisitionContract(),'9815cc1786e5a758f809a7c17d7958462a7b34a39ca353a0bbd1d53b9087e1fa');
+ assert.equal(await acquisitionContract(),'b29c293b4ff6ee6c31a7039b45f8cf1e0f73dc68774552e5aa29de2951fec0d1');
 });
