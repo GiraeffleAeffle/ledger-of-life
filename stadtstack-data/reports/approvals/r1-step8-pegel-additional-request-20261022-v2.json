@@ -1,0 +1,61 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-step8-pegel-additional-request-20261022-v2",
+  "issuedAt": "2026-10-22T03:24:30.372Z",
+  "approver": "Max (owner)",
+  "approved": true,
+  "ownerStatementsVerbatim": [
+    "Ok"
+  ],
+  "baseAuthority": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-renewal-2026-10-21-v2.json",
+    "sha256": "80e56910909b47d7aeaf4d26bbf63c30a99e0dd41aeac112b2573e417163232c"
+  },
+  "request": {
+    "action": "one-additional-exact-pegel-attempt-and-remaining-local-structured-parses",
+    "jobKey": "7d62beb71a935a53ead875aa37c3440c082d32b4b4bb7189624a49bef23b2fc5",
+    "heldReceiptId": "c32afe11-225b-4dd0-8a25-6d286c2d4a28",
+    "url": "https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json",
+    "method": "GET",
+    "acquisition": {
+      "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/acquisition.json",
+      "sha256": "8596bf0c7ada8657d25bb707bbe76a0abdf79c846f0b847c5e1ed8e660c4ea6a"
+    },
+    "securityStop": {
+      "cve": "CVE-2026-111497",
+      "requiresIssuedPostStopRelease": true,
+      "requiresReviewedPoliteFetchFix": true,
+      "requiresNodeVersion": "v24.22.1",
+      "noLiveFetchUntilAllGatesPass": true
+    },
+    "contractCutover": "The jobKey above identifies the immutable failed attempt. Resume it only if its semantic contract equals the newly gated acquisition contract; otherwise leave it held and enqueue exactly one new canonical PEGEL acquisition from the unchanged pinned selector under the reviewed fixed contract. Never retag or weaken a job identity.",
+    "additionalAcquisitionAttempts": 1,
+    "additionalPegelDataRequests": 1,
+    "additionalHttpRequestCeiling": 8,
+    "historicalFirstPegelHttpRequests": 4,
+    "historicalGenesisHttpCeiling": 8,
+    "wholeOperationHttpCeilingIncludingHistory": 20,
+    "wholeOperationAcquisitionAttemptCeilingIncludingHistory": 3,
+    "wholeOperationJobCeilingIncludingHistory": 8,
+    "maxRemainingLocalParseJobs": 5,
+    "maxPegelParserPages": 4,
+    "localParsing": {
+      "genesis": "Parse the genuine committed representation f34605edd344898c7dc5c9ebcbbd61e1309d81d864c9ce5381c4ed722421e212 from successful acquisition run 7a9ef9ad-6cee-4beb-9106-bffd00e660ca; exact original K1 scope/options, no new request",
+      "pegelonline": "Parse every output page, at most four, of the genuine committed representation from the one additional PEGEL acquisition; adapter gauges, options {}, no auxiliary sources, no discovery or measurement requests",
+      "selection": "After the exact committed parser receipt set and unchanged 13-hour policy horizon pass the refusal-only precheck, the lead may issue an exact structured selection retaining the original renewal authority plus this completed execution-continuation evidence"
+    },
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0,
+    "wallBudgetExtension": true,
+    "expiresAt": "2026-10-22T12:00:00Z",
+    "refusals": [
+      "No execution until a genuine approved owner record and inspected continuation are separately issued and committed",
+      "Exactly one additional PEGEL acquisition attempt: explicit DistrictJobStore.resume only for an unchanged gated contract, otherwise a new canonical fixed-contract job for the same exact request; fresh one-key authorization, no automatic retry after a new hold",
+      "No repeat GENESIS acquisition; its already committed representation is the only GENESIS parser input",
+      "All remaining local parsing and new executor starts must finish before the extended deadline",
+      "No sandbox bypass, socket chmod, cache-pointer deletion, new source, boundary join, models or paid API",
+      "The execution deadline is not a replacement for current source-policy proofs; the unchanged 43200+3600-second step8 horizon still applies",
+      "Security stop: no PEGEL retry, source fetch, revalidation or renewal until the polite-fetch fix and Node24.22.1 have genuinely passed review/gates and Main has issued the exact security release"
+    ]
+  }
+}
