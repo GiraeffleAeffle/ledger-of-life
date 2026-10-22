@@ -306,6 +306,12 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   current policy proof still undergo the unchanged 12-hour-plus-one-hour horizon.
   Extra requests, missing parser pages, unapproved decisions, changed stage jobs
   or work completed outside the issued window fail closed.
+  The CVE-2026-111497 source-fetch stop adds a mandatory post-stop security-release
+  pin to that execution chain: reviewed fixed fetch bytes, genuinely passed gates
+  and exact Node 24.22.1 identity precede any continuation work. A fetch-code fix
+  changes `acquisitionContract`; the canonical new job identity must then use that
+  fixed contract while the immutable failed old job stays held. Reusing/retagging
+  the old semantic identity or omitting the security release is not a continuation.
 - `registry: {path, sha256}`: the admitted registry artifact against which the
   selected native runs are exported; native checked-source evidence produces
   a new bound registry artifact, preserving the originals.
