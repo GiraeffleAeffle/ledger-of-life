@@ -296,6 +296,16 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   builder starts. The refusal-only validator is
   `scripts/r1-step8-structured-precheck.mjs`; it also rejects stale attempts,
   acquisition-only selections, legacy output codecs and missing/overlapping pages.
+  A resumed acquisition/local-parse continuation additionally pins optional
+  `executionEvidence: {path, sha256}` inside the issued selection. This authenticates
+  the renewed owner decision, exact continuation, per-job issued stage authorities,
+  successful native receipt hashes and completion within their execution windows.
+  An expired **completed execution window** is historical evidence, not current
+  permission for another request. It does not replace, extend or shorten source
+  policy proofs: the original renewal/selection authority and every selected
+  current policy proof still undergo the unchanged 12-hour-plus-one-hour horizon.
+  Extra requests, missing parser pages, unapproved decisions, changed stage jobs
+  or work completed outside the issued window fail closed.
 - `registry: {path, sha256}`: the admitted registry artifact against which the
   selected native runs are exported; native checked-source evidence produces
   a new bound registry artifact, preserving the originals.
