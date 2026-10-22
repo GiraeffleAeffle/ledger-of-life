@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "r1-step8-structured-rest-continuation-v1",
+  "id": "r1-step8-structured-rest-b4e5abf2de8e-55c48d015bc4",
+  "issuedBy": "R1 VM lead under exact renewed owner approval and post-stop security release; stage authorities only in the separate authority worktree for actual canonical job keys",
+  "issuedAt": "2026-10-22T03:28:12.896Z",
+  "expiresAt": "2026-10-22T12:00:00Z",
+  "baseAuthority": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-renewal-2026-10-21-v2.json",
+    "sha256": "80e56910909b47d7aeaf4d26bbf63c30a99e0dd41aeac112b2573e417163232c"
+  },
+  "ownerDecision": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-pegel-additional-request-20261022-v2.json",
+    "sha256": "55c48d015bc4cb9d885fce139613ddc28283757236b212df9242684413c73576"
+  },
+  "ownerDraftSha256": "9a9153c987263eb531591ce75cf0175fa49a255cfc295dd3a5cfd4f24ee56a35",
+  "securityRelease": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-source-fetch-security-release-2026-10-22-v2.json",
+    "sha256": "3d49af958eadf27842aa532fa15ddf3eb180b4e65e7f5d81238bcc5fce891858"
+  },
+  "inspection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/continuation-20261022/rest/inspection-b4e5abf2de8e3fd25f5f55b7f26015ca9e7991d2284eaeacee6eaa2ba0d9a95f-1792639533305.json",
+    "sha256": "b3abfa8c4e4d973fb06da29e45c9693414e77deba95ad1330c7ccbb71b8ad1bb"
+  },
+  "stateIdentitySha256": "b4e5abf2de8e3fd25f5f55b7f26015ca9e7991d2284eaeacee6eaa2ba0d9a95f",
+  "genesisComplete": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/continuation-20261022/execution-b2a6eaade1086cdea40572170345866ddc6f46843d8b1e47b8be9da538d6b4b5/genesis-acquisition-complete.json",
+    "sha256": "f84215184320964f8d5b21096d68c88b3d01252bb20e77c301b43fc8fc90d392"
+  },
+  "genesisContinuation": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-genesis-continuation-93f0629eb2ce.json",
+    "sha256": "b2a6eaade1086cdea40572170345866ddc6f46843d8b1e47b8be9da538d6b4b5"
+  },
+  "acquisitionSelector": {
+    "root": "https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json",
+    "scope": {
+      "ags": "13076060",
+      "tenant": null,
+      "sourceId": "pegelonline",
+      "publisherId": "wsv",
+      "municipalityId": "hagenow",
+      "observationWindow": "inventory"
+    },
+    "request": {
+      "url": "https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json",
+      "body": null,
+      "method": "GET",
+      "contentType": null,
+      "publicOperation": null
+    },
+    "version": "district-r1-acquisition-v1",
+    "maxBytes": 4194304,
+    "discovery": null,
+    "permission": {
+      "kind": "facts_with_attribution"
+    },
+    "maxRequests": 8,
+    "sourceVersion": null
+  },
+  "acquisitionContractSha256": "b29c293b4ff6ee6c31a7039b45f8cf1e0f73dc68774552e5aa29de2951fec0d1",
+  "resolution": {
+    "action": "one-pegel-attempt-then-all-remaining-local-parses",
+    "mode": "new_contract_job",
+    "priorJobKey": "7d62beb71a935a53ead875aa37c3440c082d32b4b4bb7189624a49bef23b2fc5",
+    "acquisitionJobKey": "4ce39700581d1ee94ca8beed3174ce353cb350ec243ec4b5d80bab538ade3f7d",
+    "pegelAttemptBefore": 1,
+    "pegelAttemptAfter": 1,
+    "additionalHttpRequestCeiling": 8,
+    "wholeOperationHttpCeilingIncludingHistory": 20,
+    "maxNewAcquisitionJobs": 1,
+    "maxLocalParseJobs": 5,
+    "maxPegelPages": 4,
+    "maxNewJobs": 6,
+    "maxWholeOperationJobs": 8,
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0,
+    "requiresDockerGroup": 127,
+    "maxStageElapsedMs": 540000,
+    "osStageDeadlineSeconds": 600,
+    "stageAuthorityIssuance": "Issue and commit one exact stage record per actual canonical job in this authority worktree; unique SHA per stage; no broader data/source/model scope"
+  }
+}
