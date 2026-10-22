@@ -87,3 +87,11 @@ test('the automatic export pre-pass refuses before opening an unavailable author
  assert.equal(report.status,'blocked');assert.ok(report.blockers.some((entry:{code:string})=>entry.code==='SEALED_EXPORT_PROJECTION'));assert.equal(report.exportProjection.canonicalPasses,0);
  await assert.rejects(lstat(policy.stateDir),{code:'ENOENT'});await assert.rejects(lstat(input.outputRoot),{code:'ENOENT'});
 });
+
+test('an older intake date hold never removes a later dated admission of the same record identity',()=>{
+ const old=record('synthetic-corrected-date');old.documentDate=null;old.documentDateQuote=null;old.documentDateReason='Synthetic old missing date';old.verification.evidenceHash=knowledgeEvidenceHash(old);
+ const current=record(old.id),runs=[contribution(old,'older-undated'),contribution(current,'later-dated')],projection=projectStep8PublicationIntake(input(runs));
+ assert.deepEqual(projection.context.knowledge.records,[current]);
+ const carried=withheldStep8PublicationIntake(projection.context);assert.equal(carried.length,1);assert.equal(carried[0].record.verification.evidenceHash,old.verification.evidenceHash);
+ assert.notEqual(carried[0].record.verification.evidenceHash,projection.context.knowledge.records[0].verification.evidenceHash);
+});

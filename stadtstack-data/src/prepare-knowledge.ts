@@ -110,8 +110,8 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  if(critical.holds.some(hold=>retainedPublication?.baseline.input.recordIds.includes(hold.recordId)))throw Error('Held native revision cannot remove an admitted retained fact; resubmit composition with that native admission withheld');
  for(const record of knowledge.records)if(record.kind==='text_model'&&criticalIds.has(record.id))quarantine.cases.push({kind:'text_model',recordId:record.id,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:record.extraction.inputSha256,reason:critical.holds.find(hold=>hold.recordId===record.id)!.reason});
  knowledge.records=knowledge.records.filter(record=>!criticalIds.has(record.id));
- const holds=[...(composition?withheldStep8PublicationIntake(composition):[]),...knowledge.records.flatMap(record=>{const hold=knowledgePublicationHold(record);return hold?[{record,hold}]:[];})],withheldIds=new Set(holds.map(({record})=>record.id));
- for(const {record,hold} of holds)quarantine.cases.push(knowledgePublicationQuarantineCase(record,hold));
+ const intakeHolds=composition?withheldStep8PublicationIntake(composition):[],holds=knowledge.records.flatMap(record=>{const hold=knowledgePublicationHold(record);return hold?[{record,hold}]:[];}),withheldIds=new Set(holds.map(({record})=>record.id)),allPublicationHolds=[...intakeHolds,...holds];
+ for(const {record,hold} of allPublicationHolds)quarantine.cases.push(knowledgePublicationQuarantineCase(record,hold));
  knowledge.records=knowledge.records.filter(record=>!withheldIds.has(record.id));
  if(holds.some(({record})=>retainedPublication?.baseline.input.recordIds.includes(record.id)))throw Error('Withheld native revision cannot remove an admitted retained fact; resubmit composition with that native admission withheld');
  const present=new Set(graphIdentityInputs({...knowledge,identityAssertions:[],identityAdmissions:[]}).mentions.map(mention=>mention.id));
@@ -139,7 +139,7 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  const staged=[['registry',registry],['records',knowledge],['coverage',coverage],['assessment-admissions',criticalProjection]] as const;
  const outputs=staged.map(([name,data])=>({path:`knowledge/${name}.json` as 'knowledge/registry.json'|'knowledge/records.json'|'knowledge/coverage.json'|'knowledge/assessment-admissions.json',bytes:Buffer.from(JSON.stringify(data,null,2)+'\n')}));
  const handoff=knowledgePreparationInputsSchema.parse({schemaVersion:'stadtstack-knowledge-preparation-inputs-v1',dependencies,outputs:outputs.map(({path,bytes})=>({path,sha256:hash(bytes),bytes:bytes.length}))});
- const publicationQuarantine={schemaVersion:'stadtstack-publication-quarantine-v1',records:[...critical.holds,...holds.map(({record,hold})=>({id:record.id,municipalityId:record.municipalityId,...hold}))]};
+ const publicationQuarantine={schemaVersion:'stadtstack-publication-quarantine-v1',records:[...critical.holds,...allPublicationHolds.map(({record,hold})=>({id:record.id,municipalityId:record.municipalityId,...hold}))]};
  const summary:PreparedKnowledgeSummary={schemaVersion:knowledge.schemaVersion,records:knowledge.records.length,textModelRecords:knowledge.records.filter(record=>record.kind==='text_model').length,structuredRecords:knowledge.records.filter(record=>record.kind==='structured').length,criticalHolds:critical.holds,municipalities:coverage.accounting.publishedMunicipalities,accounting:coverage.accounting,districts:coverage.districts,municipalityCoverage:projectDistrictCoverage(coverage).municipalities,dependencies};
  return {outputs,handoff,publicationQuarantine,summary};
 }

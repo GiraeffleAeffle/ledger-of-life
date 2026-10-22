@@ -144,8 +144,9 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    // Real reviewed registration, synthetic bytes/evidence, isolated authority.
    // The ordinary importer, not a patched receipt or clock, grants seven days.
    const configuredCity=JSON.parse(await readFile(new URL('../../sources/district-registry.json',import.meta.url),'utf8')).municipalities.find((row:{id:string})=>row.id===city.id),configured=configuredCity.sources.find((row:{id:string})=>row.id==='strausberg-planning');
-   assert.ok(configured);Object.assign(city.sources.find(row=>row.id==='website')!,structuredClone(configured));
-   city.seedDocuments=structuredClone(configuredCity.seedDocuments.filter((seed:{sourceId:string})=>seed.sourceId===configured.id));
+   assert.ok(configured);city.sources.push(structuredClone(configured));
+   const seedUrl=new URL('topology-original',configured.url).href,seed=city.seedDocuments[0];
+   city.seedDocuments=[{...seed,url:seedUrl,sourceId:configured.id,evidence:seed.evidence.map(entry=>({...entry,url:seedUrl}))}];
   }
   const now=new Date(Date.now()-1000).toISOString(),source=city.sources.find(row=>row.id===(longStaging?'strausberg-planning':'website'))!;source.checkState='checked';source.checkedAt=now;source.evidence=[{url:source.url!,locator:'Synthetic source configuration',sha256:digest('synthetic topology source'),retrievedAt:now}];
   if(!duplicateMode)for(const id of ['witness-alpha','witness-beta'])city.sources.push({...structuredClone(source),id});
