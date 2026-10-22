@@ -44,11 +44,13 @@ test('wire enforces identity before body handling and never constructs a decoder
  interface TransportSeam {wireRequest(url:URL,method:'GET'|'POST',body:undefined,validators:undefined,pinned:{address:string;family:number},headers:Record<string,string>):Promise<WireResult>}
  const fetcher=await createPoliteFetcher({cacheDir:join(root,'cache')});
  const request=()=>(fetcher as unknown as TransportSeam).wireRequest(fixture,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{});
- for(encoding of ['br','gzip','deflate','gzip, br','identity, gzip','compress','']){
+ for(encoding of ['br','gzip','deflate','gzip, br','identity, gzip','identity,','compress','']){
   for(status of [200,302,404])await assert.rejects(request(),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
  }
  status=200;
- for(encoding of [undefined,'identity','IDENTITY'])assert.equal((await request()).body.toString(),'identity fixture');
+ // HTTP optional whitespace is stripped by Node's header parser; it is still
+ // exactly identity at the transport boundary, unlike a trailing list comma.
+ for(encoding of [undefined,'identity','IDENTITY',' identity '])assert.equal((await request()).body.toString(),'identity fixture');
  // Exercise the public persistence path while preserving production DNS/port
  // controls: only the fixture transport is substituted, never the wire handler.
  t.mock.method(fetcher as unknown as WireSeam,'wire',async (url:URL)=>{
@@ -353,8 +355,8 @@ test('long-lived fetchers revalidate expired robots and machine policies before 
 interface LaneState {schemaVersion:1;host:string;lastStart:number;delayMs:number;nextAllowedAt:number;failures:number[];stop:null|{status:number;reason:string;checkedAt:string;until:number}}
 interface LaneSeam {
  hostStateDirectory():string;
- scheduled<T>(url:URL,work:()=>Promise<T>,onResult?:(result:T,state:LaneState)=>void):Promise<T>;
- recordHostResponse(url:URL,response:WireResult,state:LaneState):void;
+ scheduled<T>(url:URL,work:(state:LaneState)=>Promise<T>,onResult?:(result:T,state:LaneState)=>void):Promise<T>;
+ recordHostResponse(url:URL,response:Pick<WireResult,'status'|'headers'>&{body?:Buffer},state:LaneState):void;
 }
 test('municipal lane serializes instances, policy requests and restart state without credits',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'polite-shared-')));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -414,6 +416,51 @@ test('403/429 and three rolling 5xx persist cooldowns across restart with no ret
   await assert.rejects(restart.scheduled(url,work),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown'&&!!error.retryAfter);
   assert.equal(requests,status===503?3:1);
   const state=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));assert.ok(state.stop.until-Date.now()>=(status===503?3600000:7200000));
+ }
+});
+test('encoding refusal preserves header-only cooldown and 5xx accounting before restart',async t=>{
+ const root=await realpath(await mkdtemp(join(tmpdir(),'polite-encoded-circuit-')));t.after(()=>rm(root,{recursive:true,force:true}));
+ t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-22T00:00:00.000Z')});
+ let status=429,requests=0;
+ const server=createServer((request,response)=>{
+  requests++;assert.equal(request.headers['accept-encoding'],'identity');
+  response.writeHead(status,{'Content-Encoding':status===503?'gzip':'br','Retry-After':status===503?'7':'7200'});
+  response.end('untrusted encoded bytes');
+ });
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise<void>((resolve,reject)=>{server.closeAllConnections();server.close(error=>error?reject(error):resolve());}));
+ const address=server.address();assert.ok(address&&typeof address==='object');
+ const url=new URL(`http://stadt.de:${address.port}/fixture`);
+ interface EncodedLaneSeam extends LaneSeam {
+  wireRequest(url:URL,method:'GET',body:undefined,validators:undefined,pinned:{address:string;family:number},headers:Record<string,string>,onRefusedHeaders:(response:Pick<WireResult,'status'|'headers'>)=>void):Promise<WireResult>;
+ }
+ for(status of [403,429,503]){
+  const directory=join(root,String(status)),fetcher=await createPoliteFetcher({cacheDir:join(root,`cache-${status}`)}),lane=fetcher as unknown as EncodedLaneSeam;
+  t.mock.method(lane,'hostStateDirectory',()=>directory);
+  const work=(state:LaneState)=>lane.wireRequest(url,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{},headers=>lane.recordHostResponse(url,headers,state));
+  const onSuccess=t.mock.fn((response:WireResult,state:LaneState)=>lane.recordHostResponse(url,response,state));
+  const before=requests,now=Date.now();
+  await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+  let state:LaneState=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));
+  assert.equal(onSuccess.mock.callCount(),0);
+  if(status===503){
+   assert.deepEqual(state.failures,[now]);assert.equal(state.nextAllowedAt,now+7000);assert.equal(state.stop,null);
+   for(const delay of [7000,10000]){
+    await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
+    t.mock.timers.tick(delay);
+    await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+   }
+   state=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));
+   assert.equal(state.failures.length,3);assert.equal(state.stop?.status,503);assert.ok(state.nextAllowedAt>=Date.now()+3600000);
+  }else{
+   assert.equal(state.stop?.status,status);assert.equal(state.stop?.until,now+7200000);assert.equal(state.nextAllowedAt,now+7200000);
+  }
+  const restart=await createPoliteFetcher({cacheDir:join(root,`restart-${status}`)}) as unknown as LaneSeam;
+  t.mock.method(restart,'hostStateDirectory',()=>directory);
+  await assert.rejects(restart.scheduled(url,async()=>{throw Error('No dispatch during persisted cooldown');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
+  assert.equal(requests-before,status===503?3:1);
+  assert.deepEqual(await readdir(join(fetcher.cacheDir,'sha256')).catch(()=>[]),[]);
+  assert.deepEqual(await readdir(join(fetcher.cacheDir,'observations')).catch(()=>[]),[]);
  }
 });
 test('unsafe shared state fails closed before work',async t=>{

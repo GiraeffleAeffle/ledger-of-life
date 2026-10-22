@@ -312,7 +312,7 @@ export class PoliteFetcher {
   return (await this.checkedSourceBindings(bindings)).map(proof=>({...proof,independentAllowed:true}));
  }
  private hostStateDirectory():string{return join(homedir(),'.cache','stadtstack-data','host-lanes');}
- private async scheduled<T>(url:URL,work:()=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{
+ private async scheduled<T>(url:URL,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{
   const host=url.hostname,prior=sharedHostQueues.get(host)??Promise.resolve();
   const {promise:gate,resolve:unlock}=Promise.withResolvers<void>();sharedHostQueues.set(host,gate);await prior;
   let release:(()=>Promise<void>)|undefined;
@@ -354,7 +354,7 @@ export class PoliteFetcher {
    // Persist before dispatch for crash safety, then retain the actual dispatch time.
    // An unsuccessful state commit leaves the owner lock in place, never a restart bypass.
    state.lastStart=Date.now();
-   try{const result=await work();onResult?.(result,state);return result;}
+   try{const result=await work(state);onResult?.(result,state);return result;}
    finally{try{await writePrivateJson(path,state);}catch(error){release=undefined;throw error;}}
   }catch(error){
    if(error instanceof PoliteFetchError||error instanceof RequestAdmissionInterruption)throw error;
@@ -363,7 +363,7 @@ export class PoliteFetcher {
    try{await release?.();}finally{unlock();if(sharedHostQueues.get(host)===gate)sharedHostQueues.delete(host);}
   }
  }
- private recordHostResponse(url:URL,response:WireResponse,state:HostState):void {
+ private recordHostResponse(url:URL,response:Pick<WireResponse,'status'|'headers'>&{body?:Buffer},state:HostState):void {
   const now=Date.now(),status=response.status,retryAt=retryAfterTime(response.headers['retry-after'],now);
   state.failures=state.failures.filter(time=>now-time<HOST_FAILURE_WINDOW_MS);
   if(status===403||status===429){
@@ -374,7 +374,7 @@ export class PoliteFetcher {
    state.nextAllowedAt=Math.max(now+Math.min(60_000,5000*2**(state.failures.length-1)),retryAt);
    if(state.failures.length>=3){const until=Math.max(now+HOST_COOLDOWN_MS,retryAt);state.stop={status,reason:'Three HTTP 5xx responses within ten minutes; host circuit stopped',checkedAt:new Date(now).toISOString(),until};state.nextAllowedAt=until;}
   }
-  if(url.pathname==='/robots.txt'&&status===200){
+  if(url.pathname==='/robots.txt'&&status===200&&response.body){
    try{state.delayMs=Math.ceil(Math.min(8.64e15,Math.max(state.delayMs,parseRobots(response.body.toString('utf8')).delayMs)));}catch{/* Uninterpretable policy remains unavailable; never invent an allow. */}
   }
  }
@@ -390,7 +390,7 @@ export class PoliteFetcher {
    if(!addresses.length||addresses.some(item=>!isPublicAddress(item.address)))throw new PoliteFetchError('unsafe_url','DNS resolved a non-public address');
    const pinned=addresses[0];
    const nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
-   return this.scheduled(url,()=>this.wireRequest(url,method,body,validators,pinned,nativeHeaders),(response,state)=>this.recordHostResponse(url,response,state));
+   return this.scheduled(url,state=>this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state)),(response,state)=>this.recordHostResponse(url,response,state));
  }
  /** Current-proof validators must come from the actual immutable observation,
   * not only the mutable request cache. Legacy observations remain usable. */
@@ -469,7 +469,7 @@ export class PoliteFetcher {
  }
  /** Transport seam used by disposable fixture servers; production reaches this
   * only through the authority, DNS pinning and exact-host scheduler above. */
- private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>):Promise<WireResponse>{
+ private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>,onRefusedHeaders?:(response:Pick<WireResponse,'status'|'headers'>)=>void):Promise<WireResponse>{
   return new Promise<WireResponse>((done,reject)=>{
     const headers:Record<string,string>={'User-Agent':ua,Accept:'application/json,text/html,application/pdf,text/plain;q=0.8','Accept-Encoding':'identity'};
     if(body!==undefined){Object.assign(headers,nativeHeaders);headers['Content-Length']=String(Buffer.byteLength(body));}
@@ -481,7 +481,11 @@ export class PoliteFetcher {
      // Identity is the only requested representation. Refuse before reading any
      // body, including error/redirect responses; never construct a host decoder.
      const encoding=selected['content-encoding'];
-     if(encoding!==undefined&&encoding.toLowerCase()!=='identity'){clearTimeout(timer);reject(new PoliteFetchError('unsupported_encoding','Non-identity content encoding refused'));response.destroy();request.destroy();return;}
+     if(encoding!==undefined&&encoding.toLowerCase()!=='identity'){
+      // Refusal must not erase Retry-After, host cooldown or 5xx accounting.
+      onRefusedHeaders?.({status,headers:selected});
+      clearTimeout(timer);reject(new PoliteFetchError('unsupported_encoding','Non-identity content encoding refused'));response.destroy();request.destroy();return;
+     }
      if(status>=300){response.destroy();clearTimeout(timer);done({status,headers:selected,body:Buffer.alloc(0),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});return;}
      const chunks:Buffer[]=[];let bytes=0;
      if(Number(selected['content-length'])>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Response exceeds byte bound'));return;}

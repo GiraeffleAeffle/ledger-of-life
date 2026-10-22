@@ -15,8 +15,8 @@ The source campaign/catalogue pin remains
 ## Transport cutover
 
 `src/polite-fetch.ts:wireRequest` continues to send `Accept-Encoding: identity`.
-Before handling any response status or reading a body it rejects every present
-Content-Encoding except case-insensitive `identity`, with typed
+Before reading a body or returning a successful wire result it rejects every
+present Content-Encoding except case-insensitive `identity`, with typed
 `PoliteFetchError('unsupported_encoding')`. Empty, br, gzip, deflate, stacked
 and unknown values are refused. The zlib import and decoder branch are removed.
 Identity wire bytes are representation bytes, so the existing Content-Length
@@ -24,23 +24,31 @@ and streaming maxBytes limits apply directly to both; there is no expansion.
 Rejection settles before transport destruction, preventing an end/error race
 from resolving an oversized or refused response. Other admission, DNS,
 redirect, pacing, timeout, policy and custody gates are unchanged.
+For encoded error responses, status and Retry-After are accounted header-only
+before rejection. The scheduler persists403/429 cooldowns and5xx backoff/circuit
+state even though the response cannot reach its successful onResult callback.
+An absent body cannot be interpreted as a robots policy.
 Failure observations may be retained by the ordinary failure path; refused
 representation bytes never enter CAS or a successful observation.
 
 The fixture uses a real loopback HTTP server through the existing private wire
 seam (production URL/DNS admission is not relaxed), spies on all three zlib
 decoder factories, checks refusal on200/302/404, absence/identity success,
-no CAS/success observation, and declared/chunked byte bounds.
+no CAS/success observation, and declared/chunked byte bounds. Explicit cases
+cover `' identity '` (HTTP OWS normalized by Node to identity) and `'identity,'`
+(refused). A scheduled real-server regression verifies403/429+br cooldown,
+503+gzip Retry-After/backoff and three-failure circuit, no successful callback,
+and persisted restart refusal without a second network request.
 Final fixed polite-fetch SHA256:
-`e7817e79afc6d046f257fb9770de6cd2ab3bcde42af1d0a938153dc2221e1e77`.
+`1a9e6bd01fc01f1a3bb7883a466949400a369aa984895405cb0d9b52b2ce7da2`.
 
 ## Measured contract impact: all14 actual functions
 
 Measurement uses the exact14 functions in window20/contracts.mjs, historical
 blob hashes from2af157b and current worktree hashes, including complete object
 return values, not selected leaves. Evidence:
-`/home/max/.local/state/stadtstack-data/r1-fetch-safety-evidence/contracts.json`
-SHA256 `1847fadc177f2a2966fcf71dfd4a2e68f2fc86435a2429d8848890742d987ef9`.
+`/home/max/.local/state/stadtstack-data/r1-fetch-safety-evidence/contracts-cooldown.json`
+SHA256 `909e35356e6365174d1616f5e52efb066525bf57978f689a88bc113dc8e763c1`.
 Its companion `measure.mjs` records the reproducible callback/hash method.
 
 | Function | Result |
@@ -62,7 +70,7 @@ Its companion `measure.mjs` records the reproducible callback/hash method.
 
 Exactly acquisition hashes polite-fetch.ts. Acquisition changes from
 `9815cc1786e5a758f809a7c17d7958462a7b34a39ca353a0bbd1d53b9087e1fa`
-to `c3be701b9a2d1a8a1afa4c7ba0cf2b33e444a32d0af65c9aaa7076413cfeba40`.
+to `b29c293b4ff6ee6c31a7039b45f8cf1e0f73dc68774552e5aa29de2951fec0d1`.
 The13 other functions are equal, including parser, structured mapping,
 assessmentQueue/B and OMP output/runner. Historical window20's
 ff1980b1→9815cc17 transition stays historical, not rewritten.
@@ -241,17 +249,18 @@ unfounded claim of compromise is included in this security patch.
 ## Exercised checks and remaining operator boundary
 
 Actual Node24.22.1, CPUs2–7, nice10, umask022:
-- `node node_modules/typescript/bin/tsc --noEmit`: exit0, no output,23.63s.
+- `node node_modules/typescript/bin/tsc --noEmit`: exit0, no output,23.25s.
 - `node --experimental-strip-types --test --test-concurrency=1 test/polite-fetch.test.ts`:
-  **81 tests,81 pass,0 fail/cancelled/skipped**,44.60s.
+  **82 tests,82 pass,0 fail/cancelled/skipped**,42.93s.
 - All14 contract measurement: exit0; acquisition only changed.
 
-`r1-fetch-safety-evidence/checks.json` is a truthful assistant summary of these
-tool results, not a native Core receipt or Main review. Earlier attempts are
-recorded there: fixture type annotation fixed; stalled refusal run cancelled;
-streaming bound settlement corrected; wrong-umask full run failed managed-state
-gates (29/81 pass) before rerun with required022 passed81/81. No safety gate
-was relaxed. Loopback fixture transport is not a live municipal request.
+`r1-fetch-safety-evidence/checks-cooldown.json` is a truthful assistant summary
+of the corrected runtime's tool results, not a native Core receipt or Main
+review. The previous checks.json/contracts.json remain historical evidence for
+the first fix. Their earlier attempts record fixture type/settlement repairs
+and a wrong-umask failed run before the original81/81 pass. The final82/82 run
+includes the review-requested status-accounting and whitespace regressions.
+No safety gate was relaxed. Loopback fixture transport is not a live request.
 Private launchers/step8/step9/production/database/parser images were not run.
 Main still supplies real review/security-stop release and final runtime HEAD,
 reviews the renewal companion and fresh input, applies ordinary gates, and
