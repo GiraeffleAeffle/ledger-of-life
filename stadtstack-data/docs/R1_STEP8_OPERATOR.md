@@ -300,6 +300,18 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   `executionEvidence: {path, sha256}` inside the issued selection. This authenticates
   the renewed owner decision, exact continuation, per-job issued stage authorities,
   successful native receipt hashes and completion within their execution windows.
+  Both acquisitions (the completed GENESIS acquisition and the new/resumed PEGEL
+  acquisition), and every selected parser receipt, must exactly equal their
+  canonical committed `step_receipts`/`jobs` rows in one read-only DB snapshot.
+  Receipt IDs, run IDs, semantic hashes, full receipt bodies/clocks, canonical job
+  keys/contracts and current successful attempts are checked; a recomputed hash
+  inside an evidence document is not custody. Native acquisition descriptor/HTTP
+  outputs are read through the managed-CAS fence, then each parser's exact
+  snapshot, original, policy and HTTP inputs are bound to its acquired source.
+  `authenticateStep8StructuredSelection` therefore requires `custody` whenever
+  `executionEvidence` is present. Private issuance/assembly uses
+  `authenticateStep8StructuredSelectionReadOnly`; it opens the canonical local
+  read-only transaction and finishes the same managed-reader epoch fence.
   An expired **completed execution window** is historical evidence, not current
   permission for another request. It does not replace, extend or shorten source
   policy proofs: the original renewal/selection authority and every selected

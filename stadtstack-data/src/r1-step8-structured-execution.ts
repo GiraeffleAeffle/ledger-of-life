@@ -2,7 +2,12 @@ import {z} from 'zod';
 import {isAbsolute} from 'node:path';
 import {HashSchema,ScopeSchema,canonicalJson,digest,semanticHash} from './district-adapter-contract.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
+import type {StepReceipt} from './district-step-receipt.ts';
 import {canonicalJobIdentity} from './district-jobs.ts';
+import type {DistrictJobSpec} from './district-jobs.ts';
+import {AcquisitionSelectorSchema,RepresentationDescriptorSchema} from './district-r1.ts';
+import {StructuredWorkerRequestSchema} from './district-structured-parser-worker.ts';
+import {authenticatedHttpBinding,HttpSourceBindingSchema} from './district-http-observation.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute),sha256:HashSchema}).strict();
 const Clock=z.iso.datetime();
@@ -14,6 +19,63 @@ const Evidence=z.object({
  steps:z.array(Step).min(3).max(6),stageAuthorities:z.array(Pin).min(3).max(6),
  wholeOperationHttpCeilingIncludingHistory:z.literal(20),newAcquisitionAttempts:z.literal(1),newParseJobs:z.number().int().min(2).max(5),
 }).strict();
+
+export interface StructuredExecutionCustody {
+ query(sql:string,values?:unknown[]):Promise<{rows:unknown[]}>;
+ readCas(hash:string):Promise<Uint8Array>;
+}
+
+/** Evidence hashes choose records; only native committed PG custody authenticates
+ * their job identities, contracts and clocks. Managed CAS supplies native outputs. */
+async function authenticateExecutionCustody(evidence:z.infer<typeof Evidence>,custody:StructuredExecutionCustody){
+ z.object({transaction_read_only:z.literal('on')}).parse((await custody.query('SHOW transaction_read_only')).rows[0]);
+ const committed=new Map<string,{receipt:StepReceipt;spec:DistrictJobSpec}>();
+ const selected=[evidence.priorGenesis,...evidence.steps];
+ for(const entry of selected){
+  const result=await custody.query(`SELECT r.receipt_sha256,r.receipt,j.spec,j.job_key,j.state,j.attempt AS current_attempt
+    FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id
+    WHERE r.receipt_sha256=$1 AND r.id=$2::uuid AND r.run_id=$3::uuid AND j.job_key=$4`,
+   [entry.sha256,entry.receipt.id,entry.receipt.runId,entry.receipt.jobKey]);
+  requireThat(result.rows.length===1,'Structured execution receipt is not a canonical committed DB receipt');
+  const row=z.object({receipt_sha256:HashSchema,receipt:StepReceiptSchema,spec:z.unknown(),job_key:HashSchema,state:z.literal('succeeded'),current_attempt:z.number().int().positive()}).parse(result.rows[0]);
+  // canonicalJobIdentity performs the existing strict SpecSchema validation.
+  const identity=canonicalJobIdentity(row.spec as DistrictJobSpec),receipt=row.receipt;
+  requireThat(row.receipt_sha256===entry.sha256&&semanticHash(receipt)===entry.sha256&&same(receipt,entry.receipt)&&row.job_key===receipt.jobKey&&identity.jobKey===receipt.jobKey&&row.current_attempt===receipt.attempt,'Structured execution changes canonical DB custody, job identity or attempt');
+  requireThat(identity.spec.step===receipt.step&&identity.spec.sourceScope.sourceId===receipt.sourceId&&identity.spec.sourceScope.municipalityId===receipt.municipalityId,'Canonical execution source/step mismatch');
+  if(receipt.step==='acquire_representation')requireThat(receipt.versions.acquisition===identity.spec.semanticContractSha256,'Canonical acquisition semantic contract mismatch');
+  committed.set(entry.sha256,{receipt,spec:identity.spec});
+ }
+ const descriptors=new Map<string,{descriptor:z.infer<typeof RepresentationDescriptorSchema>;receipt:StepReceipt}>();
+ for(const entry of selected){
+  if(entry.receipt.step!=='acquire_representation')continue;
+  const native=committed.get(entry.sha256)!;
+  const outputs=await custody.query("SELECT sha256 FROM district_pipeline.artifacts WHERE sha256=ANY($1::text[]) AND kind='derived'",[native.receipt.outputHashes]);
+  requireThat(outputs.rows.length===1,'Canonical acquisition requires its unique committed representation descriptor');
+  const descriptorHash=z.object({sha256:HashSchema}).parse(outputs.rows[0]).sha256;
+  requireThat(native.receipt.outputHashes.includes(descriptorHash),'Acquisition descriptor is not a native output');
+  const bytes=Buffer.from(await custody.readCas(descriptorHash));requireThat(digest(bytes)===descriptorHash,'Acquisition descriptor CAS digest mismatch');
+  const descriptor=RepresentationDescriptorSchema.parse(JSON.parse(bytes.toString('utf8'))),selector=AcquisitionSelectorSchema.parse(native.spec.selector),snapshot=descriptor.snapshot;
+  requireThat(same(descriptor.scope,native.spec.sourceScope)&&descriptor.root===selector.root&&same(snapshot.request,{method:selector.request.method,body:selector.request.body,contentType:selector.request.contentType}),'Canonical descriptor changes acquisition scope/request');
+  for(const hash of [snapshot.sourceSha256,snapshot.policyReceiptSha256,descriptor.httpObservation.receiptSha256])requireThat(native.receipt.outputHashes.includes(hash),'Parser source/policy/HTTP proof is not an authenticated acquisition output');
+  requireThat(Date.parse(descriptor.fetchedAt)>=Date.parse(native.receipt.startedAt)&&Date.parse(descriptor.admittedAt)<=Date.parse(native.receipt.finishedAt),'Representation clocks are outside canonical acquisition execution');
+  const observation=Buffer.from(await custody.readCas(descriptor.httpObservation.receiptSha256));
+  requireThat(digest(observation)===descriptor.httpObservation.receiptSha256&&observation.toString('utf8')===descriptor.httpObservation.bytes,'Canonical acquisition HTTP observation differs from managed CAS');
+  requireThat(!descriptors.has(descriptor.scope.sourceId),'Duplicate acquired source in execution evidence');
+  descriptors.set(descriptor.scope.sourceId,{descriptor,receipt:native.receipt});
+ }
+ requireThat(descriptors.size===2,'Both canonical GENESIS and PEGEL acquisitions are required');
+ for(const entry of evidence.steps){
+  if(entry.receipt.step!=='structured_parse')continue;
+  const native=committed.get(entry.sha256)!,acquired=descriptors.get(native.receipt.sourceId);requireThat(acquired,'Selected parser lacks its canonical acquisition');
+  const selector=z.object({worker:StructuredWorkerRequestSchema,sourceBindings:z.array(HttpSourceBindingSchema),supportingSources:z.array(z.unknown())}).passthrough().parse(native.spec.selector),worker=selector.worker,descriptor=acquired!.descriptor,snapshot=descriptor.snapshot;
+  requireThat(worker.operation==='parse'&&worker.adapter===(native.receipt.sourceId==='pegelonline'?'gauges':'genesis')&&same(worker.options,{})&&worker.auxiliary.length===0&&selector.supportingSources.length===0,'Parser changes approved local operation or supporting input scope');
+  requireThat(same(worker.scope,descriptor.scope)&&same(worker.snapshot,snapshot)&&worker.inputArtifactSha256===snapshot.sourceSha256&&native.spec.policyProofSha256===snapshot.policyReceiptSha256&&native.receipt.policyProofSha256===snapshot.policyReceiptSha256,'Selected parser input differs from authenticated acquisition output');
+  const binding=authenticatedHttpBinding(descriptor.httpObservation,{url:snapshot.url,sha256:snapshot.sourceSha256});
+  requireThat(same(selector.sourceBindings,[binding]),'Parser does not select the acquired original HTTP observation');
+  for(const hash of [snapshot.sourceSha256,snapshot.policyReceiptSha256,binding.receiptSha256])requireThat(native.spec.inputArtifactHashes.includes(hash)&&native.receipt.inputHashes.includes(hash),'Canonical parser omits an acquired source/policy/HTTP input');
+  requireThat(Date.parse(native.receipt.startedAt)>=Date.parse(acquired!.receipt.finishedAt),'Parser precedes its canonical committed acquisition');
+ }
+}
 const same=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const requireThat=(condition:unknown,message:string)=>{if(!condition)throw Error(message);};
 /** An execution deadline governs actual completed work, not the later policy
@@ -22,7 +84,7 @@ export function assertHistoricalStructuredExecution(window:{issuedAt:string;expi
  const issued=Date.parse(Clock.parse(window.issuedAt)),end=Date.parse(Clock.parse(window.expiresAt)),started=Date.parse(Clock.parse(startedAt)),finished=Date.parse(Clock.parse(finishedAt));
  requireThat(issued<=started&&started<=finished&&finished<=end&&finished<=Date.now(),'Structured work did not finish inside its genuinely issued execution window');
 }
-export async function authenticateStructuredExecutionEvidence(input:{evidence:z.infer<typeof Pin>;baseAuthority:z.infer<typeof Pin>;selectionIssuedAt:string;receipts:readonly {runId:string;sha256:string;step:string;municipalityId:string;sourceId:string}[];readControl:(pin:z.infer<typeof Pin>)=>Promise<Uint8Array>}){
+export async function authenticateStructuredExecutionEvidence(input:{evidence:z.infer<typeof Pin>;baseAuthority:z.infer<typeof Pin>;selectionIssuedAt:string;receipts:readonly {runId:string;sha256:string;step:string;municipalityId:string;sourceId:string}[];readControl:(pin:z.infer<typeof Pin>)=>Promise<Uint8Array>;custody:StructuredExecutionCustody}){
  const read=async(pin:z.infer<typeof Pin>)=>{const bytes=Buffer.from(await input.readControl(Pin.parse(pin)));requireThat(digest(bytes)===pin.sha256,'Structured execution control digest mismatch');return JSON.parse(bytes.toString('utf8'));};
  const evidence=Evidence.parse(await read(input.evidence));requireThat(same(evidence.baseAuthority,input.baseAuthority),'Execution evidence changes original renewal authority');
  const continuation=z.object({schemaVersion:z.literal('r1-step8-structured-rest-continuation-v1'),issuedAt:Clock,expiresAt:Clock,baseAuthority:Pin,ownerDecision:Pin,ownerDraftSha256:HashSchema,securityRelease:Pin,acquisitionSelector:z.object({scope:ScopeSchema,discovery:z.null()}).passthrough(),acquisitionContractSha256:HashSchema,resolution:z.object({action:z.literal('one-pegel-attempt-then-all-remaining-local-parses'),mode:z.enum(['resume_held','new_contract_job']),priorJobKey:HashSchema,acquisitionJobKey:HashSchema,pegelAttemptBefore:z.literal(1),pegelAttemptAfter:z.union([z.literal(1),z.literal(2)]),additionalHttpRequestCeiling:z.literal(8),wholeOperationHttpCeilingIncludingHistory:z.literal(20),maxNewAcquisitionJobs:z.literal(1),maxLocalParseJobs:z.literal(5),maxPegelPages:z.literal(4),maxNewJobs:z.literal(6),maxWholeOperationJobs:z.literal(8),maxModelCalls:z.literal(0),paidMicroUsd:z.literal(0)}).passthrough()}).passthrough().parse(await read(evidence.continuation));
@@ -61,5 +123,6 @@ export async function authenticateStructuredExecutionEvidence(input:{evidence:z.
   requireThat(same(stage.parentContinuation,evidence.continuation)&&stage.stage.step===receipt.step&&stage.stage.jobKeys[0]===receipt.jobKey&&stage.stage.ags[0]===(receipt.sourceId==='pegelonline'?'13076060':'12064472')&&stage.expiresAt===continuation.expiresAt&&Date.parse(stage.issuedAt)>=Date.parse(continuation.issuedAt),'Stage authority changes continuation/job scope');
   assertHistoricalStructuredExecution(stage,receipt.startedAt,receipt.finishedAt);
  }
+ await authenticateExecutionCustody(evidence,input.custody);
  return evidence;
 }
