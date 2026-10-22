@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "r1-step8-source-fetch-security-release-v1",
+  "id": "r1-step8-source-fetch-security-release-2026-10-22-v2",
+  "issuedAt": "2026-10-22T03:27:01.000Z",
+  "approvedBy": "Main",
+  "sourceFetchStopLifted": true,
+  "cve": "CVE-2026-111497",
+  "scope": "Lifts the 2026-10-22 source-fetch security stop ONLY for the reviewed structured step-8 continuation tooling that authenticates this record; source drivers and renewal controllers remain drained (stop-campaign).",
+  "node": {
+    "path": "/home/max/.local/share/mise/installs/node/24.22.1/bin/node",
+    "version": "v24.22.1",
+    "sha256": "e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb"
+  },
+  "politeFetch": {
+    "path": "/home/max/civic-rebuild-r1/stadtstack-data/src/polite-fetch.ts",
+    "sha256": "1a9e6bd01fc01f1a3bb7883a466949400a369aa984895405cb0d9b52b2ce7da2"
+  },
+  "fixReview": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-fetch-safety-evidence/fix-review-summary-20261022.json",
+    "sha256": "976d633f6f5fbc82c48114730ad736a15178c4993053d0b85683ee47a94fc5eb"
+  },
+  "gateEvidence": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-fetch-safety-evidence/gate-evidence-20261022.json",
+    "sha256": "cd2491c6c24891b7b36576d6557a6cc3a41383751ec9333c30fc4b745b4d0797"
+  },
+  "acquisitionContractSha256": "b29c293b4ff6ee6c31a7039b45f8cf1e0f73dc68774552e5aa29de2951fec0d1",
+  "report": "/home/max/stadtstack-ops/reviews/scrape-safety-20261022.md (SS-01)",
+  "nodeInstalledBy": "Ops main session via mise",
+  "supersedes": {
+    "id": "r1-step8-source-fetch-security-release-2026-10-22",
+    "sha256": "996ab68b5bca8e69b018364a06ef6946f8e367673e78f5d6092c005f4697dbaf",
+    "reason": "node object must match strict execution-evidence schema (installedBy moved to nodeInstalledBy)"
+  }
+}
