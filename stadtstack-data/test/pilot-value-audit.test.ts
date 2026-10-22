@@ -201,7 +201,7 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
       const admittedEntry={item:admittedItem,...await syntheticAssessmentTriplet(admittedItem,admittedOutput,admitted.context)};
       const requiredStep8:Step8ExceptionBundle={...excludedStep8,inventory:{...inventory,sourceDispositions:[]},items:[],
         candidateContext:{...excludedContext,ids:[admittedItem.itemId],sourceHashes:[source.sha256]},
-        requiredAssessments:[{recordId:admittedItem.itemId,artifactSha256:{item:pin.sha256,A:pin.sha256,B:pin.sha256,C:pin.sha256},
+        requiredAssessments:[{assessmentId:pin.sha256,municipalityId:'synthetic-town',sourceId:'synthetic-source',finalArtifactSha256:pin.sha256,recordId:admittedItem.itemId,artifactSha256:{item:pin.sha256,A:pin.sha256,B:pin.sha256,C:pin.sha256},
           contentSha256:{item:digest(admittedEntry.item),A:digest(admittedEntry.A),B:digest(admittedEntry.B),C:digest(admittedEntry.C)}}]};
       await assert.rejects(buildPilotAuditPacket(finalized,entries,packet.seed,admitted.context,requiredStep8),/handed-off assessment triplet missing/);
       const requiredPacket=await buildPilotAuditPacket(finalized,[...entries,admittedEntry],packet.seed,admitted.context,requiredStep8);

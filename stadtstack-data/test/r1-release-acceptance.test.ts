@@ -6,7 +6,7 @@ import {join,dirname} from 'node:path';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {computeReleaseAcceptance,classifyReleaseException,inventoryExceptionItems,loadStep8ExceptionBundle,
-  OPTION_B_APPROVAL_SHA256,Step8ExceptionInventorySchema,runReleaseAcceptance,requireStep8AssessmentCoverage} from '../src/r1-release-acceptance.ts';
+  OPTION_B_APPROVAL_SHA256,Step8ExceptionInventorySchema,runReleaseAcceptance,requireStep8AssessmentCoverage,readStep8HandoffAssessments} from '../src/r1-release-acceptance.ts';
 import {dataReleaseId} from '../src/data-release.ts';
 import {FROZEN_R1_INPUTS} from '../src/pilot-value-audit.ts';
 import {classifyStep8Exception} from '../src/r1-step8-governance.ts';
@@ -14,6 +14,7 @@ import {RELEASE_ACCEPTANCE_RULES} from '../src/r1-release-context.ts';
 import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 import {replayEvidenceCasRoot} from '../src/replay-evidence-contract.ts';
 import {publicationPartitionSha256} from '../src/publication-provenance-partition.ts';
+import {step8AssessmentIdentity} from '../src/r1-step8-export-projection.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
 const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
@@ -63,19 +64,20 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
       completeAnswers:{actual:8,minimum:8,pass:true},correctness:{actual:60,required:60,denominator:60,pass:true},sources:{actual:46,minimum:46,denominator:60,pass:true},
       graphPairs:{actual:7,required:7,minimumGain:2,gain:2,correctnessLosses:0,pass:true,pairs:['W03','W04','E03','B03','K03','M03','H03'].map((id,index)=>({id,reviewed:true,usefulnessWithout:1,usefulnessWith:index<2?2:1,gain:index<2?1:0,correctnessWithout:2,correctnessWith:2}))},
       unresolvedCriticalAndRights:{actual:0,required:0,pass:true},ownerWorkload:{plannedMinutes:80,maximumMinutes:120,pass:true},ownerFindings:{blockingFindings:[] as string[],pass:true}}};
-  const selectAssessment=async(recordId:string)=>{
-    const paths={} as Record<'item'|'A'|'B'|'C',string>,pins:Record<string,string>={finalArtifactSha256:h};
+  const selectAssessment=async(recordId:string,assessmentSource:{municipalityId:string;sourceId:string}=inventory.sourceDispositions[0])=>{
+    const paths={} as Record<'item'|'A'|'B'|'C',string>,pins:Record<string,string>={recordId,recordEvidenceSha256:h,finalArtifactSha256:h};
     for(const role of ['item','A','B','C'] as const){
-      const payload={itemId:recordId,role,fixture:'Synthetic artifact-binding fixture; not a real assessment receipt.'};
+      const payload={itemId:recordId,sourceId:assessmentSource.sourceId,role,fixture:'Synthetic artifact-binding fixture; not a real assessment receipt.'};
       const sha256=hash(JSON.stringify(payload)+'\n'),pin=await save(`cas/sha256/${sha256.slice(0,2)}/${sha256}`,payload);
       paths[role]=pin.path;pins[role==='item'?'itemArtifactSha256':role+'ArtifactSha256']=pin.sha256;
     }
-    inventory.assessments.push({recordId,...paths});return {recordId,pins};
+    const selectedPins={recordId,recordEvidenceSha256:h,finalArtifactSha256:h,itemArtifactSha256:pins.itemArtifactSha256,AArtifactSha256:pins.AArtifactSha256,BArtifactSha256:pins.BArtifactSha256,CArtifactSha256:pins.CArtifactSha256},identity=step8AssessmentIdentity(assessmentSource,selectedPins);
+    inventory.assessments.push({...identity,...paths});return {recordId,pins:selectedPins};
   };
   const seal=async()=>{
     const auditManifest=[];
     for(const [index,raw] of inventory.assessments.entries()){
-      const row=raw as Record<'item'|'A'|'B'|'C',string>,copy={} as Record<'item'|'A'|'B'|'C',string>;
+      const row=raw as Record<'assessmentId'|'item'|'A'|'B'|'C',string>,copy={assessmentId:row.assessmentId} as Record<'assessmentId'|'item'|'A'|'B'|'C',string>;
       for(const role of ['item','A','B','C'] as const)copy[role]=(await save(`audit/${index}-${role}.json`,JSON.parse(await readFile(row[role],'utf8')))).path;
       auditManifest.push(copy);
     }
@@ -381,4 +383,27 @@ test('authenticated per-item preparation holds remain inventoried without author
  source.assessmentItemHolds=[{recordIds:['admitted:fixture'],outcome:'held_quality',reasonCode:'assessment_context_exceeded',assessmentProviderCalls:0}];
  const leaked=await computeReleaseAcceptance(await f.seal());assert.equal(leaked.accepted,false);
  assert.ok(leaked.exceptionItems.some(item=>item.origin.includes('/assessmentItemHolds/')&&item.blocking));
+});
+
+test('source-specific immutable handoff keeps distinct bundles for one record and refuses omission or reassignment',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const first=f.inventory.sourceDispositions[0],second={...structuredClone(first),sourceId:'website-alias',documentId:'document:alias',jobKey:hash('synthetic alias job')};
+  f.inventory.sourceDispositions.push(second);
+  first.assessments=[await f.selectAssessment('admitted:fixture',first)];
+  second.assessments=[await f.selectAssessment('admitted:fixture',second)];
+  const rows=f.inventory.assessments as Array<{assessmentId:string;municipalityId:string;sourceId:string;recordId:string;finalArtifactSha256:string;item:string;A:string;B:string;C:string}>;
+  const entries=rows.map(({assessmentId,item,A,B,C})=>({assessmentId,item,A,B,C})),manifest=await f.save('scoped-assessments.json',entries);
+  const required=await readStep8HandoffAssessments(manifest,f.inventory);
+  assert.equal(required.length,2);assert.equal(new Set(required.map(row=>row.assessmentId)).size,2);assert.equal(new Set(required.map(row=>row.recordId)).size,1);
+  assert.deepEqual(new Set(required.map(row=>row.sourceId)),new Set(['website','website-alias']));
+  const coverage={requiredAssessments:required,assessmentManifest:manifest};
+  assert.equal(requireStep8AssessmentCoverage(coverage,required.map(row=>row.contentSha256)).required,2);
+  assert.throws(()=>requireStep8AssessmentCoverage(coverage,[required[0].contentSha256]),/triplet missing/);
+  const duplicateContent={...coverage,requiredAssessments:required.map(row=>({...row,contentSha256:required[0].contentSha256}))};
+  assert.throws(()=>requireStep8AssessmentCoverage(duplicateContent,[required[0].contentSha256]),/triplet missing/,'one triplet cannot cover two immutable identities');
+  const omitted=await f.save('omitted-scoped-assessment.json',entries.slice(0,1));
+  await assert.rejects(readStep8HandoffAssessments(omitted,{...f.inventory,assessments:rows.slice(0,1)}),/omits selected triplets/);
+  await assert.rejects(readStep8HandoffAssessments(manifest,{...f.inventory,assessments:rows.map((row,index)=>index?{...row,sourceId:'website'}:row)}),/immutable identity mismatch/);
+  const reassigned=await f.save('reassigned-scoped-assessment.json',entries.map((row,index)=>index?{...row,assessmentId:entries[0].assessmentId}:row));
+  await assert.rejects(readStep8HandoffAssessments(reassigned,f.inventory),/immutable identity mismatch/);
 });

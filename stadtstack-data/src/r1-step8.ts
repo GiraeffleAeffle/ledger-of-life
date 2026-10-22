@@ -7,7 +7,7 @@ import {DistrictCas} from './district-cas.ts';
 import {DistrictJobStore} from './district-jobs.ts';
 import {exportRun} from './district-r1.ts';
 import {QueueTextSealInputSchema} from './district-queue-text-run.ts';
-import {r1TextCompositionInputSchema,loadR1TextCompositionInput,buildR1TextCompositionContext} from './district-r1-text-composition.ts';
+import {r1TextCompositionInputSchema,loadR1TextCompositionInput} from './district-r1-text-composition.ts';
 import type {PrivatePublicationProvenance} from './district-publication-provenance.ts';
 import {publicationPolicyReceiptInventorySchema} from './district-publication-policy.ts';
 import {CriticalAssessmentInventorySchema} from './district-critical-assessment-contract.ts';
@@ -34,6 +34,7 @@ import {normalizePublicationBindings,normalizePublicationPin} from './publicatio
 import {authenticatePublicationPartition,partitionPublicationInputs,provenanceBytes} from './publication-provenance-partition.ts';
 import {requireStep8Preflight} from './r1-step8-preflight.ts';
 import {assertStep8ProvenanceSizes} from './r1-step8-publication-bounds.ts';
+import {step8DocumentDisposition,projectStep8PublicationIntake,selectStep8PublicationPolicy,step8AssessmentIdentity,Step8AuditAssessmentSchema,Step8AssessmentManifestRowSchema} from './r1-step8-export-projection.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Operator paths must be absolute'),sha256:HashSchema}).strict();
 const sealSchema=z.object({compositionArtifactSha256:HashSchema,privateProvenance:Pin.passthrough(),policyInventory:Pin.passthrough(),criticalInventory:Pin.passthrough()}).passthrough();
@@ -130,8 +131,8 @@ export async function runStep8(raw:unknown,pool:Pool){
  if(campaign.sources.length!==input.expectedSources||campaign.sources.reduce((n,source)=>n+source.documents.length,0)!==input.expectedDocuments)throw Error('Campaign totals mismatch');
  const managed=canonicalManagedSourceAudit(provenanceContext);
  const importDispositions=await authenticateImportDispositions({decision:input.importDispositionDecision,nativeSealSelection:input.nativeSealSelection,catalogue:input.currentGeneration.catalogue,seals:input.seals,policy,control:pin=>readReplayPin(pin,process.cwd()),managed:pin=>managed.read(pin.path,pin.sha256)});
- const remainingSources=new Map(campaign.sources.map(source=>[source.corpus.sha256,source])),sourceDispositions:unknown[]=[],auditAssessments:Array<{recordId:string;item:string;A:string;B:string;C:string}>=[];
- const compositions:z.infer<typeof r1TextCompositionInputSchema>[]=[],policyInventories:z.infer<typeof publicationPolicyReceiptInventorySchema>[]=[],criticalInventories:z.infer<typeof CriticalAssessmentInventorySchema>[]=[];
+ const remainingSources=new Map(campaign.sources.map(source=>[source.corpus.sha256,source])),sourceDispositions:unknown[]=[],auditAssessments:Array<z.infer<typeof Step8AuditAssessmentSchema>>=[];
+ const compositions:z.infer<typeof r1TextCompositionInputSchema>[]=[],policyInventories:Array<{runId:string;inventory:z.infer<typeof publicationPolicyReceiptInventorySchema>}>=[],criticalInventories:z.infer<typeof CriticalAssessmentInventorySchema>[]=[];
  const exports=[],derivedSupplements:Array<{sourceSeal:typeof input.seals[number]['sealResult'];value:NonNullable<Awaited<ReturnType<typeof authenticateCanonicalSealProvenance>>['generatedSupplement']>}>=[];
  await assertCanonicalSealSelection(provenanceContext,input.seals.map(({sealResult,provenanceSupplement:_,...queue})=>({output:sealResult,queue})));
  for(const selected of input.seals){
@@ -160,17 +161,16 @@ export async function runStep8(raw:unknown,pool:Pool){
   const cases=JSON.parse(Buffer.from(exported.contribution.artifacts.quarantine.bytes).toString('utf8')).cases,admittedRecords=JSON.parse(Buffer.from(exported.contribution.artifacts.records.bytes).toString('utf8')).records;
   const assessmentPins=z.array(z.object({recordId:z.string(),pins:CriticalAssessmentInventorySchema.shape.records.element.nullable()}).passthrough()).parse(extraction.queue.assessments);
   for(const result of exported.results){
-   const documentCases=cases.filter((entry:{documentId?:string;sourceSha256?:string})=>entry.documentId===result.documentId||!entry.documentId&&entry.sourceSha256===result.result.sourceSha256),records=admittedRecords.filter((entry:{extraction:{inputSha256:string}})=>entry.extraction.inputSha256===result.result.sourceSha256);
-   if(!records.length&&!documentCases.length)throw Error('Document has neither admission nor explicit disposition');
+   const {cases:documentCases,records}=step8DocumentDisposition(expectedSource,result,admittedRecords,cases);
    const itemHolds=exported.assessmentItemHolds.filter(entry=>entry.documentId===result.documentId);
    sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:result.documentId,sourceSha256:result.result.sourceSha256,jobKey:result.result.taskId,admittedRecordIds:records.map((entry:{id:string})=>entry.id),cases:documentCases,classification:classifyStep8Exception(documentCases),assessments:assessmentPins.filter(entry=>result.result.records.some(record=>record.id===entry.recordId)),terminalAssessmentExceptions:exported.terminalAssessmentExceptions.filter(entry=>entry.documentId===result.documentId),...(itemHolds.length?{assessmentItemHolds:itemHolds}:{}),queueEvidence:extraction.queue});
   }
   for(const exception of exported.terminalDocumentExceptions){const documentCases=cases.filter((entry:{documentId?:string})=>entry.documentId===exception.documentId);if(!documentCases.length)throw Error('Terminal document lacks explicit quarantine disposition');sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:exception.documentId,sourceSha256:exception.sourceSha256,jobKey:exception.jobKey,admittedRecordIds:[],cases:documentCases,classification:{...classifyStep8Exception(documentCases),terminal:true},terminalDocumentException:exception,assessments:[],queueEvidence:extraction.queue});}
   for(const disposition of imports)sourceDispositions.push({municipalityId:disposition.municipalityId,sourceId:disposition.sourceId,documentId:disposition.documentId,sourceSha256:disposition.sourceSha256,admittedRecordIds:[],cases:[],classification:{critical:false,rights:disposition.reasonCode==='source_policy_stale',disagreement:false},importDisposition:disposition,assessments:[]});
-  for(const entry of assessmentPins)if(entry.pins){const pathFor=(sha256:string)=>join(cas.root,'sha256',sha256.slice(0,2),sha256);auditAssessments.push({recordId:entry.recordId,item:pathFor(entry.pins.itemArtifactSha256),A:pathFor(entry.pins.AArtifactSha256),B:pathFor(entry.pins.BArtifactSha256),C:pathFor(entry.pins.CArtifactSha256)});assessmentProducers.set(entry.recordId,sourcePaths);}
+  for(const entry of assessmentPins)if(entry.pins){if(entry.recordId!==entry.pins.recordId)throw Error('Assessment record differs from immutable pins');const identity=step8AssessmentIdentity(expectedSource,entry.pins),pathFor=(sha256:string)=>join(cas.root,'sha256',sha256.slice(0,2),sha256);if(assessmentProducers.has(identity.assessmentId))throw Error('Duplicate immutable assessment identity');auditAssessments.push({...identity,item:pathFor(entry.pins.itemArtifactSha256),A:pathFor(entry.pins.AArtifactSha256),B:pathFor(entry.pins.BArtifactSha256),C:pathFor(entry.pins.CArtifactSha256)});assessmentProducers.set(identity.assessmentId,sourcePaths);}
   if(canonicalJson([...selected.reconciliationJobKeys].sort())!==canonicalJson(extraction.queue.reconciliationJobKeys))throw Error('Source reconciliation selection differs from seal');
   compositions.push(serialized);
-  policyInventories.push(publicationPolicyReceiptInventorySchema.parse(JSON.parse((await source.read(seal.policyInventory.path)).toString('utf8'))));
+  policyInventories.push({runId:composition.contributions[0].runId,inventory:publicationPolicyReceiptInventorySchema.parse(JSON.parse((await source.read(seal.policyInventory.path)).toString('utf8')))});
   criticalInventories.push(CriticalAssessmentInventorySchema.parse(JSON.parse((await source.read(seal.criticalInventory.path)).toString('utf8'))));
   exports.push({compositionArtifactSha256:seal.compositionArtifactSha256,runId:exported.contribution.runId,committedDocuments:exported.results.length+exported.terminalDocumentExceptions.length,importRejectedDocuments:imports.length,jobKeys:selected.jobKeys,reconciliationJobKeys:selected.reconciliationJobKeys,terminalDocumentExceptions:exported.terminalDocumentExceptions,terminalAssessmentExceptions:exported.terminalAssessmentExceptions,importDispositions:imports,provenanceSupplement:selected.provenanceSupplement,...(exported.assessmentItemHolds.length?{assessmentItemHolds:exported.assessmentItemHolds}:{})});
  }
@@ -236,12 +236,12 @@ export async function runStep8(raw:unknown,pool:Pool){
  const generationAuditEvidence=await write('audit/current-generation.json',generationAudit,evidenceBindings);
  const preflightEvidence=await write('audit/publication-preflight.json',preflight,evidenceBindings);
  const registry=await write('inputs/registry.json',null,uniqueBindings([...nativeBindings,...producerBindings([input.registry.path])]),native.registryBytes),structuredRun=await write('inputs/structured-run.json',native.run,nativeBindings);
- const composition=r1TextCompositionInputSchema.parse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:input.clocks.recordsGeneratedAt,approvedRunOrder:compositions.flatMap(item=>item.approvedRunOrder),admissions:compositions.flatMap(item=>item.admissions),contributions:compositions.flatMap(item=>item.contributions)});
- const context=buildR1TextCompositionContext(await loadR1TextCompositionInput(composition,pin=>readReplayPin(pin,process.cwd())));
+ const originalComposition=r1TextCompositionInputSchema.parse({schemaVersion:'district-r1-text-composition-input-v1',generatedAt:input.clocks.recordsGeneratedAt,approvedRunOrder:compositions.flatMap(item=>item.approvedRunOrder),admissions:compositions.flatMap(item=>item.admissions),contributions:compositions.flatMap(item=>item.contributions)});
+ const intake=projectStep8PublicationIntake(await loadR1TextCompositionInput(originalComposition,pin=>readReplayPin(pin,process.cwd()))),composition=r1TextCompositionInputSchema.parse({...originalComposition,admissions:intake.input.admissions}),context=intake.context;
  const textComposition=await write('inputs/text-composition.json',composition,textBindings),candidateRecords=await write('inputs/records.json',context.knowledge,textBindings),candidateQuarantine=await write('inputs/quarantine.json',{...context.coverage.quarantine,generatedAt:input.clocks.quarantineGeneratedAt},textBindings),identityState=await write('inputs/identity.json',{identityAssertions:context.knowledge.identityAssertions,identityAdmissions:context.knowledge.identityAdmissions},textBindings);
- const currentAdmissionReceipts:Record<string,string>={};for(const item of policyInventories)for(const [original,current] of Object.entries(item.currentAdmissionReceipts??{})){if(currentAdmissionReceipts[original]&&currentAdmissionReceipts[original]!==current)throw Error('Conflicting source policy continuation');currentAdmissionReceipts[original]=current;}
+ const selectedTextPolicy=selectStep8PublicationPolicy(context,policyInventories);
  const nativePolicy=native.run.records.map(record=>({recordId:record.id,receipts:[record.source,...record.supportingSources].map(source=>({sourceUrl:source.url,sourceSha256:source.sha256,receiptSha256:source.policyReceiptSha256}))}));
- const policyReceipts=await write('inputs/policy.json',publicationPolicyReceiptInventorySchema.parse({records:[...policyInventories.flatMap(item=>item.records),...nativePolicy],currentAdmissionReceipts}),knowledgeBindings);
+ const policyReceipts=await write('inputs/policy.json',publicationPolicyReceiptInventorySchema.parse({...selectedTextPolicy,records:[...selectedTextPolicy.records,...nativePolicy]}),knowledgeBindings);
  if(input.criticalAssessments){const bytes=await external.read(input.criticalAssessments.path);if(digest(bytes)!==input.criticalAssessments.sha256)throw Error('Critical inventory pin mismatch');criticalInventories.push(CriticalAssessmentInventorySchema.parse(JSON.parse(bytes.toString('utf8'))));}
  const criticalAssessments=await write('inputs/critical.json',CriticalAssessmentInventorySchema.parse({records:criticalInventories.flatMap(item=>item.records)}),uniqueBindings([...textBindings,...producerBindings(input.criticalAssessments?[input.criticalAssessments.path]:[])]));
  const publicationPaths=[registry,structuredRun,textComposition,candidateRecords,candidateQuarantine,identityState,policyReceipts,criticalAssessments,...input.staging,...[input.identityAssessments,input.regionalPolicyReceipts].filter((pin):pin is NonNullable<typeof pin>=>!!pin)].map(pin=>pin.path).concat([...compositionArtifactPaths]);
@@ -289,7 +289,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  const {manifest}=published;
  await write('exception-inventory.json',published.exceptionInventory,knowledgeBindings);
   const auditManifest=[];
-  for(const [index,entry] of auditAssessments.entries()){const row:Record<string,string>={};for(const role of ['item','A','B','C'] as const){const bytes=await readFile(entry[role]),path=join(output,`audit/${index}-${role}.json`);if(digest(bytes)!==entry[role].split('/').at(-1))throw Error('Assessment handoff artifact hash mismatch');const producers=assessmentProducers.get(entry.recordId);if(!producers)throw Error('Missing assessment producer scope');await write(`audit/${index}-${role}.json`,null,producerBindings(producers),bytes);row[role]=path;}auditManifest.push(row);}
+  for(const [index,entry] of auditAssessments.entries()){const row:Record<string,string>={assessmentId:entry.assessmentId};for(const role of ['item','A','B','C'] as const){const bytes=await readFile(entry[role]),path=join(output,`audit/${index}-${role}.json`);if(digest(bytes)!==entry[role].split('/').at(-1))throw Error('Assessment handoff artifact hash mismatch');const producers=assessmentProducers.get(entry.assessmentId);if(!producers)throw Error('Missing assessment producer scope');await write(`audit/${index}-${role}.json`,null,producerBindings(producers),bytes);row[role]=path;}auditManifest.push(Step8AssessmentManifestRowSchema.parse(row));}
   await write('audit/assessments.json',auditManifest,textBindings);
  await writeBatch(published.files);
  const publicationInputs=await write('inputs/publication-inputs.json',null,knowledgeBindings,published.publicationInputsBytes);({privateProvenance,stagingProvenance,provenanceInputs}=await saveProvenance(publicationInputs));

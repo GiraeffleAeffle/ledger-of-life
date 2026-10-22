@@ -26,6 +26,7 @@ import {writeManagedSourceArtifact} from './district-private-io.ts';
 import {readCivicOptOutSnapshot,withManagedSourceScratch,CIVIC_ACQUISITION_DECISION_ID,type CivicPolicyOptions,type ManagedSourceScratch} from './civic-opt-out.ts';
 import {loadPriorPublicationRelease,type PriorRelease,type PriorReleaseCache} from './district-publication-predecessor.ts';
 import {authenticatePublicationPartition,type PublicationPin} from './publication-provenance-partition.ts';
+import {withheldStep8PublicationIntake} from './r1-step8-export-projection.ts';
 const preparedBindingSchema=z.object({kind:z.literal('prepared_source'),url:z.url(),sourceSha256:z.string().regex(/^[a-f0-9]{64}$/),observationId:z.string().min(1),receiptSha256:z.string().regex(/^[a-f0-9]{64}$/),independentAllowed:z.boolean()}).strict();
 export const knowledgePreparedSourcePinSchema=z.object({path:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/),bytes:z.number().int().nonnegative().max(512*1024*1024),bindings:z.array(preparedBindingSchema).min(1)}).strict();
 export type KnowledgePreparedSourcePin=z.infer<typeof knowledgePreparedSourcePinSchema>;
@@ -109,7 +110,7 @@ async function assembleKnowledge(options:PrepareKnowledgeOptions,provenance:Auth
  if(critical.holds.some(hold=>retainedPublication?.baseline.input.recordIds.includes(hold.recordId)))throw Error('Held native revision cannot remove an admitted retained fact; resubmit composition with that native admission withheld');
  for(const record of knowledge.records)if(record.kind==='text_model'&&criticalIds.has(record.id))quarantine.cases.push({kind:'text_model',recordId:record.id,municipalityId:record.municipalityId,sourceId:record.sources[0].id,sourceSha256:record.extraction.inputSha256,reason:critical.holds.find(hold=>hold.recordId===record.id)!.reason});
  knowledge.records=knowledge.records.filter(record=>!criticalIds.has(record.id));
- const holds=knowledge.records.flatMap(record=>{const hold=knowledgePublicationHold(record);return hold?[{record,hold}]:[];}),withheldIds=new Set(holds.map(({record})=>record.id));
+ const holds=[...(composition?withheldStep8PublicationIntake(composition):[]),...knowledge.records.flatMap(record=>{const hold=knowledgePublicationHold(record);return hold?[{record,hold}]:[];})],withheldIds=new Set(holds.map(({record})=>record.id));
  for(const {record,hold} of holds)quarantine.cases.push(knowledgePublicationQuarantineCase(record,hold));
  knowledge.records=knowledge.records.filter(record=>!withheldIds.has(record.id));
  if(holds.some(({record})=>retainedPublication?.baseline.input.recordIds.includes(record.id)))throw Error('Withheld native revision cannot remove an admitted retained fact; resubmit composition with that native admission withheld');

@@ -50,6 +50,45 @@ This is an enforced Node transport/process guard for trusted replay,
 readiness, acquisition or live fallback. The replay proof retains its existing
 honest `networkIsolation` wording; the wrapper's guard is tested separately.
 
+### Sealed-export projection before reconstruction
+
+The automatic pre-pass now checks every selected sealed native export **before**
+opening the managed inventory fence or starting the canonical source pass.
+`r1-step8-export-precheck.ts` reads SHA-pinned contributions and committed receipt
+outputs, then shares the same pure projections used by execute:
+
+- A document must have an exact native admission or explicit quarantine case.
+  Cases bind municipality, registered source and original bytes. Both actual
+  producer IDs are recognized: the crawler document ID and exactly
+  `document:<original-sha256>` from document inference. An absent legacy ID may
+  fall back only within that exact scope; any other nonempty ID is refused.
+- Native assessment admission is not publication admission. The unchanged
+  `knowledgePublicationHold` gate derives publication-intake holds, including
+  missing sourced dates. Aggregate publication admissions withhold those IDs
+  without rewriting contribution bytes, original native `admittedRecordIds` or
+  generation-audit evidence. Preparation re-derives these holds from authenticated
+  withheld originals and carries them into exceptions, quarantine and coverage.
+- Policy custody follows the composition-selected **run, record and original
+  evidence**, not a record-ID-only merge of different source proofs. Original
+  per-source controls and all consistent policy continuations remain pinned.
+- Assessment identity includes municipality, source and the full immutable
+  record/evidence/item/A/B/C/final pin set. Source producer scopes, inventory rows,
+  assessment manifests and release acceptance use that identity. Distinct source
+  assessments of one record remain distinct, including held assessments.
+  Handoff coverage is a multiset: one triplet cannot cover two required bundles.
+
+This early projection is a refusal check, never publication authority. Canonical
+native reconstruction, receipt authentication, original evidence replay, current
+policy, both exact provenance inventories and all quality/replay/loader gates
+remain mandatory. No Core or extraction-generation contract changes.
+
+The private step-8 assessment handoff now requires `assessmentId`, municipality,
+source and final-receipt metadata. Older step-8 assessment rows are not silently
+upgraded. The general standalone value-assessment manifest may still omit
+`assessmentId`; step-8 manifest consumption requires it. Hosted public release
+members/manifest and the `vm_candidate` serving loader are unchanged.
+
+
 ### One canonical pass and bounded reconstruction
 
 `execute` creates one opaque in-process canonical context. Its actual Core

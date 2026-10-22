@@ -13,6 +13,7 @@ import {Step8CurrentGenerationSchema} from './r1-step8-current-policy.ts';
 import {ImportRejectionDispositionSchema} from './r1-step8-import-disposition-contract.ts';
 import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from './replay-evidence-contract.ts';
 import {publicationPartitionSha256} from './publication-provenance-partition.ts';
+import {step8AssessmentIdentity,Step8AssessmentSelectionSchema,Step8AuditAssessmentSchema,Step8AssessmentManifestRowSchema,type Step8AssessmentIdentity} from './r1-step8-export-projection.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -167,26 +168,28 @@ export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
   return items;
 }
 const assessmentRoles=['item','A','B','C'] as const;
-export const AuditAssessmentManifestSchema=z.array(z.object({item:z.string().min(1),A:z.string().min(1),B:z.string().min(1),C:z.string().min(1),exceptionMinutes:z.number().finite().positive().optional()}).strict());
+export const AuditAssessmentManifestSchema=z.array(z.object({assessmentId:HashSchema.optional(),item:z.string().min(1),A:z.string().min(1),B:z.string().min(1),C:z.string().min(1),exceptionMinutes:z.number().finite().positive().optional()}).strict());
 export type AssessmentContentHashes=Record<typeof assessmentRoles[number],string>;
-export interface RequiredStep8Assessment {recordId:string;artifactSha256:AssessmentContentHashes;contentSha256:AssessmentContentHashes}
-async function readHandoffAssessments(pin:z.infer<typeof AcceptancePinSchema>,inventory:z.infer<typeof Step8ExceptionInventorySchema>):Promise<RequiredStep8Assessment[]>{
-  const manifest=AuditAssessmentManifestSchema.parse(await readAcceptancePin(pin));
-  const rows=z.array(z.object({recordId:z.string().min(1),item:z.string(),A:z.string(),B:z.string(),C:z.string()}).strict()).parse(inventory.assessments);
+export interface RequiredStep8Assessment extends Step8AssessmentIdentity {artifactSha256:AssessmentContentHashes;contentSha256:AssessmentContentHashes}
+export async function readStep8HandoffAssessments(pin:z.infer<typeof AcceptancePinSchema>,inventory:z.infer<typeof Step8ExceptionInventorySchema>):Promise<RequiredStep8Assessment[]>{
+  const manifest=z.array(Step8AssessmentManifestRowSchema).parse(await readAcceptancePin(pin));
+  const rows=z.array(Step8AuditAssessmentSchema).parse(inventory.assessments);
   if(manifest.length!==rows.length)throw Error('Step8 assessment handoff omits or adds inventory triplets');
-  const selectionSchema=z.object({recordId:z.string().min(1),pins:z.object({itemArtifactSha256:HashSchema,AArtifactSha256:HashSchema,
-    BArtifactSha256:HashSchema,CArtifactSha256:HashSchema,finalArtifactSha256:HashSchema}).passthrough().nullable()}).passthrough();
-  const selected=new Map<string,AssessmentContentHashes>();
+  const selected=new Map<string,{identity:Step8AssessmentIdentity;artifactSha256:AssessmentContentHashes}>();
   for(const source of inventory.sourceDispositions)for(const raw of source.assessments){
-    const row=selectionSchema.parse(raw);if(!row.pins)continue;
-    const hashes={item:row.pins.itemArtifactSha256,A:row.pins.AArtifactSha256,B:row.pins.BArtifactSha256,C:row.pins.CArtifactSha256};
-    const prior=selected.get(row.recordId);
-    if(prior&&canonicalJson(prior)!==canonicalJson(hashes))throw Error('Conflicting selected Step8 assessment triplets');
-    selected.set(row.recordId,hashes);
+    const row=Step8AssessmentSelectionSchema.parse(raw);if(!row.pins)continue;
+    if(row.recordId!==row.pins.recordId)throw Error('Step8 selected assessment record differs from immutable pins');
+    const identity=step8AssessmentIdentity(source,row.pins),artifactSha256={item:row.pins.itemArtifactSha256,A:row.pins.AArtifactSha256,B:row.pins.BArtifactSha256,C:row.pins.CArtifactSha256};
+    const value={identity,artifactSha256},prior=selected.get(identity.assessmentId);
+    if(prior&&canonicalJson(prior)!==canonicalJson(value))throw Error('Conflicting immutable Step8 assessment identity');
+    selected.set(identity.assessmentId,value);
   }
   const seen=new Set<string>(),required:RequiredStep8Assessment[]=[];
   for(const [index,row] of rows.entries()){
-    const artifactSha256=selected.get(row.recordId);if(!artifactSha256)throw Error('Step8 handoff triplet lacks selected assessment pins');
+    const selection=selected.get(row.assessmentId);if(!selection)throw Error('Step8 handoff triplet lacks selected assessment pins');
+    const {identity,artifactSha256}=selection;
+    if(row.municipalityId!==identity.municipalityId||row.sourceId!==identity.sourceId||row.recordId!==identity.recordId||row.finalArtifactSha256!==identity.finalArtifactSha256||manifest[index].assessmentId!==identity.assessmentId)throw Error('Step8 assessment handoff source/immutable identity mismatch');
+    if(seen.has(identity.assessmentId))throw Error('Duplicate Step8 assessment handoff identity');
     const contentSha256={} as AssessmentContentHashes;
     for(const role of assessmentRoles){
       if(row[role].split('/').at(-1)!==artifactSha256[role])throw Error('Step8 assessment inventory disagrees with selected artifact pins');
@@ -197,17 +200,17 @@ async function readHandoffAssessments(pin:z.infer<typeof AcceptancePinSchema>,in
         if(item.itemId!==row.recordId&&target.recordId!==row.recordId)throw Error('Step8 handoff item belongs to another selected record');
       }
     }
-    if(!seen.has(row.recordId)){required.push({recordId:row.recordId,artifactSha256,contentSha256});seen.add(row.recordId);}
+    required.push({...identity,artifactSha256,contentSha256});seen.add(identity.assessmentId);
   }
   if(seen.size!==selected.size)throw Error('Step8 assessment inventory omits selected triplets');
-  return required.sort((a,b)=>a.recordId.localeCompare(b.recordId));
+  return required.sort((a,b)=>a.assessmentId.localeCompare(b.assessmentId));
 }
 export interface Step8AssessmentCoverage {
   assessmentManifest:z.infer<typeof AcceptancePinSchema>;required:number;included:number;bindingsSha256:string;pass:boolean;
 }
-export function requireStep8AssessmentCoverage(bundle:Step8ExceptionBundle,included:AssessmentContentHashes[]):Step8AssessmentCoverage{
-  const present=new Set(included.map(semanticHash));
-  for(const required of bundle.requiredAssessments)if(!present.has(semanticHash(required.contentSha256)))throw Error('Step8 handed-off assessment triplet missing from owner packet: '+required.recordId);
+export function requireStep8AssessmentCoverage(bundle:Pick<Step8ExceptionBundle,'requiredAssessments'|'assessmentManifest'>,included:AssessmentContentHashes[]):Step8AssessmentCoverage{
+  const present=new Map<string,number>();for(const hashes of included){const key=semanticHash(hashes);present.set(key,(present.get(key)??0)+1);}
+  for(const required of bundle.requiredAssessments){const key=semanticHash(required.contentSha256),remaining=present.get(key)??0;if(!remaining)throw Error('Step8 handed-off assessment triplet missing from owner packet: '+required.assessmentId);present.set(key,remaining-1);}
   return {assessmentManifest:bundle.assessmentManifest,required:bundle.requiredAssessments.length,included:bundle.requiredAssessments.length,
     bindingsSha256:semanticHash(bundle.requiredAssessments),pass:true};
 }
@@ -254,7 +257,7 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
     if(sourceInventory.schemaVersion!=='stadtstack-r1-step8-source-dispositions-v1'||sourceInventory.complete!==true||sourceInventory.generationNonce!==gate.generationNonce
       ||canonicalJson(sourceInventory.sourceDispositions)!==canonicalJson(inventory.sourceDispositions)||canonicalJson(sourceInventory.campaign)!==canonicalJson(gate.campaign))throw Error('Terminal source disposition inventory binding mismatch');
   }
-  const requiredAssessments=await readHandoffAssessments(handoff.assessmentManifest,inventory);
+  const requiredAssessments=await readStep8HandoffAssessments(handoff.assessmentManifest,inventory);
   const manifest=dataReleaseSchema.parse(await readAcceptancePin({path:join(gate.candidateDirectory,'release-manifest.json'),sha256:gate.manifestSha256}));
   const verified=await verifyDataRelease(gate.candidateDirectory);
   if(manifest.id!==gate.releaseId||verified.id!==gate.releaseId)throw Error('Candidate manifest differs from release gate');
