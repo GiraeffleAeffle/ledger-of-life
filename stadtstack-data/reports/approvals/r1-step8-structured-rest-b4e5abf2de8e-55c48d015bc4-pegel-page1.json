@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-step8-structured-rest-b4e5abf2de8e-55c48d015bc4-pegel-page1",
+  "issuedBy": "R1 VM lead under exact renewed owner approval and post-stop security release; stage authorities only in the separate authority worktree for actual canonical job keys",
+  "issuedAt": "2026-10-22T03:39:20.211Z",
+  "expiresAt": "2026-10-22T12:00:00Z",
+  "parentContinuation": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-rest-b4e5abf2de8e-55c48d015bc4.json",
+    "sha256": "19a5fb8677b510377e26710edbd24b6e5fc146b02d5b21bbd8d2d61d133c008f"
+  },
+  "stage": {
+    "step": "structured_parse",
+    "jobKeys": [
+      "6c30def8d76fcf371908a5b9f6d909764e4392ea467677cf9affd91647960d89"
+    ],
+    "ags": [
+      "13076060"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 540000,
+    "category": "production",
+    "mode": "bounded_unattended"
+  }
+}
