@@ -108,7 +108,7 @@ export async function auditStep8(input:Step8Input,pool:Pool,borrowedContext?:Wit
    if(reader.authority.mode!=='isolated-fixture')requireThat(input.expectedSources===27&&input.expectedDocuments===208,'Production requires the frozen 27-source campaign');
    if(reader.authority.mode!=='isolated-fixture'){
     requireThat(input.structuredSelection,'Production requires an issued exact structured selection');
-    await authenticateStep8StructuredSelection({selection:input.structuredSelection!,runIds:input.structuredRunIds,readControl:plain});
+    await authenticateStep8StructuredSelection({selection:input.structuredSelection!,runIds:input.structuredRunIds,readControl:plain,custody:{query:(sql,values)=>client.query(sql,values),readCas:hash=>cas.read(hash)}});
     requireThat(canonicalJson(input.priorRelease)===canonicalJson(STEP8_PRIOR_RELEASE),'Production requires authentic released 0.3.2 predecessor');
    }
    campaignBytes=await (preparedStaging?readPreparedStep8Campaign(preparedStaging,input.campaign):managed(input.campaign));

@@ -1,8 +1,13 @@
 import {z} from 'zod';
 import {isAbsolute} from 'node:path';
-import {dirname,resolve} from 'node:path';
+import {dirname,join,resolve} from 'node:path';
 import {OMP_NATIVE_STREAM_VERSION} from './district-omp-b-runner.ts';
 import {HashSchema,canonicalJson,digest} from './district-adapter-contract.ts';
+import {authenticateStructuredExecutionEvidence} from './r1-step8-structured-execution.ts';
+import type {StructuredExecutionCustody} from './r1-step8-structured-execution.ts';
+import type {CivicPolicyOptions} from './civic-opt-out.ts';
+import {createCanonicalWitnessReadPool} from './r1-step8-provenance.ts';
+import {createReadOnlyManagedSourceAudit} from './r1-step8-managed-read-view.ts';
 
 export const STEP8_STRUCTURED_SOURCE_SCOPES=[['strausberg','regionalstatistik-genesis'],['hagenow','pegelonline']] as const;
 export const STEP8_PRIOR_RELEASE={gitCommit:'57bddbbd8b84b0634229ad9cd45b689bda7271ea',directory:'release' as const,manifestSha256:'85b9236328402364ee1211ffe274933d3eaf0ff52c976a39720920337cc866b8',releaseId:'4ceebf75374df54c51bcf4a212c73770186a1a6db502423be7f108b665096691'};
@@ -12,10 +17,11 @@ export const Step8StructuredSelectionSchema=z.object({
  issuedBy:z.string().min(1),issuedAt:z.iso.datetime(),expiresAt:z.iso.datetime(),
  renewalAuthority:pin,ownerDecision:pin,runIds:z.array(z.uuid()).min(1).max(1000),
  receipts:z.array(z.object({runId:z.uuid(),sha256:HashSchema,step:z.enum(['structured_parse','structured_discover']),municipalityId:z.string().min(1),sourceId:z.string().min(1)}).strict()).min(1).max(1000),
+ executionEvidence:pin.optional(),
 }).strict();
 /** Independently pinned issuance replaces the erroneous five-ID literal. This
  * checks authority and exact receipt selection, not source-policy currency. */
-export async function authenticateStep8StructuredSelection(input:{selection:{path:string;sha256:string};runIds:readonly string[];readControl:(pin:{path:string;sha256:string})=>Promise<Uint8Array>;requiredThrough?:number}){
+export async function authenticateStep8StructuredSelection(input:{selection:{path:string;sha256:string};runIds:readonly string[];readControl:(pin:{path:string;sha256:string})=>Promise<Uint8Array>;requiredThrough?:number;custody?:StructuredExecutionCustody}){
  const read=async(selected:{path:string;sha256:string})=>{pin.parse(selected);const bytes=Buffer.from(await input.readControl(selected));if(digest(bytes)!==selected.sha256)throw Error('Structured control digest mismatch');return JSON.parse(bytes.toString('utf8'));};
  const selection=Step8StructuredSelectionSchema.parse(await read(input.selection));
  const issued=(value:{issuedAt:string;expiresAt:string},label:string)=>{const issuedAt=Date.parse(z.iso.datetime().parse(value.issuedAt)),expiresAt=Date.parse(z.iso.datetime().parse(value.expiresAt));if(issuedAt>Date.now()||expiresAt<=Date.now()||expiresAt<=issuedAt||input.requiredThrough!==undefined&&expiresAt<=input.requiredThrough)throw Error(label+' unissued, future, expired or shorter than required horizon');};
@@ -29,7 +35,26 @@ export async function authenticateStep8StructuredSelection(input:{selection:{pat
  const owner=z.object({schemaVersion:z.literal('stadtstack-r1-owner-approval-record-v1'),id:z.string(),issuedAt:z.iso.datetime(),approver:z.literal('Max (owner)'),ownerStatementsVerbatim:z.array(z.string().min(1)).min(1),approved:z.literal(true),request:z.object({action:z.string(),actionDraftSha256:HashSchema,acquisition:pin,bounds:z.record(z.string(),z.unknown()),expiresAt:z.iso.datetime()}).passthrough()}).passthrough().parse(await read(selection.ownerDecision));
  issued(authority,'Structured renewal authority');issued({issuedAt:owner.issuedAt,expiresAt:owner.request.expiresAt},'Structured owner decision');
  if(authority.requiredOwnerDecision!==owner.id||owner.request.action!==authority.action||owner.request.actionDraftSha256!==digest(JSON.stringify({...rawAuthority,issuedAt:''},null,2)+'\n')||canonicalJson(owner.request.acquisition)!==canonicalJson(authority.acquisition)||canonicalJson(owner.request.bounds)!==canonicalJson(authority.bounds)||authority.expiresAt!==owner.request.expiresAt||Date.parse(selection.expiresAt)>Date.parse(authority.expiresAt)||Date.parse(authority.issuedAt)<Date.parse(owner.issuedAt)||Date.parse(selection.issuedAt)<Date.parse(authority.issuedAt))throw Error('Structured selection changes approved renewal action/bounds or issuance order');
+ if(selection.executionEvidence){
+  if(!input.custody)throw Error('Structured execution evidence requires canonical read-only DB/CAS custody');
+  await authenticateStructuredExecutionEvidence({evidence:selection.executionEvidence,baseAuthority:selection.renewalAuthority,selectionIssuedAt:selection.issuedAt,receipts:selection.receipts,readControl:input.readControl,custody:input.custody});
+ }
  return selection;
+}
+
+/** Private issuance/assembly callers use the same canonical read-only witness
+ * and managed-CAS epoch fence as preflight; there is no controls-only bypass. */
+export async function authenticateStep8StructuredSelectionReadOnly(input:Omit<Parameters<typeof authenticateStep8StructuredSelection>[0],'custody'>,access:{connectionString:string;casRoot:string;policy:CivicPolicyOptions}){
+ const fence=await createReadOnlyManagedSourceAudit(access.policy),pool=createCanonicalWitnessReadPool({connectionString:access.connectionString});
+ try{
+  const client=await pool.connect();
+  try{
+   await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+   const selection=await authenticateStep8StructuredSelection({...input,custody:{query:(sql,values)=>client.query(sql,values),readCas:hash=>fence.read(join(access.casRoot,'sha256',hash.slice(0,2),hash),hash)}});
+   await fence.finish();await client.query('COMMIT');return selection;
+  }catch(error){await client.query('ROLLBACK');throw error;}
+  finally{client.release();}
+ }finally{await pool.end();}
 }
 /** The catalogue's independently pinned confirmed review, not publication HEAD
  * or a window-specific code literal, supplies the admitting worker identities. */

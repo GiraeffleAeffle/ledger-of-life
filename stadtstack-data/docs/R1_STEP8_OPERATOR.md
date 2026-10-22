@@ -302,6 +302,34 @@ expensive work: execute embeds it. `plan` remains the cheap, non-authorizing dry
   builder starts. The refusal-only validator is
   `scripts/r1-step8-structured-precheck.mjs`; it also rejects stale attempts,
   acquisition-only selections, legacy output codecs and missing/overlapping pages.
+  A resumed acquisition/local-parse continuation additionally pins optional
+  `executionEvidence: {path, sha256}` inside the issued selection. This authenticates
+  the renewed owner decision, exact continuation, per-job issued stage authorities,
+  successful native receipt hashes and completion within their execution windows.
+  Both acquisitions (the completed GENESIS acquisition and the new/resumed PEGEL
+  acquisition), and every selected parser receipt, must exactly equal their
+  canonical committed `step_receipts`/`jobs` rows in one read-only DB snapshot.
+  Receipt IDs, run IDs, semantic hashes, full receipt bodies/clocks, canonical job
+  keys/contracts and current successful attempts are checked; a recomputed hash
+  inside an evidence document is not custody. Native acquisition descriptor/HTTP
+  outputs are read through the managed-CAS fence, then each parser's exact
+  snapshot, original, policy and HTTP inputs are bound to its acquired source.
+  `authenticateStep8StructuredSelection` therefore requires `custody` whenever
+  `executionEvidence` is present. Private issuance/assembly uses
+  `authenticateStep8StructuredSelectionReadOnly`; it opens the canonical local
+  read-only transaction and finishes the same managed-reader epoch fence.
+  An expired **completed execution window** is historical evidence, not current
+  permission for another request. It does not replace, extend or shorten source
+  policy proofs: the original renewal/selection authority and every selected
+  current policy proof still undergo the unchanged 12-hour-plus-one-hour horizon.
+  Extra requests, missing parser pages, unapproved decisions, changed stage jobs
+  or work completed outside the issued window fail closed.
+  The CVE-2026-111497 source-fetch stop adds a mandatory post-stop security-release
+  pin to that execution chain: reviewed fixed fetch bytes, genuinely passed gates
+  and exact Node 24.22.1 identity precede any continuation work. A fetch-code fix
+  changes `acquisitionContract`; the canonical new job identity must then use that
+  fixed contract while the immutable failed old job stays held. Reusing/retagging
+  the old semantic identity or omitting the security release is not a continuation.
 - `registry: {path, sha256}`: the admitted registry artifact against which the
   selected native runs are exported; native checked-source evidence produces
   a new bound registry artifact, preserving the originals.
