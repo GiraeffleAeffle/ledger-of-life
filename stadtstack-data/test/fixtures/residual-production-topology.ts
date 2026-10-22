@@ -145,12 +145,11 @@ test('enrolled artifacts CAS survives real preparation/extraction and fixture A/
    // The ordinary importer, not a patched receipt or clock, grants seven days.
    const configuredCity=JSON.parse(await readFile(new URL('../../sources/district-registry.json',import.meta.url),'utf8')).municipalities.find((row:{id:string})=>row.id===city.id),configured=configuredCity.sources.find((row:{id:string})=>row.id==='strausberg-planning');
    assert.ok(configured);city.sources.push(structuredClone(configured));
-   const seedUrl=new URL('topology-original',configured.url).href,seed=city.seedDocuments[0];
-   city.seedDocuments=[{...seed,url:seedUrl,sourceId:configured.id,evidence:seed.evidence.map(entry=>({...entry,url:seedUrl}))}];
   }
   const now=new Date(Date.now()-1000).toISOString(),source=city.sources.find(row=>row.id===(longStaging?'strausberg-planning':'website'))!;source.checkState='checked';source.checkedAt=now;source.evidence=[{url:source.url!,locator:'Synthetic source configuration',sha256:digest('synthetic topology source'),retrievedAt:now}];
   if(!duplicateMode)for(const id of ['witness-alpha','witness-beta'])city.sources.push({...structuredClone(source),id});
   const registry=await createOperatorRegistryFixture(t,{context:fixture,value,label:'topology-registry'}),rawRoot=join(root,'raw'),indexRoot=join(root,'index'),cas=new DistrictCas(join(root,'cas'));
+  if(longStaging){const {admittedRegisteredRobotsScopes}=await import('../../src/registered-source-policy.ts');assert.ok(admittedRegisteredRobotsScopes(registry.admitted.registry,registry.registrySha256).some(row=>row.municipalityId===city.id&&row.sourceId===source.id),'fixture preserves the exact reviewed root, crawl scope and empty planning-seed set');}
   // This is the production topology: the whole CAS, not its hash subdirectory,
   // is enrolled as artifacts before any real residual queue handler runs.
   for(const [path,kind] of [[rawRoot,'fetch'],[indexRoot,'artifacts'],[cas.root,'artifacts']] as const)await civic.initializeManagedAcquisitionLane(path,{...policy,decisionId:civic.CIVIC_ACQUISITION_DECISION_ID,kind});
