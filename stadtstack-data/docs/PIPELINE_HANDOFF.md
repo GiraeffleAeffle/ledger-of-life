@@ -60,7 +60,7 @@ Legacy implicit live collectors/evaluators, API-key fallbacks and ungoverned old
 
 ## 5. VM state and first commands
 
-Host aliases `codex-workstation` / `codex-netbird` refer to the same VM, user `max`. Installed Node used by this pipeline: `/home/max/.local/share/mise/installs/node/24.21.0/bin/node`.
+Host aliases `codex-workstation` / `codex-netbird` refer to the same VM, user `max`. New governed R1 commands select `/home/max/.local/share/mise/installs/node/24.22.1/bin/node`; historical Node24.21.0 receipts and frozen source tooling remain unchanged. See [R1_FETCH_SAFETY.md](R1_FETCH_SAFETY.md) for the acquisition hold and separate runtime/processing-pin gates.
 
 The civic lane fails closed on group/world-writable managed files and ancestry. The VM login default is `umask 002`, under which every gate and pipeline command fails with `host_state_unsafe`/`CIVIC_POLICY_STATE_UNSAFE`. Run all tests and pipeline commands with `umask 022` (or stricter) from a checkout without group/other write bits (`chmod -R go-w` after cloning). Do not weaken the permission checks instead.
 
@@ -79,7 +79,7 @@ Private resume metadata was transferred to `/home/max/stadtstack-ops/civic-pipel
 Use a new checkout; do not reset an existing user's tree:
 
 ```sh
-export PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:$PATH
+export PATH=/home/max/.local/share/mise/installs/node/24.22.1/bin:$PATH
 git clone --no-hardlinks --branch council-owner-override https://github.com/GiraeffleAeffle/ledger-of-life.git ~/civic-0.3.2-resume
 cd ~/civic-0.3.2-resume/stadtstack-data
 npm ci

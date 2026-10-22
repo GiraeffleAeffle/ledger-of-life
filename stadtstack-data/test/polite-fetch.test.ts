@@ -23,6 +23,51 @@ import {ParserIsolationError,ParserIsolationReasonSchema} from '../src/district-
 import {largeBobInventory} from './fixtures/bob-inventory.ts';
 import {genesisOwnerAccountRoot} from '../src/genesis-owner-acquisition.ts';
 import {recordedPolicyIdentity} from '../src/district-policy-refresh.ts';
+import {createServer} from 'node:http';
+import zlib from 'node:zlib';
+
+test('wire enforces identity before body handling and never constructs a decoder',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'polite-identity-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const spies=[t.mock.method(zlib,'createBrotliDecompress',()=>{throw new Error('decoder forbidden');}),t.mock.method(zlib,'createGunzip',()=>{throw new Error('decoder forbidden');}),t.mock.method(zlib,'createInflate',()=>{throw new Error('decoder forbidden');})];
+ let encoding:string|undefined,status=200,chunked=false;
+ const server=createServer((request,response)=>{
+  assert.equal(request.headers['accept-encoding'],'identity');
+  if(encoding!==undefined)response.setHeader('Content-Encoding',encoding);
+  response.setHeader('Content-Type','text/plain');
+  response.statusCode=status;
+  if(chunked){response.write('12345');response.end('67890');}else response.end('identity fixture');
+ });
+ await new Promise<void>(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise<void>((resolve,reject)=>{server.closeAllConnections();server.close(error=>error?reject(error):resolve());}));
+ const address=server.address();assert.ok(address&&typeof address==='object');
+ const fixture=new URL(`http://stadt.de:${address.port}/fixture`);
+ interface TransportSeam {wireRequest(url:URL,method:'GET'|'POST',body:undefined,validators:undefined,pinned:{address:string;family:number},headers:Record<string,string>):Promise<WireResult>}
+ const fetcher=await createPoliteFetcher({cacheDir:join(root,'cache')});
+ const request=()=>(fetcher as unknown as TransportSeam).wireRequest(fixture,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{});
+ for(encoding of ['br','gzip','deflate','gzip, br','identity, gzip','compress','']){
+  for(status of [200,302,404])await assert.rejects(request(),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+ }
+ status=200;
+ for(encoding of [undefined,'identity','IDENTITY'])assert.equal((await request()).body.toString(),'identity fixture');
+ // Exercise the public persistence path while preserving production DNS/port
+ // controls: only the fixture transport is substituted, never the wire handler.
+ t.mock.method(fetcher as unknown as WireSeam,'wire',async (url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return request();
+ });
+ encoding='br';
+ await assert.rejects(fetcher.fetch('https://stadt.de/fixture'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+ assert.deepEqual(await readdir(join(root,'cache','sha256')).catch(()=>[]),[]);
+ const observations=await Promise.all((await readdir(join(root,'cache','observations'))).map(async name=>JSON.parse(await readFile(join(root,'cache','observations',name),'utf8'))));
+ assert.equal(observations.some(row=>row.state==='fetched'||row.state==='not_modified'),false);
+ assert.equal(observations.find(row=>row.url==='https://stadt.de/fixture')?.failure,'unsupported_encoding');
+ for(const spy of spies)assert.equal(spy.mock.callCount(),0);
+ encoding=undefined;chunked=true;
+ const bounded=await createPoliteFetcher({cacheDir:join(root,'bounded'),maxBytes:8});
+ await assert.rejects((bounded as unknown as TransportSeam).wireRequest(fixture,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='too_large');
+ chunked=false;
+ await assert.rejects((bounded as unknown as TransportSeam).wireRequest(fixture,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='too_large');
+});
 
 async function createPoliteFetcher(options:PoliteFetcherOptions):Promise<BasePoliteFetcher> {
  return new BasePoliteFetcher({...await politeTestOptions(options),fixtureInspection:fixturePolicyInspection});

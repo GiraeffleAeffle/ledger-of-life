@@ -4,9 +4,15 @@ This is the executable operator procedure for step 8, not a change to the frozen
 `CIVIC_PIPELINE_REBUILD.md` plan or permission to deploy. The owner option-B gates
 still require step 9's frozen value test before hosted release.
 
+The 2026-10-22 acquisition security hold, exact contract transition and runtime
+switch are documented in [R1_FETCH_SAFETY.md](R1_FETCH_SAFETY.md). The historical
+source processing pin is not changed by that host-runtime switch. Old commands
+and observed test receipts below remain historical evidence, not authority to
+restart old source drivers or to select Node24.21.0 for new acquisition.
+
 ## One command
 
-From `stadtstack-data`, with Node 24.21.0 selected:
+From `stadtstack-data`, with Node 24.22.1 selected:
 
 ```sh
 DATABASE_URL='postgresql://max@/civic_r1?host=/var/run/postgresql' \

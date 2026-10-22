@@ -10,7 +10,7 @@ set -euo pipefail
 umask 022
 mode=${1:-all}; shift || true
 cd "$(dirname "$0")/.."
-export PATH=/home/max/.local/share/mise/installs/node/24.21.0/bin:/usr/bin:/bin
+export PATH=/home/max/.local/share/mise/installs/node/24.22.1/bin:/usr/bin:/bin
 PG_BIN=/usr/lib/postgresql/16/bin
 log_root=${R1_VERIFY_LOG_ROOT:-$HOME/.local/state/stadtstack-data/r1-verify}
 mkdir -p -m 0700 "$log_root"

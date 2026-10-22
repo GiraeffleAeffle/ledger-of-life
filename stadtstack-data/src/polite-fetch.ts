@@ -6,7 +6,6 @@ import {mkdir,readFile,writeFile,rename,lstat,realpath,readdir} from 'node:fs/pr
 import {join,resolve,basename,dirname,relative,isAbsolute} from 'node:path';
 import {randomUUID} from 'node:crypto';
 import {homedir} from 'node:os';
-import {createGunzip,createInflate,createBrotliDecompress} from 'node:zlib';
 import {z} from 'zod';
 import {hash,ua} from './common.ts';
 import {parseTdmRules,parseTdmReservation,tdmRuleForUrl,matchesPolicyPattern,ownerRobotsOverrideFor,ownerRobotsOverrideApplies,effectiveRobotsPermission,documentOriginExcludes,effectiveSourcePermission,projectSourcePolicyMetadata} from './source-policy.ts';
@@ -479,17 +478,16 @@ export class PoliteFetcher {
     const request=(url.protocol==='https:'?httpsRequest:httpRequest)(url,{method,headers,agent:false,family:pinned.family,lookup:(_name,_options,callback)=>callback(null,pinned.address,pinned.family)},response=>{
      const status=response.statusCode??0;
      const selected:Record<string,string|undefined>={};for(const key of ['content-type','content-length','content-encoding','etag','last-modified','location','tdm-reservation','tdm-policy','x-robots-tag','retry-after']){const value=response.headers[key];selected[key]=Array.isArray(value)?value[0]:value;}
+     // Identity is the only requested representation. Refuse before reading any
+     // body, including error/redirect responses; never construct a host decoder.
+     const encoding=selected['content-encoding'];
+     if(encoding!==undefined&&encoding.toLowerCase()!=='identity'){clearTimeout(timer);reject(new PoliteFetchError('unsupported_encoding','Non-identity content encoding refused'));response.destroy();request.destroy();return;}
      if(status>=300){response.destroy();clearTimeout(timer);done({status,headers:selected,body:Buffer.alloc(0),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});return;}
-     const encoding=selected['content-encoding']?.toLowerCase()??'identity';
-     if(!['identity','gzip','deflate','br'].includes(encoding)){request.destroy(new PoliteFetchError('unsupported_encoding','Unsupported content encoding'));return;}
+     const chunks:Buffer[]=[];let bytes=0;
      if(Number(selected['content-length'])>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Response exceeds byte bound'));return;}
-     const decoder=encoding==='gzip'?createGunzip():encoding==='deflate'?createInflate():encoding==='br'?createBrotliDecompress():null;
-     const stream=decoder?response.pipe(decoder):response,chunks:Buffer[]=[];let bytes=0,wireBytes=0;
-     if(decoder)response.on('data',(chunk:Buffer)=>{wireBytes+=chunk.length;if(wireBytes>this.options.maxBytes)request.destroy(new PoliteFetchError('too_large','Encoded response exceeds byte bound'));});
-     stream.on('data',(chunk:Buffer)=>{bytes+=chunk.length;if(bytes>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Decoded response exceeds byte bound'));decoder?.destroy();return;}chunks.push(chunk);});
-     stream.on('end',()=>{clearTimeout(timer);done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});
-     stream.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
-     if(decoder)response.on('error',error=>decoder.destroy(error));
+     response.on('data',(chunk:Buffer)=>{bytes+=chunk.length;if(bytes>this.options.maxBytes){clearTimeout(timer);reject(new PoliteFetchError('too_large','Response exceeds byte bound'));response.destroy();request.destroy();return;}chunks.push(chunk);});
+     response.on('end',()=>{clearTimeout(timer);done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});
+     response.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
     });
     const timer=setTimeout(()=>request.destroy(new PoliteFetchError('timeout','Request deadline exceeded')),this.requestTimeoutMs(url,method));
     request.on('error',error=>{clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Public request failed'));});
