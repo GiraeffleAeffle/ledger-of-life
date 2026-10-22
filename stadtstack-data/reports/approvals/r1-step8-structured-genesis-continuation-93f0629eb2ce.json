@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "r1-step8-structured-inspected-continuation-v1",
+  "id": "r1-step8-structured-genesis-continuation-93f0629eb2ce",
+  "issuedBy": "R1 VM lead under exact unconsumed GENESIS allowance of owner decision96 and base action; not a PEGEL retry grant",
+  "issuedAt": "2026-10-22T00:14:09.631Z",
+  "expiresAt": "2026-10-22T01:03:12.262Z",
+  "baseAuthority": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-authorities/stadtstack-data/reports/approvals/r1-step8-structured-renewal-2026-10-21-v2.json",
+    "sha256": "80e56910909b47d7aeaf4d26bbf63c30a99e0dd41aeac112b2573e417163232c"
+  },
+  "inspection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-step8-structured-renewal-20261021/continuation-20261022/inspection-93f0629eb2ce47913f9703b92cb5dc0d8ca6a1d4815e1beac4d0201118cd79b7.json",
+    "sha256": "3991439d547d6fd0bbf63f4188a4a261e70698fbbc0557cdbbff661fa730c61a"
+  },
+  "stateIdentitySha256": "93f0629eb2ce47913f9703b92cb5dc0d8ca6a1d4815e1beac4d0201118cd79b7",
+  "resolution": {
+    "action": "fresh-authority-for-unattempted-genesis-only",
+    "jobKeys": [
+      "e82e3f7735f4dfcdf7da44fd81fe5e6cc842e3d55c92e74be226265f16e5d399"
+    ],
+    "neverResume": [
+      "7d62beb71a935a53ead875aa37c3440c082d32b4b4bb7189624a49bef23b2fc5"
+    ],
+    "requiresDockerGroup": 127,
+    "additionalPegelRequests": 0,
+    "additionalPegelAttempts": 0,
+    "remainingGenesisDataRequests": 1,
+    "maxGenesisHttpRequests": 8,
+    "maxJobs": 1,
+    "maxElapsedMs": 540000,
+    "expiresAt": "2026-10-22T01:03:12.262Z",
+    "pegelRecovery": "Remains held. A second PEGEL GET exceeds the exact original per-source data-request authority and maxAcquisitionJobs2; require a separate reviewed additional-attempt/request decision before resume."
+  }
+}
