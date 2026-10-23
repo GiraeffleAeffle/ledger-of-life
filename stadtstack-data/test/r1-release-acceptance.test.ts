@@ -15,6 +15,7 @@ import {OMP_NATIVE_STREAM_VERSION} from '../src/district-omp-b-runner.ts';
 import {replayEvidenceCasRoot} from '../src/replay-evidence-contract.ts';
 import {publicationPartitionSha256} from '../src/publication-provenance-partition.ts';
 import {step8AssessmentIdentity} from '../src/r1-step8-export-projection.ts';
+import {step8QueueEvidence} from '../src/r1-step8-queue-evidence.ts';
 const hash=(bytes:string|Uint8Array)=>createHash('sha256').update(bytes).digest('hex');
 const h='a'.repeat(64),b='b'.repeat(64);
 const requiredChecks=['exact campaign membership','complete exception inventory','atomic generation ownership','native contributor custody','authenticated source exports','current assessment generation','allowance accounting','native B purge acknowledgments','quality','coverage','critical assessments','identity admissions','current policy','every manifest member','exact manifest bytes and ID','vm_candidate loader'];
@@ -51,12 +52,17 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
     const auditPin=await save('replay-audit.json',audit),auditPath=join(artifactCasRoot,'sha256',auditPin.sha256.slice(0,2),auditPin.sha256);
     await mkdir(dirname(auditPath),{recursive:true});await writeFile(auditPath,await readFile(auditPin.path));return auditPin;
   };
-  const parsedInventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign,complete:true,
-    sourceDispositions:[{municipalityId:'synthetic-town',sourceId:'website',documentId:'document:fixture',sourceSha256:h,jobKey:b,admittedRecordIds:['admitted:fixture'],cases:[],classification:{critical:false,rights:false,disagreement:false},assessments:[],queueEvidence:{stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'succeeded',reasonCode:'completed'}}]}}],
+  const queue={stepReceipts:[{sha256:h,receipt:{id:'11111111-1111-4111-8111-111111111111',jobKey:b,step:'residual_extract',outcome:'succeeded',reasonCode:'completed'}}]},queueRun=await save('native-extraction-run.json',{queue});
+  const parsedInventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v2',releaseId:manifest.id,campaign,complete:true,
+    sourceDispositions:[{municipalityId:'synthetic-town',sourceId:'website',documentId:'document:fixture',sourceSha256:h,jobKey:b,admittedRecordIds:['admitted:fixture'],cases:[],classification:{critical:false,rights:false,disagreement:false},assessments:[],queueEvidence:step8QueueEvidence(queueRun,queue,'document:fixture',b)}],
     native:{coverage:[],fieldHolds:{schemaVersion:'district-r1-native-field-holds-v1',basis:'actual_committed_output_pages',unpublishedObservations:0,counts:{narrative_requires_text_model:0,source_literal_exceeds_short_quote:0,contact_field:0}}},
     preparation:{publicationQuarantine:{schemaVersion:'stadtstack-publication-quarantine-v1',records:[]},criticalHolds:[],classification:{critical:false,rights:false,disagreement:false}},assessments:[]});
   const inventory={...parsedInventory,sourceDispositions:parsedInventory.sourceDispositions.filter(source=>'jobKey' in source)};
   assert.equal(inventory.sourceDispositions.length,parsedInventory.sourceDispositions.length,'This fixture models native dispositions only');
+  const setQueue=async(outcome:string,reasonCode:string)=>{
+    const source=inventory.sourceDispositions[0],queue={stepReceipts:[{sha256:h,receipt:{id:'11111111-1111-4111-8111-111111111111',jobKey:source.jobKey,step:'residual_extract',outcome,reasonCode}}]},pin=await save(`native-extraction-${outcome}-${reasonCode}.json`,{queue});
+    source.queueEvidence=step8QueueEvidence(pin,queue,source.documentId,source.jobKey);
+  };
   const gateState={status:'passed',checks:[...requiredChecks]};
   const value={version:'pilot-value-r1-verdict-v1',releaseId:manifest.id,manifestSha256:manifestPin.sha256,reportSha256:h,packetSha256:b,
     frozenInputs:FROZEN_R1_INPUTS,verdict:'pass',blockingReasons:[] as string[],pending_owner_audit:true,ownerAuditPolicy:'option_B_post_release_sample_only',
@@ -84,7 +90,9 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
     const generationAuditEvidence=await save('current-generation-audit.json',{schemaVersion:'stadtstack-r1-step8-read-only-audit-v1',status:'compatible',currentGeneration,campaign,blockers:[],writes:[],network:false,providers:false,publicationExecuted:false,
       sources:[{municipalityId:'synthetic-town',sourceId:'website',corpusSha256:h,admittedRecordIds:[...new Set(inventory.sourceDispositions.flatMap(source=>source.admittedRecordIds))].sort()}],allowance:{schemaVersion:'stadtstack-r1-step8-allowance-evidence-v1'},purgeAcknowledgements:[]});
     inventory.generationAuditEvidence=generationAuditEvidence;
-    const exceptions=await save('exception-inventory.json',inventory),assessmentManifest=await save('assessments.json',auditManifest);
+    const sourceDispositionInventory=await save('source-dispositions.json',{schemaVersion:'stadtstack-r1-step8-source-dispositions-v1',status:'authenticated_not_released',generationNonce:'synthetic-generation',campaign,complete:true,sourceDispositions:inventory.sourceDispositions});
+    const {sourceDispositions:_,...wire}=inventory;
+    const exceptions=await save('exception-inventory.json',{...wire,sourceDispositionInventory}),assessmentManifest=await save('assessments.json',auditManifest);
     const handoff=await save('step9-handoff.json',{schemaVersion:'stadtstack-r1-step9-handoff-v1',releaseId:manifest.id,candidateDirectory,exceptionInventory:exceptions,assessmentManifest,provenanceInventories:{primary:campaign,staging:stagingProvenance},policy:{}});
     const audit=await persistReplay();
     const gate=await save('release-gate.json',{schemaVersion:'stadtstack-r1-step8-gate-v1',...gateState,releaseId:manifest.id,manifestSha256:manifestPin.sha256,candidateDirectory,campaign,
@@ -95,8 +103,20 @@ async function fixture(contributingSource='website',sourceSha256='c'.repeat(64))
     const valueVerdict=await save('value-verdict.json',{...value,step8,step8AssessmentCoverage});
     return {step8,valueVerdict,ownerApproval:{path:new URL('../reports/approvals/r1-autonomy-and-release-2026-10-14.json',import.meta.url).pathname,sha256:OPTION_B_APPROVAL_SHA256}};
   };
-  return {root,save,seal,selectAssessment,inventory,value,gateState,proof,manifest,manifestPin};
+  return {root,save,seal,setQueue,selectAssessment,inventory,value,gateState,proof,manifest,manifestPin};
 }
+
+test('exception loader authenticates compact queue metadata against immutable original bytes',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const source=f.inventory.sourceDispositions[0],queue=source.queueEvidence as {extractionRun:{path:string;sha256:string};stepReceipts:Array<{receipt:{outcome:string}}>};
+  queue.stepReceipts[0].receipt.outcome='held_quality';
+  await assert.rejects(f.seal(),/differs from its pinned original/);
+  queue.stepReceipts[0].receipt.outcome='succeeded';
+  const selected=await f.seal();
+  await writeFile(queue.extractionRun.path,'{"queue":{}}\n',{mode:0o600});
+  await assert.rejects(loadStep8ExceptionBundle(selected.step8),/hash mismatch/);
+});
+
 
 test('whole release acceptance is immutable-input bound and option B defers only sample audit',async t=>{
   const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
@@ -213,14 +233,14 @@ test('current held_quality extraction is a known gap, not a negative or a blanke
   const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
   const source=f.inventory.sourceDispositions[0];
   source.cases=[{reason:'no_supported_case'}];source.classification=classifyStep8Exception(source.cases);source.admittedRecordIds=[];
-  source.queueEvidence={stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'held_quality',reasonCode:'quality_failed'}}]};
+  await f.setQueue('held_quality','quality_failed');
   const gap=await computeReleaseAcceptance(await f.seal());
   assert.equal(gap.accepted,true);assert.ok(gap.exceptionItems.some(item=>item.classification==='known_gap'));
   source.cases=[{reason:'assessment_held',candidate:{id:'withheld:fixture'}}];source.classification=classifyStep8Exception(source.cases);
   const excluded=await computeReleaseAcceptance(await f.seal());
   assert.equal(excluded.accepted,true);assert.ok(excluded.exceptionItems.some(item=>item.classification==='known_gap'&&item.ownerAuditPriority==='high'));
   source.cases=[{reason:'no_supported_case'}];source.classification=classifyStep8Exception(source.cases);
-  source.queueEvidence={stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'no_supported_case',reasonCode:'completed'}}]};
+  await f.setQueue('no_supported_case','completed');
   assert.equal((await computeReleaseAcceptance(await f.seal())).accepted,true);
 });
 
@@ -230,7 +250,7 @@ test('excluded context and infrastructure terminal documents are known gaps, but
   for(const reasonCode of ['assessment_context_exceeded','execution_exception']){
     source.cases=[{reason:'terminal_document_exception:'+reasonCode}];source.classification=classifyStep8Exception(source.cases);
     source.terminalDocumentException={reasonCode,outcome:'held_execution'};
-    source.queueEvidence={stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'held_execution',reasonCode}}]};
+    await f.setQueue('held_execution',reasonCode);
     const result=await computeReleaseAcceptance(await f.seal());
     assert.equal(result.accepted,true);assert.ok(result.exceptionItems.some(item=>item.classification==='known_gap'));
   }
@@ -321,7 +341,7 @@ test('unknown case codes remain blockers even when accompanied by a controlled q
   const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
   const source=f.inventory.sourceDispositions[0];
   source.cases=[{reason:'novel_unclassified_hold'}];source.classification=classifyStep8Exception(source.cases);
-  source.queueEvidence={stepReceipts:[{receipt:{jobKey:b,step:'residual_extract',outcome:'held_quality',reasonCode:'quality_failed'}}]};
+  await f.setQueue('held_quality','quality_failed');
   assert.ok((await computeReleaseAcceptance(await f.seal())).exceptionItems.some(item=>item.classification==='unknown'&&item.blocking));
   source.terminalAssessmentExceptions=[{recordIds:['admitted:fixture'],reasonCode:'invented_code'}];
   source.assessments=[await f.selectAssessment('admitted:fixture')];
@@ -406,4 +426,20 @@ test('source-specific immutable handoff keeps distinct bundles for one record an
   await assert.rejects(readStep8HandoffAssessments(manifest,{...f.inventory,assessments:rows.map((row,index)=>index?{...row,sourceId:'website'}:row)}),/immutable identity mismatch/);
   const reassigned=await f.save('reassigned-scoped-assessment.json',entries.map((row,index)=>index?{...row,assessmentId:entries[0].assessmentId}:row));
   await assert.rejects(readStep8HandoffAssessments(reassigned,f.inventory),/immutable identity mismatch/);
+});
+
+test('source-wide pinned execution history is inventoried once rather than once per document',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const source=f.inventory.sourceDispositions[0],queue=source.queueEvidence as Record<string,unknown>;
+  queue.extractionAttemptHistory={extractionRun:queue.extractionRun,pointer:'/queue/extractionAttemptHistory'};
+  f.inventory.sourceDispositions.push({...structuredClone(source),documentId:'document:second'});
+  assert.equal(inventoryExceptionItems(f.inventory).filter(item=>item.classification==='execution_history').length,1);
+});
+
+test('compact private exception wire rejects the obsolete embedded v1 contract',async t=>{
+  const f=await fixture();t.after(()=>rm(f.root,{recursive:true,force:true}));
+  const selected=await f.seal(),wire=JSON.parse(await readFile(selected.step8.exceptions.path,'utf8')),originalGate=JSON.parse(await readFile(selected.step8.gate.path,'utf8')),originalHandoff=JSON.parse(await readFile(selected.step8.handoff.path,'utf8'));
+  assert.equal('sourceDispositions' in wire,false);assert.equal(wire.schemaVersion,'stadtstack-r1-step8-exceptions-v2');
+  const exceptions=await f.save('obsolete-exceptions.json',{...wire,schemaVersion:'stadtstack-r1-step8-exceptions-v1'}),handoff=await f.save('obsolete-handoff.json',{...originalHandoff,exceptionInventory:exceptions}),gate=await f.save('obsolete-gate.json',{...originalGate,exceptionInventory:exceptions,step9Handoff:handoff});
+  await assert.rejects(loadStep8ExceptionBundle({gate,exceptions,handoff}),error=>error instanceof Error&&error.message.includes('stadtstack-r1-step8-exceptions-v2'));
 });

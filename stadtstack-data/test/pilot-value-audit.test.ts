@@ -154,7 +154,7 @@ test('owner packet, frozen gates and audit binding use synthetic original-backed
     });
     await t.test('owner packet includes non-A/B/C step8 inventory exceptions and cannot defer them',async()=>{
       const pin={path:'/synthetic/pinned-input.json',sha256:'e'.repeat(64)};
-      const inventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:finalized.server.releaseId,campaign:pin,complete:true,
+      const inventory=Step8ExceptionInventorySchema.parse({schemaVersion:'stadtstack-r1-step8-exceptions-v2',releaseId:finalized.server.releaseId,campaign:pin,complete:true,
         sourceDispositions:[{municipalityId:'synthetic',sourceId:'source1',documentId:'document:held',sourceSha256:'f'.repeat(64),jobKey:'b'.repeat(64),
           admittedRecordIds:[],cases:[{reason:'rights_pending'}],classification:{critical:false,rights:true,disagreement:false},assessments:[],
           terminalDocumentException:{reasonCode:'policy_excluded'},queueEvidence:{stepReceipts:[{receipt:{jobKey:'b'.repeat(64),step:'residual_prepare',outcome:'blocked_policy',reasonCode:'policy_excluded'}}]}}],

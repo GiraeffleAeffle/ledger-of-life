@@ -34,7 +34,10 @@ import {normalizePublicationBindings,normalizePublicationPin} from './publicatio
 import {authenticatePublicationPartition,partitionPublicationInputs,provenanceBytes} from './publication-provenance-partition.ts';
 import {requireStep8Preflight} from './r1-step8-preflight.ts';
 import {assertStep8ProvenanceSizes} from './r1-step8-publication-bounds.ts';
-import {step8DocumentDisposition,projectStep8PublicationIntake,selectStep8PublicationPolicy,step8AssessmentIdentity,Step8AuditAssessmentSchema,Step8AssessmentManifestRowSchema} from './r1-step8-export-projection.ts';
+import {projectStep8PublicationIntake,selectStep8PublicationPolicy,step8AssessmentIdentity,Step8AuditAssessmentSchema,Step8AssessmentManifestRowSchema} from './r1-step8-export-projection.ts';
+import {step8SourceDispositions} from './r1-step8-source-dispositions.ts';
+import {encodeStep8Json,assertStep8JsonArtifact} from './r1-step8-json-budget.ts';
+import {assertStep8JsonBudget} from './r1-step8-json-forecast.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Operator paths must be absolute'),sha256:HashSchema}).strict();
 const sealSchema=z.object({compositionArtifactSha256:HashSchema,privateProvenance:Pin.passthrough(),policyInventory:Pin.passthrough(),criticalInventory:Pin.passthrough()}).passthrough();
@@ -58,7 +61,7 @@ export type Step8Input=z.infer<typeof Step8InputSchema>;
 const Step8AssemblyExecutionSchema=Step8InputSchema.omit({campaign:true,registry:true,privateProvenance:true,stagingProvenance:true,staging:true,identityAssessments:true,criticalAssessments:true,regionalPolicyReceipts:true}).extend({stagingAssembly:Pin});
 export const Step8OperatorInputSchema=z.union([Step8InputSchema,Step8AssemblyExecutionSchema]);
 export type Step8OperatorInput=z.infer<typeof Step8OperatorInputSchema>;
-const encoded=(value:unknown)=>Buffer.from(JSON.stringify(value,null,2)+'\n');
+const encoded=encodeStep8Json;
 const inside=(parent:string,path:string)=>{const child=relative(parent,path);return !!child&&!child.startsWith('..')&&!isAbsolute(child);};
 const uniqueBindings=normalizePublicationBindings;
 
@@ -108,6 +111,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  await assertCivicPolicyAuthority(policy);
  const phaseTimings:Record<string,number>={},preflightStarted=performance.now();
  const preflight=await requireStep8Preflight(invocation,pool);
+ if(!preflight.jsonBudgets)throw Error('Step8 automatic pre-pass lacks complete JSON artifact budgets');
  phaseTimings.preflightMs=performance.now()-preflightStarted;const reconstructionStarted=performance.now();
  const provenanceContext=await createWitnessedProvenanceContext(invocation.nativeSealSelection,policy,{pool,casRoot:invocation.casRoot,catalogue:invocation.currentGeneration.catalogue,mode:'step8',workers:invocation.reconstructionWorkers,timing:invocation.reconstructionTiming,importDispositionDecision:invocation.importDispositionDecision});
  phaseTimings.reconstructionMs=performance.now()-reconstructionStarted;
@@ -160,12 +164,7 @@ export async function runStep8(raw:unknown,pool:Pool){
   if(canonicalJson([...selected.assessmentItemHolds].sort((a,b)=>a.holdReceiptArtifactSha256.localeCompare(b.holdReceiptArtifactSha256)))!==canonicalJson(holdPins))throw Error('Source item hold selection differs from authenticated seal');
   const cases=JSON.parse(Buffer.from(exported.contribution.artifacts.quarantine.bytes).toString('utf8')).cases,admittedRecords=JSON.parse(Buffer.from(exported.contribution.artifacts.records.bytes).toString('utf8')).records;
   const assessmentPins=z.array(z.object({recordId:z.string(),pins:CriticalAssessmentInventorySchema.shape.records.element.nullable()}).passthrough()).parse(extraction.queue.assessments);
-  for(const result of exported.results){
-   const {cases:documentCases,records}=step8DocumentDisposition(expectedSource,result,admittedRecords,cases);
-   const itemHolds=exported.assessmentItemHolds.filter(entry=>entry.documentId===result.documentId);
-   sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:result.documentId,sourceSha256:result.result.sourceSha256,jobKey:result.result.taskId,admittedRecordIds:records.map((entry:{id:string})=>entry.id),cases:documentCases,classification:classifyStep8Exception(documentCases),assessments:assessmentPins.filter(entry=>result.result.records.some(record=>record.id===entry.recordId)),terminalAssessmentExceptions:exported.terminalAssessmentExceptions.filter(entry=>entry.documentId===result.documentId),...(itemHolds.length?{assessmentItemHolds:itemHolds}:{}),queueEvidence:extraction.queue});
-  }
-  for(const exception of exported.terminalDocumentExceptions){const documentCases=cases.filter((entry:{documentId?:string})=>entry.documentId===exception.documentId);if(!documentCases.length)throw Error('Terminal document lacks explicit quarantine disposition');sourceDispositions.push({municipalityId:expectedSource.municipalityId,sourceId:expectedSource.sourceId,documentId:exception.documentId,sourceSha256:exception.sourceSha256,jobKey:exception.jobKey,admittedRecordIds:[],cases:documentCases,classification:{...classifyStep8Exception(documentCases),terminal:true},terminalDocumentException:exception,assessments:[],queueEvidence:extraction.queue});}
+  sourceDispositions.push(...step8SourceDispositions({source:expectedSource,results:exported.results,records:admittedRecords,cases,queue:extraction.queue,extractionRun:serialized.contributions[0].artifacts.extractionRun,assessmentItemHolds:exported.assessmentItemHolds}));
   for(const disposition of imports)sourceDispositions.push({municipalityId:disposition.municipalityId,sourceId:disposition.sourceId,documentId:disposition.documentId,sourceSha256:disposition.sourceSha256,admittedRecordIds:[],cases:[],classification:{critical:false,rights:disposition.reasonCode==='source_policy_stale',disagreement:false},importDisposition:disposition,assessments:[]});
   for(const entry of assessmentPins)if(entry.pins){if(entry.recordId!==entry.pins.recordId)throw Error('Assessment record differs from immutable pins');const identity=step8AssessmentIdentity(expectedSource,entry.pins),pathFor=(sha256:string)=>join(cas.root,'sha256',sha256.slice(0,2),sha256);if(assessmentProducers.has(identity.assessmentId))throw Error('Duplicate immutable assessment identity');auditAssessments.push({...identity,item:pathFor(entry.pins.itemArtifactSha256),A:pathFor(entry.pins.AArtifactSha256),B:pathFor(entry.pins.BArtifactSha256),C:pathFor(entry.pins.CArtifactSha256)});assessmentProducers.set(identity.assessmentId,sourcePaths);}
   if(canonicalJson([...selected.reconciliationJobKeys].sort())!==canonicalJson(extraction.queue.reconciliationJobKeys))throw Error('Source reconciliation selection differs from seal');
@@ -181,7 +180,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  phaseTimings.auditAndExportMs=performance.now()-auditStarted;const stagingCommitStarted=performance.now();
  let stagingAssemblyResult;
  if(preparedStaging){
-  stagingAssemblyResult=await commitStep8Staging(preparedStaging);input={...input,...stagingAssemblyResult.inputs};
+  stagingAssemblyResult=await commitStep8Staging(preparedStaging,preflight.jsonBudgets);input={...input,...stagingAssemblyResult.inputs};
   const relocated=await relocateStep8AuditCampaign(generationAudit,input.campaign,input.privateProvenance,input.stagingProvenance,policy);generationAudit=relocated.audit;external=relocated.provenance;
   addInventory(external.inputs,process.cwd());
  }
@@ -191,14 +190,14 @@ export async function runStep8(raw:unknown,pool:Pool){
  const textBindings=producerBindings(textProducerPaths),auditBindings=producerBindings(pins.keys());
  const write=async(name:string,value:unknown,artifactBindings:SourceArtifactBinding[],bytes?:Buffer)=>{
   await claim.assertOwned();
-  const bindings=uniqueBindings(artifactBindings.map(binding=>({...binding,independentAllowed:false}))),body=bytes??encoded(value),path=join(output,name),sha256=await writeManagedSourceArtifact(output,path,body,bindings,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
+  const bindings=uniqueBindings(artifactBindings.map(binding=>({...binding,independentAllowed:false}))),body=bytes??encoded(value,name),path=join(output,name);assertStep8JsonArtifact(name,body);assertStep8JsonBudget(preflight.jsonBudgets,name,body.length);const sha256=await writeManagedSourceArtifact(output,path,body,bindings,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});
   await claim.assertOwned();
   const pin={path,sha256,bytes:body.length,bindings};pins.set(path,pin);return {path,sha256};
  };
  // Reuse Core's existing multi-entry boundary: one closed public snapshot, one
  // source scratch, exact per-file entries, no direct inventory manipulation.
  const writeBatch=async(items:Array<{name:string;bytes:Buffer;bindings:SourceArtifactBinding[]}>)=>{
-  const paths=new Set<string>(),rows=items.map(item=>{const path=resolve(output,item.name),relativePath=relative(output,path);if(!relativePath||relativePath.startsWith('..')||isAbsolute(relativePath)||paths.has(path))throw Error('Invalid/duplicate candidate batch path');paths.add(path);const bindings=uniqueBindings(item.bindings.map(binding=>({...binding,independentAllowed:false})));if(!bindings.length)throw Error('Candidate batch lacks producer bindings');return {...item,path,relativePath,bindings,sha256:digest(item.bytes)};});
+  const paths=new Set<string>(),rows=items.map(item=>{assertStep8JsonArtifact(item.name,item.bytes);assertStep8JsonBudget(preflight.jsonBudgets,item.name,item.bytes.length);const path=resolve(output,item.name),relativePath=relative(output,path);if(!relativePath||relativePath.startsWith('..')||isAbsolute(relativePath)||paths.has(path))throw Error('Invalid/duplicate candidate batch path');paths.add(path);const bindings=uniqueBindings(item.bindings.map(binding=>({...binding,independentAllowed:false})));if(!bindings.length)throw Error('Candidate batch lacks producer bindings');return {...item,path,relativePath,bindings,sha256:digest(item.bytes)};});
   if(!rows.length)throw Error('Empty candidate batch');
   const options={...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts' as const},bindings=uniqueBindings(rows.flatMap(row=>row.bindings));
   await claim.assertOwned();await assertSourceHostsNotOptedOut(bindings.map(binding=>binding.url),policy);await initializeManagedAcquisitionLane(output,options);
@@ -268,7 +267,7 @@ export async function runStep8(raw:unknown,pool:Pool){
   const scratchOutput=join(prepared.scope.directory,'candidate');
   const manifest=await publish({stagingDir:prepared.stagingDir,outDir:scratchOutput,asOf:input.asOf,priorRelease:input.priorRelease,legacyPreviousReleases:input.legacyPreviousReleases,priorCityRoot:prepared.publication.priorDirectory,policyReceipts:policyReceipts.path,textComposition:textComposition.path,structuredRun:structuredRun.path,criticalAssessments:criticalAssessments.path,identityAssessments:input.identityAssessments?.path,regionalPolicyReceipts:input.regionalPolicyReceipts?.path,privateProvenance,casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,qualityGeneratedAt:input.clocks.qualityGeneratedAt,manifestGeneratedAt:input.clocks.manifestGeneratedAt, stagingProvenance}, predecessors,prepared.publication);
   await verifyDataRelease(scratchOutput);
-  const exceptionInventory={schemaVersion:'stadtstack-r1-step8-exceptions-v1',releaseId:manifest.id,campaign:input.campaign,sourceDispositionInventory,generationAuditEvidence,complete:true,sourceDispositions,native:{coverage:native.run.coverage,fieldHolds:native.fieldHolds},preparation:{publicationQuarantine:prepared.publicationQuarantine,criticalHolds:prepared.summary.criticalHolds,classification:classifyStep8Exception(prepared.publicationQuarantine)},assessments:auditAssessments};
+  const exceptionInventory={schemaVersion:'stadtstack-r1-step8-exceptions-v2',releaseId:manifest.id,campaign:input.campaign,sourceDispositionInventory,generationAuditEvidence,complete:true,native:{coverage:native.run.coverage,fieldHolds:native.fieldHolds},preparation:{publicationQuarantine:prepared.publicationQuarantine,criticalHolds:prepared.summary.criticalHolds,classification:classifyStep8Exception(prepared.publicationQuarantine)},assessments:auditAssessments};
   const groups={knowledge:knowledgeBindings,whole:producerBindings(publicationPaths),staging:new Map(input.staging.map(pin=>[pin.destination,producerBindings([pin.path])])),regional:producerBindings(input.regionalPolicyReceipts?[input.regionalPolicyReceipts.path]:[])};
   const releaseBindings=(member:string)=>publicationMemberProducerBindings(member,groups);
   const expected=new Map(manifest.files.map(file=>[file.path,file]));

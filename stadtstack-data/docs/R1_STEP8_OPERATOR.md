@@ -89,6 +89,70 @@ upgraded. The general standalone value-assessment manifest may still omit
 members/manifest and the `vm_candidate` serving loader are unchanged.
 
 
+### Compact private evidence and bounded JSON
+
+The private exception contract is now `stadtstack-r1-step8-exceptions-v2`.
+`source-dispositions.json` contains the complete document table exactly once;
+`exception-inventory.json` pins that table instead of embedding another copy.
+`loadStep8ExceptionBundle` authenticates the table's bytes, campaign and generation
+nonce before returning the same fully materialized `inventory.sourceDispositions`
+API used by release acceptance and step 9. It does not accept the old v1 wire
+format. Public release members, the public manifest and serving loader do not
+change.
+
+Each document's versioned `queueEvidence` pins the original immutable extraction
+run, which remains a publication/replay dependency. It embeds only that exact
+document/job's current extraction/preparation receipt classification and receipt
+hash. Full source-wide specs, accounting, receipts and attempt history remain
+available in the original SHA-pinned run, never copied into every document.
+Acceptance reads each referenced run once and recomputes the compact metadata;
+changed metadata, original bytes, document/job bindings or history locators fail
+closed. Source-wide history becomes one exception item per source, not one
+duplicate item per document. Cases, terminal/import dispositions, item holds and
+all immutable assessment bundles remain complete.
+
+The automatic pre-pass now budgets **every post-export JSON writer family**:
+document tables, current-generation/preflight audits, native union inventories
+and attestations, assessment artifacts/manifests, publication inputs, exceptions,
+candidate members/manifest, replay receipt/proof, handoff and release gate.
+Sizes use the exact shared disposition projection, actual immutable assessment
+bytes, structured **publication records** (not unrelated discovery observations),
+committed predecessor metadata and current allowance accounting read in the
+existing read-only transaction. Known projections have conservative domain
+upper bounds; a bound reaching **64 MiB** refuses before canonical reconstruction.
+Native union inventory bounds reproduce the complete witnessed binding union.
+Both publication inventories and these native inventories retain the unchanged
+16 MiB limit and at least 1 MiB headroom.
+
+Execution enforces the closed budget ledger again for each JSON artifact. A
+new/unbudgeted writer or an actual size above its pre-pass bound refuses.
+`encodeStep8Json` counts exact UTF-8 pretty-JSON bytes, including escapes,
+surrogates and nesting indentation, before allocating the serialized string;
+it never relies on catching V8's approximately 512 MB string-limit exception.
+This is not streaming, truncation, evidence omission or a higher Core size cap.
+
+### Failed generation inspection and retirement
+
+A failed invocation remains a consumed generation. Preserve its `execute.started`
+marker, sibling `.claim`, receipts and any persisted audit artifacts; use fresh
+candidate/staging/replay namespaces for a reviewed retry. In particular,
+serialization failure before the managed writer does not imply that earlier
+staging or native-provenance writes never happened.
+
+Inspect both actual root contents **and authenticated authority lease state**.
+An empty physical `scratch/` directory alone does not establish closed leases.
+Never `rm -rf` an enrolled root, edit inventory segments, delete claims to resume,
+or run global scratch recovery merely because one generation failed.
+If Main explicitly authorizes retirement, unchanged Core
+`retireManagedRoot(root,{reason},policy)` reconciles all files and bindings and
+refuses active scratch or overlapping roots. Any genuinely pending scratch
+requires the separately reviewed governed recovery path; the global recovery
+API can affect unrelated leases and must not be run blindly.
+
+Native receipt CAS objects may already have been ensured before a later export
+failure. Those immutable committed inputs are not failed-generation debris:
+never retire or prune the shared source CAS as part of candidate cleanup.
+
 ### One canonical pass and bounded reconstruction
 
 `execute` creates one opaque in-process canonical context. Its actual Core

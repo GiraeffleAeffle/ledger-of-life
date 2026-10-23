@@ -14,6 +14,7 @@ import {ImportRejectionDispositionSchema} from './r1-step8-import-disposition-co
 import {replayEvidenceCasRoot,ReplayEvidenceInputPinsSchema} from './replay-evidence-contract.ts';
 import {publicationPartitionSha256} from './publication-provenance-partition.ts';
 import {step8AssessmentIdentity,Step8AssessmentSelectionSchema,Step8AuditAssessmentSchema,Step8AssessmentManifestRowSchema,type Step8AssessmentIdentity} from './r1-step8-export-projection.ts';
+import {authenticateStep8QueueEvidence} from './r1-step8-queue-evidence.ts';
 
 export const OPTION_B_APPROVAL_SHA256='865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5';
 const hash=(value:string|Uint8Array)=>createHash('sha256').update(value).digest('hex');
@@ -39,12 +40,15 @@ const importDispositionSchema=z.object({municipalityId:z.string(),sourceId:z.str
     ||entry.classification.critical||entry.classification.disagreement||entry.classification.terminal!==undefined||entry.classification.rights!==(entry.importDisposition.reasonCode==='source_policy_stale'))ctx.addIssue({code:'custom',message:'Import disposition identity or classification mismatch'});
 });
 const dispositionSchema=z.union([nativeDispositionSchema,importDispositionSchema]);
-export const Step8ExceptionInventorySchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-exceptions-v1'),releaseId:HashSchema,
+export const Step8ExceptionInventorySchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-exceptions-v2'),releaseId:HashSchema,
   campaign:AcceptancePinSchema,sourceDispositionInventory:AcceptancePinSchema.optional(),complete:z.boolean(),sourceDispositions:z.array(dispositionSchema),
   generationAuditEvidence:AcceptancePinSchema.optional(),
   native:z.object({coverage:z.array(z.unknown()),fieldHolds:z.record(z.string(),z.unknown())}).strict(),
   preparation:z.object({publicationQuarantine:z.object({schemaVersion:z.literal('stadtstack-publication-quarantine-v1'),records:z.array(z.unknown())}).strict(),
     criticalHolds:z.array(z.unknown()),classification:classificationSchema}).strict(),assessments:z.array(z.unknown())}).strict();
+// Persist the document table once. Consumers receive the same fully materialized
+// inventory API only after authenticating its separate immutable table pin.
+const Step8ExceptionWireSchema=Step8ExceptionInventorySchema.omit({sourceDispositions:true}).extend({sourceDispositionInventory:AcceptancePinSchema});
 export interface ReleaseExceptionItem {
   itemId:string;evidenceSha256:string;origin:string;classification:'negative'|'known_gap'|'privacy_excluded'|'superseded_assessment'|'execution_history'|'rights'|'critical'|'legal'|'disagreement'|'unknown'|'withheld_in_candidate';
   riskClassification:ReleaseExceptionItem['classification'];ownerAuditPriority:'high'|'normal';
@@ -106,7 +110,7 @@ export function classifyReleaseException(value:unknown):ReleaseExceptionItem['cl
   return 'unknown';
 }
 export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
-  const inventory=Step8ExceptionInventorySchema.parse(input),items:ReleaseExceptionItem[]=[];
+  const inventory=Step8ExceptionInventorySchema.parse(input),items:ReleaseExceptionItem[]=[],seenHistory=new Set<string>();
   const append=(origin:string,evidence:unknown,force?:ReleaseExceptionItem['classification'])=>{
     const classification=force??classifyReleaseException(evidence),content={origin,classification,evidence};
     items.push({itemId:'step8:'+semanticHash(content),evidenceSha256:semanticHash(content),origin,classification,riskClassification:classification,
@@ -141,7 +145,7 @@ export function inventoryExceptionItems(input:unknown):ReleaseExceptionItem[]{
     for(const [terminalIndex,entry] of terminals.entries())append(`sourceDispositions/${index}/terminalAssessmentExceptions/${terminalIndex}`,
       entry.superseded?{exception:entry.item,selectedAdmission:selected}:entry.item,entry.superseded?'superseded_assessment':undefined);
     for(const [holdIndex,entry] of (source.assessmentItemHolds??[]).entries())append(`sourceDispositions/${index}/assessmentItemHolds/${holdIndex}`,entry);
-    if(queue.success&&queue.data.extractionAttemptHistory!==undefined)append(`sourceDispositions/${index}/queueEvidence/extractionAttemptHistory`,queue.data.extractionAttemptHistory,'execution_history');
+    if(queue.success&&queue.data.extractionAttemptHistory!==undefined){const key=semanticHash([source.municipalityId,source.sourceId,queue.data.extractionAttemptHistory]);if(!seenHistory.has(key)){seenHistory.add(key);append(`sourceDispositions/${index}/queueEvidence/extractionAttemptHistory`,queue.data.extractionAttemptHistory,'execution_history');}}
     if(current.length!==1)append(`sourceDispositions/${index}/currentExtractionReceipt`,{reason:'current_extraction_receipt_missing_or_ambiguous'},'unknown');
     else if(!['succeeded','no_supported_case'].includes(current[0].receipt.outcome))append(`sourceDispositions/${index}/currentExtractionReceipt`,current[0]);
     const flags=classifyStep8Exception(source.cases);
@@ -221,7 +225,10 @@ export interface Step8ExceptionBundle {
 }
 export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedReleaseId?:string){
   const pins=Step8AcceptancePinsSchema.parse(pinsInput),gate=gateSchema.parse(await readAcceptancePin(pins.gate));
-  const handoff=handoffSchema.parse(await readAcceptancePin(pins.handoff)),inventory=Step8ExceptionInventorySchema.parse(await readAcceptancePin(pins.exceptions));
+  const handoff=handoffSchema.parse(await readAcceptancePin(pins.handoff)),wire=Step8ExceptionWireSchema.parse(await readAcceptancePin(pins.exceptions));
+  const sourceInventory=z.object({schemaVersion:z.literal('stadtstack-r1-step8-source-dispositions-v1'),status:z.literal('authenticated_not_released'),generationNonce:z.string(),campaign:AcceptancePinSchema,complete:z.literal(true),sourceDispositions:z.array(dispositionSchema)}).strict().parse(await readAcceptancePin(wire.sourceDispositionInventory));
+  if(sourceInventory.generationNonce!==gate.generationNonce||canonicalJson(sourceInventory.campaign)!==canonicalJson(gate.campaign))throw Error('Terminal source disposition inventory binding mismatch');
+  const inventory=Step8ExceptionInventorySchema.parse({...wire,sourceDispositions:sourceInventory.sourceDispositions});
   if(expectedReleaseId&&gate.releaseId!==expectedReleaseId)throw Error('Step8 bundle binds another release');
   if(gate.releaseId!==handoff.releaseId||gate.releaseId!==inventory.releaseId||gate.candidateDirectory!==handoff.candidateDirectory
     ||canonicalJson(gate.exceptionInventory)!==canonicalJson(pins.exceptions)||canonicalJson(handoff.exceptionInventory)!==canonicalJson(pins.exceptions)
@@ -252,11 +259,10 @@ export async function loadStep8ExceptionBundle(pinsInput:unknown,expectedRelease
     const audited=z.object({importDispositions:z.array(ImportRejectionDispositionSchema).default([])}).passthrough().parse(source);
     if(canonicalJson(imports)!==canonicalJson(audited.importDispositions))throw Error('Current generation audit import disposition mismatch');
   }
-  if(inventory.sourceDispositionInventory){
-    const sourceInventory=record(await readAcceptancePin(inventory.sourceDispositionInventory));
-    if(sourceInventory.schemaVersion!=='stadtstack-r1-step8-source-dispositions-v1'||sourceInventory.complete!==true||sourceInventory.generationNonce!==gate.generationNonce
-      ||canonicalJson(sourceInventory.sourceDispositions)!==canonicalJson(inventory.sourceDispositions)||canonicalJson(sourceInventory.campaign)!==canonicalJson(gate.campaign))throw Error('Terminal source disposition inventory binding mismatch');
-  }
+  const queueRuns=new Map<string,Promise<unknown>>();
+  for(const source of inventory.sourceDispositions)if('jobKey' in source)await authenticateStep8QueueEvidence(source.queueEvidence,source.documentId,source.jobKey,pin=>{
+    const key=canonicalJson(pin);let result=queueRuns.get(key);if(!result){result=readAcceptancePin(pin);queueRuns.set(key,result);}return result;
+  });
   const requiredAssessments=await readStep8HandoffAssessments(handoff.assessmentManifest,inventory);
   const manifest=dataReleaseSchema.parse(await readAcceptancePin({path:join(gate.candidateDirectory,'release-manifest.json'),sha256:gate.manifestSha256}));
   const verified=await verifyDataRelease(gate.candidateDirectory);

@@ -18,6 +18,8 @@ import {NativeProvenancePinSchema,ProvenanceSupplementSelectionSchema,Reconstruc
 import {normalizePublicationBindings,normalizePublicationPin} from './publication-binding-normalization.ts';
 import {partitionPublicationInputs,provenanceBytes,authenticatePublicationPartition} from './publication-provenance-partition.ts';
 import {assertStep8ProvenanceSizes} from './r1-step8-publication-bounds.ts';
+import {step8JsonBytes,assertStep8JsonArtifact} from './r1-step8-json-budget.ts';
+import {assertStep8JsonBudget,type Step8JsonBudget} from './r1-step8-json-forecast.ts';
 
 const Pin=z.object({path:z.string().refine(isAbsolute,'Absolute input path required'),sha256:HashSchema}).strict();
 const Policy=z.object({stateDir:z.string().refine(isAbsolute),authorityId:z.string().min(1),authoritySha256:HashSchema}).strict();
@@ -30,7 +32,7 @@ export const Step8StagingAssemblySchema=z.object({
  managedRoot:z.string().refine(isAbsolute),policy:Policy,
 }).strict();
 type InventoryPin=PrivatePublicationProvenance['inputs'][number];
-const encoded=(value:unknown)=>Buffer.from(canonicalJson(value));
+const encoded=(value:unknown)=>{step8JsonBytes(value,'staging control');return Buffer.from(canonicalJson(value));};
 const same=(a:unknown,b:unknown)=>canonicalJson(a)===canonicalJson(b);
 const uniqueBindings=(bindings:SourceArtifactBinding[])=>[...new Map(bindings.map(binding=>[canonicalJson(binding),binding])).values()];
 
@@ -154,7 +156,7 @@ export async function readPreparedStep8Provenance(prepared:PreparedStep8Staging,
  if(!bytes.equals(expected)||digest(bytes)!==pin.sha256)throw Error('Prepared provenance control changed');return bytes;
 }
 
-export async function commitStep8Staging(prepared:PreparedStep8Staging){
+export async function commitStep8Staging(prepared:PreparedStep8Staging,jsonBudget?:Step8JsonBudget){
  const live=preparation(prepared);if(live.committed)throw Error('Staging preparation already committed');
  const {input,output,campaignBytes,campaignBindings,bindings}=live,policy=input.policy;
  if(live.context)assertCanonicalEpochFinished(live.context);
@@ -165,6 +167,7 @@ export async function commitStep8Staging(prepared:PreparedStep8Staging){
  for(const pin of live.selected.values())await source.read(pin.path);
  await assertStagingRootsDisjoint(output,policy);const claim=await reserveStep8Generation(output);live.committed=true;
  const write=async(name:string,bytes:Buffer,contributors=bindings)=>{
+  assertStep8JsonArtifact(name,bytes);if(jsonBudget)assertStep8JsonBudget(jsonBudget,'staging/'+name,bytes.length);
   await claim.assertOwned();const path=join(output,name),sha256=await writeManagedSourceArtifact(output,path,bytes,contributors,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'artifacts'});await claim.assertOwned();return {path,sha256};
  };
  const campaignPin=await write('campaign.json',campaignBytes,campaignBindings),selected=new Map(live.selected);

@@ -19,9 +19,10 @@ export async function precheckStep8Publication(raw,{pool,proposeControls=false,i
  const campaign=governance.Step8CampaignSchema.parse(JSON.parse((await pinned(assembly.campaign)).toString('utf8'))),action=JSON.parse((await pinned(input.nativeSealSelection)).toString('utf8')),frame=witness.NativeSealSelectionSchema.parse(JSON.parse((await pinned(action.selection)).toString('utf8')));
  const {precheckStep8Exports}=await load('r1-step8-export-precheck.ts'),exportProjection=await precheckStep8Exports(input,campaign,pinned);
  if(exportProjection.blockers.length)return {report:{schemaVersion:'stadtstack-r1-step8-publication-precheck-v1',status:'blocked',readOnly:true,writes:[],network:false,providers:false,canonicalPasses:0,input:inputPin,blockers:exportProjection.blockers,exportProjection},controlInventory:undefined};
+ const {forecastStep8JsonOutputs,forecastStep8NativeInventories}=await load('r1-step8-json-forecast.ts'),{step8JsonBytes}=await load('r1-step8-json-budget.ts');
  const fence=await audit.createReadOnlyManagedSourceAudit(input.policy);
- const nativeMap=new Map(),externalMap=new Map(),nativeInventories=[],nativeOutputs=[],urlMap=new Map();
- let report,controlInventory;
+ const nativeMap=new Map(),externalMap=new Map(),nativeInventories=[],nativeInventoryValues=[],nativeOutputs=[],urlMap=new Map();
+ let report,controlInventory,jsonBudgets;
  const addUrl=value=>{try{const url=new URL(value);if(!['http:','https:'].includes(url.protocol))return;url.hostname=url.hostname.replace(/\.$/,'');url.hash='';urlMap.set(digest(url.href),url.href);}catch{}};
  const visit=value=>{if(typeof value==='string')addUrl(value);else if(Array.isArray(value))value.forEach(visit);else if(value&&typeof value==='object')Object.values(value).forEach(visit);};
  const merge=(map,inventory,base)=>{for(const pin of inventory.inputs){const path=resolve(base,pin.path),old=map.get(path);if(old&&(old.sha256!==pin.sha256||old.bytes!==pin.bytes))throw Error('Conflicting inventory declaration: '+path);map.set(path,normalization.normalizePublicationPin({...pin,path,bindings:[...old?.bindings??[],...pin.bindings]}));for(const binding of pin.bindings)addUrl(binding.url);}};
@@ -46,6 +47,7 @@ export async function precheckStep8Publication(raw,{pool,proposeControls=false,i
   for(const selected of frame.seals){
    const output=JSON.parse((await pinned(selected.output)).toString('utf8')),bytes=await managedRead(output.privateProvenance.path,output.privateProvenance.sha256),inventory=provenance.privatePublicationProvenanceSchema.parse(JSON.parse(bytes.toString('utf8')));
    merge(nativeMap,inventory,dirname(output.privateProvenance.path));nativeOutputs.push(output);nativeInventories.push({sourceId:selected.sourceId,provenance:output.privateProvenance,inputCount:inventory.inputs.length});
+   nativeInventoryValues.push({seal:selected.output,inventory});
   }
   for(const pin of assembled?assembly.provenances:[input.privateProvenance,input.stagingProvenance]){
    const bytes=await pinned(pin);if(bytes.length>=partition.PROVENANCE_LIMIT_BYTES-partition.PROVENANCE_SAFETY_MARGIN_BYTES)blockers.push({code:'INPUT_PROVENANCE_SIZE_GUARD',path:pin.path,bytes:bytes.length});
@@ -96,20 +98,23 @@ export async function precheckStep8Publication(raw,{pool,proposeControls=false,i
   const stagePaths=stagePins.map(pin=>pin.path),preparedPartition=partition.partitionPublicationInputs([...proposed,...stagePins],stagePaths),campaignBytes=await pinned(assembly.campaign),campaignBindings=normalization.normalizePublicationBindings(proposed.filter(pin=>campaign.sources.some(source=>resolve(source.corpus.path)===pin.path)).flatMap(pin=>pin.bindings.map(binding=>({...binding,independentAllowed:false})))),campaignPin={path:join(assembled?assembly.managedRoot:input.outputRoot,'campaign.json'),sha256:digest(campaignBytes),bytes:campaignBytes.length,bindings:campaignBindings};
   const committedPartition=partition.partitionPublicationInputs([...preparedPartition.primary,campaignPin,...preparedPartition.staging],stagePaths);
   const stageSizes={prepared:bounds.assertStep8ProvenanceSizes('prepared staging',partition.provenanceBytes(preparedPartition.primary).length,partition.provenanceBytes(preparedPartition.staging).length),committed:bounds.assertStep8ProvenanceSizes('committed staging',partition.provenanceBytes(committedPartition.primary).length,partition.provenanceBytes(committedPartition.staging).length)};
-  const nativeBindings=[];let structuredReport;
+  const nativeBindings=[];let structuredReport,structuredBytes=0,structuredCoverageBytes=0,allowanceBytes=0,auditAuxiliaryBytes=0;
   const db=witness.createCanonicalWitnessReadPool(pool?.options??{connectionString:process.env.DATABASE_URL});let client,committed=false;
   try{
    client=await db.connect();
    await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
    if(fence.authority.mode!=='isolated-fixture')try{if(!input.structuredSelection)throw Error('Production requires an issued structured selection');const selection=await current.authenticateStep8StructuredSelection({selection:input.structuredSelection,runIds:input.structuredRunIds,readControl:pinned,requiredThrough,custody:{query:(sql,values)=>client.query(sql,values),readCas}});structuredReport=await precheckStructuredSelection({client,readCas,runIds:input.structuredRunIds,requiredThrough,policy:input.policy,core:await loadStructuredPrecheckCore(packageRoot),selection,expectedScopes:current.STEP8_STRUCTURED_SOURCE_SCOPES});}catch(error){blockers.push({code:'STRUCTURED_SELECTION_PRECHECK',message:error.message,report:error.report});}
-   const rows=(await client.query("SELECT j.spec FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE r.run_id=ANY($1::uuid[]) AND r.receipt->>'step' IN ('structured_parse','structured_discover')",[input.structuredRunIds])).rows;
-   for(const row of rows)for(const binding of row.spec.selector.sourceBindings??[])nativeBindings.push({...civic.ManagedSourceBindingSchema.parse(binding),independentAllowed:false});
+   const rows=(await client.query("SELECT j.spec,r.receipt FROM district_pipeline.step_receipts r JOIN district_pipeline.jobs j ON j.id=r.job_id WHERE r.run_id=ANY($1::uuid[]) AND r.receipt->>'step' IN ('structured_parse','structured_discover')",[input.structuredRunIds])).rows;
+   for(const row of rows){for(const binding of row.spec.selector.sourceBindings??[])nativeBindings.push({...civic.ManagedSourceBindingSchema.parse(binding),independentAllowed:false});for(const hash of row.receipt.outputHashes){const result=JSON.parse((await readCas(hash)).toString('utf8'));if(!Array.isArray(result.records)||!result.result?.coverage)throw Error('JSON sizing requires the actual structured result record/coverage domains');structuredBytes+=step8JsonBytes(result.records,'structured publication records',undefined,1);structuredCoverageBytes+=step8JsonBytes(result.result.coverage,'structured coverage',undefined,3);}}
+   const {auditStep8Allowance}=await load('r1-step8-allowance-audit.ts');
+   allowanceBytes=step8JsonBytes(await auditStep8Allowance(client,[...new Set(campaign.sources.flatMap(source=>source.documents.map(document=>document.sha256)))],async hash=>JSON.parse((await readCas(hash)).toString('utf8'))),'current allowance accounting',undefined,1);
    await client.query('COMMIT');committed=true;
   }finally{client?.release(committed?undefined:true);await db.end();}
   const policyProofs=new Map(),checkedPolicies=new Set(),proof=async hash=>{let value=policyProofs.get(hash);if(!value){value=await policyReceipt.loadPolicyReceipt({read:readCas},hash);policyProofs.set(hash,value);}return value;};
   for(const output of nativeOutputs){
    const run=JSON.parse((await readCas(output.runId)).toString('utf8')),inventory=JSON.parse((await readCas(output.policyInventory.sha256)).toString('utf8')),currentMap=inventory.currentAdmissionReceipts??{},hashes=new Set(Object.keys(currentMap));
    for(const step of run.queue.stepReceipts)if(step.spec.policyProofSha256)hashes.add(step.spec.policyProofSha256);
+   for(const step of run.queue.stepReceipts){const hash=step.receipt.versions.ompPurgeAckSha256;if(hash)auditAuxiliaryBytes+=(step8JsonBytes(JSON.parse((await readCas(hash)).toString('utf8')))+4096)*Math.max(1,step.receipt.outputHashes.length);}
    for(const record of inventory.records)for(const receipt of record.receipts){hashes.add(receipt.receiptSha256);if(receipt.currentReceiptSha256&&currentMap[receipt.receiptSha256]!==receipt.currentReceiptSha256)throw Error('Pinned current policy mapping conflicts');}
    for(const hash of hashes){const currentHash=currentMap[hash]??hash,key=hash+':'+currentHash;if(checkedPolicies.has(key))continue;
     try{const original=await proof(hash),currentProof=await proof(currentHash);await policyReceipt.recheckPolicyReceipt(original,{...input.policy,evaluationAt:new Date().toISOString(),currentProof});witness.assertReconstructionPolicyExpiry(currentProof.expiresAt,requiredThrough);checkedPolicies.add(key);}
@@ -121,10 +126,26 @@ export async function precheckStep8Publication(raw,{pool,proposeControls=false,i
   const producers=paths=>normalization.normalizePublicationBindings(paths.flatMap(path=>{const pin=declarations.get(resolve(path));if(!pin)throw Error('Producer pin absent: '+path);return pin.bindings;}));
   const publicationBounds=bounds.step8PublicationProvenanceBounds({fixedInputs:[...fixed.values()],stagingPaths:stagePaths,outputRoot:input.outputRoot,textBindings:[...nativeMap.values()].flatMap(pin=>pin.bindings),nativeBindings,registryBindings:producers([assembly.registry.path]),identityBindings:assembly.identityAssessments?producers([assembly.identityAssessments.path]):[],criticalBindings:assembly.criticalAssessments?producers([assembly.criticalAssessments.path]):[]});
   if(!publicationBounds.pass)blockers.push({code:'PUBLICATION_PROVENANCE_SIZE_BOUND',...publicationBounds});
+  try{
+   const replay=await load('replay-pipeline.ts'),predecessor=await load('district-publication-predecessor.ts'),manifestBytes=await predecessor.readCommittedReleaseFile(input.priorRelease.gitCommit,'release-manifest.json',undefined,input.priorRelease.directory);
+   if(digest(manifestBytes)!==input.priorRelease.manifestSha256)throw Error('JSON budget predecessor manifest mismatch');
+   const manifest=JSON.parse(manifestBytes.toString('utf8')),changes=await load('changes.ts');let priorMaximumBytes=0;
+   for(const pin of manifest.files.filter(pin=>pin.path==='knowledge/records.json'||pin.path==='knowledge/changes.json'||pin.path.startsWith('cities/')&&(pin.path.endsWith('/signals.geojson')||pin.path.endsWith('/changes.json')))){
+    const bytes=await predecessor.readCommittedReleaseFile(input.priorRelease.gitCommit,pin.path,undefined,input.priorRelease.directory);if(bytes.length!==pin.bytes||digest(bytes)!==pin.sha256)throw Error('Historical JSON sizing member pin mismatch');
+    if(pin.path.endsWith('/changes.json')){priorMaximumBytes=Math.max(priorMaximumBytes,bytes.length);continue;}
+    const value=JSON.parse(bytes.toString('utf8')),records=pin.path==='knowledge/records.json'?value.records.map(changes.knowledgeChangeRecord):value.features.map(changes.signalChangeRecord);
+    // Size-only worst-case removal projection, never an issued civic change.
+    priorMaximumBytes=Math.max(priorMaximumBytes,step8JsonBytes(changes.diff(records,[],input.clocks.manifestGeneratedAt),'historical revision projection'));
+   }
+   const runtimeSources=await replay.requiredReplayRuntimeSources(true);
+   jsonBudgets=forecastStep8JsonOutputs({exports:exportProjection.jsonArtifacts,metadata:{input,pins:[...declarations.values(),...stagePins].map(({path,sha256,bytes})=>({path,sha256,bytes})),runtimeSources},structuredBytes,structuredCoverageBytes,registryBytes:declarations.get(resolve(assembly.registry.path)).bytes,allowanceBytes,auditAuxiliaryBytes,retainedMaximumBytes:Math.max(0,...stagePins.map(pin=>pin.bytes)),priorMaximumBytes,primaryProvenanceBytes:publicationBounds.primaryUpperBoundBytes,stagingProvenanceBytes:publicationBounds.stagingExactBytes,nativeInventories:forecastStep8NativeInventories(nativeInventoryValues),staging:assembled?{campaignBytes:campaignBytes.length,primaryBytes:stageSizes.committed.primaryBytes,retainedBytes:stageSizes.committed.stagingBytes}:undefined});
+  }catch(error){blockers.push({code:'POST_EXPORT_JSON_SIZE_BOUND',message:error.message});}
   for(const pin of controlsRead.values())await pinned(pin);
   report={schemaVersion:'stadtstack-r1-step8-publication-precheck-v1',status:blockers.length?'blocked':'static_controls_covered',readOnly:true,writes:[],network:false,providers:false,canonicalPasses:0,input:inputPin,processingCommit:input.currentGeneration.processingCommit,nativeSealCount:frame.seals.length,nativeInventories,inventoryInputCount:declarations.size,requiredControlCount:controlRefs.length,retainedCopiesVerified:stagePins.length,structured:structuredReport,requiredThrough:new Date(requiredThrough).toISOString(),inventoryEpoch:fence.inventorySha256,reads:[...controlsRead.values()],stageSizes,publicationBounds,controlInventory:{sha256:digest(Buffer.from(adapter.canonicalJson(controlInventory))),bytes:Buffer.byteLength(adapter.canonicalJson(controlInventory)),inputs:controlInventory.inputs.length},blockers,limitations:['Early refusal only; canonical native reconstruction and every unchanged Core publication/replay/loader/quality gate remain mandatory.','Exact fixed metadata and full producer bindings are inspected under the lock-free authority/segment/objection epoch fence.','Generated hash widths and artifact byte-length codec bounds give a conservative wire-size bound; no generated pin is issued.','Original corpus paths and historical release/out trees are unchanged; a proposed control inventory is an unissued private draft, not authority.'],normalizedInputSha256:adapter.semanticHash(input),managedReads:[...managedReads.values()].sort((a,b)=>a.path<b.path?-1:a.path>b.path?1:0),inventoryFiles:[{path:join(state,'inventory.json'),sha256:fence.inventorySha256,bytes:manifestBytes.length},...(hot.storage?.segments??[]).map(pin=>({path:join(state,'inventory-segments',pin.sha256+'.json'),sha256:pin.sha256,bytes:pin.bytes}))],database:{readOnly:true,tables:['district_pipeline.jobs','district_pipeline.step_receipts'],runIds:input.structuredRunIds}};;
  }finally{await fence.finish();}
  report.exportProjection=exportProjection;
+ report.jsonBudgets=jsonBudgets;
+ report.database.tables.push('district_pipeline.r1_codex_call_intents','district_pipeline.r1_codex_documents','district_pipeline.r1_codex_allowance_intents','district_pipeline.r1_codex_call_authorizations');
  return {report,controlInventory};
 }
 
