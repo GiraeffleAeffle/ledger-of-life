@@ -1,0 +1,100 @@
+{
+  "schemaVersion": "ledger-fresh-judge-selection-v1",
+  "date": "2026-10-11",
+  "origin": "https://ledger.stadtstack.eu",
+  "scope": "Fresh passkey account and embedded-wallet setup, synthetic cash listing, tenant application, landlord selection; not a new full custody proof.",
+  "accounts": {
+    "independentPairs": 2,
+    "freshAccounts": 4,
+    "existingResidentAccountUsed": false,
+    "passkeySecretsPublished": false
+  },
+  "browser": {
+    "engine": "Chromium",
+    "isolation": "Independent fresh browser contexts per account",
+    "passkeys": "New CDP virtual platform authenticators, ordinary account-creation UI; no authentication bypass",
+    "mobileScope": "390 CSS-pixel viewport, not a physical-handset claim",
+    "confirmationHandling": "Accepted the actual matching native confirmation; window.confirm was not replaced or bypassed"
+  },
+  "terms": {
+    "network": "Solana devnet",
+    "monthlyRentTUsdc": "1",
+    "requiredDepositTUsdc": "3"
+  },
+  "desktop": {
+    "at": "2026-10-11T19:24:18.183Z",
+    "viewport": 1280,
+    "listingId": "47094c4b-a2f4-42b0-b281-1dada27eab33",
+    "status": 200,
+    "elapsedMs": 75,
+    "agreementId": "listing-47094c4b-a2f4-42b0-b281-1dada27eab33",
+    "dialog": [
+      {
+        "type": "confirm",
+        "message": "Choose Synthetic fresh judge tenant 1280 for [TEST ONLY] Fresh judge choose 1280 — 11 Oct 2026? This creates the agreement and cannot be undone here.",
+        "accepted": true
+      }
+    ]
+  },
+  "mobile": {
+    "at": "2026-10-11T19:27:44.484Z",
+    "viewport": 390,
+    "listingId": "53515b4a-7510-405c-9b60-7505f75abefe",
+    "status": 200,
+    "elapsedMs": 79,
+    "agreementId": "listing-53515b4a-7510-405c-9b60-7505f75abefe",
+    "dialog": [
+      {
+        "type": "confirm",
+        "message": "Choose Synthetic fresh judge tenant 390 for [TEST ONLY] Fresh judge choose 390 — 11 Oct 2026? This creates the agreement and cannot be undone here.",
+        "accepted": true
+      }
+    ]
+  },
+  "tenantReadbacks": [
+    {
+      "role": "tenant",
+      "headings": [
+        "Home",
+        "[TEST ONLY] Fresh judge choose 1280 — 11 Oct 2026",
+        "Cancel during setup",
+        "About this tenancy"
+      ],
+      "chosen": true
+    },
+    {
+      "role": "tenant390",
+      "headings": [
+        "Home",
+        "[TEST ONLY] Fresh judge choose 390 — 11 Oct 2026",
+        "Cancel during setup",
+        "About this tenancy"
+      ],
+      "chosen": true
+    }
+  ],
+  "conclusion": {
+    "appDefectReproduced": false,
+    "applicationCodeChanged": false,
+    "releaseRequired": false,
+    "nativeConfirmation": "Choose this tenant uses a browser confirmation before sending the request. Accepting the expected confirmation completed both cases without a signature prompt or stuck spinner.",
+    "originalAttempt": "The earlier ColosseumPrep CDP timeout remains unclassified. An unhandled confirmation is consistent with it, not proven as its exact cause.",
+    "signatureExpectedForChoice": false,
+    "onchainTransactionsPerformed": 0,
+    "custodyContinuationVerified": false
+  },
+  "setupNote": "An initial automation-filled synthetic listing had the wrong numeric values; it was closed without applications or funds. Both reported cases were reviewed as rent1/deposit3 before publication.",
+  "screenshots": {
+    "directory": "/Users/max/.cache/ledger-evidence",
+    "desktopBefore": "judge-choose-1280-before-20261011.png",
+    "desktopAfter": "judge-choose-1280-after-20261011.png",
+    "mobileBefore": "judge-choose-390-before-20261011.png",
+    "mobileAfter": "judge-choose-390-after-20261011.png",
+    "afterScreenshotsVisuallyInspected": true
+  },
+  "mobileLayout": {
+    "cssWidth": 390,
+    "scrollWidth": 390,
+    "horizontalOverflow": false
+  }
+}

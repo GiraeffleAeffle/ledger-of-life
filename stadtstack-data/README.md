@@ -1079,6 +1079,21 @@ Fresh scoped generation archives use `stadtstack-extraction-contract-archive-v2`
 
 **Off-site backup: deferred by owner.** The raw corpus remains on the workstation; no storage purchase or upload has been made. Reproducibility uses the existing corpus/cache independently of an external backup.
 
+## Required Strausberg core release
+
+Pin the core evaluator with `cache/venv/bin/pip install 'deepeval==3.9.9'`; the exact metric version is part of the required judge policy.
+
+`npm run weekend` fetches the two original city PDFs fresh, evaluates only the three selected core assertions, and publishes Strausberg/core outputs from the existing snapshot without recollecting or replacing other cities or feeds. `npm run evaluate:core -- --from-published` prepares staging only; `npm run publish -- --core-only` validates and publishes it. Normal `evaluate` also requires these gates for Strausberg; collect-only selected facts cannot be published.
+
+The shared contract is `out/core/strausberg-facts.json` (`stadtstack-core-facts-v1`) plus `out/core/release-manifest.json` (`stadtstack-core-release-v1`). Stable IDs are `lake:straussee-level-2026-09-14`, `budget:investment-outlays-2025` and `budget:investment-outlays-2026`. The lake measurement is **historical**, −1.61 m relative to Normalstau on **2026-09-14**, from the PDF headed **2026-10-05**; the newer document date does not turn it into a current measurement. The two budget assertions are **planned** investment outlays: **17,941,270 EUR (2025)** and **12,609,320 EUR (2026)**. Their document heading remains 2024-11-07, not their retrieval date or the later ordinance publication date.
+
+Each fact retains its assertion/date/unit, original PDF URL and byte SHA-256, exact page/row locator, extractor version, assertion hash, deterministic checks and actual DeepEval `FaithfulnessMetric` evidence from **codex:gpt-6-luna**, threshold **0.8**, ambiguity penalization enabled (metric 3.9.9). No model substitution or LLM rewriting is used. The schema preserves the evidence in full and compact signals; the lake uses `kind:"measurement"`. `reviewState:"auto_checked"` is retained for compatibility; explicit `verification.status:"auto-verified"` means **only that the named automated gates passed**, not human review or independent truth certification. The evidence basis is one primary source per assertion, not cross-source corroboration.
+
+Publication validates **all three assertions and gates before any public output replacement**, including exact corpus equality, original cached PDF hashes, re-extracted row/unit checks, context and statement hashes, and local actual-judge evidence. Missing, failed, altered or stale-to-source evidence aborts publication. The manifest binds bundle file bytes/version, each fact version, source/assertion/evidence hashes and full/compact corpus hashes. The exact bundle is the game/MCP contract, not separately rewritten facts. `out/core/handover-draft.json` is explicitly **not sent** and includes exact release/fact references; poll results and council receipt are null.
+
+Gate caching is keyed by exact source-byte hash, statement/context hashes, extractor version and judge policy; changed input/configuration requires actual re-evaluation. Originals, extracted page text and evaluator working files stay under ignored `cache/`; public files contain only attributed facts and short gate reasons, never the PDFs, secrets or request headers. A fresh cache needs the documented DeepEval environment and authenticated Codex access; an unavailable required model fails closed. Run focused regression checks with `node --experimental-strip-types --test test/core.test.ts` after generation; tests use the actual released evidence, not invented judge scores.
+
+
 ## Public files
 
 `out/catalogue.json` retains schema `stadtstack-signals-v1`, generated time, publisher and city/bounds/distribution metadata. Each source additionally has collected/published record counts, `coverage` with requested/observed dates and complete/partial/empty/failed/not-checked state, optional verified `bodyBinding`, and `licenceEvidence`. City temporal coverage comes from actual retained dated observations, not a fabricated beginning. `feedUrl`/`minUrl` are relative to the catalogue; `fullBytes`/`minBytes` are exact UTF-8 sizes including the final newline.
@@ -1466,6 +1481,8 @@ The refresh receipt-codec contract, preparation/extraction and assessment
 contracts do not hash that file and remain unchanged. A new governed processing
 pin is still required; use one pin for all 27 reseals. Neither an updated pin nor
 a seal-only continuation resolves importer holds outside the selected seals.
+
+`get_core_bundle()` returns `{bundle,manifest}` from the exact shared release. `search_signals(cityId,query?,topic?)` searches citywide/full features by all case-insensitive text terms and optional topic/kind/category, including null geometry. `topic:"water"` finds the historical lake assertion; `topic:"budget"` finds the planned outlays. `get_sources` additionally returns assertions and verification. City IDs are restricted to safe catalogue-style slugs. These local tools are read-only and do not require or send geometry.
 
 ## Consumers
 

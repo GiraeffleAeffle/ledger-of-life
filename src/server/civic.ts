@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { CIVIC_LIMITS, type CivicAction, type CivicContribution, type CivicResult, type CivicTopic, type CivicTopicList } from '../data/civic.ts';
 import { isCivicCity } from '../data/civic-cities.ts';
 import { hasCityAiTag, type CivicAiSource } from '../data/civic-ai.ts';
+import { projectAutoVerification, projectSourceAssertion } from '../data/city-source-evidence.ts';
 import { WorkflowError } from '../domain/errors.ts';
 import { IdentityError, type VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { AccessError } from './errors.ts';
@@ -134,9 +135,14 @@ function contribution(value: CivicContribution): CivicContribution {
     id: value.id, parentId: value.parentId, stance: value.stance, text: value.text, createdAt: value.createdAt,
     ...(value.ai ? { ai: {
       authority: value.ai.authority, provider: value.ai.provider, jobId: value.ai.jobId, model: value.ai.model,
-      sources: value.ai.sources.map((item) => ({
-        id: item.id, title: item.title, url: item.url, asOf: item.asOf, kind: item.kind, reviewState: item.reviewState,
-      })),
+      sources: value.ai.sources.map((item) => {
+        const verification = item.reviewState === 'auto_checked' ? projectAutoVerification(item.verification) : null;
+        const assertion = verification ? projectSourceAssertion(item.assertion) : null;
+        return {
+          id: item.id, title: item.title, url: item.url, asOf: item.asOf, kind: item.kind, reviewState: item.reviewState,
+          ...(verification ? { verification } : {}), ...(assertion ? { assertion } : {}),
+        };
+      }),
       generatedAt: value.ai.generatedAt,
     } } : {}),
   };
@@ -354,11 +360,18 @@ export async function appendCivicAiContribution(store: Store, input: {
   const model = text(input.model, 160, 'AI model');
   if (!Array.isArray(input.sources) || input.sources.length < 1 || input.sources.length > 3)
     invalid('An AI reply needs one to three published source references.');
-  const sources = input.sources.map((item) => ({
-    id: text(item.id, 160, 'Source identifier'), title: text(item.title, 160, 'Source title'),
-    url: source(item.url) ?? invalid('Source URL is required.'), asOf: text(item.asOf, 64, 'Source date'),
-    kind: text(item.kind, 64, 'Source kind'), reviewState: text(item.reviewState, 32, 'Source review state'),
-  }));
+  const sources = input.sources.map((item) => {
+    const verification = item.verification ? projectAutoVerification(item.verification) : null;
+    const assertion = item.assertion ? projectSourceAssertion(item.assertion) : null;
+    if (item.verification && (!verification || item.reviewState !== 'auto_checked') || item.assertion && (!assertion || !verification))
+      invalid('Invalid automated source evidence.');
+    return {
+      id: text(item.id, 160, 'Source identifier'), title: text(item.title, 160, 'Source title'),
+      url: source(item.url) ?? invalid('Source URL is required.'), asOf: text(item.asOf, 64, 'Source date'),
+      kind: text(item.kind, 64, 'Source kind'), reviewState: text(item.reviewState, 32, 'Source review state'),
+      ...(verification ? { verification } : {}), ...(assertion ? { assertion } : {}),
+    };
+  });
   if (typeof input.generatedAt !== 'string' || !Number.isFinite(Date.parse(input.generatedAt)) ||
       new Date(input.generatedAt).toISOString() !== input.generatedAt) invalid('Use an ISO timestamp for the AI reply.');
   const generatedAt = input.generatedAt;

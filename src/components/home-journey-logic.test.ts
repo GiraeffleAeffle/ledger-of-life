@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, pollingPaused, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic.ts';
+import { applicationStatusLabel, claimAmount, confirmationStalled, currentHomeTenancy, HOME_STAGES, homeSituation, homeStage, invitationKey, invitationPayload, invitationStatus, recoverExpiredRentReview, settlementSplit, tenancyNeedsPerson } from './home-journey-logic.ts';
 import type { PublicListing } from '../server/listings.ts';
 import { prepareEmptyEscrowReview, signEmptyEscrowReview } from './home-journey-logic.ts';
 import type { SolanaInitializationView } from '../server/solana-initialization.ts';
@@ -81,9 +81,7 @@ test('invitation is scoped to account and agreement and expires at exactly 24 ho
     { id: 'home', role: 'arbitrator', token: 'a'.repeat(64) });
 });
 
-test('waiting thresholds surface persistent failures and stalled confirmation', () => {
-  assert.equal(pollingPaused(2), false);
-  assert.equal(pollingPaused(3), true);
+test('waiting threshold surfaces a stalled confirmation', () => {
   assert.equal(confirmationStalled(0, 89_999), false);
   assert.equal(confirmationStalled(0, 90_000), true);
 });

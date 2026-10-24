@@ -152,7 +152,7 @@ export function chainStep(
       return {
         stage: 'paid',
         next: owed > 0n
-          ? { kind: 'paying_out', label: 'Paying out', detail: 'Payouts go to each side’s own account while Home is open. Keep Home open; failed attempts retry here.' }
+          ? { kind: 'paying_out', label: 'Payouts remaining', detail: 'Check the fixed-recipient payouts to recover a saved transfer or complete the remaining payouts. Each side is paid only to its own account.' }
           : { kind: 'done', label: 'All paid out', detail: 'This tenancy is closed.' },
       };
     }

@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import type { RelevantRegionalTopic, RegionalTopicItem, RegionalTopicResult } from '@/server/city-signals';
-import { REVIEW_LABELS } from './personal-map-relevance';
+import { REVIEW_LABELS } from '@/data/city-source-evidence';
 import type { AuthorizedRequest } from './use-city-signals';
 import { formatCityDate } from './city-coverage';
 import { CIVIC_CITIES } from '@/data/civic-cities';

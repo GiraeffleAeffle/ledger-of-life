@@ -1,5 +1,6 @@
 import type { CityFeature } from '../server/city-signals.ts';
 import { civicOutcomeEvidence, type CivicOutcomeEvidence } from '../data/civic-outcome-evidence.ts';
+import { sourceAssertionLabel, sourceReviewLabel } from '../data/city-source-evidence.ts';
 
 export type FollowTarget = { kind: 'case' | 'signal'; cityId: string; id: string };
 export type Fact = { key: string; value: string; label: string; sourceUrl: string; context: string; comparison?: string };
@@ -45,17 +46,19 @@ export function projectSnapshot(target: FollowTarget, cityName: string, features
     if (!item) continue;
     const p = item.properties;
     const sourceUrl = safeUrl('sources' in p ? p.sources[0]?.url : p.primarySource?.url);
-    const context = `${p.title} · source as of ${p.asOf} · ${p.reviewState.replace('_', ' ')}; date fields are not automatically deadlines`;
+    const context = `${p.title} · ${p.assertion ? 'document date' : 'source as of'} ${p.asOf} · ${sourceReviewLabel(p.reviewState, p.verification)}${p.assertion ? ` · ${sourceAssertionLabel(p.assertion)}` : ''}; date fields are not automatically deadlines`;
     for (const [key, label, value] of [
       ['status', 'Published status', p.status], ['start', 'Start date', p.startDate],
       ['end', 'End date (not necessarily a consultation deadline)', p.endDate], ['review', 'Evidence review state (not project approval)', p.reviewState],
     ] as const) facts.push({ key: `signal:${p.id}:${key}`, label, value: normalized(value), sourceUrl, context });
+    if (p.verification) facts.push({ key: `signal:${p.id}:verification`, label: 'Automated source verification (not human review)',
+      value: sourceReviewLabel(p.reviewState, p.verification), sourceUrl, context });
     const step = normalized(p.nextStep);
     facts.push({ key: `signal:${p.id}:next-step`, label: 'Published next-step note (not a verified action invitation)',
       value: step, comparison: nextStepComparison(step), sourceUrl, context: `${context} · check the source before acting` });
     if (p.kind === 'budget') {
-      // Publication schema has no typed amount/basis. Compare only number tokens and explicit
-      // plan/recorded wording; never turn them into an inferred actual-spend measure.
+      // Legacy records have no typed assertion. Keep their existing text comparison;
+      // even a typed core budget assertion is planned outlay, never actual spending.
       const figures = (p.statement.match(/\b\d{1,3}(?:[.,\s]\d{3})+(?:[.,]\d{1,2})?\b|\b\d+(?:[.,]\d+)?\b/g) ?? [])
         .map((item) => item.replace(/(?<=\d)[.,\s](?=\d{3}(?:[.,\s]|$))/g, '').replace(',', '.'))
         .sort().join(' · ');

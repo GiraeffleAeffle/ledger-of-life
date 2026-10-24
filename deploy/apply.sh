@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Bounded release of Ledger of Life to the reviewed Talos cluster. On the owner's machine it runs inside
-# strausberg-zk-residency's infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh, which opens the session.
+# Bounded release of Ledger of Life to the reviewed Talos cluster. On the owner's machine the current
+# shared-Lease, registered/fenced cache-only launcher exports this committed deploy tree and opens the session.
 #
 #   deploy/apply.sh --diff-only      read-only: what would change, and whether the Secret exists
 #   deploy/apply.sh --namespace      first run only: create the namespace (so the Secret can be stored), nothing else
