@@ -1,4 +1,4 @@
-import {createServer} from 'node:http';
+import {createServer,type IncomingMessage} from 'node:http';
 import {z} from 'zod';
 import {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StdioServerTransport} from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -9,6 +9,25 @@ import {cityIdSchema,querySchema,queryShape,queryFields,publicData,exportRecords
 import {assertTopic,assignTopics,textMatches,topicMatches} from './topics.ts';
 import {entitySearchSchema,graphNeighborsSchema,graphPathSchema} from './district-graph-query.ts';
 import {MCP_RELEASE_VERSION} from './mcp-version.ts';
+// SDK counts object members and array entries recursively, before Zod validation.
+// The largest current schema is search_signals_along: 7 keys + 96 line entries
+// (32 tuples and 64 coordinates) + 20 kinds + 67 fields = 190 elements.
+export const MCP_MAX_TOOL_INPUT_ELEMENTS=256;
+export const MCP_HTTP_BODY_BYTES=32*1024;
+
+export async function readMcpHttpBody(req:IncomingMessage):Promise<unknown> {
+ const length=req.headers['content-length'];
+ if(length&&(!/^\d+$/.test(length)||Number(length)>MCP_HTTP_BODY_BYTES))throw Object.assign(Error('body too large'),{status:413});
+ const chunks:Buffer[]=[];let size=0;
+ // Keep the socket available for a 413 response when chunked input exceeds the cap.
+ for await(const chunk of req.iterator({destroyOnReturn:false})){
+  size+=chunk.length;
+  if(size>MCP_HTTP_BODY_BYTES)throw Object.assign(Error('body too large'),{status:413});
+  chunks.push(chunk);
+ }
+ try{return JSON.parse(Buffer.concat(chunks,size).toString('utf8'));}
+ catch{throw Object.assign(Error('invalid JSON'),{status:400});}
+}
 const historicalGraphExamples='Reviewed committed 0.3.2 graph-v2 inventory only; not current graph-v3 identifiers or live coverage guarantees. Three known-good committed 0.3.2 examples, all operates/asserted: Gemeinschaftsschule -> Offene Ganztagsschule (Mölln), edge:d6b17dc1dddf9d7082674f705e2df5b50485657d80b65357a7dbf77fa6806845; Stadt Ratzeburg -> Kindertagesstätte in Ratzeburg, edge:abe58d44b4927db8f59eeed36939f06b06d1b1ffe0b604c7d31377ca2c91b43d; Marion-Dönhoff-Gymnasium -> Offene Ganztagsschule (Mölln), edge:73c525b5fbbd940c45d53fe0c8829fafb1c894c0ebe18309923d100954945caf. Edge IDs are release-specific output IDs; use entity_search to obtain the entity input ID. These examples do not establish membership coverage. Plans, proposals, conditional, negated and historical relations never enter confirmed paths. Decisions/approvals are not construction, spending or success. Discover live IDs with entity_search; no complete membership inventory is inferred.';
 type Coord=[number,number];
 const radians=Math.PI/180;
@@ -25,7 +44,7 @@ export function searchText(features:Signal[],query?:string,topic?:string){
 export function along(features:Signal[],line:Coord[],buffer:number,kinds?:string[]){return features.filter(f=>(!kinds||kinds.includes(f.properties.kind))&&line.some((b,i)=>i>0&&geometryNearSegment(f,line[i-1],b,buffer)));}
 function geometryNearSegment(feature:Signal,a:Coord,b:Coord,buffer:number){if(feature.geometry?.type==='Point')return segmentDistance(feature.geometry.coordinates,a,b)<=buffer;if(geometryDistance(feature,a)<=buffer||geometryDistance(feature,b)<=buffer)return true;const g=feature.geometry;if(!g)return false;const lines:Coord[][]=g.type==='LineString'?[g.coordinates]:g.type==='Polygon'?g.coordinates:g.coordinates.flat();for(const line of lines)for(let i=1;i<line.length;i++){const c=line[i-1],d=line[i];if(segmentDistance(c,a,b)<=buffer||segmentDistance(d,a,b)<=buffer)return true;const cross=(u:Coord,v:Coord,w:Coord)=>(v[0]-u[0])*(w[1]-u[1])-(v[1]-u[1])*(w[0]-u[0]);if(cross(a,b,c)*cross(a,b,d)<=0&&cross(c,d,a)*cross(c,d,b)<=0)return true;}return false;}
 export function server(options:{transformResult?:(data:unknown)=>{content:{type:'text';text:string}[];structuredContent?:Record<string,unknown>};release?:ReleasedData;policyOptions?:Parameters<typeof recheckReleasePolicy>[1]}={}) {
- const mcp=new McpServer({name:'stadtstack-data',version:MCP_RELEASE_VERSION});
+ const mcp=new McpServer({name:'stadtstack-data',version:MCP_RELEASE_VERSION},{maxToolInputElements:MCP_MAX_TOOL_INPUT_ELEMENTS});
  const transform=options.transformResult??((data:unknown)=>{const safe=publicData(data);return {content:[{type:'text' as const,text:JSON.stringify(safe)}],structuredContent:typeof safe==='object'&&safe!==null&&!Array.isArray(safe)?safe as Record<string,unknown>:undefined};});
  let current:ReleasedData|undefined;
  const tool=(value:unknown)=>transform(value&&typeof value==='object'&&!Array.isArray(value)?{...value,administrativeView:current?.index.administrativeView}:value);
@@ -70,4 +89,25 @@ export function server(options:{transformResult?:(data:unknown)=>{content:{type:
  mcp.registerTool('get_changes',{description:'Visible authentic publication changes from the sealed release. Administrative withholding suppresses events with blocked targets, witnesses or unresolved historical ancestry; it never creates a civic removal, withdrawal or supersession.',inputSchema:z.object({cityId:cityIdSchema}).strict(),annotations},async({cityId})=>{const release=await data();if(!Object.hasOwn(release.changes,cityId))throw Error('Unknown release municipality');const feed=release.changes[cityId];return tool(release.revocations?.targets.length?{schemaVersion:feed.schemaVersion,generatedAt:feed.generatedAt,events:feed.events,sealedSnapshots:feed.snapshots,scope:'Partial administrative view. Snapshot hashes identify original sealed collections, not these visible events. Unresolvable historical source ancestry is withheld, not a civic change.'}:feed);});
  return mcp;
 }
-if (process.argv[1]&&new URL(import.meta.url).pathname===process.argv[1]) { await ensureRelease(); if (process.argv.includes('--http')) { const port=Number(process.env.STADTSTACK_MCP_PORT??'4318');const http=createServer(async(req,res)=>{if(!req.url?.startsWith('/mcp')){res.writeHead(req.url==='/health'?200:404,{'content-type':'application/json'});res.end(JSON.stringify({ok:req.url==='/health'}));return;}const instance=server(),transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined});try{await instance.connect(transport);await transport.handleRequest(req,res);}catch(error){console.error(error);if(!res.headersSent){res.writeHead(500);res.end();}}});http.listen(port,'127.0.0.1',()=>console.error(`Stadtstack MCP http://127.0.0.1:${port}/mcp`)); } else { await server().connect(new StdioServerTransport()); } }
+export function createLocalHttp(factory=server) {
+ return createServer(async(req,res)=>{
+  if(!req.url?.startsWith('/mcp')){
+   res.writeHead(req.url==='/health'?200:404,{'content-type':'application/json'});
+   res.end(JSON.stringify({ok:req.url==='/health'}));return;
+  }
+  let instance:McpServer|undefined,transport:StreamableHTTPServerTransport|undefined;
+  res.once('close',()=>{void transport?.close().catch(()=>{});void instance?.close().catch(()=>{});});
+  try{
+   const parsed=req.method==='POST'?await readMcpHttpBody(req):undefined;
+   instance=factory();transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined});
+   await instance.connect(transport);await transport.handleRequest(req,res,parsed);
+  }catch(error){
+   const status=error instanceof Error&&'status' in error?error.status:undefined;
+   if(status!==413&&status!==400)console.error(error);
+   if(!res.headersSent){res.writeHead(status===413||status===400?status:500,{'content-type':'application/json','connection':'close'});res.end(JSON.stringify({ok:false}));}
+   else res.destroy();
+  }
+ });
+}
+
+if (process.argv[1]&&new URL(import.meta.url).pathname===process.argv[1]) { await ensureRelease(); if (process.argv.includes('--http')) { const port=Number(process.env.STADTSTACK_MCP_PORT??'4318');const http=createLocalHttp();http.listen(port,'127.0.0.1',()=>console.error(`Stadtstack MCP http://127.0.0.1:${port}/mcp`)); } else { await server().connect(new StdioServerTransport()); } }

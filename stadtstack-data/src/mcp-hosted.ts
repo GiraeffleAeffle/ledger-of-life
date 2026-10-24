@@ -1,15 +1,16 @@
 import {createHash, timingSafeEqual} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
-import {createServer, type IncomingMessage, type ServerResponse} from 'node:http';
+import {createServer, type ServerResponse} from 'node:http';
 import {pathToFileURL} from 'node:url';
 import type {McpServer} from '@modelcontextprotocol/sdk/server/mcp.js';
 import {StreamableHTTPServerTransport} from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {hostedServer} from './mcp-tools.ts';
+import {MCP_HTTP_BODY_BYTES,readMcpHttpBody} from './mcp.ts';
 import {loadRelease} from './mcp-release.ts';
 import {governedReleaseDirectory} from './governed-release-directory.ts';
 import {DEFAULT_TOKEN_LIMITS,validateTokenRecords,type TokenLimits} from './mcp-token-config.mjs';
 
-export const limits = Object.freeze({requestsPerMinute:DEFAULT_TOKEN_LIMITS.requestsPerMinute, concurrentPerToken:DEFAULT_TOKEN_LIMITS.maxConcurrent, bodyBytes:32768, deadlineMs:30000, concurrentTotal:32});
+export const limits = Object.freeze({requestsPerMinute:DEFAULT_TOKEN_LIMITS.requestsPerMinute, concurrentPerToken:DEFAULT_TOKEN_LIMITS.maxConcurrent, bodyBytes:MCP_HTTP_BODY_BYTES, deadlineMs:30000, concurrentTotal:32});
 export interface TokenState {
   readonly id:string;
   readonly digest:Buffer;
@@ -30,16 +31,6 @@ function reply(res:ServerResponse,status:number,headers:Record<string,string>={}
   if (res.headersSent) {res.destroy();return;}
   res.writeHead(status,{'content-type':'application/json','cache-control':'no-store','x-content-type-options':'nosniff','connection':'close',...headers});
   res.end(JSON.stringify(payload));
-}
-async function body(req:IncomingMessage):Promise<unknown> {
-  const chunks:Buffer[]=[]; let size=0;
-  for await (const chunk of req) {
-    size+=chunk.length;
-    if(size>limits.bodyBytes) throw Object.assign(Error('body too large'),{status:413});
-    chunks.push(chunk);
-  }
-  try {return JSON.parse(Buffer.concat(chunks).toString('utf8'));}
-  catch {throw Object.assign(Error('invalid JSON'),{status:400});}
 }
 export function createHostedHttp(tokens:TokenState[], factory=hostedServer, origin='https://mcp.stadtstack.eu', now:()=>number=Date.now) {
   const publicUrl=new URL(origin);
@@ -94,7 +85,7 @@ export function createHostedHttp(tokens:TokenState[], factory=hostedServer, orig
     const deadline=setTimeout(()=>{counts.errors++;reply(res,408);req.destroy();cleanup();},limits.deadlineMs);
     res.once('close',cleanup);
     try {
-      const parsed=await body(req);
+      const parsed=await readMcpHttpBody(req);
       if(res.destroyed || released)return;
       // Batches are disallowed; the quota counts each authenticated HTTP request.
       if(Array.isArray(parsed)) {reply(res,400);return;}
