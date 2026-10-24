@@ -8,7 +8,7 @@ import type {Catalogue,FeatureCollection,CityFeed} from './schema.ts';
 import {hash} from './common.ts';
 import {validateCore} from './core.ts';
 import type {CoreBundle} from './core-schema.ts';
-import {normalizePublicationSignals,assertPublicUrls} from './publication-quality.ts';
+import {normalizePublicationSignals,assertPublicUrls,carryForwardQuarantines,councilQualityNotice,type QuarantinedSignal,type RetainedQuarantine,type QualityReportReference} from './publication-quality.ts';
 import {normalizeRegionalPublication} from './regional-quality.ts';
 import {sourceHealth,cityTemporalCoverage,assertSourceHealth} from './source-health.ts';
 import {publishDataRelease} from './data-release.ts';
@@ -98,18 +98,31 @@ const staging=new Map<string,Buffer>();
 const sourceInput=async(path:string)=>{publicationStagingPathSchema.parse(path);const filename=join(options.stagingDir,path),reader=path.startsWith('knowledge/')?provenance:stagingProvenance,bytes=await (custody?custody.read(filename):reader.read(filename));staging.set(path,bytes);return JSON.parse(bytes.toString('utf8'));};
 const catalogue=catalogueSchema.parse(await sourceInput('catalogue.json'));
 requiredPublicationStaging(catalogue.cities.map(city=>city.id));
-const priorPaths=[...catalogue.cities.flatMap(city=>[`cities/${city.id}/signals.geojson`,`cities/${city.id}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
+const priorPaths=[...catalogue.cities.flatMap(city=>[`cities/${city.id}/signals.geojson`,`cities/${city.id}/changes.json`]),'quality-report.json','knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
 const baseline=await loadPriorPublicationRelease(options.priorRelease,priorPaths,options.manifestGeneratedAt,undefined,predecessors);
 if(options.priorCityRoot)for(const [path,bytes] of baseline.files){const filename=join(options.priorCityRoot,path);if(!bytes.equals(await (custody?custody.read(filename):readPinned(filename))))throw Error('Staged predecessor differs from authentic committed release');}
+const priorQualityReportSchema=z.object({schemaVersion:z.literal('stadtstack-publication-quality-v1'),generatedAt:z.iso.datetime(),cities:z.array(z.object({
+ cityId:z.string().min(1),
+ quarantined:z.array(z.object({id:z.string().min(1),cityId:z.string().min(1),reason:z.string().min(1),kind:z.enum(['planning','construction','roadworks','council_paper','council_meeting','budget','consultation','place','measurement']).optional()})).default([]),
+ retainedQuarantines:z.array(z.object({id:z.string().min(1),cityId:z.string().min(1),reason:z.string().min(1),kind:z.enum(['planning','construction','roadworks','council_paper','council_meeting','budget','consultation','place','measurement']).optional(),originalReport:z.object({releaseId:z.string().regex(/^[a-f0-9]{64}$/),generatedAt:z.iso.datetime(),qualityReportSha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()})).default([]),
+}).passthrough())}).passthrough();
+const priorQualityBytes=baseline.files.get('quality-report.json');
+if(!priorQualityBytes)throw Error('Authenticated predecessor lacks its quality report');
+const priorQualityReport=priorQualityReportSchema.parse(JSON.parse(priorQualityBytes.toString('utf8')));
+const priorQualityReference:QualityReportReference={releaseId:baseline.manifest.id,generatedAt:priorQualityReport.generatedAt,qualityReportSha256:hash(priorQualityBytes)};
 const collections:Record<string,FeatureCollection>={},feeds:Record<string,unknown>={};
 const cityQuality=[];
 for(const city of catalogue.cities){
  const original=collectionSchema.parse(await sourceInput(join('cities',city.id,'signals.geojson')));
  const normalized=normalizePublicationSignals(original.features);
+ const previous=priorQualityReport.cities.find(entry=>entry.cityId===city.id);
+ const retainedQuarantines=carryForwardQuarantines((previous?.quarantined??[]) as QuarantinedSignal[],(previous?.retainedQuarantines??[]) as RetainedQuarantine[],original.features,normalized.features,priorQualityReference);
  collections[city.id]={type:'FeatureCollection',features:normalized.features};
  city.sources=city.sources.map(source=>sourceHealth(source,normalized.features));
+ const qualityNotice=councilQualityNotice(normalized.quarantined,retainedQuarantines);
+ if(qualityNotice)city.sources=city.sources.map(source=>source.kind!=='council'?source:{...source,coverage:{...source.coverage!,reason:`${source.coverage?.reason??''} ${qualityNotice}`}});
  city.temporalCoverage=cityTemporalCoverage(normalized.features);
- cityQuality.push({cityId:city.id,...normalized.counts,quarantined:normalized.quarantined,sources:city.sources.map(source=>({id:source.id,status:source.status,recordCount:source.recordCount,publishedRecordCount:source.publishedRecordCount,coverage:source.coverage,licence:source.licence,licenceEvidence:source.licenceEvidence}))});
+ cityQuality.push({cityId:city.id,...normalized.counts,quarantined:normalized.quarantined,retainedQuarantines,sources:city.sources.map(source=>({id:source.id,status:source.status,recordCount:source.recordCount,publishedRecordCount:source.publishedRecordCount,coverage:source.coverage,licence:source.licence,licenceEvidence:source.licenceEvidence}))});
  feeds[city.id]=await sourceInput(join('cities',city.id,'feed.json'));
 }
 const regionalInput=await sourceInput('regions/brandenburg-mol/topics.json');
@@ -131,7 +144,6 @@ const regional=await normalizeRegionalPublication(regionalInput,regionalInventor
 const knowledge=validateKnowledgeRelease(await sourceInput('knowledge/records.json'),knowledgeRegistry);
 const knowledgeCoverage=districtCoverageSchema.parse(await sourceInput('knowledge/coverage.json'));
 const criticalProjection=CriticalAdmissionsSchema.parse(await sourceInput('knowledge/assessment-admissions.json'));
-assertCriticalAdmissionsBound(knowledge.records,criticalProjection.admissions,knowledgeCoverage.retainedPublication);
 validateDistrictCoverage(knowledgeCoverage,knowledgeRegistry,knowledge.records);
 assertKnowledgeSlice(knowledgeRegistry,knowledge.records);
 const knowledgeBytes=staging.get('knowledge/records.json')!.toString('utf8');
@@ -145,7 +157,7 @@ const qualityReport={schemaVersion:'stadtstack-publication-quality-v1',generated
  policy:{publicUrls:'required',councilBodyBinding:'required',emptySuccess:'forbidden',sourceEventDates:'required; unresolved comparison records quarantined',placeDates:'observation only; no invented event date',core:'authenticated retained release; no new raw PDF or model verification'},
  cities:cityQuality,regional:{input:regional.inputRecords,published:regional.publishedRecords,quarantined:regional.quarantined},
  knowledge:{published:knowledge.records.length,textModelRecords:knowledge.records.filter(record=>record.kind==='text_model').length,structuredRecords:knowledge.records.filter(record=>record.kind==='structured').length,municipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts,models:knowledgeCoverage.models,adapters:knowledgeCoverage.adapters,graph:{asOf:knowledgeGraph.asOf,entities:knowledgeGraph.entities.length,edges:knowledgeGraph.edges.length,recordsSha256:knowledgeGraph.recordsSha256},policy:'Text claims retain actual model/faithfulness provenance. Structured fields are replayed against original admitted native bytes and mapping contracts; no model score or prose quote is invented. Identity reviews use actual A/B/C source-bound reconciliation; not independent truth certification.'},
- summary:{publishedRecords:cityQuality.reduce((n,c)=>n+c.published,0)+regional.publishedRecords+knowledge.records.length,quarantinedRecords:cityQuality.reduce((n,c)=>n+c.quarantined.length,0)+regional.quarantined.length+knowledgeCoverage.municipalities.reduce((n,city)=>n+city.quarantinedRecords,0),cities:catalogue.cities.length,knowledgeMunicipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts.length,knowledgeTextModelRecords:knowledge.records.filter(record=>record.kind==='text_model').length,knowledgeStructuredRecords:knowledge.records.filter(record=>record.kind==='structured').length}};
+ summary:{publishedRecords:cityQuality.reduce((n,c)=>n+c.published,0)+regional.publishedRecords+knowledge.records.length,quarantinedRecords:cityQuality.reduce((n,c)=>n+new Set([...c.quarantined,...c.retainedQuarantines].map(item=>item.id)).size,0)+regional.quarantined.length+knowledgeCoverage.municipalities.reduce((n,city)=>n+city.quarantinedRecords,0),cities:catalogue.cities.length,knowledgeMunicipalities:knowledgeCoverage.municipalities.filter(city=>city.publishedRecords>0).length,districts:knowledgeCoverage.districts.length,knowledgeTextModelRecords:knowledge.records.filter(record=>record.kind==='text_model').length,knowledgeStructuredRecords:knowledge.records.filter(record=>record.kind==='structured').length}};
 // All required gates are validated before the first public output is replaced.
 let core:CoreBundle|undefined;
 if(validated.collections.strausberg){

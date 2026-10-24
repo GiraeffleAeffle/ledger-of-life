@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-import { selectCouncilRecords } from './civic-decisions.ts';
+import { councilQualityMessage, selectCouncilRecords } from './civic-decisions.ts';
 import type { CityFeature } from '../server/city-signals.ts';
 
 const record = (id: string, kind: 'council_meeting' | 'council_paper', date: string | null): CityFeature => ({ type: 'Feature', geometry: null, properties: { id, kind, title: id, startDate: date, primarySource: { url: `https://council.example/bodies/42/${id}`, publisher: 'Council' } } } as CityFeature);
@@ -17,11 +17,24 @@ test('upcoming meetings use scheduled date, papers use publication date, never m
   assert.deepEqual(selectCouncilRecords([unsafe], 0).papers, []);
 });
 
-test('all seven published OParl cities expose official council records', async () => {
+test('quality holds are rendered with a count and source-grounded reason', () => {
+  assert.equal(councilQualityMessage([
+    { id: 'council:1', kind: 'council_meeting', reason: 'end_before_start' },
+    { id: 'council:2', kind: 'council_meeting', reason: 'end_before_start' },
+  ]), '2 meetings withheld for data quality: end before start in the source.');
+});
+
+test('published OParl cities expose selectable council records or a sourced quality disposition', async () => {
+  const quality = JSON.parse(await readFile(new URL('../../stadtstack-data/out/quality-report.json', import.meta.url), 'utf8'));
   for (const city of ['koeln', 'muenster', 'wuppertal', 'castrop-rauxel', 'duesseldorf', 'dresden', 'freiburg']) {
     const snapshot = JSON.parse(await readFile(new URL(`../../stadtstack-data/out/cities/${city}/signals.min.geojson`, import.meta.url), 'utf8'));
     const selected = selectCouncilRecords(snapshot.features, Date.parse('2026-10-01'));
-    assert.ok(selected.papers.length || selected.meetings.length, `${city} has no selectable council records`);
+    const cityQuality = quality.cities.find((entry: { cityId: string }) => entry.cityId === city);
+    const holds = [...(cityQuality?.quarantined ?? []), ...(cityQuality?.retainedQuarantines ?? [])]
+      .filter((item: { id: string; kind?: string }) => item.kind === 'council_meeting' || item.kind === 'council_paper' || item.id.startsWith('council:'));
+    const message = councilQualityMessage(holds);
+    assert.ok(selected.papers.length || selected.meetings.length || holds.length > 0, `${city} has neither selectable council records nor a published quality disposition`);
+    if (!selected.papers.length && !selected.meetings.length) assert.ok(message, `${city} has no selectable council records and no explicit quality reason`);
     for (const item of [...selected.meetings, ...selected.papers]) assert.ok(/^https?:\/\//.test(item.url), `${city}: unsafe official link`);
   }
 });

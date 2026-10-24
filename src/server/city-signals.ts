@@ -47,7 +47,8 @@ export interface SignalCity {
   sources: { id: string; kind: string; publisher: string; url: string; licence: string; reuse: string; retrievedAt: string }[];
 }
 export interface SignalCatalogue { schemaVersion: 'stadtstack-signals-v1'; generatedAt: string; cities: SignalCity[] }
-export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
+export interface CouncilQualityHold { id: string; reason: string; kind?: 'council_meeting' | 'council_paper' }
+export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] }; councilQualityHolds: CouncilQualityHold[] }
 export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[]; generatedAt: string };
 export interface CityFeedItem {
   id: string; kind: 'news' | 'event'; title: string; url: string; publisher: string;
@@ -136,6 +137,21 @@ export async function readSignalsCatalogue(): Promise<SignalCatalogue> {
   if (catalogue.schemaVersion !== 'stadtstack-signals-v1' || !Array.isArray(catalogue.cities)) throw new Error('Unsupported city signals catalogue.');
   return catalogue;
 }
+function councilQualityHolds(report: unknown, cityId: string): CouncilQualityHold[] {
+  if (!report || typeof report !== 'object' || !('cities' in report) || !Array.isArray(report.cities)) throw new Error('Invalid publication quality report.');
+  const city = report.cities.find((item) => item && typeof item === 'object' && 'cityId' in item && item.cityId === cityId);
+  if (!city || typeof city !== 'object') return [];
+  const rows = [...('quarantined' in city && Array.isArray(city.quarantined) ? city.quarantined : []),
+    ...('retainedQuarantines' in city && Array.isArray(city.retainedQuarantines) ? city.retainedQuarantines : [])];
+  const holds = new Map<string, CouncilQualityHold>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || !('id' in row) || typeof row.id !== 'string' || !('reason' in row) || typeof row.reason !== 'string') continue;
+    const kind = 'kind' in row && (row.kind === 'council_meeting' || row.kind === 'council_paper') ? row.kind : undefined;
+    if (!kind && !row.id.startsWith('council:')) continue;
+    holds.set(row.id, { id: row.id, reason: row.reason, ...(kind ? { kind } : {}) });
+  }
+  return [...holds.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
 export async function readCitySignals(cityId: string, detail: 'compact' | 'full' = 'compact'): Promise<SignalResult> {
   const catalogue = await readSignalsCatalogue();
   // Never use raw input as a filesystem path: only catalogue IDs select directories.
@@ -143,14 +159,15 @@ export async function readCitySignals(cityId: string, detail: 'compact' | 'full'
   if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt };
   const root = dataDirectory();
   const directory = join(root, 'cities', city.id);
-  const [snapshot, changes] = await Promise.all([
+  const [snapshot, changes, quality] = await Promise.all([
     jsonSnapshot(join(directory, detail === 'compact' && city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
     jsonFile<CitySignals['changes']>(join(directory, 'changes.json')),
+    jsonFile<unknown>(join(root, 'quality-report.json')),
   ]);
   const signals = snapshot.value as CityCollection;
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
   return { state: 'covered', data: { catalogue: city, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt,
-    signals: await publishedCoreSignals(root, city.id, signals, snapshot.sha256), changes } };
+    signals: await publishedCoreSignals(root, city.id, signals, snapshot.sha256), changes, councilQualityHolds: councilQualityHolds(quality, city.id) } };
 }
 export interface CityCoverage {
   generatedAt: string;

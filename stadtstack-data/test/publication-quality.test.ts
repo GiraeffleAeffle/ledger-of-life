@@ -1,9 +1,9 @@
 import {test} from 'node:test';
+import {carryForwardQuarantines,councilQualityNotice,assertPublicUrls,isPublicUrl,publicUrlIssues,parseSourceDate,normalizePublicationSignals} from '../src/publication-quality.ts';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {collectionSchema} from '../src/schema.ts';
+import {collectionSchema,type Signal} from '../src/schema.ts';
 import {signal} from '../src/common.ts';
-import {assertPublicUrls,isPublicUrl,publicUrlIssues,parseSourceDate,normalizePublicationSignals} from '../src/publication-quality.ts';
 
 const feature=(id:string,startDate:string|null,kind:'planning'|'place'|'council_meeting'='planning',endDate:string|null=null)=>signal({id,cityId:'koeln',kind,category:'Fixture',title:'Source fixture',statement:'Source-derived fixture',status:'unverified',startDate,endDate,nextStep:'Check source',unknowns:[],scale:'city',geometryPrecision:'none',sources:[{url:'https://www.stadt-koeln.de/',title:'Public source',publisher:'Stadt Köln',locator:'source record',retrievedAt:'2026-10-10T12:00:00Z',sha256:null,snapshot:false,licence:'unknown',reuse:'facts_with_attribution'}],extraction:{method:'structured'},reviewState:'candidate',asOf:'2026-10-10T12:00:00Z'},null);
 
@@ -38,7 +38,7 @@ test('strict comparable date gate explicitly quarantines undated records but ret
  const input=[feature('plan:dated','2026-10-01'),feature('plan:undated',null),feature('plan:invalid','2026-02-30'),feature('plan:reversed','2026-10-10','planning','2026-10-09'),feature('osm:node-7',null,'place')];
  const result=normalizePublicationSignals(input);
  assert.deepEqual(result.counts,{input:5,deduplicated:5,published:2,quarantined:3});
- assert.deepEqual(result.quarantined,[{id:'plan:undated',cityId:'koeln',reason:'missing_sourced_start_date'},{id:'plan:invalid',cityId:'koeln',reason:'invalid_sourced_start_date'},{id:'plan:reversed',cityId:'koeln',reason:'end_before_start'}]);
+ assert.deepEqual(result.quarantined,[{id:'plan:undated',cityId:'koeln',kind:'planning',reason:'missing_sourced_start_date'},{id:'plan:invalid',cityId:'koeln',kind:'planning',reason:'invalid_sourced_start_date'},{id:'plan:reversed',cityId:'koeln',kind:'planning',reason:'end_before_start'}]);
  assert.equal(result.features.find(x=>x.properties.id==='osm:node-7')?.properties.temporalBasis,'observation');
  assert.equal(result.features.find(x=>x.properties.id==='osm:node-7')?.properties.startDate,null);
  assert.equal(input[0].properties.temporalBasis,undefined);
@@ -51,6 +51,28 @@ test('meeting ISO precision and offsets survive normalization, reversed precise 
  assert.equal(result.features[0].properties.startDate,good.properties.startDate);
  assert.equal(result.features[0].properties.endDate,good.properties.endDate);
  assert.equal(result.quarantined[0].reason,'end_before_start');
+});
+
+test('prior quality holds retain their original reason and report reference until the ID passes current gates',()=>{
+ const old={id:'council:meeting-1',cityId:'castrop-rauxel',kind:'council_meeting' as const,reason:'end_before_start'};
+ const report={releaseId:'a'.repeat(64),generatedAt:'2026-09-28T00:00:00.000Z',qualityReportSha256:'b'.repeat(64)};
+ const first=carryForwardQuarantines([old],[],[],[],report);
+ assert.deepEqual(first,[{...old,originalReport:report}]);
+ const nextStaged:Signal[]=[];
+ const nextHolds=carryForwardQuarantines([],first,nextStaged,[],{...report,releaseId:'c'.repeat(64)});
+ const nextQualityCity={quarantined:[],retainedQuarantines:nextHolds};
+ assert.equal(nextStaged.some(item=>item.properties.id===old.id),false);
+ assert.equal(nextQualityCity.retainedQuarantines[0].reason,'end_before_start');
+ assert.deepEqual(nextQualityCity.retainedQuarantines[0].originalReport,report);
+ const stillFailing=feature(old.id,'2026-10-10','council_meeting','2026-10-09');
+ assert.deepEqual(carryForwardQuarantines([],first,[stillFailing],[],{...report,releaseId:'c'.repeat(64)}),first);
+ const nowValid=feature(old.id,'2026-10-10','council_meeting','2026-10-11');
+ assert.deepEqual(carryForwardQuarantines([],first,[nowValid],[nowValid],{...report,releaseId:'c'.repeat(64)}),[]);
+});
+
+test('catalogue quality notice supplements binding coverage with withheld counts and reasons',()=>{
+ const old={id:'council:meeting-1',cityId:'castrop-rauxel',kind:'council_meeting' as const,reason:'end_before_start',originalReport:{releaseId:'a'.repeat(64),generatedAt:'2026-09-28T00:00:00.000Z',qualityReportSha256:'b'.repeat(64)}};
+ assert.equal(councilQualityNotice([], [old]),'Publication quality also withholds 1 council record: end_before_start.');
 });
 
 test('unsafe source references fail publication rather than disappear silently',()=>{
