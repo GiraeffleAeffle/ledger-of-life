@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
-import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {once} from 'node:events';
@@ -10,7 +10,7 @@ import {R2AcquisitionExecutor,R2ExecutorError,type R2ManifestItem} from '../src/
 import {PoliteFetcher} from '../src/polite-fetch.ts';
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
-import type {FetchObservation,PoliteFetcherOptions} from '../src/polite-fetch.ts';
+import type {FetchObservation,FetchedDocument,PoliteFetcherOptions} from '../src/polite-fetch.ts';
 import {REVIEWED_REGISTERED_ROBOTS_SCOPES} from '../src/registered-source-policy.ts';
 
 const sha=(bytes:Buffer|string)=>createHash('sha256').update(bytes).digest('hex');
@@ -51,6 +51,20 @@ test('R2 executor stops before request and wire-byte budget overflow',async t=>{
  const policyBodyExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'policy-body-progress.jsonl')}),policyBodySeam=policyBodyExecutor as unknown as ExecutorInternals,policyBodyJournal=await policyBodySeam.journal;policyBodySeam.current=policyBodyJournal;
  policyBodyJournal.attempts=[{url:policyUrl,startedAt:new Date().toISOString(),bytes:1_048_575,status:200,failure:null}];policyBodyJournal.wireBytes=1_048_575;
  await assert.rejects(policyBodySeam.onChunk(policyUrl,2),error=>error instanceof R2ExecutorError&&error.code==='POLICY_BODY_BUDGET');
+ const totalExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'total-progress.jsonl')}),totalSeam=totalExecutor as unknown as ExecutorInternals,totalJournal=await totalSeam.journal;totalSeam.current=totalJournal;
+ totalJournal.attempts=Array.from({length:42},()=>({url:docUrl,startedAt:new Date().toISOString(),bytes:25_000_000,status:200,failure:null}));totalJournal.attempts.push({url:docUrl,startedAt:new Date().toISOString(),bytes:0,status:200,failure:null});totalJournal.wireBytes=1_073_741_823;
+ await assert.rejects(totalSeam.onChunk(docUrl,2),error=>error instanceof R2ExecutorError&&error.code==='WIRE_BUDGET');
+ const elapsedExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'elapsed-progress.jsonl')}),elapsedSeam=elapsedExecutor as unknown as ExecutorInternals&{startedAt?:string},elapsedJournal=await elapsedSeam.journal;elapsedSeam.current=elapsedJournal;(elapsedJournal as Journal&{startedAt:string}).startedAt=new Date(Date.now()-28_800_001).toISOString();
+ await assert.rejects(elapsedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='TIME_BUDGET');
+ const documentExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'document-progress.jsonl')}),documentSeam=documentExecutor as unknown as ExecutorInternals&{completed?:Record<string,unknown>},documentJournal=await documentSeam.journal;documentSeam.current=documentJournal;documentJournal.completed=Object.fromEntries(Array.from({length:140},(_,index)=>[`completed-${index}`,{sha256:'0'.repeat(64),bytes:0,localPath:'',sourceId:'fixture'}]));
+ await assert.rejects(documentExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='DOCUMENT_BUDGET');
+ const retainedExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'retained-progress.jsonl')}),retainedSeam=retainedExecutor as unknown as ExecutorInternals&{retainedBytes?:number},retainedJournal=await retainedSeam.journal;retainedSeam.current=retainedJournal;retainedJournal.retainedBytes=1_073_741_824;
+ const retainedPath=join(root,'retained.html'),retainedBody=Buffer.from('x');await writeFile(retainedPath,retainedBody);
+ const retainedFetcher=(retainedExecutor as unknown as {fetcher:PoliteFetcher}).fetcher,retainedMock=t.mock.method(retainedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(retainedBody),localPath:retainedPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:retainedPath}));
+ await assert.rejects(retainedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='RETAINED_BYTE_BUDGET');retainedMock.mock.restore();
+ const htmlExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'html-progress.jsonl')}),htmlFetcher=(htmlExecutor as unknown as {fetcher:PoliteFetcher}).fetcher,htmlBody=Buffer.alloc(2_097_153),htmlPath=join(root,'oversized.html');await writeFile(htmlPath,htmlBody);
+ const htmlMock=t.mock.method(htmlFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(htmlBody),localPath:htmlPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:htmlPath}));
+ await assert.rejects(htmlExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='HTML_BUDGET');htmlMock.mock.restore();
 });
 
 test('R2 executor refuses an off-list redirect before dispatch to localhost fixture',async t=>{
@@ -78,4 +92,36 @@ test('R2 executor refuses an off-list redirect before dispatch to localhost fixt
  for(const url of offList)await assert.rejects(admission.beforeRequest(url.href),error=>error instanceof R2ExecutorError&&error.code==='URL_NOT_ALLOWLISTED');
  const journal=(await readFile(input.journalPath,'utf8')).trimEnd().split('\n').map(row=>JSON.parse(row));
  assert.deepEqual(journal.at(-1).attempts.map((row:{url:string})=>new URL(row.url).pathname),['/robots.txt','/.well-known/tdmrep.json',new URL(manifestRows()[0]!.url).pathname]);
+});
+
+test('R2 executor pauses after ten and quarantines changed R1 bytes without release',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'r2-executor-review-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const input=await options(root,true),body=Buffer.from('<html>fixture</html>'),bodyPath=join(root,'body.html');await writeFile(bodyPath,body);
+ const executor=await R2AcquisitionExecutor.open(input),fetcher=(executor as unknown as {fetcher:PoliteFetcher}).fetcher,calls:string[]=[];
+ const fetchMock=t.mock.method(fetcher,'fetch',async(url:string):Promise<FetchedDocument>=>{calls.push(url);return {url,sha256:sha(body),localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath};});
+ const batch=await executor.run();assert.equal(batch.completed,10);assert.equal(batch.paused,true);assert.equal(calls.length,10);
+ assert.equal((await executor.run()).paused,true);assert.equal(calls.length,10);fetchMock.mock.restore();
+ const changedRoot=join(root,'changed');await mkdir(changedRoot,{mode:0o700});
+ const changedInput=await options(changedRoot,true),changedUrl=changedInput.manifest[0]!.url,changedExecutor=await R2AcquisitionExecutor.open({...changedInput,priorR1:{[changedUrl]:'0'.repeat(64)}}),changedFetcher=(changedExecutor as unknown as {fetcher:PoliteFetcher}).fetcher;
+ const changedMock=t.mock.method(changedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(body),localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath}));
+ await assert.rejects(changedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1');
+ assert.equal((await changedExecutor.run()).paused,true);
+ const journal=(await readFile(changedInput.journalPath,'utf8')).trimEnd().split('\n').map(row=>JSON.parse(row)).at(-1);
+ assert.equal(journal.quarantined[changedUrl].reviewed,false);assert.equal(Object.hasOwn(journal.completed,changedUrl),false);changedMock.mock.restore();
+});
+
+test('R2 executor resumes a crash only after review and skips completed URLs',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'r2-executor-resume-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const base=await options(root,true),reviewPath=join(root,'review.json'),input={...base,reviewPath};
+ const body=Buffer.from('<html>resumed</html>'),bodyPath=join(root,'resumed.html');await writeFile(bodyPath,body);
+ const firstUrl=input.manifest[0]!.url,initial=await R2AcquisitionExecutor.open(input);
+ type ResumeJournal={attempts:Array<{url:string;startedAt:string;bytes:number;status:number|null;failure:string|null}>;completed:Record<string,{sha256:string;bytes:number;localPath:string;sourceId:string}>;retainedBytes:number;documentsSinceReview:number;[key:string]:unknown};
+ type JournalSeam={journal:Promise<ResumeJournal>;current:ResumeJournal;save():Promise<void>};
+ const journalSeam=initial as unknown as JournalSeam,journal=await journalSeam.journal;journalSeam.current=journal;
+ journal.attempts=[{url:firstUrl,startedAt:new Date().toISOString(),bytes:0,status:null,failure:null}];journal.completed[firstUrl]={sha256:sha(body),bytes:body.length,localPath:bodyPath,sourceId:input.manifest[0]!.sourceId};journal.retainedBytes=body.length;journal.documentsSinceReview=1;await journalSeam.save();
+ const resumed=await R2AcquisitionExecutor.open(input),fetcher=(resumed as unknown as {fetcher:PoliteFetcher}).fetcher,calls:string[]=[];
+ const fetchMock=t.mock.method(fetcher,'fetch',async(url:string):Promise<FetchedDocument>=>{calls.push(url);return {url,sha256:sha(body),localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath};});
+ assert.equal((await resumed.run()).paused,true);assert.equal(calls.length,0);
+ await writeFile(reviewPath,JSON.stringify({schemaVersion:'r2-acquisition-review-v1',releaseSha256:input.recordSha256,manifestSha256:input.manifestSha256,action:'resume',reviewedBy:'fixture reviewer',issuedAt:new Date().toISOString()}));
+ const continued=await resumed.run();assert.equal(continued.completed,10);assert.equal(continued.paused,true);assert.equal(calls.length,9);assert.equal(calls.includes(firstUrl),false);fetchMock.mock.restore();
 });

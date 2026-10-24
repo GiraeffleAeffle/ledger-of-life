@@ -60,7 +60,7 @@ export class R2AcquisitionExecutor{
   if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)return this.stop('TIME_BUDGET');
   await this.releaseQuarantined(journal);
   if(Object.values(journal.quarantined).some(row=>!row.reviewed))return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};
-  if(journal.paused){if(!await this.validReview())return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};journal.paused=false;journal.documentsSinceReview=0;await this.save();}
+  if(journal.paused){if(!await this.validReview())return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};journal.paused=false;if(journal.documentsSinceReview>=bounds.reviewBatch)journal.documentsSinceReview=0;await this.save();}
   for(const [url,item] of this.documents){
    if(journal.completed[url])continue;
    if(Object.keys(journal.completed).length>=bounds.documents)return this.stop('DOCUMENT_BUDGET');
