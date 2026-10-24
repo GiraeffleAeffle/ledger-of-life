@@ -462,7 +462,7 @@ export function nativeStructuredIdentityGraph(observationInput: StructuredObserv
     }
     return result;
   }
-  if (!observation.evidence.every(value => value.mappingVersion === 'mastr-public-export-v1')) return result;
+  if (scope.sourceId!=='mastr'||!observation.evidence.every(value => value.mappingVersion === 'mastr-public-export-v2')) return result;
   const unit = /^mastr:unit:(SEE\d{12})$/u.exec(observation.subject);
   const actor = /^mastr:actor:(ABR\d{12})$/u.exec(observation.subject);
   const hashes = observation.evidence.map(value => semanticHash(value)).sort();

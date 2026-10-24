@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-10-17
+updated: 2026-10-24
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -234,6 +234,10 @@ concepts:
     definition: A separately sourced delivered, reported or planned thing such as a phase-one facility, scheduled opening or nominal solar capacity; each output retains its own basis, URL, locator and date (null if unknown), and none proves benefit.
     relations: {produced_by: Project, may_contribute_to: Outcome}
     code: [src/data/civic-outcome-evidence.ts]
+    invariants:
+      - A source-identified electricity unit is an Output observation, not a financial Asset, municipal ownership or a measured Outcome.
+      - "The R2 MaStR mapping is prototype pending source admission: only nine-town solar/wind unit identity, status, commissioning and rated capacity; no natural-person/contact enrichment."
+      - Rated solar kWp and net or wind kW are distinct from generated energy/yield; GENESIS building/dwelling stock is reference-day statistical context, not project completion.
     reality: read_only_live
 
   Outcome:
@@ -265,6 +269,7 @@ concepts:
       uses a dashed line with editable assumptions and cannot inherit adjacent source status.
     modes: [evidence_backed, proposed, modeled_assumption]
     rule: Reported work and a measured before/during indicator do not alone prove a causal benefit; planned spending and provisional actual costs do not reveal funding source.
+    structured_register_rule: A public organization-only operator field plus an explicit MaStR ABR registry ID can support an attributed organization operates SEE energy-unit relation; both endpoints retain native cell evidence and source-scoped identity. Name-only, ID-only, redacted or private-person rows cannot create the relation. Unknown validity remains unknown, not confirmed-current operation or independently verified legal-entity equivalence.
     reality: read_only_live
 
 

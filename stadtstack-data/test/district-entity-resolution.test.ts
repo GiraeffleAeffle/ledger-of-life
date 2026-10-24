@@ -85,7 +85,7 @@ test('boundary inclusivity, precision and fixed asOf are explicit and replayable
 
 test('native operator mapping uses original source fields; unknown operation validity stays non-current', () => {
   const scope: AdapterScope = { publisherId: 'bnetza', sourceId: 'mastr', municipalityId: 'town-one', ags: '12064472', tenant: null, observationWindow: '2026-10-11' };
-  const cells: StructuredLocator[] = ['SEE000000000001', 'ABR000000000001', 'Synthetic Utility GmbH'].map((rawValue, i) => ({ sourceSha256: hash, format: 'csv', nativeId: 'SEE000000000001', path: `export/A${i + 1}`, sheet: null, rowKey: 'SEE000000000001', cells: [`A${i + 1}`], rawValue, schemaHash: hash, mappingVersion: 'mastr-public-export-v1' }));
+  const cells: StructuredLocator[] = ['SEE000000000001', 'ABR000000000001', 'Synthetic Utility GmbH'].map((rawValue, i) => ({ sourceSha256: hash, format: 'csv', nativeId: 'SEE000000000001', path: `export/A${i + 1}`, sheet: null, rowKey: 'SEE000000000001', cells: [`A${i + 1}`], rawValue, schemaHash: hash, mappingVersion: 'mastr-public-export-v2' }));
   const native = observation({ publisherId: scope.publisherId, sourceId: scope.sourceId, nativeId: 'SEE000000000001', nativeVersion: null, kind: 'RegisteredOperatorAssignment', subject: 'mastr:actor:ABR000000000001', predicate: 'operates', value: 'mastr:unit:SEE000000000001', unit: null, date: null, dateRole: null, financialRole: 'none', geography: { ags: scope.ags, basis: 'source_explicit', role: 'project_location' }, sourceReferenceDate: null, publishedAt: null, retrievedAt: '2026-10-11T00:00:00Z', evidence: cells, limitations: [] });
   const graph = nativeStructuredIdentityGraph(native, scope);
   assert.equal(graph.mentions.length, 2);

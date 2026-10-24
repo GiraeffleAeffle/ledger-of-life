@@ -1,5 +1,5 @@
 {
-  "contractVersion": "mastr-public-export-v1",
+  "contractVersion": "mastr-public-export-v2",
   "sourceId": "mastr",
   "familyRank": 2,
   "wave": "A",
@@ -15,10 +15,10 @@
     {"url": "https://www.marktstammdatenregister.de/MaStR/Einheit/Detail/EinheitDetailDrucken/2686519", "observed": "Read-only detail inspection establishes native SEE/ABR prefixes, separate commissioning/registration dates and solar gross kWp versus net kW. Its contents are not fixture data and do not cover a pilot town.", "operation": "public_detail_read"}
   ],
   "admission": {
-    "requiredInput": "Exact admitted original bytes plus sourceSha256 and policyReceiptSha256. The adapter checks byte/hash binding, official HTTPS origin and scope; it does not replace the acquisition rights engine or create a licence/admission receipt.",
+    "requiredInput": "Exact admitted original bytes plus sourceSha256 and policyReceiptSha256. Exact mastr source ID and canonical nine-town municipality/AGS pair; only explicit solar/wind electricity rows and approved unit/status/commissioning/rated-power/public-organization fields. Parser admission does not replace current source policy.",
     "csvAndXls": "dl-de/by-2-0 is documentation evidence, subject to distribution-specific contrary markings, attribution, publicness, personal-data minimization and current policy. Attribution must identify Bundesnetzagentur/Marktstammdatenregister, source and licence; modifications/mappings must be disclosed.",
     "unknownRights": "held_origin; an official host/link alone is not admission",
-    "bulkXmlZip": "held_origin; unresolved distribution-specific rights, excluded from this adapter",
+    "bulkXmlZip": "Documented dl-de/by-2-0 route recommended for R2, subject to byte-pinned distribution evidence. This bounded CSV/XLS adapter returns held_quality: national ZIP/XML needs a separately reviewed streaming acquisition/parser sandbox and native XML/schema evidence; do not raise generic whole-buffer limits.",
     "soap": "blocked_access; no authenticated SOAP route, account/key acquisition or technical-user association",
     "network": "No acquisition, network, subprocess, provider call or implicit current-clock read inside discover or parse. Discovery consumes an already admitted fetched landing. Each newly discovered resource requires separate admission."
   },
@@ -34,13 +34,8 @@
     "Betriebs-Status": {"meaning": "Attributed register operating-status label; preserved literally, not coerced to final completion, approval or measured generation."},
     "Bruttoleistung der Einheit": {"meaning": "Rated gross capacity; solar kWp based on the explicit solar energy-carrier field, other electricity units kW. Raw field and energy-carrier evidence retained; not actual generation."},
     "Nettonennleistung der Einheit": {"meaning": "Rated net capacity in kW; not interchangeable with solar gross kWp."},
-    "Nutzbare Speicherkapazität in kWh": {"meaning": "Usable storage energy capacity in kWh, not generation or rated power."},
     "Inbetriebnahmedatum der Einheit": {"meaning": "Sourced commissioning date, not registration, publication, planning or ownership date."},
-    "Inbetriebnahmedatum der Einheit am aktuellen Standort": {"meaning": "Separate site-commissioning date, not necessarily the original commissioning date."},
-    "Registrierungsdatum der Einheit": {"meaning": "Registration date only; never commissioning or ownership."},
-    "Datum der geplanten Inbetriebnahme": {"meaning": "Planned commissioning date only; no operation claim."},
-    "Datum der endgültigen Stilllegung": {"meaning": "Permanent decommissioning date; separate from deletion/deactivation of an erroneous registration."},
-    "Letzte Aktualisierung": {"meaning": "Native record version/raw expression and sourceReferenceDate. Not publication date or validFrom of an operator relationship. Missing publication/version dates remain null."},
+    "Letzte Aktualisierung": {"meaning": "Excluded from this narrowed mapping, as are storage, registration, site/planning/decommissioning dates and contact/address cells. Native version comes only from admitted snapshot metadata; commissioning reference date applies only to that observation. Operator validity/publication remain unknown."},
     "MaStR-Nr. des Anlagenbetreibers": {"key": "mastr:actor:ABR<12 digits>", "meaning": "Retain an explicit publicly disclosed ID only together with a non-redacted organization-only name. ID-only/organization-redacted rows are unknown and the pseudonymous ABR is excluded from observations and evidence. No name-based operator identity. Registered organization operator ID is not ownership or independent legal-entity verification."},
     "Name des Anlagenbetreibers (nur Org.)": {"meaning": "Only with a valid public ABR ID and non-redacted organization-only field: registered operator identifier, source-attributed OrganizationObservation and actor operates unit. ID-only rows emit operator_disclosure null without ABR or organization/operates evidence. Names without IDs and redacted/missing operators remain unknown. Contacts, asset labels, addresses, natural-person identities and private fields are not ingested."},
     "withdrawnView": {"meaning": "Native deleted/deactivated view lacks AGS; rows stay unassigned with partial coverage pending an admitted prior-version municipality join. They do not remove every town's unit or infer municipal deletion. A missing unit in any partial/empty export is never a tombstone."}
@@ -48,17 +43,17 @@
   "workbookDateBoundary": "SpreadsheetML calendar-string and native DateTime dates are supported. Numeric date cells remain held_quality even when a helper identifies a date style: the current source contract lacks original number-format and workbook date-system evidence locators. No Excel serial date is interpreted from column name or style classification alone.",
   "temporalSemantics": "An exported operator relationship is an attributed as-observed assignment with unknown effective interval; retrievedAt and record update do not establish present validity. Current graph traversal must apply the shared temporal admission contract and cannot promote this alone to confirmed-current operation.",
   "evidence": {"formats": ["csv", "xls"], "binding": ["sourceSha256", "nativeId", "rowKey", "sheet", "cell address", "rawValue", "schemaHash", "mappingVersion"], "schemaHash": "Ordered native headers plus format/sheet", "verification": "Deterministic cell mapping; no invented prose quotations, model IDs, judge score or LLM receipt"},
-  "discovery": {"behavior": "Official same-host HTTPS advertised .csv/.xls and known public unit-overview links only; preserve query selectors. No guessed API/download URLs, onclick execution, interactive modal promotion to GET or bulk dump references.", "pagination": "32 sorted advertised resources per local discovery page; cursor binds exact source bytes and entire source/municipality/tenant/window scope. This is adapter-local pagination, not claimed publisher export pagination.", "completion": "Always partial or not_checked for public landings; a CSV slice does not encode all filters, export total, cap position or exhausted successor pages."},
+  "discovery": {"behavior": "Official same-host HTTPS advertised .csv/.xls and known public overview links; additionally record advertised Gesamtdatenexport .zip references only from exact /MaStR/Datendownload. No guessed endpoint, session execution, host grant or bulk admission. Source HTML discovery runs in the parser sandbox; the host planner consumes committed discovery references only.", "pagination": "32 sorted resources per local page, cursor bound to exact original and full scope. Bulk resolution refuses incomplete/multiple candidates; it never picks an inferred latest version.", "completion": "Always partial or not_checked; a reference is not a fetched/verified export, municipal completeness, current licence or reviewed XML/parser route."},
   "capabilityReceipt": {
     "observed": ["Primary documentation and public landing/header inspection", "Licence wording and export-cap documentation", "Native withdrawal-view absence of AGS", "Public detail capacity/date/ID semantics"],
-    "unverified": ["Live CSV download selectors, session/anti-forgery flow and export bytes", "Publisher-side multi-export continuation", "Exact municipality filter coverage", "Actual XLS distribution/profile", "Any nine-town unit/operator inventory", "Synthetic test execution and TypeScript integration"],
-    "notPerformed": ["Collection/bulk export", "SOAP request or technical-account authentication", "XML dump acquisition", "Network in parser/discovery", "Build/test/lint/format checks", "Commit or package changes"],
+    "unverified": ["Live CSV download selectors, session/anti-forgery flow and export bytes", "Publisher-side multi-export continuation", "Exact municipality filter coverage", "Actual XLS distribution/profile", "Any nine-town unit/operator inventory", "Exact versioned bulk ZIP, integrity/size and native XML/public-operator schema", "Streaming bulk transport and real-image XML/ZIP gates"],
+    "notPerformed": ["Collection/bulk export", "SOAP request or technical-account authentication", "XML dump acquisition", "Network in parser/discovery"],
     "coverageState": "not_checked"
   },
   "pilotCoverage": [
     {"municipalityId": "strausberg", "ags": "12064472", "state": "not_checked"},
     {"municipalityId": "hoppegarten", "ags": "12064227", "state": "not_checked"},
-    {"municipalityId": "ruedersdorf", "ags": "12064428", "state": "not_checked"},
+    {"municipalityId": "ruedersdorf-bei-berlin", "ags": "12064428", "state": "not_checked"},
     {"municipalityId": "ratzeburg", "ags": "01053100", "state": "not_checked"},
     {"municipalityId": "moelln", "ags": "01053090", "state": "not_checked"},
     {"municipalityId": "schwarzenbek", "ags": "01053116", "state": "not_checked"},
@@ -66,7 +61,7 @@
     {"municipalityId": "parchim", "ags": "13076108", "state": "not_checked"},
     {"municipalityId": "hagenow", "ags": "13076060", "state": "not_checked"}
   ],
-  "questionBoundaries": {"E03": "Conditional public operator-ID route only; redacted/ID-only operator rows cannot establish shared legal organizations. Independent identity/ownership evidence remains required.", "E05": "Commissioning and rated capacity are not measured generation, municipal ownership or asset-outcome evidence.", "W04": "MaStR electricity-unit operators do not establish actual heat-network operators; remains unaddressed by this adapter."},
-  "fixtures": {"path": "test/mastr-adapter.test.ts", "provenance": "Synthetic native-format bytes using inspected official column titles; not acquired real exports or verified pilot facts", "cases": ["positive", "empty", "paginated discovery", "schema change", "withdrawn/decommissioned", "blocked access", "redacted/ID-only operator", "nine-town AGS", "invalid dates/units/IDs", "hash mismatch", "unresolved bulk rights", "SpreadsheetML XLS", "unsupported binary XLS", "bounded input"], "execution": "not_run"},
+  "questionBoundaries": {"E03": "Only public organization-only disclosure plus explicit source-registry ABR identity may create an asserted organization operates electricity-unit relation. Natural persons, ID-only/name-only records, municipal ownership, independent legal-entity equivalence and current validity are not inferred.", "E05": "Solar/wind status, commissioning and rated kWp/kW are source observations, not measured generation/yield, municipal ownership or causal effects.", "W04": "Electricity-unit operators do not establish heat-network operation."},
+  "fixtures": {"path": "test/mastr-adapter.test.ts", "provenance": "Synthetic native-format bytes using inspected official column titles; not acquired real exports or verified pilot facts", "cases": ["narrow solar/wind scope", "nine canonical AGS", "empty", "paginated/advertised bulk discovery", "schema change", "status without unapproved dates", "blocked access", "redacted/ID-only/private operator", "invalid dates/units/IDs", "hash mismatch", "bulk streaming-path refusal", "SpreadsheetML XLS", "unsupported binary XLS", "bounded input", "structured record/typed graph projection"], "execution": "Actual exercised offline gates are recorded separately in docs/R2_STRUCTURED_SOURCES.md; no source-coverage credit"},
   "integrationChecks": ["Repository TypeScript check", "node --experimental-strip-types --test test/mastr-adapter.test.ts", "Shared structured-tables tests and full adapter integration suite", "Verify publication preserves structured provenance, public-organization role and unknown effective validity without inferred ownership/generation"]
 }

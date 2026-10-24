@@ -9,7 +9,7 @@ import {load} from 'cheerio';
 export interface GenesisTableDefinition {level: 'GE' | 'KR'; referenceDay: string; statistic: string; requestName?: '12411-02-03-5'}
 export type GenesisTables = Readonly<Record<string, GenesisTableDefinition>>;
 
-export const GENESIS_VERSION = 'regionalstatistik-datencsv-v2';
+export const GENESIS_VERSION = 'regionalstatistik-datencsv-v3';
 export const GENESIS_BASE = 'https://www.regionalstatistik.de/genesisws/rest/2020/';
 export const GENESIS_TABLES = {
   '12411-06-01': {level: 'GE', referenceDay: '06-30', statistic: 'population'},
@@ -121,7 +121,8 @@ function discover(snapshot: AdmittedSnapshot, scope: AdapterScope, cursor: strin
     if (!year) throw Error('Discovery requires a year or ISO-date observation window');
     const params = {regionalvariable, regionalkey: tables[table].level === 'GE' ? scope.ags : scope.ags.slice(0, 5), startyear: year, endyear: year, compress: 'false', transpose: 'false', job: 'false'};
     const requestName = tables[table].requestName ?? table;
-    return page([request('data/table', requestName, params, `${table}:metadata/table`), request('data/tablefile', requestName, {...params, format: 'datencsv', quality: 'on'}, `${table}:metadata/table`)], snapshot, scope, cursor);
+    const dataParams=table==='31231-02-01'?{...params,format:'datencsv',quality:'on'}:params;
+    return page([request('data/table', requestName, dataParams, `${table}:metadata/table`), request('data/tablefile', requestName, {...params, format: 'datencsv', quality: 'on'}, `${table}:metadata/table`)], snapshot, scope, cursor);
   } catch (error) {
     return {resources: [], coverage: coverage(snapshot, scope, 'held_quality', error instanceof Error ? error.message : 'Invalid native discovery snapshot')};
   }
@@ -198,6 +199,8 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
     const structure = native?.Structure ? object(native.Structure) : null;
     const regionRows = Array.isArray(structure?.Rows) ? structure.Rows.map(object).filter(row => /Gemeind|Kreise/i.test(String(row.Content))) : [];
     const selectedRegion = regionRows.length === 1 && regionRows[0].Code === parameters?.regionalvariable && String(regionRows[0].Selected) === '1' ? regionRows[0] : null;
+    const municipalHousing=table==='31231-02-01',housingYear=/^((?:19|20)\d{2}|2100)(?:$|-)/.exec(scope.observationWindow)?.[1];
+    if(municipalHousing&&(!housingYear||tables[table].level!=='GE'||root&&(parameters?.format!=='datencsv'||parameters.regionalvariable!=='GEMEIN'||selection!==scope.ags||!selectedRegion||!/Gemeind/i.test(String(selectedRegion.Content)))))throw Error('Housing stock requires the exact evidenced municipal GEMEIN selection, reference year and datencsv format');
     if (municipalDatencsv) {
       if (tables[table].level !== 'GE' || front !== 4 ||
           rows[0]?.length !== 1 || rows[0][0] !== tableMatch?.[0] ||
@@ -241,6 +244,7 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
       const activeCode = code ?? selection;
       if (!activeCode) throw Error('No evidenced native administrative-area code');
       const level = activeCode.length === 8 ? 'GE' : 'KR';
+      if(municipalHousing&&level!=='GE')throw Error('Municipal housing stock cannot admit a district aggregate');
       if (!code && selectedRegion && (/Kreise/i.test(String(selectedRegion.Content)) ? 'KR' : 'GE') !== level) throw Error('Native region level/key mismatch');
       if (level === 'GE' && activeCode !== scope.ags) continue;
       if (level === 'KR' && activeCode !== scope.ags.slice(0, 5)) continue;
@@ -249,6 +253,7 @@ export function parseGenesisTable(snapshot: AdmittedSnapshot, scope: AdapterScop
         const column = header.map(line => line[c] ?? '').filter(Boolean);
         const all = [...leading, ...column, ...header.filter(line => line.slice(1).every(value => !value)).map(line => line[0])];
         const date = referenceDate(all, tables[table]);
+        if(municipalHousing&&date.slice(0,4)!==housingYear)throw Error('Housing stock reference year differs from the requested observation window');
         const units = [...new Set(all.flatMap(value => [...value.matchAll(/\((Anzahl|1000 m²|1 000 m²|m²|qm|%)\)/g)].map(match => match[1])))];
         if (units.length !== 1) throw Error('Missing or ambiguous native unit');
         const rawValue = row[c];

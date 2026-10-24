@@ -390,3 +390,42 @@ test('ZIP tablefile binds evidence to the original archive hash and exact native
   const unsafe = storedZip('../12411-06-01.csv', table());
   assert.equal(genesisAdapter.parse({...input, bytes: unsafe, sourceSha256: digest(unsafe)}, scope).coverage.state, 'held_quality');
 });
+
+test('housing metadata yields the exact bounded nine-town owner-account request bodies',()=>{
+ const towns={strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'};
+ for(const [municipalityId,ags] of Object.entries(towns)){
+  const local={...scope,municipalityId,ags},result=genesisAdapter.discover(snapshot(metadata('31231-02-01'),'metadata/table'),local,null);
+  assert.equal(result.coverage.state,'partial');assert.equal(result.resources.length,1);
+  assert.equal(result.resources[0].body,`name=31231-02-01&area=free&language=de&regionalvariable=GEMEIN&regionalkey=${ags}&startyear=2024&endyear=2024&compress=false&transpose=false&job=false&format=datencsv&quality=on`);
+  assert.equal(result.resources[0].url,GENESIS_BASE+'data/table');assert.equal(result.resources[0].method,'POST');
+ }
+});
+
+function housingResponse(ags:string,year='2024'){
+ return {Ident:{Service:'data',Method:'table'},Status:{Code:0,Type:'Information',Content:'SYNTHETIC TEST ONLY'},Parameter:{name:'31231-02-01',regionalkey:ags,regionalvariable:'GEMEIN',format:'datencsv'},Object:{Content:`GENESIS-Tabelle: 31231-02-01\nWohnungsbestand;;;;\n;;Wohngebäude (Anzahl);Wohnungen (Anzahl);Wohnfläche (1000 m²)\n;;${year};${year};${year}\n${ags};Synthetic municipality;2;3;1,25\n__________\n`,TableLayout:{FrontColumnsNumber:'2'},Structure:{Rows:[{Code:'GEMEIN',Content:'Gemeinden',Selected:'1'}]}}};
+}
+test('housing stock is municipal reference-day context in all nine AGS, never construction or impact',()=>{
+ for(const [municipalityId,ags] of Object.entries({strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'})){
+  const input=snapshot(JSON.stringify(housingResponse(ags)),'data/table'),result=genesisAdapter.parse(input,{...scope,municipalityId,ags});
+  assert.equal(result.coverage.state,'partial');assert.deepEqual(result.observations.map(item=>item.value),[2,3,1.25]);
+  assert.ok(result.observations.every(item=>item.geography.ags===ags&&item.date==='2024-12-31'&&item.sourceReferenceDate==='2024-12-31'&&item.dateRole==='statistical_reference_date'&&item.publishedAt===null&&item.retrievedAt===input.retrievedAt&&item.predicate==='describes:housing_stock'));
+  assert.ok(result.observations.every(item=>item.evidence.every(cell=>cell.sourceSha256===input.sourceSha256)));
+  assert.equal(result.observations[2].unit,'1000 m²');
+ }
+});
+interface HousingMutationTarget {Parameter:{regionalkey:string;regionalvariable:string;format:string};Object:{Structure:{Rows:{Selected:string;Content:string}[]};Content:string}}
+test('housing JSON cannot silently replace selected town, geography, format or reference year',()=>{
+ const mutations:Array<(value:HousingMutationTarget)=>void>=[
+  value=>{value.Parameter.regionalkey='12064472';},
+  value=>{value.Parameter.regionalvariable='KREISE';},
+  value=>{value.Parameter.format='genml';},
+  value=>{value.Object.Structure.Rows[0].Selected='0';},
+  value=>{value.Object.Structure.Rows[0].Content='Kreise';},
+  value=>{value.Object.Content=value.Object.Content.replaceAll('2024','2023');},
+ ];
+ for(const mutate of mutations){const value=housingResponse(scope.ags);mutate(value);const result=genesisAdapter.parse(snapshot(JSON.stringify(value),'data/table'),scope);assert.equal(result.coverage.state,'held_quality');assert.deepEqual(result.observations,[]);}
+ const district='GENESIS-Tabelle: 31231-02-01\nWohnungsbestand;;;;\n;;Wohngebäude (Anzahl);Wohnungen (Anzahl);Wohnfläche (1000 m²)\n;;2024;2024;2024\n01053;Synthetic district;20;30;12,5\n__________\n';
+ assert.equal(genesisAdapter.parse(snapshot(district),scope).coverage.state,'held_quality');
+ const wrongDay=housingResponse(scope.ags);wrongDay.Object.Content=wrongDay.Object.Content.replace(';;2024;2024;2024',';;30.06.2024;30.06.2024;30.06.2024');
+ assert.equal(genesisAdapter.parse(snapshot(JSON.stringify(wrongDay),'data/table'),scope).coverage.state,'held_quality');
+});
