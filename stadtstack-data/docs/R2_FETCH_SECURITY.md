@@ -262,27 +262,25 @@ probe and proved no readiness message on failure; it did not run the image.
 The all14 measurement completed exit0 under the same lock.
 
 
-This branch's reviewed-executor follow-up was typechecked with exit0 and its new
-focused suite completed **6/6 passed, 0 failed/skipped**. It covers draft
-rejection, stop-file handling, exact off-list redirect/path/query/host refusal,
-request and policy request caps, per-response/policy/total wire-byte caps,
-campaign time, HTML, document and retained-byte caps, the ten-document pause,
-crash-resume without refetching completed URLs, and changed-byte quarantine
-without automatic release. The redirect integration test used a deterministic
-localhost HTTP fixture; budget, pause and resume tests exercised the explicit
-test seam. A fresh-process `acquisitionContract()` measurement is
-`5946022a8fa4d1098d19d09963efddbc519e97a498d349c4a0d059cc1023187e`.
-Still untested or not implemented: changed-source review release, refusal of
-quarantined representations by preparation/inference, cross-instance global
-in-flight exclusion and exact failure/status journal updates. These remain
-issuance blockers; no live-source claim is made.
-Exact commands/results and limitations are in
-`/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json`,
-SHA256 `fe82293f67922769ce28fd31fa3f3566645f8ad4a84990db5697d1ab87298e76`.
-The initial300s typecheck call timed out during shared-lock contention without
-output; the successful retry used a3600s lock-inclusive deadline. No test or
-compiler failure is inferred from that wait timeout. No live-source, real TLS,
-parser build/SBOM, privileged review, production CLI/DB or full-suite check ran.
+The reviewed-executor follow-up was typechecked with `tsc --noEmit` exit0, then
+its focused behavior suite completed **7/7 passed, 0 failed/skipped**. Coverage
+includes draft rejection, stop-file handling, exact off-list redirect/path/query/
+host refusal, request and policy attempt caps, per-response/policy/total wire
+byte caps, campaign time, HTML/document/retained-byte caps, the ten-document
+pause, changed-byte quarantine and exact changed-source release matching,
+crash-resume without refetching completed URLs, journal status accounting and
+cross-instance exclusion. The redirect integration test used a deterministic
+localhost HTTP fixture; tests exercised only the explicit test seam. Preparation
+and inference use the shared `assertPreparedSourcesActive` integrity gate, with
+the guard pinned into the preparation plan and rechecked before model calls.
+A fresh Node process measured the current `acquisitionContract()` as
+`083b564ac78f8756e915733a658b9b49d43f34d05aeef3df5d219c2cbca41fc9`; this
+replaces the pre-follow-up measurement recorded above. The issued v3 record is
+bound by the raw-record SHA-256 argument, while the exact manifest bytes are
+independently SHA-256 checked and must equal
+`ownerApprovalReference.sha256`. No live-source fetch, issuance, stop lift,
+parser build/SBOM, privileged review, production CLI/DB write or full-suite
+check was run.
 
 Root `docs/ontology.yaml` and `docs/ONTOLOGY.md` were read. No civic concept,
 assessment truth claim or DocumentDisposition semantics changes here; both
