@@ -40,15 +40,17 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
  for(const value of [{jobKeys:[],reconciliationJobKeys:[]},{jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[exception,exception]},{jobKeys:[jobKey],reconciliationJobKeys:[],terminalDocumentExceptions:[exception]}])assert.equal(QueueTextSealInputSchema.safeParse(value).success,false);
  assert.equal(TerminalAssessmentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,true);assert.equal(TerminalDocumentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,false);
 });
-// R2 source mappings advance the shared parser/preparation closure. These are
-// the measured current identities, not a claim that frozen R1 receipts changed.
-// Extraction/assessment/refresh/OMP stay independent of the narrowed adapters;
-// acquisition already had this identity at the 46adf2e base.
-test('terminal sealing preserves extraction/assessment identities across the measured R2 parser cutover',async()=>{
- assert.deepEqual(await residualPreparationContract(),{preparationSha256:'44f6a0be6f20759add538f1f7ee41a9a954d85340f8b256ca7cdbc09db7f1389'});
- assert.deepEqual(await residualJobContract(),{preparationSha256:'44f6a0be6f20759add538f1f7ee41a9a954d85340f8b256ca7cdbc09db7f1389',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
- assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2');
+// R2 source mappings (e962c1b) and the reviewed R2 acquisition executor (e8c67b6:
+// guarded preparation/extraction reads, record-bound caps) advance the shared
+// parser/preparation/extraction/acquisition/OMP-runner closures. These are the
+// measured current identities (fresh Node 24.22.1 process), not a claim that
+// frozen R1 receipts changed. Assessment queue/B, policy refresh, OMP output and
+// parser output stay unchanged.
+test('terminal sealing preserves assessment identities across the measured R2 parser and acquisition cutover',async()=>{
+ assert.deepEqual(await residualPreparationContract(),{preparationSha256:'c9aff861a533be4cc09ae2d9f032b17ad31329bdb9f90e47c9e5183639595d21'});
+ assert.deepEqual(await residualJobContract(),{preparationSha256:'c9aff861a533be4cc09ae2d9f032b17ad31329bdb9f90e47c9e5183639595d21',extraction:{promptSha256:'11fed38a252dee91e01afebf3b593faad1c18a50c77c1535a0e1ad50ef27ffbe',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'8bca64ba7930ab103495ba06ed2e54dac886e4729cf269a2b25622d1b56b8506'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
+ assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'d1c85950dc871747b691edf6f4be82cccfb54f160ee28441c6230f9b812a0e0e');
  assert.equal(await ompRunnerOutputContractSha256(),'0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361');
- assert.equal(await parserIsolationContractSha256(),'fa81c5332b9ec0ebc7be7c252d9ac8fb9fbfd0eb609e69a1f376305fb0b86255');assert.equal(await parserOutputContractSha256(),'3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599');
- assert.equal(await acquisitionContract(),'fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c');
+ assert.equal(await parserIsolationContractSha256(),'281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73');assert.equal(await parserOutputContractSha256(),'3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599');
+ assert.equal(await acquisitionContract(),'b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd');
 });
