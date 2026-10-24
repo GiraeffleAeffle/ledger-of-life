@@ -20,7 +20,7 @@ import {startWorkerLease,finishWorkerLease,captureLocalDocumentWorker} from './d
 import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,type CivicPolicyOptions} from './civic-opt-out.ts';
 
 const providerSchema=z.literal('openai-subscription');
-const authoritySchema=z.object({stateDir:z.literal(CIVIC_POLICY_AUTHORITY.stateDir),authorityId:z.literal(CIVIC_POLICY_AUTHORITY.authorityId),authoritySha256:hashSchema,r2Integrity:z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:hashSchema.optional()}).strict().optional()}).strict();
+const authoritySchema=z.object({stateDir:z.literal(CIVIC_POLICY_AUTHORITY.stateDir),authorityId:z.literal(CIVIC_POLICY_AUTHORITY.authorityId),authoritySha256:hashSchema,r2Integrity:z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema}).strict().optional()}).strict();
 const receiptSchema=z.object({taskId:hashSchema,resultSha256:hashSchema,preparedSha256:hashSchema,promptSha256:hashSchema,schemaSha256:hashSchema,records:z.number().int().nonnegative(),quarantined:z.number().int().nonnegative(),authorityId:z.string(),authoritySha256:hashSchema}).strict();
 function groupFor(plan:PreparationPlan,task:WorkTask):PreparationGroup{
  const group=plan.groups.find(group=>group.expected.municipalityId===task.group.municipalityId&&group.expected.sourceSha256===task.group.sourceSha256&&group.expected.receiptSha256===task.group.preparedSha256);

@@ -175,44 +175,86 @@ the current old installed image patched or authorized for the changed worker.
 
 ## Exact draft scope and caps
 
-The offline manifest was frozen byte-exactly at
-`/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/R2_ACQUISITION_MANIFEST.snapshot.json`,
-SHA256 `ea0478d57d7b68a105772fbe46b3bcc1e355c89bf5314aa96d6314388f2ffba5`.
-It contains120 candidate source bindings but112 distinct HTTPS GET URLs, from18
-selected source scopes on11hosts. The draft enumerates every document URL,
-method, permitted document MIME and source/candidate binding, plus22 exact
-robots/TDM policy URLs. No hostname wildcard, subtree prefix, query mutation,
-automatic redirect target or discovery expansion is allowed. Unlisted policy
-references also stop pending a genuine reviewed amendment.
+The current unissued scope references the V2 manifest at
+`/home/max/.local/state/stadtstack-data/r2-planning/R2_ACQUISITION_MANIFEST_V2_DRAFT.json`,
+SHA256 `c23a739b27dd85e2a67cef0d14826f2c1c5407e1caf7c5049b7c451262543e1c`.
+It contains221 unique candidate URLs, each bound to exactly one admitted
+sourceId, and17 selected source scopes. The 8 duplicate URL/source listings
+were resolved by deterministic precedence (council, gazette, participation,
+website, structured; ties use alphabetically first sourceId); other listings
+are informational `alsoListedUnder`, never admitted or policy-checked. The
+draft enumerates every document URL, method, permitted document MIME and exact
+candidate/source binding, plus22 exact robots/TDM policy URLs. No hostname
+wildcard, subtree prefix, query mutation, automatic redirect target or dynamic
+discovery expansion is allowed. The changed manifest hash requires separate
+owner approval; the release draft remains unissued with the source-fetch stop
+set.
 
 The owner description says42sources; the actual registry and registered robots
-scope table have43entries. All18 selected scopes exist, but the universe
-mismatch is an explicit issuance blocker, not silent approval of43sources.
-The selected112URLs must be deduplicated against the final frozen R1 corpus
-and current content:120bindings is not120new documents or a completeness claim.
-The three candidate cached hashes are retained as known prior baselines, not
-current source-policy/admission receipts. Other previously known representations
-must also be bound during final review, not silently treated as new identities.
+scope table have43entries. All selected scopes must still be reconciled during
+issuance; the universe mismatch is not silent approval of43sources. The final
+manifest's 221 URL/source pairs are unique; `alsoListedUnder` entries are
+informational only. Final R1 inventory bytes must bind every exact URL/source
+pair, including known previous representations.
 
-Proposed, **not approved**, maxima:140documents; review after the first10;
-600total actual network attempts including policy/redirect/failure requests;
-22initial policy-probe requests;24MiB per HTTP body,2MiB HTML before host
-discovery and1MiB policy bodies; a proposed1GiB controller memory boundary;
-1GiB total HTTP-body bytes;
-1GiB retained source bytes;8h campaign wall;25s DNS and25s wire;5redirects;
-1global/host in-flight and at least5s global spacing (or longer robots delay);
-zero automatic retries, zero model calls, zero paid micro-USD. The byte measure
-is HTTP body bytes supplied by Node, not encrypted packet/TLS framing counts.
-Parsing keeps the fixed sandbox caps. Stop rather than reset a consumed budget.
+#### Issuance record schema for the later issuer
+
+Issuance is a separate owner action; the executor only reads this record. The
+issuer starts from this exact v3 draft and adds the following strict fields
+(no additional or omitted issuance fields):
+
+```json
+{
+  "status": "ISSUED",
+  "issuedAt": "<RFC3339 timestamp>",
+  "approver": "<non-empty owner approver>",
+  "sourceFetchStopLifted": true,
+  "validFrom": "<RFC3339 timestamp>",
+  "expiresAt": "<RFC3339 timestamp>",
+  "ownerApprovalReference": {
+    "sha256": "<sha256 of exact acquisition manifest bytes>",
+    "approvalRecordPath": "<absolute path to owner approval record>",
+    "approvalRecordSha256": "<sha256 of raw owner approval record bytes>"
+  },
+  "r1DigestInventoryReference": {
+    "sha256": "<sha256 of exact R1 digest inventory bytes>"
+  }
+}
+```
+
+`ownerApprovalReference.sha256` must equal the CLI-bound manifest SHA-256 and
+the approved manifest hash inside the independently hashed approval record.
+The record also contains `executorCaps` exactly as the unissued draft. The
+executor CLI requires record path and expected SHA-256, manifest path and
+expected SHA-256, and R1 digest inventory path and expected SHA-256; none is
+inferred. It validates the raw record file digest, strict issuance fields,
+approval/inventory binding, current time within `validFrom`/`expiresAt`, and
+byte-for-byte equivalence to the draft after issuance-only fields are removed.
+Draft records, missing approvers, false stop-lift fields, not-yet-valid or
+expired records, manifest mismatch and unlisted URLs fail closed. Issuing this
+record and lifting the stop are not performed by this executor change.
+
+`executorCaps` is a strict record-bound object with exactly
+`maxDocuments`, `maxNetworkAttemptsIncludingPolicyRedirectFailure`,
+`maxTotalBodyBytes`, `maxBodyBytes`, `maxHtmlBytes`, `maxCampaignHours`,
+`maxInFlight`, `minSpacingSeconds`, `maxRedirects`, `automaticRetries`,
+`reviewAfterFirstDocuments`, `modelCalls`, and `paidMicroUsd`. The V2 draft
+sets them to250,1200,2684354560,25165824,2097152,16,1,5,5,0,10,0,0. Code enforces
+hard ceilings of300 documents,1500 attempts,3GiB total body bytes,24MiB per
+response,2MiB HTML,24 hours,one in-flight request,at least5s spacing, exactly5
+redirects, zero retries/model calls/spend, and review after exactly10 documents.
+The one per response cap applies to policy and document bodies alike. Total
+body bytes count all response-body bytes observed on policy, redirect, failed,
+and document attempts; they do not measure encrypted packet/TLS framing.
+Parsing keeps its separate fixed sandbox caps. Stop rather than reset a consumed budget.
 
 The executor adds a private append-only, fsync-per-entry journal of attempted
-wire URLs, timestamps, response-body byte counts, completed and quarantined
-representation digests, and retained/wire byte counters. Budgets derive from
-this journal on resume; torn or inconsistent records fail closed. The journal
-does not yet persist response status/failure, implement the proposed30s
-aggregation, capture full headers/provenance/parser telemetry, or monitor the
-disk floor. Those remain blockers for issuance; journal accounting is not an
-operator-monitoring or production-readiness claim.
+wire URLs, timestamps, response-body byte counts, HTTP statuses/failures,
+completed and quarantined representation digests, applied changed-source
+release hashes and tuples, plus retained/wire byte counters. Budgets derive
+from this journal on resume; torn or inconsistent records fail closed. A
+changed-source review is appended and hash-chained into the journal, not added
+to the stable `{journalPath,recordSha256,manifestSha256}` source guard.
 
 ## Required approvals and receipts before acquisition
 
@@ -264,54 +306,33 @@ The installed old parser review must fail against the new runner contract.
 No root review or historical fingerprint/receipt was edited. Main must measure
 all affected contracts in the actual integrated runtime before issuing v3.
 
-All14 actual contract functions were measured against33fa1d3. Seven changed:
-preparationExtractor, residualPreparation, residualJob, acquisition,
-structuredStateGauges, parserOutput, parserIsolation; seven are unchanged.
-Evidence: `r2-fetch-security-evidence/contracts.json`, SHA256
-`dd79a20c3f541d87abe3227fd1f55520194038a06ee338a99ba7e8a2971bc421`.
-Acquisition is
-`fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c`;
-parser isolation is
-`0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268`.
-These are prepared branch fingerprints, not integrated-image approvals.
+The historical all14-contract report below is not a fresh integrated-runtime
+measurement for this executor branch. The acquisition contract was freshly
+measured in a separate Node24.22.1 process using this worktree's
+`src/district-r1.ts`: SHA256
+`b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd`.
+Measurement record `reports/r2-acquisition-contract-measurement.json` SHA256
+`e5173c09a7fba90883dc7747091656bbc525567a8496823faa9b6f84706ec9b6`.
+Other preparation/parser contracts, installed image/runtime review and the
+integrated 14-contract set remain for the main integration review before
+issuance.
 
 ## Exercised verification
 
-Executor verification used `/home/max/.local/bin/stadtstack-cpu-slot bash -c
-'umask 022; <command>'`, Node24.22.1 and the worktree-local dependency tree.
-The focused executor run reports below; no production/live-source operation ran.
-The combined focused run used `--test-concurrency=1 --test-isolation=none` for
-polite-fetch, district-parser-worker and district-parser-isolation tests:
-**117 total,92 passed,0 failed/cancelled,25 skipped**,39.63s test duration.
-The25 skips are the non-Linux path and opt-in real-image/container sentinels;
-`STADTSTACK_PARSER_SECURITY_TESTS=0` deliberately prevented production/Docker
-sentinels. TLS testing intercepted constructor options and did not establish a
-real handshake. The Python worker test mocked the bounded source-free version
-probe and proved no readiness message on failure; it did not run the image.
-The all14 measurement completed exit0 under the same lock.
+`tsc --noEmit` passed. The focused executor suite reports **9 total, 9 passed,
+0 failed/cancelled/skipped**. It covered localhost fake HTTP, exact allowlist
+and redirect rejection, duplicate manifest URL refusal, budget stops, policy
+attempt accounting, ten-document review pause, changed-R1 quarantine, crash
+resume and stop-file handling. The fixture used explicit test-only localhost
+wire substitution and isolated fixture authority; no civic source was fetched.
+The suite ran under `/home/max/.local/bin/stadtstack-cpu-slot` with
+`umask 022`, Node24.22.1 and worktree-local dependencies.
 
 
-The reviewed-executor follow-up was typechecked with `tsc --noEmit` exit0, then
-its focused behavior suite completed **7/7 passed, 0 failed/skipped**. Coverage
-includes draft rejection, stop-file handling, exact off-list redirect/path/query/
-host refusal, request and policy attempt caps, per-response/policy/total wire
-byte caps, campaign time, HTML/document/retained-byte caps, the ten-document
-pause, changed-byte quarantine and exact changed-source release matching,
-crash-resume without refetching completed URLs, journal status accounting and
-cross-instance exclusion. The redirect integration test used a deterministic
-localhost HTTP fixture; tests exercised only the explicit test seam. Preparation
-and inference use the shared `assertPreparedSourcesActive` integrity gate.
-The R2 guard is persisted in managed source bindings and authenticated source
-references, required to match the pinned preparation plan and derived from
-those references in coordinator and worker paths. In a fresh Node24.22.1 process,
-`acquisitionContract()` measured `fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c`
-at base `f2876ef` and
-`330f45c5254c2fecb0999481a106b81f372782cbef839403a0ef67482f0773c1` after this
-change. The issued v3 record is bound by the raw-record SHA-256 argument, while
-the exact manifest bytes are independently SHA-256 checked and must equal
-`ownerApprovalReference.sha256`. No live-source fetch, issuance, stop lift,
-parser build/SBOM, privileged review, production CLI/DB write or full-suite
-check was run.
+No live-source fetch, issuance, source-fetch-stop lift, parser build/SBOM,
+privileged review, production CLI/DB write or full-suite check was run. The
+executor implementation is an unissued gate only; the main integration review
+must still verify the full affected contract set and runtime/image boundary.
 
 Root `docs/ontology.yaml` and `docs/ONTOLOGY.md` were read. No civic concept,
 assessment truth claim or DocumentDisposition semantics changes here; both

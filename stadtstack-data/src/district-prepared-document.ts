@@ -12,7 +12,7 @@ import {assertR2ReferencesReleased} from './r2-acquisition-integrity.ts';
 export const PREPARED_DOCUMENT_VERSION = 'district-prepared-v2';
 export const PREPARED_VM_ROOT = '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared';
 const MAX_PREPARED_BYTES = 6 * 1024 * 1024;
-const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:hashSchema.optional()}).strict().superRefine((value,ctx)=>{if(!!value.changedSourceReleasePath!==!!value.changedSourceReleaseSha256)ctx.addIssue({code:'custom',message:'Changed-source release path and digest must be supplied together'});});
+const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema}).strict();
 const ReferenceSchema = z.object({ id: z.string().min(1), url: z.url(), sha256: hashSchema, retrievedAt: z.iso.datetime(), locator: z.string().min(1), mimeType: z.string().min(1), sourceType: z.enum(['council', 'participation', 'gazette', 'website', 'structured']), policy: SourceAccessPolicySchema,r2Integrity:R2IntegrityReferenceSchema.optional() }).strict();
 export type PreparedSourceReference = z.infer<typeof ReferenceSchema>;
 const ToolVersionsSchema = z.record(z.string().regex(/^[a-zA-Z0-9._-]{1,80}$/), z.string().min(1).max(300));

@@ -117,7 +117,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>}
+export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>;onValidatedRepresentation?:(input:{url:string;body:Buffer;observation:FetchObservation;localPath:string})=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -138,13 +138,14 @@ function retryAfterTime(value:string|undefined,now:number):number {
  return Number.isFinite(time)?Math.max(now,time):0;
 }
 export class PoliteFetcher {
- readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'|'onWireAttemptResult'|'onWireResponse'>>;
+ readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'|'onWireAttemptResult'|'onWireResponse'|'onValidatedRepresentation'>>;
  private readonly fixtureInspection:FixturePolicyInspection|undefined;
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
  private readonly onResponseChunk:PoliteFetcherOptions['onResponseChunk'];
  private readonly onWireAttemptResult:PoliteFetcherOptions['onWireAttemptResult'];
  private readonly onWireResponse:PoliteFetcherOptions['onWireResponse'];
+ private readonly onValidatedRepresentation:PoliteFetcherOptions['onValidatedRepresentation'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private readonly inventoryTimeoutMs:number;
  private readonly ownerGenesisTableTimeoutMs:number;
@@ -217,6 +218,7 @@ export class PoliteFetcher {
   this.onResponseChunk=options.onResponseChunk;
   this.onWireAttemptResult=options.onWireAttemptResult;
   this.onWireResponse=options.onWireResponse;
+  this.onValidatedRepresentation=options.onValidatedRepresentation;
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
@@ -631,6 +633,22 @@ export class PoliteFetcher {
    return {sourcePolicy,expiresAt:new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(sourcePolicy,source,options.scope,options.registeredSourceEligibility)).toISOString(),observations:[...this.policyObservationPaths],...(absence?{originalRobotsAbsence:absence.proof}:{})};
   }catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}finally{this.policyObservationPaths=undefined;this.policyRefreshOriginalUrl=undefined;}
  }
+ async promoteQuarantinedRepresentation(input:{url:string;sha256:string;localPath:string;mimeType:string;observation:FetchObservation}):Promise<FetchedDocument>{
+  await this.initialize();
+  const url=publicUrl(input.url),bytes=await readFile(input.localPath);
+  if(hash(bytes)!==input.sha256||input.observation.state!=='fetched'||input.observation.url!==url.href||input.observation.sha256!==input.sha256||input.observation.mimeType!==input.mimeType||input.observation.bytes!==bytes.length||!input.observation.policy||!effectiveSourcePermission(input.observation.policy,{url:url.href,sha256:input.sha256}))throw new PoliteFetchError('cache_missing','Quarantined representation no longer matches its checked source admission');
+  await this.assertHostAllowed(url.href);
+  const localPath=this.publicPolicyFetcher?join(this.cacheDir,'sha256',input.sha256.slice(0,2),input.sha256):join(this.cacheDir,'sha256',input.sha256);
+  const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=Buffer.from(this.encodeObservation({...input.observation})),r2Integrity=this.policyOptions().r2Integrity;
+  const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:input.sha256,sourceSha256:input.sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:effectiveSourcePermission(input.observation.policy,{url:url.href,sha256:input.sha256}),...(r2Integrity?{r2Integrity}:{})};
+  const observationEntry={...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false};
+  await withManagedSourceWrite(this.cacheDir,[sourceEntry,observationEntry],async()=>{
+   await mkdir(dirname(localPath),{recursive:true,mode:0o700});
+   await writeFile(localPath,bytes,{flag:'wx',mode:0o600}).catch(async error=>{if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await readFile(localPath);if(hash(existing)!==input.sha256)throw new PoliteFetchError('cache_missing','Existing CAS path differs from the quarantined digest');});
+   await mkdir(dirname(observationPath),{recursive:true,mode:0o700});await writeFile(observationPath,observationBytes,{flag:'wx',mode:0o600});
+  },this.policyOptions());
+  return {url:url.href,sha256:input.sha256,localPath,mimeType:input.mimeType,retrievedAt:input.observation.retrievedAt!,checkedAt:input.observation.checkedAt,status:input.observation.status!,observationPath,policy:input.observation.policy,...(r2Integrity?{r2Integrity}:{})};
+ }
  async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{
   await this.initialize();this.fetchCount++;
   try{
@@ -869,6 +887,7 @@ export class PoliteFetcher {
     if(checkTdm&&!effectiveSourcePermission(policy,{url:url.href,sha256}))throw new PoliteFetchError(policy.tdm.state==='reserved'?'tdm_reserved':'tdm_unavailable','Source policy does not authorize retaining this representation');
     policyPhase=null;
     observation.etag=response.headers.etag??observation.etag;observation.lastModified=response.headers['last-modified']??observation.lastModified;
+    await this.onValidatedRepresentation?.({url:url.href,body:representation,observation,localPath});
     const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=this.encodeObservation(observation);
     const persist=async()=>{
      await this.assertHostAllowed(url.href);

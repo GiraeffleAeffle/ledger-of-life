@@ -12,7 +12,7 @@ export const HttpObservationProofSchema=z.object({observationId:z.string().regex
  if(Buffer.byteLength(proof.bytes)>1024*1024||digest(proof.bytes)!==proof.receiptSha256)ctx.addIssue({code:'custom',message:'Original HTTP observation byte digest/bound mismatch'});
  try{HttpObservationSchema.parse(JSON.parse(proof.bytes));}catch{ctx.addIssue({code:'custom',message:'Original HTTP observation safe schema mismatch'});}
 });
-const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:HashSchema,manifestSha256:HashSchema,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:HashSchema.optional()}).strict().superRefine((value,ctx)=>{if(!!value.changedSourceReleasePath!==!!value.changedSourceReleaseSha256)ctx.addIssue({code:'custom',message:'Changed-source release path and digest must be supplied together'});});
+const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:HashSchema,manifestSha256:HashSchema}).strict();
 export const HttpSourceBindingSchema=z.object({kind:z.literal('http_observation'),url:SourceObservationSchema.shape.url,sourceSha256:HashSchema,observationId:HttpObservationProofSchema.shape.observationId,receiptSha256:HashSchema,r2Integrity:R2IntegrityReferenceSchema.optional()}).strict();
 export type HttpObservationProof=z.infer<typeof HttpObservationProofSchema>;
 export function authenticatedHttpBinding(proofInput:unknown,expected:{url:string;sha256:string;mimeType?:string;retrievedAt?:string;fetchedAt?:string;r2Integrity?:R2IntegrityGuard}):Extract<ManagedSourceBinding,{kind:'http_observation'}>{
