@@ -118,7 +118,7 @@ export async function assembleRun(preparation:PreparationPlan,plan:WorkPlan,out:
 }
 export async function runCodexExtraction(options:{preparationPath:string;preparationSha256:string;registry:OperatorRegistryInputPin;out:string;resume?:boolean;policy?:CivicPolicyOptions}){
  if(process.platform!=='linux')throw Error('Source extraction runs only on the authoritative Codex VM');
- const selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...CIVIC_POLICY_AUTHORITY,...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ const selectedPolicy:CivicPolicyOptions=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy:CivicPolicyOptions={...CIVIC_POLICY_AUTHORITY,...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  authoritySchema.parse(policy);
 
  const out=resolve(options.out),contentRoot=join(out,'source-content');
