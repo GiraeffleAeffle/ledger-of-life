@@ -1,0 +1,338 @@
+{
+  "schemaVersion": "ledger-hosted-rpc-recovery-v1",
+  "recordedOn": "2026-10-12",
+  "origin": "https://ledger.stadtstack.eu",
+  "priorFailureEvidence": "HOSTED_RPC_DEGRADATION_2026-10-12.json",
+  "rootCause": {
+    "source": "Owner-confirmed Helius dashboard",
+    "monthlyCredits": 1000000,
+    "creditsExhausted": true,
+    "serviceStatus": "Service halted",
+    "resetInDays": 14,
+    "originalHttpStatusNotObserved": true,
+    "cancelledProbeLiveCalls": 0
+  },
+  "release": {
+    "revision": 42,
+    "deployedAt": "2026-10-12T17:47:07+02:00",
+    "source": "dcbc889201575dea09452fc230c0d2dd3583d5f0",
+    "pin": "d5b34917d81b8653e204d85545459ccdd1cafbed",
+    "digest": "sha256:d9da0cd6c21148b18caa060cb08a4317ddd15805895c5ac690ccd89cfd82ebfb",
+    "sourceCi": 38268925331,
+    "imageRun": 38269533764,
+    "pinCi": 38270978354,
+    "pod": "ledger-of-life-65f84496d9-4q9fz",
+    "ready": true,
+    "specAndImageIdMatched": true,
+    "storeAvailable": true,
+    "persistence": "local-sqlite"
+  },
+  "cutover": {
+    "providerOrder": [
+      "Alchemy Solana devnet",
+      "existing Helius Solana devnet",
+      "official public Solana devnet"
+    ],
+    "changedSecretKeys": [
+      "SOLANA_RPC_URL",
+      "SOLANA_RPC_FALLBACK_URLS"
+    ],
+    "identityBinding": "observe-existing-once-under-approved-session",
+    "secretUid": "a4268b39-78f3-46dd-9119-82f3f2974c7d",
+    "observedResourceVersion": "31394793",
+    "committedResourceVersion": "37167646",
+    "preservedOtherDataKeys": 7,
+    "preservationVerified": true,
+    "credentialLookupCount": 1,
+    "credentialOrUrlRecorded": false,
+    "retries": 0,
+    "secretRollback": false,
+    "programAuthorityNetworkPolicyOrOtherProductChanges": false,
+    "lease": {
+      "owner": "mac-b214303ce28308293c376200f9659cd7b56468db6a741f2f",
+      "event": "released",
+      "payloadFenced": true,
+      "viewerRestored": true,
+      "watchVerifiedAt": "2026-10-12T15:47:44Z"
+    },
+    "sourceReview": "LeaseActivation and independent V5 SOURCEPASS",
+    "offlineChecksPassed": 147,
+    "spentApprovalReceiptRetained": true
+  },
+  "verification": {
+    "typegenTypeScriptLint": "passed",
+    "testsPassed": 1196,
+    "optInTestsSkipped": 2,
+    "whitespaceAndProductionBuild": "passed",
+    "allSourceImagePinCi": "passed",
+    "securityAndUiReviews": "No surviving findings after cancellation/semantic/circuit/redirect/body-size and refresh-invalidation/activity corrections.",
+    "imageSmoke": {
+      "routes": [
+        {
+          "path": "/",
+          "status": 200
+        },
+        {
+          "path": "/story",
+          "status": 200
+        },
+        {
+          "path": "/replay",
+          "status": 200
+        },
+        {
+          "path": "/library",
+          "status": 200
+        },
+        {
+          "path": "/api/rent",
+          "status": 401
+        },
+        {
+          "path": "/api/account",
+          "status": 404
+        },
+        {
+          "path": "/api/jobs/retention",
+          "status": 404
+        }
+      ],
+      "storeAvailable": true,
+      "persistence": "local-sqlite",
+      "concurrentBuilding": {
+        "elapsedMs": 400,
+        "samples": [
+          {
+            "status": 200,
+            "network": "solana-devnet",
+            "cache": {
+              "state": "fresh",
+              "checkedAt": "2026-10-12T15:37:11.237Z",
+              "ageMs": 0
+            },
+            "observedSlot": "510311140"
+          },
+          {
+            "status": 200,
+            "network": "solana-devnet",
+            "cache": {
+              "state": "fresh",
+              "checkedAt": "2026-10-12T15:37:11.237Z",
+              "ageMs": 0
+            },
+            "observedSlot": "510311140"
+          },
+          {
+            "status": 200,
+            "network": "solana-devnet",
+            "cache": {
+              "state": "fresh",
+              "checkedAt": "2026-10-12T15:37:11.237Z",
+              "ageMs": 0
+            },
+            "observedSlot": "510311140"
+          },
+          {
+            "status": 200,
+            "network": "solana-devnet",
+            "cache": {
+              "state": "fresh",
+              "checkedAt": "2026-10-12T15:37:11.237Z",
+              "ageMs": 0
+            },
+            "observedSlot": "510311140"
+          }
+        ]
+      },
+      "stale": {
+        "status": 200,
+        "elapsedMs": 56,
+        "cache": {
+          "state": "stale",
+          "checkedAt": "2026-10-12T15:37:11.237Z",
+          "ageMs": 108961
+        },
+        "observedSlot": "510311140"
+      },
+      "refreshed": {
+        "status": 200,
+        "cache": {
+          "state": "fresh",
+          "checkedAt": "2026-10-12T15:39:00.353Z",
+          "ageMs": 1873
+        },
+        "observedSlot": "510311593"
+      },
+      "filesystem": {
+        "uid": 1000,
+        "privatePathsAbsent": true,
+        "publicCorpus": [
+          {
+            "path": "core/strausberg-facts.json",
+            "matched": true
+          },
+          {
+            "path": "cities/strausberg/signals.geojson",
+            "matched": true
+          },
+          {
+            "path": "cities/strausberg/signals.min.geojson",
+            "matched": true
+          }
+        ]
+      },
+      "hardening": "true [\"ALL\"] [\"no-new-privileges\"] 1000:1000",
+      "resourcesRemoved": true,
+      "credentialsUsed": false,
+      "environment": "public official devnet only; not a proof of hosted Alchemy or a transaction",
+      "correctedSetup": "Initial smoke omitted the base-chart ALLOW_LOCAL_STORE=1 opt-in and correctly reported unavailable storage. Recreated the same digest with the explicit production-chart opt-in; store and RPC acceptance then passed. No app/image fix or weakening."
+    }
+  },
+  "burnAccounting": {
+    "kind": "Static source estimates, not measured attribution",
+    "documentation": "../DEPLOYMENT.md#rpc-credit-accounting-and-idle-reads",
+    "example": "Before:20expired unsigned house plans plus five-second display polling could cause42RPC/read,725760RPC/day for one continuously visible tab. Terminal display history no longer triggers those expiry reads; two-house holdings and portfolio reads are batched; display reads have no recurring idle cadence.",
+    "cron": "No eligible signed operation in the configured Solana lane means zero Solana RPC from the minute job. EVM price/income scopes were not misattributed to Helius."
+  },
+  "freshJudge": {
+    "createdThroughNormalUiOnRevision": 42,
+    "accountsCreated": 1,
+    "authentication": "New isolated browser context and virtual platform passkey; no injected session or API signup bypass.",
+    "home": {
+      "journeyStatus": 200,
+      "listingsStatus": 200,
+      "viewports": [
+        {
+          "width": 1280,
+          "scrollWidth": 1280
+        },
+        {
+          "width": 390,
+          "scrollWidth": 390
+        }
+      ]
+    },
+    "moneyLocalStakes": {
+      "healthy": true,
+      "publicAndPrivateReadStatus": 200,
+      "heldUnits": "0.001 tHOME",
+      "stakedUnits": "0",
+      "cashAfter": "9999.999 tUSDC",
+      "recordedFinalizedBuys": 1,
+      "viewports": [
+        {
+          "width": 1280,
+          "scrollWidth": 1280
+        },
+        {
+          "width": 390,
+          "scrollWidth": 390
+        }
+      ],
+      "data": "Real devnet observations, not browser-local fixtures."
+    },
+    "faucet": {
+      "httpStatus": 200,
+      "status": "confirmed",
+      "signature": "ikNBPknKpMurHtC1eJ2hRLhXDGKgEawXfRJxrcUVwoVCrJEX1RpdWxbGWXegoKiFEF4241irz5DWYat2JrwyLXQ",
+      "error": null
+    },
+    "scopeLimitation": {
+      "legacyPortfolioHttpStatus": 200,
+      "legacyPortfolioAvailable": false,
+      "meaning": "The separate operator-test tSPYx market remains unconfigured on the hosted image; its old aggregate Holdings total correctly remains unavailable. This was not enabled or relabelled healthy. Healthy Money acceptance here refers to the real Solana local-stakes path, tTSLA and local-unit reads, not that closed legacy market."
+    },
+    "contextClosed": true,
+    "initialPrivateCredentialAndBackupPreserved": true,
+    "latestCredentialRecapture": "Unavailable after wallet use; initial private credential and backup retained. No credential material is included here."
+  },
+  "money": {
+    "signature": "Cv9cEeRkzdBxfS3JvG5ap9L2Yg7RnFiyeuHFEHcMggqr6thBYhkvP6bw5hQhvvnrbygPQBEE4hhvj2Uo4jYYaou",
+    "genesis": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG",
+    "commitment": "finalized",
+    "slot": 510319610,
+    "at": "2026-10-12T16:10:52.000Z",
+    "error": null,
+    "owner": "7kb5nVzSMDaFeQVSRtxprZCSSZJQ6oP8H2ihLYBjFkgQ",
+    "cashDeltaAtoms": "-1000",
+    "unitDeltaAtoms": "1000",
+    "unitAtaCreated": true,
+    "unitPreLamports": 0,
+    "ownerNativeDeltaLamports": "0",
+    "approvedBudgetTestUsdc": "0.001",
+    "receivedTestHome": "0.001",
+    "successfulAttempt": {
+      "approvedOnce": true,
+      "closeClicked": true,
+      "elapsedMs": 2797
+    },
+    "explorer": "https://explorer.solana.com/tx/Cv9cEeRkzdBxfS3JvG5ap9L2Yg7RnFiyeuHFEHcMggqr6thBYhkvP6bw5hQhvvnrbygPQBEE4hhvj2Uo4jYYaou?cluster=devnet",
+    "alternateExplorer": "https://solscan.io/tx/Cv9cEeRkzdBxfS3JvG5ap9L2Yg7RnFiyeuHFEHcMggqr6thBYhkvP6bw5hQhvvnrbygPQBEE4hhvj2Uo4jYYaou?cluster=devnet",
+    "independentRead": "Official public devnet getGenesisHash plus finalized getTransaction, separate from the app-configured private provider.",
+    "newUnitAccountEvidence": "No unit pre-token entry was treated as zero only after confirming zero pre-lamports and an associated-token-account creation instruction bound to the reviewed unit account.",
+    "otherFinancialCyclesReexecuted": false
+  },
+  "preservedUnsuccessfulReviews": [
+    {
+      "stage": "Initial unsigned review inspection",
+      "observation": "A delayed automation step reached an aged public reading; no wallet prompt or signing/reconciliation request followed that disabled control. The unsigned review was cancelled before replacement.",
+      "onchainBuyRecorded": false
+    },
+    {
+      "stage": "Expired pre-broadcast attempt",
+      "observation": "Wallet consent was given, but the harness returned before closing the success dialog. The later closure/submission occurred about91seconds after preparation; the server refused with HTTP409 and This review expired; prepare a fresh review. UI reported no sent transaction or receipt; cash remained10000 and units0. The final successful attempt kept review, wallet consent and dialog closure together in2797ms.",
+      "httpStatus": 409,
+      "onchainBuyRecorded": false,
+      "notRelabelledSuccessful": true
+    }
+  ],
+  "idleAcceptance": {
+    "scope": "Observed authenticated same-origin display endpoints; not a measurement of every provider request or SDK websocket.",
+    "visible": {
+      "durationMs": 12000,
+      "requests": 0
+    },
+    "hidden": {
+      "visibility": "hidden",
+      "exercised": true,
+      "durationMs": 12000,
+      "events": []
+    },
+    "firstHideAttempt": "Activating the control in another context left the document visible; that window was not claimed as hidden proof. A later actual hidden browser state was observed without overriding visibility APIs.",
+    "requestBodiesAndHeadersNotRecorded": true
+  },
+  "screenshots": {
+    "directory": "~/.cache/ledger-evidence",
+    "allOpenedAndInspected": true,
+    "fullPageMobileNote": "Fixed navigation appears at the original viewport boundary in the full-page capture; the separate detail image is an ordinary scrolled390px viewport.",
+    "files": [
+      {
+        "file": "rpc-recovery-home-1280-20261012.png",
+        "sha256": "e2ec1b4a8502908ea88b07344156a779f0f6a6dedb8451f86b319223c0afeff8"
+      },
+      {
+        "file": "rpc-recovery-home-390-20261012.png",
+        "sha256": "6a254fc37487c7f2d739ae1d00c6eca62e256612a60b1bad2a34c6d59e3409b2"
+      },
+      {
+        "file": "rpc-recovery-money-1280-20261012.png",
+        "sha256": "42277d79cee2bca5c8be62e74618756de4bcc856e1a3300657ad946fa6f74213"
+      },
+      {
+        "file": "rpc-recovery-money-390-20261012.png",
+        "sha256": "2961276b1203ba46ae42cc4fd9d83c255eef84f4f564a6e734ff47dc1fe3fb11"
+      },
+      {
+        "file": "rpc-recovery-money-390-detail-20261012.png",
+        "sha256": "583b2784a1430f74a2590dbc3f20ac8a7eaaa5d8cff8cd796266af27c542806e"
+      }
+    ]
+  },
+  "notClaimed": [
+    "Synthetic fixture values as production observations.",
+    "An original in-pod HTTP quota status or a NetworkPolicy outage.",
+    "A fresh complete deposit/rent/lending/share-deposit/AI cycle from this one buy.",
+    "Availability of the unconfigured operator-test tSPYx market.",
+    "Deployment of paused retention/consent work or another product."
+  ]
+}

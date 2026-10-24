@@ -4,6 +4,7 @@ import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 import { SOLANA_MAINNET_MANIFEST } from '../finance/solana/manifest.ts';
 import { createBaseSolanaGateway, type SolanaGateway } from './solana-rpc.ts';
+import { solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredFeeSponsor, SolanaServiceError, type FeeSponsor } from './solana-service.ts';
 import type { Store } from './store.ts';
 
@@ -337,9 +338,7 @@ export function createSolanaOperations(deps: { store: Store; gateway: SolanaOper
 export async function configuredSolanaOperations(store: Store, config: SolanaOperationsConfig, environment: Record<string, string | undefined> = process.env) {
   const sponsor = await configuredFeeSponsor(environment);
   if (!sponsor || !environment.SOLANA_RPC_URL) fail('Solana fee sponsorship is not configured.');
-  const url = new URL(environment.SOLANA_RPC_URL!);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) fail('RPC must use HTTPS or loopback.');
-  const gateway = createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: config.genesisHash, maximumSponsorLamports: config.maximumSponsorLamports.toString() });
+  const gateway = createBaseSolanaGateway({ ...solanaRpcConfiguration(environment, config), maximumSponsorLamports: config.maximumSponsorLamports.toString() });
   const sponsorshipLimits = sponsorshipLimitsFromEnvironment(environment, { ...DEFAULT_SPONSORSHIP_LIMITS, ...config.sponsorshipLimits });
   return { operations: createSolanaOperations({ store, gateway, sponsor: sponsor!, config: { ...config, sponsorshipLimits } }), gateway, sponsor: sponsor! };
 }

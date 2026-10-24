@@ -5,7 +5,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import investments from '../../contracts/evm/deployments/local-investments-46630.json' with { type: 'json' };
 import { LocalStore } from './store.ts';
 import { BUILDING_ACTION_ABI, BUILDING_TOKEN_ABI, validateBuildingActionTransaction, type BuildingActionReview, type BuildingOperation } from './building-revenue-signing.ts';
-import { readBuildingView, type BuildingManifest, type BuildingRpc } from './building-revenue.ts';
+import { buildingRpc, createBuildingReadCache, readBuildingView, type BuildingManifest, type BuildingRpc } from './building-revenue.ts';
 import { prepareBuildingAction, readBuildingPosition, submitBuildingAction } from './building-revenue-claims.ts';
 import { setConnectorPayoutWallet } from './local-ai-hosts.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
@@ -117,7 +117,7 @@ test('building exposes only active distributor-paying device names, kind and ava
       { name: 'Sleeping GPU', kind: 'community', availability: 'asleep' },
       { name: 'Offline GPU', kind: 'operator', availability: 'offline' },
     ]);
-    assert.deepEqual((await readBuildingView(store, { loadManifest: async () => null })).payingDevices, []);
+    await assert.rejects(readBuildingView(store, { loadManifest: async () => null }), /not deployed/);
   } finally { await store.close(); }
 });
 
@@ -252,4 +252,112 @@ test('host payout is owner-only, reversible to verified wallets and refuses arbi
     await assert.rejects(setConnectorPayoutWallet(store, { ...identity, subject: 'other' }, 'host', foreign), /owner/);
     await assert.rejects(setConnectorPayoutWallet(store, identity, 'host', distributor), /verified wallet/);
   } finally { await store.close(); }
+});
+
+test('public EVM building reads share one aborting deadline without changing financial transport defaults', async t => {
+  const store = new LocalStore(':memory:'), controller = new AbortController();
+  t.after(() => store.close());
+  const deadlines: number[] = [], signals: (AbortSignal | null | undefined)[] = [], methods: string[] = [];
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    deadlines.push(milliseconds);
+    return controller.signal;
+  });
+  const pending = Promise.withResolvers<void>();
+  let aborted = false;
+  t.mock.method(globalThis, 'fetch', async (_: unknown, options?: RequestInit) => {
+    signals.push(options?.signal);
+    options?.signal?.throwIfAborted();
+    const body = JSON.parse(String(options?.body));
+    methods.push(body.method);
+    if (body.method === 'eth_chainId') return Response.json({ jsonrpc: '2.0', id: body.id, result: '0xb626' });
+    pending.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      options!.signal!.addEventListener('abort', () => { aborted = true; reject(options!.signal!.reason); }, { once: true });
+    });
+  });
+  const read = readBuildingView(store, { loadManifest: async () => manifest });
+  await pending.promise;
+  controller.abort(new DOMException('Read deadline', 'TimeoutError'));
+  await assert.rejects(read);
+  assert.equal(aborted, true);
+  assert.deepEqual(deadlines, [3_000]);
+  assert.ok(signals.length > 1);
+  assert.ok(signals.every(signal => signal === controller.signal));
+  assert.equal(methods[0], 'eth_chainId');
+  assert.equal(buildingRpc.transport.timeout, 15_000);
+  assert.equal(buildingRpc.transport.retryCount, 0);
+});
+
+test('public building cache single-flights cold and stale reads with honest observation age', async () => {
+  let now = Date.UTC(2026, 9, 12), calls = 0;
+  const initialTime = now, cache = createBuildingReadCache<{ observedSlot: string; revenueRaw: string }>(() => now);
+  const started = Promise.withResolvers<void>(), first = Promise.withResolvers<{ observedSlot: string; revenueRaw: string }>();
+  const reader = async () => { calls++; started.resolve(); return first.promise; };
+  const cold = cache('solana-devnet/home/config-a', reader);
+  await started.promise;
+  const concurrent = cache('solana-devnet/home/config-a', reader);
+  first.resolve({ observedSlot: '50', revenueRaw: '123' });
+  const initial = await cold;
+  assert.deepEqual(await concurrent, initial);
+  assert.equal(calls, 1);
+  assert.deepEqual(initial.cache, { state: 'fresh', checkedAt: new Date(initialTime).toISOString(), ageMs: 0 });
+  now += 59_999;
+  assert.equal((await cache('solana-devnet/home/config-a', reader)).cache.state, 'fresh');
+  assert.equal(calls, 1);
+  now++;
+  const refresh = Promise.withResolvers<{ observedSlot: string; revenueRaw: string }>();
+  const refreshing = async () => { calls++; return refresh.promise; };
+  const retained: Promise<void>[] = [];
+  const stale = await cache('solana-devnet/home/config-a', refreshing, pending => { retained.push(pending); });
+  assert.deepEqual(stale, { building: initial.building,
+    cache: { state: 'stale', checkedAt: new Date(initialTime).toISOString(), ageMs: 60_000 } });
+  assert.deepEqual(await cache('solana-devnet/home/config-a', refreshing, pending => { retained.push(pending); }), stale);
+  assert.equal(retained.length, 2);
+  assert.equal(retained[0], retained[1]);
+  assert.equal(calls, 2);
+  refresh.resolve({ observedSlot: '51', revenueRaw: '456' });
+  await retained[0];
+  const updated = await cache('solana-devnet/home/config-a', reader);
+  assert.deepEqual(updated.building, { observedSlot: '51', revenueRaw: '456' });
+  assert.deepEqual(updated.cache, { state: 'fresh', checkedAt: new Date(now).toISOString(), ageMs: 0 });
+});
+
+test('public building cache preserves stale timestamps, cools failed refreshes and never serves beyond fifteen minutes', async () => {
+  let now = Date.UTC(2026, 9, 12), calls = 0;
+  const cache = createBuildingReadCache<{ observedSlot: string }>(() => now);
+  const initial = await cache('home', async () => ({ observedSlot: '50' }));
+  const failing = async () => { calls++; throw new Error('private upstream detail'); };
+  now += 60_000;
+  const stale = await cache('home', failing);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(stale.cache.state, 'stale');
+  now += 59_999;
+  const retained = await cache('home', failing);
+  assert.equal(calls, 1);
+  assert.equal(retained.cache.checkedAt, initial.cache.checkedAt);
+  assert.equal(retained.cache.ageMs, 119_999);
+  assert.equal(retained.building.observedSlot, '50');
+  now++;
+  await cache('home', failing);
+  await new Promise<void>(resolve => setImmediate(resolve));
+  assert.equal(calls, 2);
+  now += 780_000;
+  await assert.rejects(cache('home', failing), { message: 'Building view unavailable.' });
+  assert.equal(calls, 3);
+  await assert.rejects(cache('home', failing), { message: 'Building view unavailable.' });
+  assert.equal(calls, 3);
+});
+
+test('cold failure cooldown and successful snapshots are isolated by network, house and configuration keys', async () => {
+  let now = 0, calls = 0;
+  const cache = createBuildingReadCache<string>(() => now);
+  const failed = async () => { calls++; throw new Error('RPC unavailable'); };
+  await assert.rejects(cache('solana/home/config-a', failed));
+  await assert.rejects(cache('solana/home/config-a', failed));
+  assert.equal(calls, 1);
+  for (const key of ['solana/workshop/config-a', 'solana/home/config-b', 'robinhood/home/config-a']) {
+    assert.equal((await cache(key, async () => key)).building, key);
+  }
+  now = 60_000;
+  assert.equal((await cache('solana/home/config-a', async () => 'recovered')).building, 'recovered');
 });

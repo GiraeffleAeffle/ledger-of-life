@@ -45,7 +45,15 @@ Financial custody still depends on identity, home and signed operations. The civ
 
 Grounding uses full published source records with their original unknowns, status and locators. Only valid recorded dates qualify as dated evidence. Relevance ignores engine-generated field labels; source type preference follows substantive matching. The bounded prompt retains complete included facts/caveats and the actual question, or declines explicitly; it does not turn a context-size failure into a false claim of missing evidence.
 
+**Auto-verified core sources.** The Straussee record is a `measurement`, not a place: **14 September 2026, 1.61 m below Normalstau**, from a document dated **5 October 2026**, with no claim about today's level. The **2025 / 2026 planned investment outlays** are **17,941,270 / 12,609,320 EUR**, from the budget ordinance dated **7 November 2024**, not actual expenditure. `reviewState` stays `auto_checked`. **Auto-verified** is a separate status for named deterministic checks and actual DeepEval faithfulness evidence (threshold0.8, configured model), not human review or independent truth certification; each claim has one primary source.
+
+The hosted reader binds the core bundle, full/compact corpus and source/assertion/evaluation hashes to their committed release manifest before projecting public verification metadata. Missing/mismatched evidence stays explicitly unverified and cannot ground City AI. The immutable image is the manifest trust boundary, not a signed municipal certificate. Relevant admitted core records outrank candidates; source DTOs and UI preserve document date, measurement date/budget year and automated-evidence caveats.
+
+If a question names admitted budget years, every such year must remain in its grounding packet. Redundant metadata can be compacted, but not the facts/caveats; an oversized complete year set is declined rather than presenting omitted data as unavailable.
+
 **Public loyalty places.** Enabling the optional map layer reads the separate Stadtstack loyalty service's public merchant feed in the browser. Only validated, city-matching published records create **Sepolia test** pins with their evidence links. A successful empty feed invites shop owners to the service; failed/invalid reads create no pins and remain failures. No Ledger identity, wallet, city choice or personal balance is sent, and the separate service's membership/rewards never become a Ledger Position.
+
+An optional literal `test: true` marks an owner-published operator test entry, not a real business. Its muted dashed **T** pin, accessible name, list row and selected detail say **Test entry · not a real business**, alongside **Sepolia test**. Test entries remain explorable but contribute zero to the real-shop count; a test-only city still offers the no-real-shops owner handoff. `false`, `null`, strings and unknown fields fail validation rather than silently becoming ordinary participation.
 
 ## Concept map
 

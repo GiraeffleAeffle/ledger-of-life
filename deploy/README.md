@@ -1,6 +1,6 @@
 # Ledger of Life on the Talos cluster: Helm release for review
 
-**Live since 30 September.** Revision 1 from commit `090608b`; revision 2 from `ffb2d96` (image `sha256:6cbf8c0b…6193`) the same day. What was checked is in `docs/DEPLOYMENT.md`. Applying runs through `infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh` in `strausberg-zk-residency`, which opens the owner's rootless session and runs one mode of `deploy/apply.sh`; every change needs a typed confirmation. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
+**Live since 30 September.** Dated revisions and checks are recorded in [Deployment](../docs/DEPLOYMENT.md). Current owner-cluster operations use the independently reviewed, Main-bound **shared-Lease launcher**, a registered/fenced PTY and a cache-only dispatcher; the committed `deploy/apply.sh` retains release confirmations and rollout checks. Test networks only; no real money. This is a bounded, digest-pinned release, not a claim of production readiness.
 
 ## Why helmfile
 
@@ -60,21 +60,14 @@ Every external change requires the owner's approval. Revision 1 was applied by t
 
 1. DNS is done. Privy: `https://ledger.stadtstack.eu` is in the app's own Allowed Origins (30 Sep; the wallet iframe's `frame-ancestors` lists it), so no app client id is needed.
 2. The image comes from `.github/workflows/image.yml`, run by pushing a tag `image-*` on a commit whose CI passed. Make the package public once, then paste the digest from the job summary into `deploy/values/ledger.stadtstack.eu.yaml`, commit and push.
-3. In `strausberg-zk-residency`, stop the Freelens viewer (the session uses the same daily WireGuard identity), set the acknowledgement once, and run the wrapper. No sudo is needed:
+3. Obtain the current independently reviewed cache-only launcher/dispatcher packet and the owner's exact one-run approval. It must bind the tested pushed commit, immutable digest, artifact hashes, operation scope, acknowledgements and permitted prompts. Run only through **one** `session.py run` supervisor; Expect first checks admission and registers its new PTY through `mac-fencer.py` before starting the transport.
+4. The supervisor owns payload fencing, filtered-viewer restoration and Lease release. Do not manually stop/start the viewer, acquire/remove guard directories, export another owner's identity, nest supervisors, reuse a cancelled probe or retry a refused operation. Preserve the final `released`, `payloadFenced` and `viewerRestored` receipt.
+5. A release-only dispatcher grants no Secret-update authority. The RPC cutover requires its own reviewed operation: exact Keychain service/account, a bare-key schema, existing Secret selected by pinned cluster/namespace/name, one observed UID/resourceVersion snapshot and an atomic JSON Patch testing both before changing only the two approved RPC data keys. Values stay in captured memory/stdin, never output, argv, environment variables or Git. Verify every unrelated data field and user-metadata value before releasing the immutable snapshot.
+6. Secret patch and Helm rollout are not atomic. A timeout leaves commit status unknown; an acknowledged patch stays committed even if verification or rollout fails. No automatic Secret rollback, approval replay or fresh provider probe is implied. Stop and report partial state for a new exact owner decision.
 
-   ```bash
-   infra/hetzner-talos/scripts/open-freelens-filtered-viewer.sh stop
-   export LIVE_LEDGER_OF_LIFE_ACK=release-ledger-of-life-through-deploy-apply-only-v1
-   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --namespace          # first run only
-   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --secret ~/ledger-env.local
-   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --release            # shows the diff, then asks
-   infra/hetzner-talos/scripts/apply-live-ledger-of-life.sh --network-test       # after releasing the probe hooks
-   infra/hetzner-talos/scripts/open-freelens-filtered-viewer.sh start --manual-stop
-   ```
+The original infra wrapper/PID-lock procedure described in historical release records is **not** the current approved launch path. The application release waits up to 180 seconds for rollout and up to two minutes for the certificate; a still-pending certificate is reported separately from rollout success.
 
-   The wrapper runs only the pushed commit's `deploy/` tree and refuses any cluster but the reviewed one (kube-system UID `7bc769bc-e860-4d54-a0d5-d426f3a52420`). It refuses to start while another rootless tunnel runs and checks again just before applying; the wrapper and Freelens supervisor now both atomically acquire the same per-user daily-identity lock, record their PID and hold it until their tunnel stops. The canonical path is `$(getconf DARWIN_USER_TEMP_DIR)stadtstack-wireguard-daily.${UID}.lock`, independent of the caller's `TMPDIR`; each launchd restart reacquires it, a live holder is named and refused, and only a recorded dead PID permits stale-lock reclamation. Offline smokes can redirect the lock with `STADTSTACK_WIREGUARD_DAILY_TEST_LOCK` only when `STADTSTACK_WIREGUARD_LOCK_TEST_MODE=1`; the former public `STADTSTACK_WIREGUARD_DAILY_LOCK` override is refused. `--release` waits up to 180 seconds for the rollout and up to 2 minutes for the certificate; if the certificate is still pending it says so and exits successfully, because the release itself is up.
-
-Prerequisites: helmfile, Helm, the Helm diff plugin, kubectl, curl and Python 3. `KUBECTL` overrides the kubectl binary (for example `$HOME/.local/bin/kubectl-v1.36.0`). Secret checks fetch only `.data` key names, never values. Rendering happens before any cluster write, so missing digest stops safely.
+Prerequisites: helmfile, Helm, the Helm diff plugin, the approved kubectl, curl and Python 3. Main binds the actual toolchain; do not substitute binaries in a privileged run. The generic application script checks Secret key names only. A separately approved RPC cutover captures values privately for its exact CAS/preservation operation. Rendering and the read-only release preflight happen before that mutation; existing release state must be cleanly deployed.
 Helm API-server, CA, token, impersonation and TLS connection environment overrides must be unset (even empty values are refused before any tool runs); context-name checks remain in place. Preview and apply both include test hooks in their change decision.
 
 The private env file must hold **every key to keep**: `--secret` replaces the whole Secret. In addition to Privy and
@@ -148,7 +141,7 @@ This protects against corruption and accidental changes **after a successful sna
 
 ### List snapshots (owner's admin session)
 
-The release wrapper only accepts the existing `deploy/apply.sh` modes. It cannot run arbitrary `kubectl exec`, scale, patch or maintenance Pods. **All commands in this section require the owner's separately authorised admin session** on the reviewed cluster, not the release wrapper or the filtered read-only viewer. No cluster changes were made while writing this runbook.
+The current release-only dispatcher cannot run arbitrary `kubectl exec`, scale, patch or maintenance Pods. The separately reviewed RPC cutover adds only its explicitly approved two-key Secret patch, not general administrative authority. **All commands in this section require a separately authorised governed maintenance operation** on the reviewed cluster, not the release dispatcher or filtered read-only viewer. No cluster changes were made while writing this runbook.
 
 1. Record the ready web pod's node and the deployed image (public values), then create a hardened, network-isolated maintenance Pod on that node. Use it to list the backup PVC; no database content is printed.
 

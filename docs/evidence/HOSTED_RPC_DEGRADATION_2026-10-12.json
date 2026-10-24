@@ -1,0 +1,197 @@
+{
+  "schemaVersion": "ledger-hosted-rpc-degradation-v1",
+  "recordedOn": "2026-10-12",
+  "origin": "https://ledger.stadtstack.eu",
+  "scope": "Bounded public building reads, public-only cache and optional validated read fallback, independent Home/Money degradation, and the migrated governed release launcher. No financial program, authority, Secret, NetworkPolicy or other-product deployment change.",
+  "release": {
+    "revision": 41,
+    "deployedAt": "2026-10-12T14:51:45+02:00",
+    "source": "f2488b0a88d824086637431abc993ea71030189d",
+    "pin": "9edd171c2e4cd433d886c1289d54747c6af8011c",
+    "digest": "sha256:24c728c441aed0b5ab1218a4e35fb42adf5888751a1d3bed55c9ba04c1a8ff0c",
+    "sourceCi": 38248717024,
+    "imageRun": 38249052507,
+    "pinCi": 38250637047,
+    "readyPod": "ledger-of-life-c7f96bc7f-f4s5t",
+    "specAndImageIdMatched": true,
+    "storeAvailable": true,
+    "storeBackend": "local-sqlite",
+    "lease": {
+      "owner": "mac-2ce710f81579499ae85cf4924c8054397d05924c13b0e18a",
+      "terminalEvent": "released",
+      "payloadFenced": true,
+      "viewerRestored": true,
+      "viewerWatchVerifiedAt": "2026-10-12T12:52:26Z",
+      "independentReceipt": "~/.cache/cluster-ops/ledger-building-release-review-20261012/production-release-result.json",
+      "manualGuardOrViewerHandling": false,
+      "releaseReruns": 0
+    }
+  },
+  "preReleaseChecks": {
+    "source": "f2488b0a88d824086637431abc993ea71030189d",
+    "typeGenerationTypeScriptAndLint": "passed",
+    "testsPassed": 1137,
+    "optInTestsSkipped": 2,
+    "whitespaceAndProductionBuild": "passed",
+    "independentBackendAndUiReviews": "No surviving findings after corrections; signed retry/reconciliation, auth-read abort forwarding, EVM recovery and monotonic freshness boundaries reviewed.",
+    "offlineLauncherChecksPassed": 33,
+    "offlineLauncherCheckScope": "Tcl parsing and prompt admission, dispatcher rejection matrix, private-copy hash admission and tamper rejection; operational exec/spawn/Kubernetes/release paths stubbed, no cluster access.",
+    "hardenedImage": "Actual published amd64 image: uid 1000, read-only root, drop ALL, no-new-privileges, private paths absent, bundled public-data hashes matched; public routes 200, unauthenticated rent 401, paused account/retention routes 404.",
+    "privatePacket": "~/.cache/ledger-release/building-rpc-pre-release-evidence-20261012.json"
+  },
+  "actualImageCacheExercise": {
+    "environment": "Published image running locally with real public Solana devnet data, not hosted production and not a synthetic RPC fixture.",
+    "concurrentColdReads": 4,
+    "concurrentStatus": 200,
+    "concurrentElapsedMs": 553,
+    "sharedCheckedAt": "2026-10-12T12:37:41.040Z",
+    "sharedObservedSlot": "510266101",
+    "stale": {
+      "status": 200,
+      "elapsedMs": 38,
+      "ageMs": 118323,
+      "checkedAt": "2026-10-12T12:37:41.040Z",
+      "observedSlot": "510266101"
+    },
+    "backgroundRefresh": {
+      "status": 200,
+      "state": "fresh",
+      "checkedAt": "2026-10-12T12:39:39.655Z",
+      "observedSlot": "510266601"
+    },
+    "resourcesRemoved": true
+  },
+  "diagnosis": {
+    "reportedBeforeChange": "Default /api/building returned 503 after approximately nine seconds. The RPC/configuration flags in /api/status were not health probes.",
+    "defaultReader": "Solana when a house manifest is configured; explicit network=robinhood selects the separate legacy reader. Runtime failure metadata now identifies solana-devnet.",
+    "confirmedUiCauses": [
+      "A building network read could replace the whole local-stakes screen with an error.",
+      "Home initially gated independent content on completion of both journey and listing reads.",
+      "Display reads lacked the new bounded abort/cache behavior."
+    ],
+    "originalUpstreamHttpStatus": null,
+    "ownerConfirmedCause": {
+      "source": "Owner's Helius dashboard, reported through Main on 12 October",
+      "monthlyCredits": 1000000,
+      "creditsExhausted": true,
+      "serviceStatus": "Service halted",
+      "resetInDays": 14,
+      "independentSecretReadPerformed": false
+    },
+    "cancelledClassifier": {
+      "offlineChecksPassed": 102,
+      "sourceReview": "Conditional SOURCEPASS for exact frozen artifacts",
+      "operationalRuns": 0,
+      "liveGetHealthCalls": 0,
+      "reason": "Owner cancelled the approved diagnostic before execution because the dashboard established quota exhaustion.",
+      "record": "~/.cache/cluster-ops/ledger-helius-health-review-20261012/cancellation.json"
+    },
+    "limitation": "The original provider HTTP response was not observed in-pod. Earlier admission failures and the later explicitly cancelled probe did not read the live Secret or call getHealth. Owner-confirmed Helius quota exhaustion is recorded separately; no particular original HTTP code or NetworkPolicy fault is claimed.",
+    "fallbackConfigured": false,
+    "fallbackReason": "No owner-controlled secondary key was available. The documented public dRPC candidate returned an error and the Solana-listed Ankr candidate required credentials. No unverified endpoint or borrowed credential was installed.",
+    "financialTransport": "Preparation, signing, broadcasting, private positions and reconciliation retain the configured primary SOLANA_RPC_URL; public read fallback cannot repair an unavailable financial primary."
+  },
+  "freshJudgeLiveAcceptance": {
+    "freshAccountsCreated": 1,
+    "authentication": "Normal hosted Create account UI with a new virtual platform passkey in an isolated browser context; no injected auth or API signup bypass. Private passkey material saved separately and never included in this evidence.",
+    "home": {
+      "journeyStatus": 200,
+      "listingsStatus": 200,
+      "findHomeAndActualListingsVisible": true,
+      "viewports": [
+        { "width": 1280, "scrollWidth": 1280 },
+        { "width": 390, "scrollWidth": 390 }
+      ]
+    },
+    "building": {
+      "firstPostReleaseRead": {
+        "status": 503,
+        "elapsedMs": 140,
+        "network": "solana-devnet",
+        "cache": null,
+        "observedSlot": null,
+        "errorCode": "rpc_unavailable"
+      },
+      "healthyHostedSnapshotProven": false,
+      "genuineOutageUi": "Testnetz-RPC derzeit nicht erreichbar; illustrative map, House/Workshop/Agri-PV picker, contextual rows and earlier Robinhood lanes remain available. Unknown balances and income are dashes, not zeros.",
+      "viewports": [
+        { "width": 1280, "scrollWidth": 1280 },
+        { "width": 390, "scrollWidth": 390 }
+      ],
+      "independentPicker": "Agri-PV opened normally at 390px with its existing illustrative/model/not-an-investment labels; no horizontal overflow. Its simulated amounts are not live income."
+    },
+    "moneyRegression": {
+      "status": "blocked before review; not passed",
+      "enteredBudgetTestUsdc": "0.001",
+      "reviewPurchaseDisabled": true,
+      "financialActionSubmitted": false,
+      "walletTransactionSignatureRequested": false,
+      "transactionSignature": null,
+      "otherMoneyFlowsReexecuted": false,
+      "reason": "The hosted Solana read remained unavailable and no usable public snapshot or private balance could be verified. No financial action was forced through the unavailable state. A successful configured-primary read is required before an honest new transaction proof; older receipts are not relabelled as revision-41 verification."
+    }
+  },
+  "browserLocalFixtures": {
+    "warning": "These are explicitly labelled browser-local QA simulations, not production decisions, live income or upstream-outage evidence. Only GET display reads were intercepted; no financial POST or private balance was mocked and no transaction was performed.",
+    "homeTimeout": {
+      "path": "/api/journey",
+      "method": "GET",
+      "heldRequests": 1,
+      "errorAfterMs": 4129,
+      "healthyListingResponse": 200,
+      "result": "The existing Browse other homes row remained available and opened real listings alongside the bounded error and Retry control.",
+      "viewports": [1280, 390],
+      "horizontalOverflow": false
+    },
+    "stalePublicSnapshot": {
+      "path": "/api/building",
+      "synthetic": true,
+      "ageMs": 120000,
+      "syntheticRevenueAtomic": "1500000",
+      "result": "Displayed 1.5 test USDC only as a saved/not-current public reading, with its verification time and the new-financial-actions-paused explanation. Private balances remained unknown.",
+      "viewports": [1280, 390],
+      "horizontalOverflow": false
+    },
+    "expiredPublicSnapshot": {
+      "path": "/api/building",
+      "synthetic": true,
+      "ageMs": 900001,
+      "syntheticRevenueAtomic": "1500000",
+      "result": "Removed the expired amount and staker count, showing unknown values and Public income snapshot expired. The private read was still pending at capture; this is not private-RPC health evidence.",
+      "viewports": [1280, 390],
+      "horizontalOverflow": false
+    },
+    "cleanup": "Each fixture handler was removed in finally and request interception disabled. The QA banners disappeared on normal reload. Real Home returned and a subsequent unmodified Money view again showed genuine unavailable/unknown state rather than the synthetic amount.",
+    "harnessCorrections": [
+      "The first Home fixture wait incorrectly expected automatically expanded listings; it timed out. Source inspection showed the existing Browse other homes row is intentionally used while tenancy state is unknown. The corrected case opens that row.",
+      "An Agri-PV wait expected wording not used by the existing model; actual selected content was then inspected. Neither selector error was labelled an app failure.",
+      "A separate fresh-profile browser launcher failed before any production navigation. The account acceptance used a new isolated context in the working managed browser instead."
+    ]
+  },
+  "screenshots": {
+    "directory": "~/.cache/ledger-evidence",
+    "allOpenedAndVisuallyInspected": true,
+    "note": "Full-page mobile captures retain the fixed navigation at the original viewport boundary; the separate genuine detail capture shows the card in an ordinary scrolled 390px viewport.",
+    "files": [
+      { "file": "rpc-home-1280-20261012.png", "kind": "genuine live", "sha256": "35a8f84d3ada551f15ddc7d5d1b67d521d907ac23789ade3f079617dff116168" },
+      { "file": "rpc-home-390-20261012.png", "kind": "genuine live", "sha256": "cc83a6a6e4e8d90cbecdfb6ce1cb5ede498d58ee58e263896f26340f1e123a52" },
+      { "file": "rpc-local-stakes-1280-20261012.png", "kind": "genuine live outage", "sha256": "c50aa938deb7af4ab88039768050468862bfbb0fff36f2d6559bcda6c7f42c34" },
+      { "file": "rpc-local-stakes-390-20261012.png", "kind": "genuine live outage", "sha256": "176b08240ceff19bf287f80b997c480fbd88939dd536b21f188f41e479dd8a04" },
+      { "file": "rpc-local-stakes-390-detail-20261012.png", "kind": "genuine live outage", "sha256": "a017b4687d70bb7c8ed93f1269b21e7b636c30b43eef5e07f4bd78548c75321b" },
+      { "file": "rpc-independent-agri-pv-390-20261012.png", "kind": "genuine live illustrative model", "sha256": "7d3f47ee1886c96a246a5ebaa4e055f20dbebc1b123d80a35841b2d064798cb9" },
+      { "file": "rpc-home-timeout-fixture-1280-20261012.png", "kind": "labelled browser-local QA fixture", "sha256": "54fdfbf5c0ea31f5a8982193ee8a7178555a28e3d999ffc42eab371ac1a91392" },
+      { "file": "rpc-home-timeout-fixture-390-20261012.png", "kind": "labelled browser-local QA fixture", "sha256": "ca83243c5553c3b7f903ffa922706fbd5949979e350ef7a5e76402cb0ec1f935" },
+      { "file": "rpc-stale-fixture-1280-20261012.png", "kind": "labelled synthetic public snapshot", "sha256": "363dea7d3b4c248667343615b5c00f8c98fd7db9a7c84bd9b7f03ee83131fdac" },
+      { "file": "rpc-stale-fixture-390-20261012.png", "kind": "labelled synthetic public snapshot", "sha256": "3c3273f75ada07ecf9f8dff97f86c588d38b2db51d2e13111a5348027a68fd4f" },
+      { "file": "rpc-expired-fixture-1280-20261012.png", "kind": "labelled synthetic public snapshot", "sha256": "751ad5f51bc275d83a49fdf9135270c44234d2be35408505f844525de581ecc2" },
+      { "file": "rpc-expired-fixture-390-20261012.png", "kind": "labelled synthetic public snapshot", "sha256": "2addea506465181a90f713d6354575f461944e53770f425460a0a26a2a312887" }
+    ]
+  },
+  "notClaimed": [
+    "A recovered hosted Solana provider or a new finalized financial transaction on revision 41.",
+    "A proven original upstream HTTP status or NetworkPolicy fault; Helius quota exhaustion is owner-confirmed dashboard evidence.",
+    "A secondary provider configured without an owner-controlled usable endpoint.",
+    "Synthetic QA snapshot amounts as actual income, positions or decisions.",
+    "Deployment of owner-paused retention/consent work or any other Stadtstack product."
+  ]
+}

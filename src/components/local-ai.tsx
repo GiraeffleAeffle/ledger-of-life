@@ -12,7 +12,7 @@ import { HostKindBadge } from './home-node-host-badge';
 import { inferenceApprovalForReview, inferenceNextAction, LOCAL_AI_RECEIPT_KEY } from './local-ai-review';
 import { cityQuestionStart, deskAvailability, lastAnswerText } from './local-ai-availability';
 import { coveredNames } from './city-coverage';
-import { useSectionTabActive } from './section-tabs';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
 import './local-ai.css';
 import { LocalAiProgress } from './local-ai-progress';
 import { aiApprovalPollId, aiRequestPollId, aiSelectedHostStatus, aiTerminalError, isAiRequestTerminal } from './local-ai-progress-state';
@@ -38,7 +38,6 @@ export function LocalAiWorkspace({ initialMode = 'paid', publicAccess = false, c
 
 function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: LocalAiMode; publicAccess: boolean; cityId: string | null }) {
   const wallet = useRentalWallet();
-  const activeTab = useSectionTabActive();
   const { authenticated, getAccessToken, subject } = wallet;
   const [mode, setMode] = useState<LocalAiMode>(publicAccess ? 'library' : initialMode);
   const [service, setService] = useState<LocalAiServiceStatus | null>(null);
@@ -90,7 +89,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     return readLocalAiResponse<T>(response, requestId, body ? 'POST' : 'GET');
   }, [mode, authenticated, getAccessToken]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async () => {
     const revision = ++readRevision.current;
     await Promise.all([
       api<{ service: LocalAiServiceStatus }>('/api/local-ai/status').then((result) => {
@@ -100,8 +99,9 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
         if (mounted.current && revision === readRevision.current) { setUsage(result.usage); setUsageError(''); }
       }, (cause: unknown) => { if (mounted.current && revision === readRevision.current) setUsageError(errorMessage(cause)); })]),
     ]);
-  }, [api, publicAccess]);
+  }, [api, publicAccess]));
 
+  const announcedReceipt = useRef<string | null>(null);
   const accept = useCallback((next: LocalAiRequest) => {
     setSavedRequestId(null); setError(''); setCurrent(next); setApproval(next.approval); setPrompt(next.purgedAt ? '' : next.prompt); if (next.purgedAt) setDraft(null); setOutputLimit(next.maxOutputTokens);
     setHostScope(next.hostScope ?? 'own'); setPublicQuestion(next.publicQuestion ?? false);
@@ -109,15 +109,18 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       setPaymentSubmitted(false); paymentHeaders.current = null;
       if (next.mode === 'paid' && next.state === 'completed' && next.payment.state === 'settled' && next.payment.receipt?.success) {
         try { if (subject) sessionStorage.setItem(`${LOCAL_AI_RECEIPT_KEY}:${subject}`, next.id); } catch { /* The saved server receipt remains available in this view. */ }
-        window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: next.solanaReview ? 'solana' : 'evm' } }));
+        if (announcedReceipt.current !== next.id) {
+          announcedReceipt.current = next.id;
+          window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: next.solanaReview ? 'solana' : 'evm' } }));
+        }
       }
     }
   }, [subject]);
-  const readSaved = useCallback(async (id: string) => {
+  const readSaved = useSerializedRead(useCallback(async (id: string) => {
     const revision = requestRevision.current;
     const result = await api<{ request: LocalAiRequest }>(`/api/local-ai/requests/${id}`, undefined, undefined, mode === 'paid');
     if (mounted.current && revision === requestRevision.current) accept(result.request);
-  }, [api, mode, accept]);
+  }, [api, mode, accept]));
 
   useEffect(() => {
     mounted.current = true;
@@ -125,32 +128,23 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
     return () => { active.current = false; ++reads.current; ++requests.current; };
   }, []);
   useEffect(() => {
-    if (activeTab && document.visibilityState === 'visible') void refresh();
-    const balancesChanged = (event: Event) => {
-      if (activeTab && document.visibilityState === 'visible' && ['evm', 'solana'].includes((event as CustomEvent<{ chain?: string }>).detail?.chain ?? '') && !action.current) void refresh();
-    };
-    const onVisible = () => { if (activeTab && document.visibilityState === 'visible') void refresh(); };
-    window.addEventListener('ledger-balances-changed', balancesChanged);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => { window.removeEventListener('ledger-balances-changed', balancesChanged); document.removeEventListener('visibilitychange', onVisible); };
-  }, [refresh, activeTab]);
-  useEffect(() => {
-    let active = true;
-    const requests = requestRevision;
-    queueMicrotask(() => {
-      if (!active || !mounted.current) return;
-      let id: string | null = null;
-      try {
-        const stored = sessionStorage.getItem(storageKey);
-        if (stored && /^[0-9a-f-]{36}$/i.test(stored)) id = stored;
-      } catch { /* Session storage is optional; requests themselves are persisted on the server. */ }
-      setSavedRequestId(id);
-      if (id) void readSaved(id).catch((cause: unknown) => {
-        if (active && mounted.current) setError(`Saved request unavailable: ${errorMessage(cause)}`);
-      });
-    });
-    return () => { active = false; ++requests.current; };
-  }, [storageKey, readSaved]);
+    const revision = requestRevision;
+    return () => { ++revision.current; };
+  }, [storageKey]);
+  useFinancialRefresh(async () => { if (!action.current) await refresh(); }, { identity: mode });
+  useFinancialRefresh(async () => {
+    if (action.current) return;
+    let id: string | null = null;
+    try {
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored && /^[0-9a-f-]{36}$/i.test(stored)) id = stored;
+    } catch { /* Session storage is optional; requests themselves are persisted on the server. */ }
+    setSavedRequestId(id);
+    if (id) {
+      try { await readSaved(id); }
+      catch (cause) { if (mounted.current) setError(`Saved request unavailable: ${errorMessage(cause)}`); }
+    }
+  }, { identity: storageKey });
   useEffect(() => {
     if (publicAccess) return;
     const consume = () => {
@@ -165,36 +159,23 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
 
   const unresolvedId = aiRequestPollId(current);
   const hasUnresolvedRequest = current?.state === 'running' || current?.state === 'settling';
-  useEffect(() => {
-    if (!unresolvedId) return;
-    let checking = false; let active = true;
-    const check = () => {
-      if (checking || action.current || !activeTab || document.visibilityState === 'hidden') return;
-      checking = true;
-      void readSaved(unresolvedId).then(() => { if (active) void refresh(); }, (cause: unknown) => {
-        if (active) setError(`Still waiting for the saved result: ${errorMessage(cause)}`);
-      }).finally(() => { checking = false; });
-    };
-    const timer = window.setInterval(check, 4000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [unresolvedId, readSaved, refresh, activeTab]);
+  useFinancialRefresh(async () => {
+    if (!unresolvedId || action.current) return;
+    try { await readSaved(unresolvedId); }
+    catch (cause) { if (mounted.current) setError(`Still waiting for the saved result: ${errorMessage(cause)}`); }
+  }, { enabled: Boolean(unresolvedId), pendingKey: unresolvedId, initial: false });
 
   const approvalPending = aiApprovalPollId(current, approval);
-  useEffect(() => {
-    if (!approvalPending) return;
-    let checking = false; let active = true;
-    const check = () => {
-      if (checking || action.current || !activeTab || document.visibilityState === 'hidden') return;
-      checking = true;
-      void api<{ approval: LocalAiApproval }>(`/api/local-ai/requests/${approvalPending}/approval`, { action: 'reconcile' }, undefined, true).then(({ approval: next }) => {
-        if (!active) return;
-        setApproval(next);
-        if (next.state === 'completed') { void refresh(); void readSaved(approvalPending); }
-      }, (cause: unknown) => { if (active) setError(`Access approval remains unresolved: ${errorMessage(cause)}`); }).finally(() => { checking = false; });
-    };
-    const timer = window.setInterval(check, 4000);
-    return () => { active = false; window.clearInterval(timer); };
-  }, [approvalPending, api, refresh, activeTab, readSaved]);
+  const checkApproval = useSerializedRead(useCallback(async () => {
+    if (!approvalPending || action.current) return;
+    try {
+      const { approval: next } = await api<{ approval: LocalAiApproval }>(`/api/local-ai/requests/${approvalPending}/approval`, { action: 'reconcile' }, undefined, true);
+      if (!mounted.current) return;
+      setApproval(next);
+      if (next.state === 'completed') { await refresh(); await readSaved(approvalPending); }
+    } catch (cause) { if (mounted.current) setError(`Access approval remains unresolved: ${errorMessage(cause)}`); }
+  }, [approvalPending, api, refresh, readSaved]));
+  useFinancialRefresh(checkApproval, { enabled: Boolean(approvalPending), pendingKey: approvalPending, initial: false });
 
   async function run(label: string, operation: () => Promise<void>) {
     if (action.current) return;
@@ -379,6 +360,7 @@ function LocalAiPanel({ initialMode, publicAccess, cityId }: { initialMode: Loca
       </div>}
       {busy && !unresolvedId && <p className="local-ai-progress" role="status">{busy}</p>}
       {current && <LocalAiProgress request={current} />}
+      {(unresolvedId || approvalPending) && <button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void (approvalPending ? checkApproval() : readSaved(unresolvedId!)).catch(cause => setError(errorMessage(cause)))}>Check the same saved request</button>}
       {error && <p className="local-ai-alert" role="alert">{error}</p>}
       {savedRequestId && <div className="local-ai-payment-review"><p role="status">The saved request&apos;s outcome is not known until it can be read. An authorization is not proof of payment or an answer. Do not sign or submit another payment while recovering it.</p><button type="button" className="text-button" disabled={Boolean(busy)} onClick={() => void run('Reading the saved request', () => readSaved(savedRequestId))}>Read saved request again</button></div>}
       {(terminalError || current?.error) && <p className="local-ai-alert" role="alert">{terminalError || current?.error}</p>}

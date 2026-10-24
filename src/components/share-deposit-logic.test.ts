@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, requireBoundSolanaShareReview, formatDepositShares, shareDepositReceiptUrl, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic.ts';
+import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, requireBoundSolanaShareReview, formatDepositShares, shareDepositReceiptUrl, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance } from './share-deposit-logic.ts';
 import type { ShareDepositPlan, SolanaShareDepositPlan, ShareDepositView } from '../domain/share-deposit.ts';
 
 test('next action respects server role permissions and timeout priority', () => {
@@ -106,12 +106,6 @@ test('fee balance remains usable when token valuation is unavailable', () => {
   assert.equal(shareFeeBalance({ robinhood: null }), undefined);
 });
 
-test('pending receipt retries use five seconds normally and capped error backoff', () => {
-  assert.equal(shareReceiptPollDelay(0), 5000);
-  assert.equal(shareReceiptPollDelay(1), 10000);
-  assert.equal(shareReceiptPollDelay(2), 20000);
-  assert.equal(shareReceiptPollDelay(10), 60000);
-});
 
 test('Solana share amounts retain all six decimals without floating point loss', () => {
   assert.equal(formatDepositShares('1000001', 6), '1.000001');

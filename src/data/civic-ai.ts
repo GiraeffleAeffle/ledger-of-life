@@ -1,6 +1,10 @@
+import type { AutoVerifiedSource, SourceAssertion } from './city-source-evidence.ts';
+
 /** Native public City AI is independent of paid inference and grants no municipal authority. */
 export interface CivicAiSource {
   id: string; title: string; url: string; asOf: string; kind: string; reviewState: string;
+  verification?: AutoVerifiedSource;
+  assertion?: SourceAssertion;
 }
 export type CivicAiStatus = 'pending' | 'running' | 'completed' | 'failed' | 'unavailable' | 'budget_exhausted' | 'interrupted';
 export interface CivicAiJob {

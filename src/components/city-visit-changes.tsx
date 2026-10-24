@@ -1,7 +1,7 @@
 'use client';
 import type { AuthorizedRequest } from './use-city-signals';
 import { useCityVisitChanges } from './use-city-visit-changes';
-import { REVIEW_LABELS } from './personal-map-relevance';
+import { sourceReviewLabel } from '@/data/city-source-evidence';
 import { formatCityDate } from './city-coverage';
 import { MoreRow, StatusLine } from './blocks';
 import { goToSection, type Area } from './areas';
@@ -24,7 +24,7 @@ export function CityVisitChanges({ request, accountId, go }: { request: Authoriz
     </div>}
     <MoreRow id="city-changes" title={hasUpdates ? 'What changed' : summary} meta={hasUpdates ? visit.changes[0]?.title || 'Changes and source coverage' : undefined}>
       {issue && <p role="alert">{issue}</p>}
-      {visit.changes.length > 0 && <ul className="city-change-list">{visit.changes.map((change) => <li key={change.id}><strong>{change.title}</strong><p>{change.description} · {REVIEW_LABELS[change.reviewState as keyof typeof REVIEW_LABELS] ?? 'Not yet checked'}</p><small>{visit.relevant.get(change.id) ?? 'Published city feed item'} · {formatCityDate(change.asOf)}</small></li>)}</ul>}
+      {visit.changes.length > 0 && <ul className="city-change-list">{visit.changes.map((change) => <li key={change.id}><strong>{change.title}</strong><p>{change.description} · {sourceReviewLabel(change.reviewState, change.verification)}</p><small>{visit.relevant.get(change.id) ?? 'Published city feed item'} · {formatCityDate(change.asOf)}</small></li>)}</ul>}
       {visit.pendingCount > 0 && <p>{visit.pendingCount} followed-project update{visit.pendingCount === 1 ? '' : 's'}. <a href="#followed-projects" onClick={(event) => { event.preventDefault(); goToSection(go, 'places', 'followed-projects'); }}>Review followed projects →</a></p>}
       <p>Changes match your home, device pins and city interests. Only “Mark changes seen” advances this account’s private baseline on this device. Followed-project updates are reviewed separately. Unavailable sources cannot show changes.</p>
     </MoreRow>
