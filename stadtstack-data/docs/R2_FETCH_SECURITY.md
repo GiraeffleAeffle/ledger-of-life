@@ -540,6 +540,10 @@ Follow this order:
 - The complete fourteen-contract report must be generated twice on that exact
   tree, reconciled, retained externally and used to mint the current generation
   pin. The report currently only defines the measurement procedure.
+- The pure R1/R2 pin validators must be wired into the merged job/receipt
+  boundary: authenticated historical R1 jobs use their exact recorded pin set,
+  and every newly admitted R2 job must pass the current-generation check. The
+  focused fixtures prove validator behavior, not integration into a live queue.
 - The parser image must be rebuilt if its final image inputs/worker differ from
   the candidate, then independently reviewed with current real image/SBOM
   identity. The OMP runner/image/resolver/daemon review and both root-owned
