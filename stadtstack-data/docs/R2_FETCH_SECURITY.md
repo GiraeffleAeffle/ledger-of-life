@@ -119,9 +119,37 @@ robots/TDM policy URLs. No hostname wildcard, subtree prefix, query mutation,
 automatic redirect target or discovery expansion is allowed. Unlisted policy
 references also stop pending a genuine reviewed amendment.
 
-The owner description says42sources; the actual registry and registered robots
-scope table have43entries. All18 selected scopes exist, but the universe
-mismatch is an explicit issuance blocker, not silent approval of43sources.
+The source count is reconciled: **43 total registered routes =41 district
+document registrations +2 structured routes**. The wording42was outdated:
+GENESIS increased41→42 in `ae49124d132539650feb183aa2246bde4ee51581`
+(12October21:48:30UTC); PEGELONLINE increased42→43 in
+`96e34c49891d9be3762b5ae181df7c0a32682cc1` (13October06:27:21UTC).
+The latter was initially a proposal, then merged in
+`7b9ab165398f8229c0cf0db4c85d3c6926695235` (13October10:21:10UTC)
+under the genuine K2 owner approval committed in
+`45bea58e919d810d49db2eb8d6ecc49845a765c4`.
+
+The43rd source is `pegelonline`, municipality `hagenow`, AGS13076060, exact
+WSV station-list endpoint
+`https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json`.
+The [K2 owner record](../reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json)
+records the owner's `"1. yes 2. C"`, pins this registry commit/hash and permits
+exactly one station-list GET plus policy requests, within5jobs/25min, expiring
+16October. That historical permission is not current R2 fetch authority.
+Its licence field is explicitly a catalog declaration, not verified licence
+terms or a new source agreement. `R1_STATUS.md:35,40` records both the initial
+proposal and subsequent approved successful K2 batch; those dated statements
+remain historical, not contradictory current instructions.
+
+FULL's frozen catalogue uses the96e34c4 processing-registry descriptor
+(`registry-96e34c4-code-3a1e1b1/operator-registry-config.json`), with configuration
+SHA256 `e471ba1fecc2be15f81e109dc8eb82360d85cebaa1a54ef1f3da3b1427399134`;
+its27text-source corpus rows are a different count from the43-route registry.
+The current18selected R2 scopes include neither `pegelonline` nor
+`regionalstatistik-genesis`, and the v3 draft expressly excludes GENESIS/PEGEL
+native acquisitions. **No selected scope or URL needs adding/removing for this
+count correction.** The numerical discrepancy is no longer an issuance
+blocker; final exact registry/manifest pins and genuine R2 approvals still are.
 The selected112URLs must be deduplicated against the final frozen R1 corpus
 and current content:120bindings is not120new documents or a completeness claim.
 The three candidate cached hashes are retained as known prior baselines, not
