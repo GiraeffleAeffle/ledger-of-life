@@ -20,7 +20,7 @@ import {startWorkerLease,finishWorkerLease,captureLocalDocumentWorker} from './d
 import {CIVIC_POLICY_AUTHORITY,CIVIC_ACQUISITION_DECISION_ID,assertCivicPolicyAuthority,assertManagedSourceReadable,assertManagedSourceBindings,initializeManagedAcquisitionLane,type CivicPolicyOptions} from './civic-opt-out.ts';
 
 const providerSchema=z.literal('openai-subscription');
-const authoritySchema=z.object({stateDir:z.literal(CIVIC_POLICY_AUTHORITY.stateDir),authorityId:z.literal(CIVIC_POLICY_AUTHORITY.authorityId),authoritySha256:hashSchema}).strict();
+const authoritySchema=z.object({stateDir:z.literal(CIVIC_POLICY_AUTHORITY.stateDir),authorityId:z.literal(CIVIC_POLICY_AUTHORITY.authorityId),authoritySha256:hashSchema,r2Integrity:z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema}).strict().optional()}).strict();
 const receiptSchema=z.object({taskId:hashSchema,resultSha256:hashSchema,preparedSha256:hashSchema,promptSha256:hashSchema,schemaSha256:hashSchema,records:z.number().int().nonnegative(),quarantined:z.number().int().nonnegative(),authorityId:z.string(),authoritySha256:hashSchema}).strict();
 function groupFor(plan:PreparationPlan,task:WorkTask):PreparationGroup{
  const group=plan.groups.find(group=>group.expected.municipalityId===task.group.municipalityId&&group.expected.sourceSha256===task.group.sourceSha256&&group.expected.receiptSha256===task.group.preparedSha256);
@@ -64,7 +64,8 @@ export async function runDocumentWorker():Promise<void>{
   const policy={...request.policy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
   await assertManagedSourceReadable(request.preparationPath,policy);
   const preparation=preparationPlanSchema.parse(await readPinnedJson(request.preparationPath,request.preparationSha256));
-  await assertManagedSourceReadable(request.preparationPath,policy);
+  if(JSON.stringify(request.policy.r2Integrity)!==JSON.stringify(preparation.r2Integrity))throw Error('Worker control R2 guard differs from hash-pinned preparation');
+  policy.r2Integrity=preparation.r2Integrity;
   const registryAdmission=await readOperatorRegistryInputPin(request.registry,policy);
   if(sha256(registryAdmission.bytes)!==preparation.registrySha256)throw Error('Worker admitted registry differs from preparation');
   const contract=await jointExtractionContract(),plan=createWorkPlan(preparation.groups.map(group=>({municipalityId:group.expected.municipalityId,sourceSha256:group.expected.sourceSha256,preparedSha256:group.expected.receiptSha256})),contract,'codex-only');
@@ -118,7 +119,7 @@ export async function assembleRun(preparation:PreparationPlan,plan:WorkPlan,out:
 }
 export async function runCodexExtraction(options:{preparationPath:string;preparationSha256:string;registry:OperatorRegistryInputPin;out:string;resume?:boolean;policy?:CivicPolicyOptions}){
  if(process.platform!=='linux')throw Error('Source extraction runs only on the authoritative Codex VM');
- const selectedPolicy=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy={...CIVIC_POLICY_AUTHORITY,...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ const selectedPolicy:CivicPolicyOptions=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selectedPolicy),policy:CivicPolicyOptions={...CIVIC_POLICY_AUTHORITY,...selectedPolicy,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  authoritySchema.parse(policy);
 
  const out=resolve(options.out),contentRoot=join(out,'source-content');
@@ -130,6 +131,7 @@ export async function runCodexExtraction(options:{preparationPath:string;prepara
  try{
   await assertManagedSourceReadable(options.preparationPath,policy);
   const preparation=preparationPlanSchema.parse(await readPinnedJson(options.preparationPath,options.preparationSha256)),contract=await jointExtractionContract();
+  if(preparation.r2Integrity)policy.r2Integrity=preparation.r2Integrity;
   await assertManagedSourceReadable(options.preparationPath,policy);
   const registryAdmission=await readOperatorRegistryInputPin(options.registry,policy);
   if(sha256(registryAdmission.bytes)!==preparation.registrySha256)throw Error('Admitted registry differs from trusted preparation');

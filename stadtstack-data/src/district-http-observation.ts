@@ -5,18 +5,20 @@ import {HashSchema,digest} from './district-adapter-contract.ts';
 import {ContentFreeSourcePolicySchema} from './district-schema.ts';
 import {SourceObservationSchema} from './source-observation.ts';
 import type {ManagedSourceBinding} from './civic-opt-out.ts';
+import type {R2IntegrityGuard} from './r2-acquisition-integrity.ts';
 
 export const HttpObservationSchema=SourceObservationSchema.omit({exclusion:true}).extend({state:z.enum(['fetched','not_modified']),status:z.number().int().min(200).max(399),policy:ContentFreeSourcePolicySchema.optional()}).strict();
 export const HttpObservationProofSchema=z.object({observationId:z.string().regex(/^[0-9]+-[a-f0-9-]{36}\.json$/).max(160),receiptSha256:HashSchema,bytes:z.string().max(1024*1024)}).strict().superRefine((proof,ctx)=>{
  if(Buffer.byteLength(proof.bytes)>1024*1024||digest(proof.bytes)!==proof.receiptSha256)ctx.addIssue({code:'custom',message:'Original HTTP observation byte digest/bound mismatch'});
  try{HttpObservationSchema.parse(JSON.parse(proof.bytes));}catch{ctx.addIssue({code:'custom',message:'Original HTTP observation safe schema mismatch'});}
 });
-export const HttpSourceBindingSchema=z.object({kind:z.literal('http_observation'),url:SourceObservationSchema.shape.url,sourceSha256:HashSchema,observationId:HttpObservationProofSchema.shape.observationId,receiptSha256:HashSchema}).strict();
+const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:HashSchema,manifestSha256:HashSchema}).strict();
+export const HttpSourceBindingSchema=z.object({kind:z.literal('http_observation'),url:SourceObservationSchema.shape.url,sourceSha256:HashSchema,observationId:HttpObservationProofSchema.shape.observationId,receiptSha256:HashSchema,r2Integrity:R2IntegrityReferenceSchema.optional()}).strict();
 export type HttpObservationProof=z.infer<typeof HttpObservationProofSchema>;
-export function authenticatedHttpBinding(proofInput:unknown,expected:{url:string;sha256:string;mimeType?:string;retrievedAt?:string;fetchedAt?:string}):Extract<ManagedSourceBinding,{kind:'http_observation'}>{
+export function authenticatedHttpBinding(proofInput:unknown,expected:{url:string;sha256:string;mimeType?:string;retrievedAt?:string;fetchedAt?:string;r2Integrity?:R2IntegrityGuard}):Extract<ManagedSourceBinding,{kind:'http_observation'}>{
  const proof=HttpObservationProofSchema.parse(proofInput),observation=HttpObservationSchema.parse(JSON.parse(proof.bytes));
  if(observation.url!==expected.url||observation.sha256!==expected.sha256||expected.mimeType!==undefined&&observation.mimeType!==expected.mimeType||expected.retrievedAt!==undefined&&observation.retrievedAt!==expected.retrievedAt||expected.fetchedAt!==undefined&&observation.checkedAt!==expected.fetchedAt||observation.state==='fetched'&&(observation.status<200||observation.status>=300)||observation.state==='not_modified'&&observation.status!==304)throw Error('Original HTTP observation does not bind the selected representation');
- return {kind:'http_observation',url:observation.url,sourceSha256:observation.sha256,observationId:proof.observationId,receiptSha256:proof.receiptSha256};
+ return {kind:'http_observation',url:observation.url,sourceSha256:observation.sha256,observationId:proof.observationId,receiptSha256:proof.receiptSha256,...(expected.r2Integrity?{r2Integrity:expected.r2Integrity}:{})};
 }
 
 export async function authenticateHttpSourceBindings(cas:{root:string;read:(hash:string)=>Promise<Uint8Array>},bindings:ManagedSourceBinding[],sources:{url:string;sha256:string}[],policy:CivicPolicyOptions={}):Promise<Extract<ManagedSourceBinding,{kind:'http_observation'}>[]>{
@@ -28,7 +30,7 @@ export async function authenticateHttpSourceBindings(cas:{root:string;read:(hash
   const observationPath=join(cas.root,'sha256',selected.receiptSha256.slice(0,2),selected.receiptSha256);
   await assertManagedSourceBindings(observationPath,[selected],{...policy,sourceUrl:source.url});
   const bytes=Buffer.from(await cas.read(selected.receiptSha256));
-  const bound=authenticatedHttpBinding({observationId:selected.observationId,receiptSha256:selected.receiptSha256,bytes:bytes.toString('utf8')},source);
+  const bound=authenticatedHttpBinding({observationId:selected.observationId,receiptSha256:selected.receiptSha256,bytes:bytes.toString('utf8')},{...source,...(selected.r2Integrity?{r2Integrity:selected.r2Integrity}:{})});
   await assertManagedSourceBindings(observationPath,[selected],{...policy,sourceUrl:source.url});
   await assertManagedIndependentHttpSourceBinding(join(cas.root,'sha256',source.sha256.slice(0,2),source.sha256),selected,{...policy,sourceUrl:source.url});
   result.push(bound);

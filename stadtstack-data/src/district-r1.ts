@@ -93,7 +93,7 @@ export async function acquisitionContract(hash?:(file:string)=>Promise<string>){
  const hostGroupsBytes=await readFile(join(REPO,'sources/district-host-groups.json'));
  HostGroupsSchema.parse(JSON.parse(hostGroupsBytes.toString('utf8'))); // Live pacing, not identity.
  // Mixed request/representation code stays semantic; authority/policy/custody do not.
- const files=['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-native-request.ts','genesis-owner-acquisition.ts'];
+ const files=['district-r1.ts','district-r1-state.ts','polite-fetch.ts','district-native-request.ts','genesis-owner-acquisition.ts','r2-acquisition-executor.ts'];
  return semanticHash({version:ACQUISITION_VERSION,files:await Promise.all(files.map(async file=>({file,sha256:hash?await hash(file):digest(await readFile(join(REPO,'src',file)))})))});
 }
 

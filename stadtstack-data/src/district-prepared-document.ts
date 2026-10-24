@@ -8,10 +8,12 @@ import { collectParserToolVersions, parserOutputContractSha256, readParserReview
 import {contractSourceManifest,type ContractSourceHash} from './district-contract-source.ts';
 import type { CivicPolicyOptions, ManagedSourceBinding, ManagedAcquisitionLaneOptions } from './civic-opt-out.ts';
 import type { ParserSourceContext } from './district-parser-isolation.ts';
+import {assertR2ReferencesReleased} from './r2-acquisition-integrity.ts';
 export const PREPARED_DOCUMENT_VERSION = 'district-prepared-v2';
 export const PREPARED_VM_ROOT = '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared';
 const MAX_PREPARED_BYTES = 6 * 1024 * 1024;
-const ReferenceSchema = z.object({ id: z.string().min(1), url: z.url(), sha256: hashSchema, retrievedAt: z.iso.datetime(), locator: z.string().min(1), mimeType: z.string().min(1), sourceType: z.enum(['council', 'participation', 'gazette', 'website', 'structured']), policy: SourceAccessPolicySchema }).strict();
+const R2IntegrityReferenceSchema=z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema}).strict();
+const ReferenceSchema = z.object({ id: z.string().min(1), url: z.url(), sha256: hashSchema, retrievedAt: z.iso.datetime(), locator: z.string().min(1), mimeType: z.string().min(1), sourceType: z.enum(['council', 'participation', 'gazette', 'website', 'structured']), policy: SourceAccessPolicySchema,r2Integrity:R2IntegrityReferenceSchema.optional() }).strict();
 export type PreparedSourceReference = z.infer<typeof ReferenceSchema>;
 const ToolVersionsSchema = z.record(z.string().regex(/^[a-zA-Z0-9._-]{1,80}$/), z.string().min(1).max(300));
 export const PreparedDocumentSchema = z.object({
@@ -47,7 +49,7 @@ export function preparedSourceBindings(references: PreparedSourceReference[], re
   const bindings = new Map<string, PreparedArtifactBinding>();
   for (const reference of references) {
     const key = JSON.stringify([reference.id, reference.url, reference.sha256]);
-    if (!bindings.has(key)) bindings.set(key, { kind: 'prepared_source', url: reference.url, sourceSha256: reference.sha256, observationId: reference.id, receiptSha256, independentAllowed: true });
+    if (!bindings.has(key)) bindings.set(key, { kind: 'prepared_source', url: reference.url, sourceSha256: reference.sha256, observationId: reference.id, receiptSha256, ...(reference.r2Integrity?{r2Integrity:reference.r2Integrity}:{}), independentAllowed: true });
   }
   return [...bindings.values()];
 }
@@ -76,6 +78,15 @@ export async function assertPreparedSourcesActive(references: PreparedSourceRefe
   // Host-only authority modules are deliberately absent from the credential-free parser image.
   const { assertCivicPolicyAuthority, assertHostNotOptedOut } = await import('./civic-opt-out.ts');
   await assertCivicPolicyAuthority(options);
+  const provenance=references.map(reference=>reference.r2Integrity);
+  if(provenance.some(Boolean)){
+    if(provenance.some(value=>!value)||provenance.some(value=>canonical(value)!==canonical(provenance[0])))throw Error('Prepared source references have inconsistent R2 acquisition provenance');
+    if(options.r2Integrity&&canonical(options.r2Integrity)!==canonical(provenance[0]))throw Error('Caller R2 integrity option differs from authenticated source references');
+    await assertR2ReferencesReleased(references,provenance[0]);
+  }else{
+    if(options.r2Integrity)throw Error('R2 integrity cannot be supplied without source-bound R2 acquisition provenance');
+    await assertR2ReferencesReleased(references);
+  }
   const hosts = new Set<string>();
   for (const reference of references) {
     assertSubscriptionSourcePolicy(reference.policy, reference);

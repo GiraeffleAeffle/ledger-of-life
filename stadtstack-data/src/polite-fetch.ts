@@ -34,19 +34,20 @@ import {persistCrawlRequestEvidence,persistOwnerAccountRequestEvidence,OwnerAcqu
 import {semanticHash} from './district-adapter-contract.ts';
 import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,registeredBobScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
+import type {R2IntegrityGuard} from './r2-acquisition-integrity.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'inspection_failed'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
-class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
+export class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
  status?:number;failure?:FetchFailure;retryAfter?:string;sha256?:string;bytes?:number;mimeType?:string;etag?:string;lastModified?:string;location?:string;policy?:SourceAccessPolicy;exclusion?:ExcludedDocument['exclusion'];
 }
-export interface FetchedDocument {url:string;sha256:string;localPath:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy?:SourceAccessPolicy}
+export interface FetchedDocument {url:string;sha256:string;localPath:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy?:SourceAccessPolicy;r2Integrity?:R2IntegrityGuard}
 type ValidatedPolicy={kind:'robots';value:RobotsPolicy}|{kind:'tdm';value:TdmRule[]};
 export interface ExcludedDocument {url:string;sha256:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy:SourceAccessPolicy;sizeBytes:number;exclusion:{reason:'non_official_restricted';excludedAt:string;previousManagedCopy:'removed'|'retained_independent'|'not_managed'|'partial'}}
-export interface SourceContentBinding {url:string;sha256:string;observationPath:string;independentAllowed:boolean}
+export interface SourceContentBinding {url:string;sha256:string;observationPath:string;independentAllowed:boolean;r2Integrity?:R2IntegrityGuard}
 export function sourceContentBinding(document:FetchedDocument):SourceContentBinding {
- return {url:document.url,sha256:document.sha256,observationPath:document.observationPath,independentAllowed:!!document.policy&&effectiveSourcePermission(document.policy,document)};
+ return {url:document.url,sha256:document.sha256,observationPath:document.observationPath,independentAllowed:!!document.policy&&effectiveSourcePermission(document.policy,document),...(document.r2Integrity?{r2Integrity:document.r2Integrity}:{})};
 }
 export class PoliteFetchError extends Error {
  failure:FetchFailure;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;robotsEvidence?:PolicyEvidence;excludedDocument?:ExcludedDocument;
@@ -116,7 +117,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}
+export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>;onValidatedRepresentation?:(input:{url:string;body:Buffer;observation:FetchObservation;localPath:string})=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -137,10 +138,14 @@ function retryAfterTime(value:string|undefined,now:number):number {
  return Number.isFinite(time)?Math.max(now,time):0;
 }
 export class PoliteFetcher {
- readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'>>;
+ readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'|'onWireAttemptResult'|'onWireResponse'|'onValidatedRepresentation'>>;
  private readonly fixtureInspection:FixturePolicyInspection|undefined;
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
+ private readonly onResponseChunk:PoliteFetcherOptions['onResponseChunk'];
+ private readonly onWireAttemptResult:PoliteFetcherOptions['onWireAttemptResult'];
+ private readonly onWireResponse:PoliteFetcherOptions['onWireResponse'];
+ private readonly onValidatedRepresentation:PoliteFetcherOptions['onValidatedRepresentation'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private readonly inventoryTimeoutMs:number;
  private readonly ownerGenesisTableTimeoutMs:number;
@@ -207,9 +212,13 @@ export class PoliteFetcher {
  }
  get requestCount():number{return this.fetchCount;}
  constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
-  if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
   this.fixtureInspection=options.fixtureInspection;
-  this.beforeRequest=options.beforeRequest;this.onRedirect=options.onRedirect;
+  this.beforeRequest=options.beforeRequest;
+  this.onRedirect=options.onRedirect;
+  this.onResponseChunk=options.onResponseChunk;
+  this.onWireAttemptResult=options.onWireAttemptResult;
+  this.onWireResponse=options.onWireResponse;
+  this.onValidatedRepresentation=options.onValidatedRepresentation;
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
@@ -291,12 +300,13 @@ export class PoliteFetcher {
    catch(error){if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)throw error;throw new PoliteFetchError('host_state_unsafe','Immutable source observation is missing or invalid');}
    if(!sourceObservationMatches(observation,{url:binding.url,sha256:binding.sha256,mimeType:observation.mimeType,retrievedAt:observation.retrievedAt,checkedAt:observation.checkedAt,status:observation.status,sizeBytes:(await lstat(rawPath)).size,bodyState:'retained'}))throw new PoliteFetchError('host_state_unsafe','Immutable source observation binding mismatch');
    const proof:Extract<ManagedSourceBinding,{kind:'http_observation'}>={kind:'http_observation',url:binding.url,sourceSha256:binding.sha256,observationId:name,receiptSha256:hash(bytes)};
-   await assertManagedRawSourceBinding(rawPath,proof,this.policyOptions());
+   const r2Integrity=await assertManagedRawSourceBinding(rawPath,proof,this.policyOptions());
+   if(binding.r2Integrity&&JSON.stringify(binding.r2Integrity)!==JSON.stringify(r2Integrity))throw new PoliteFetchError('host_state_unsafe','Caller R2 guard differs from authenticated source provenance');
    const parsed=ContentFreeSourcePolicySchema.safeParse(observation.policy);
    if(!parsed.success)throw new PoliteFetchError('host_state_unsafe','Stored source policy is not safe complete metadata');
    if(!effectiveSourcePermission(parsed.data,binding))throw new PoliteFetchError('document_excluded','Stored source policy no longer permits derived-content reuse',undefined,parsed.data);
    for(const url of registeredSourcePolicyContextUrls(parsed.data,binding))await this.assertHostAllowed(url);
-   result.push(proof);
+   result.push({...proof,...(r2Integrity?{r2Integrity}:{})});
   }
   return result;
  }
@@ -397,9 +407,14 @@ export class PoliteFetcher {
    catch(error){if(error instanceof PoliteFetchError)throw error;throw new PoliteFetchError('dns_error','Public DNS lookup failed');}
    finally{clearTimeout(dnsTimer);}
    if(!addresses.length||addresses.some(item=>!isPublicAddress(item.address)))throw new PoliteFetchError('unsafe_url','DNS resolved a non-public address');
-   const pinned=addresses[0];
-   const nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
-   return this.scheduled(url,state=>this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state)),(response,state)=>this.recordHostResponse(url,response,state));
+   const pinned=addresses[0],nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
+   let started=false;
+   let response:WireResponse;
+   try{response=await this.scheduled(url,state=>{started=true;return this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state));},(result,state)=>this.recordHostResponse(url,result,state));}
+   catch(error){if(started)await this.onWireAttemptResult?.(url.href,error instanceof PoliteFetchError?error.status??null:null,error instanceof PoliteFetchError?error.failure:'network_error');throw error;}
+   if(started)await this.onWireAttemptResult?.(url.href,response.status,response.status>=400?`http_${response.status}`:null);
+   if(started)await this.onWireResponse?.(url.href,response.status,response.body,response.headers['content-type']??'');
+   return response;
  }
  /** Current-proof validators must come from the actual immutable observation,
   * not only the mutable request cache. Legacy observations remain usable. */
@@ -478,7 +493,7 @@ export class PoliteFetcher {
  }
  /** Transport seam used by disposable fixture servers; production reaches this
   * only through the authority, DNS pinning and exact-host scheduler above. */
- private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>,onRefusedHeaders?:(response:Pick<WireResponse,'status'|'headers'>)=>void):Promise<WireResponse>{
+ private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>,onRefusedHeaders?:(response:Pick<WireResponse,'status'|'headers'>)=>void,accountingUrl=url.href):Promise<WireResponse>{
   return new Promise<WireResponse>((done,reject)=>{
     const headers:Record<string,string>={'User-Agent':ua,Accept:'application/json,text/html,application/pdf,text/plain;q=0.8','Accept-Encoding':'identity'};
     if(body!==undefined){Object.assign(headers,nativeHeaders);headers['Content-Length']=String(Buffer.byteLength(body));}
@@ -498,7 +513,7 @@ export class PoliteFetcher {
      if(status>=300){response.destroy();clearTimeout(timer);done({status,headers:selected,body:Buffer.alloc(0),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});return;}
      const chunks:Buffer[]=[];let bytes=0;
      if(Number(selected['content-length'])>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Response exceeds byte bound'));return;}
-     response.on('data',(chunk:Buffer)=>{bytes+=chunk.length;if(bytes>this.options.maxBytes){clearTimeout(timer);reject(new PoliteFetchError('too_large','Response exceeds byte bound'));response.destroy();request.destroy();return;}chunks.push(chunk);});
+     response.on('data',(chunk:Buffer)=>{response.pause();void (async()=>{try{await this.onResponseChunk?.(accountingUrl,chunk.length);bytes+=chunk.length;if(bytes>this.options.maxBytes)throw new PoliteFetchError('too_large','Response exceeds byte bound');chunks.push(chunk);response.resume();}catch(error){clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Wire accounting failed'));response.destroy();request.destroy();}})();});
      response.on('end',()=>{clearTimeout(timer);done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});
      response.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
     });
@@ -518,8 +533,8 @@ export class PoliteFetcher {
   if(!this.publicPolicyFetcher||alreadyManaged)return persist();
   // A denial's actual observation bytes are inventoried as their OWN content
   // for custody/purge only, never as a fetched representation or admissible proof.
-  const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256;
-  return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false}],persist,this.policyOptions());
+  const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256,r2Integrity=this.policyOptions().r2Integrity;
+  return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false,...(r2Integrity?{r2Integrity}:{})}],persist,this.policyOptions());
  }
  private async policy(url:URL,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs):Promise<RobotsPolicy>{
   if(this.publicPolicyFetcher)return this.publicPolicyFetcher.policy(url,hostProfile,ttl);
@@ -618,11 +633,27 @@ export class PoliteFetcher {
    return {sourcePolicy,expiresAt:new Date(Math.min(...clocks.map(clock=>Date.parse(clock!)))+sourcePolicyValidityMs(sourcePolicy,source,options.scope,options.registeredSourceEligibility)).toISOString(),observations:[...this.policyObservationPaths],...(absence?{originalRobotsAbsence:absence.proof}:{})};
   }catch(error){if(error instanceof RequestAdmissionInterruption)throw error.admissionError;throw error;}finally{this.policyObservationPaths=undefined;this.policyRefreshOriginalUrl=undefined;}
  }
+ async promoteQuarantinedRepresentation(input:{url:string;sha256:string;localPath:string;mimeType:string;observation:FetchObservation}):Promise<FetchedDocument>{
+  await this.initialize();
+  const url=publicUrl(input.url),bytes=await readFile(input.localPath);
+  if(hash(bytes)!==input.sha256||input.observation.state!=='fetched'||input.observation.url!==url.href||input.observation.sha256!==input.sha256||input.observation.mimeType!==input.mimeType||input.observation.bytes!==bytes.length||!input.observation.policy||!effectiveSourcePermission(input.observation.policy,{url:url.href,sha256:input.sha256}))throw new PoliteFetchError('cache_missing','Quarantined representation no longer matches its checked source admission');
+  await this.assertHostAllowed(url.href);
+  const localPath=this.publicPolicyFetcher?join(this.cacheDir,'sha256',input.sha256.slice(0,2),input.sha256):join(this.cacheDir,'sha256',input.sha256);
+  const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=Buffer.from(this.encodeObservation({...input.observation})),r2Integrity=this.policyOptions().r2Integrity;
+  const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:input.sha256,sourceSha256:input.sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:effectiveSourcePermission(input.observation.policy,{url:url.href,sha256:input.sha256}),...(r2Integrity?{r2Integrity}:{})};
+  const observationEntry={...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false};
+  await withManagedSourceWrite(this.cacheDir,[sourceEntry,observationEntry],async()=>{
+   await mkdir(dirname(localPath),{recursive:true,mode:0o700});
+   await writeFile(localPath,bytes,{flag:'wx',mode:0o600}).catch(async error=>{if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await readFile(localPath);if(hash(existing)!==input.sha256)throw new PoliteFetchError('cache_missing','Existing CAS path differs from the quarantined digest');});
+   await mkdir(dirname(observationPath),{recursive:true,mode:0o700});await writeFile(observationPath,observationBytes,{flag:'wx',mode:0o600});
+  },this.policyOptions());
+  return {url:url.href,sha256:input.sha256,localPath,mimeType:input.mimeType,retrievedAt:input.observation.retrievedAt!,checkedAt:input.observation.checkedAt,status:input.observation.status!,observationPath,policy:input.observation.policy,...(r2Integrity?{r2Integrity}:{})};
+ }
  async fetch(url:string,options:FetchOptions={}):Promise<FetchedDocument>{
   await this.initialize();this.fetchCount++;
   try{
    if(!this.publicPolicyFetcher&&options.method==='POST'&&options.publicOperation==='genesis_guest'&&ownerGenesisAccessFor(url)){
-    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,ownerAcquisitionProducer:this.ownerAcquisitionProducer,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect},this);
+    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,ownerAcquisitionProducer:this.ownerAcquisitionProducer,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect,onResponseChunk:this.onResponseChunk},this);
     await this.ownerAccountFetcher.initialize();
     return await this.ownerAccountFetcher.fetchInternal(url,options,'document');
    }
@@ -856,6 +887,7 @@ export class PoliteFetcher {
     if(checkTdm&&!effectiveSourcePermission(policy,{url:url.href,sha256}))throw new PoliteFetchError(policy.tdm.state==='reserved'?'tdm_reserved':'tdm_unavailable','Source policy does not authorize retaining this representation');
     policyPhase=null;
     observation.etag=response.headers.etag??observation.etag;observation.lastModified=response.headers['last-modified']??observation.lastModified;
+    await this.onValidatedRepresentation?.({url:url.href,body:representation,observation,localPath});
     const observationPath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),observationBytes=this.encodeObservation(observation);
     const persist=async()=>{
      await this.assertHostAllowed(url.href);
@@ -863,17 +895,18 @@ export class PoliteFetcher {
      await this.observation(observation,observationPath,observationBytes,!!this.publicPolicyFetcher);
      if(!this.publicPolicyFetcher){await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);}
     };
-    const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256})};
+    const r2Integrity=this.policyOptions().r2Integrity;
+    const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256}),...(r2Integrity?{r2Integrity}:{})};
     await withManagedSourceWrite(this.cacheDir,[sourceEntry,...(this.publicPolicyFetcher?[{...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false}]:[])],persist,this.policyOptions());
     if(checkTdm){
      try{
       const publicSelector=originalBody!==undefined&&![...new URLSearchParams(originalBody).keys()].some(key=>/^(?:username|user|password|secret|authorization|access_token|api_key|apikey|token|sessionid|phpsessid|cookie)$/i.test(key))&&String(policy.access)!=='authenticated_owner_account'?originalBody:null;
-      const evidence={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:{kind:'http_observation' as const,url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain};
+      const evidence={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:{kind:'http_observation' as const,url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes),...(r2Integrity?{r2Integrity}:{})},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain};
       if(this.publicPolicyFetcher&&this.ownerAcquisitionProducer&&String(policy.access)==='authenticated_owner_account')await persistOwnerAccountRequestEvidence(this.cacheDir,{...evidence,producer:this.ownerAcquisitionProducer},this.policyOptions());
       else await persistCrawlRequestEvidence(this.cacheDir,evidence,this.policyOptions());
      }catch{throw new CrawlRequestEvidenceCaptureError();}
     }
-    return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(validatedPolicy?{validatedPolicy}:{})};
+    return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(r2Integrity?{r2Integrity}:{}),...(validatedPolicy?{validatedPolicy}:{})};
    }catch(error){
     if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
     if(error instanceof RequestAdmissionInterruption){Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;observation.state='failed';observation.failure='host_admission_deferred';await this.observation(observation);throw error;}

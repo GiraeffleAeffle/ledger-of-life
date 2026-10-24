@@ -87,7 +87,7 @@ export interface CorpusManifestSummary extends Omit<CorpusManifestVerification,'
 const IndexDocumentSchema=crawlDocumentSchema.extend({policy:SourceAccessPolicySchema.optional()});
 type IndexDocument=z.infer<typeof IndexDocumentSchema>|z.infer<typeof excludedCrawlDocumentSchema>;
 const IndexSchema=z.object({schemaVersion:z.literal('stadtstack-crawl-index-v1'),documents:z.array(IndexDocumentSchema),excludedDocuments:z.array(excludedCrawlDocumentSchema).optional()});
-const InventoryPreparationSchema=preparationPlanSchema.extend({corpusSha256:hashSchema});
+const InventoryPreparationSchema=preparationPlanSchema.safeExtend({corpusSha256:hashSchema});
 const provider=z.enum(['openai-subscription','anthropic-subscription']);
 // Binding-only historical decoding deliberately preserves, but never re-admits,
 // original graph payloads. Hashes are computed over the complete original record.

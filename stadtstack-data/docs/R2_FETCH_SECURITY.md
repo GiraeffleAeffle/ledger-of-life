@@ -3,8 +3,9 @@
 ## Decision and scope
 
 Owner choice C (#103), as reported by Main: close R1 and prepare approximately
-100–140 new documents for R2. This branch starts at
-`33fa1d3df5daa485b609be9a2ab904add3cfb649`; it neither reopens R1 nor extends
+100–140 new documents for R2. The executor work branches from `rebuild-r1`
+at `f2876ef`; earlier v3 hardening evidence was measured against
+`33fa1d3df5daa485b609be9a2ab904add3cfb649`. It neither reopens R1 nor extends
 its processing/source pin. No source request, production DB/CLI write,
 container build/start, service change or authorization issuance is performed.
 The v2 security release was limited to the structured step8 continuation.
@@ -15,6 +16,71 @@ It has `issuedAt:""`, `approvedBy:null`, `sourceFetchStopLifted:false` and a
 DRAFT-only schema/status. **It cannot clear the SS-01 stop.** Its runtime/image,
 manifest, authority and executor prerequisites must be independently satisfied
 before Main creates any genuinely issued release.
+
+### Executor record-binding contract
+
+The executor accepts no draft as authorization. Its release input is an
+authority-worktree record path plus the expected SHA-256 of its complete raw
+bytes. The record must exactly match this v3 draft's schema and values, with
+only these issuance fields added/replaced: `status:"ISSUED"`,
+RFC3339 `issuedAt`, non-empty `approver`, RFC3339 `validFrom` and `expiresAt`,
+`sourceFetchStopLifted:true`, and
+`ownerApprovalReference:{sha256:<exact acquisition-manifest SHA-256>,
+approvalRecordPath:<authority-worktree path>,
+approvalRecordSha256:<owner-approval raw-file SHA-256>}` plus
+`r1DigestInventoryReference:{sha256:<final R1 inventory raw-file SHA-256>}`.
+The owner-approval file must itself be a regular non-symlink v1 approval record
+whose `approved.acquisition.manifest.sha256` equals the pinned manifest digest.
+The separately supplied final R1 inventory is a raw-hash-pinned
+`r2-r1-digest-inventory-v1` JSON file with unique canonical `{url,sourceIds,
+sha256}` entries; every exact manifest URL/source binding must be covered and
+`sha256:null` means no sealed R1 original was recorded for that URL. Its path
+and expected SHA-256 are explicit executor arguments and the record's inventory
+digest must match. The executor binds to SHA-256 of the complete raw issued
+record file and rejects schema drift, hash mismatch, a not-yet-valid/expired
+window, or a manifest/inventory hash other than the issued reference. In
+addition, `runtimeRequirements.preparedContractsEvidence.acquisitionContractSha256`
+must equal the digest returned by the running `district-r1.ts` acquisition
+contract in a fresh process. `open()` checks that digest before constructing the
+fetcher; the complete raw issued-record hash consequently pins this runtime
+contract requirement together with the exact v3 draft values. Paths and
+expected hashes are explicit inputs, never inferred. The draft's
+`approvedBy:null`, empty issuance clock and `sourceFetchStopLifted:false` do not
+meet this contract. This describes the required later issuance record; it does
+not issue one, authorize a fetch, or lift the current stop.
+
+Changed bytes are durably recorded in the executor's append-only journal as
+`changed_since_r1` representations, with their source ID, R1/new digests, and
+quarantined CAS representation. A changed representation is never treated as
+completed/admitted until a separately reviewed record with
+`schemaVersion:"r2-changed-source-release-v1"`, `id:"r2-changed-source-release"`,
+`reviewedBy`, RFC3339 `reviewedAt`, non-empty `reason`, and
+`representations:[{url,sourceId,sha256,r1Sha256}]` is supplied with its expected
+raw-file SHA-256. It releases only exact listed tuples and never waives MIME,
+body/HTML, retained-byte, or document budgets; the held CAS bytes are rehashed
+and rechecked against those limits immediately before release. The `r2Integrity`
+provenance is included in authenticated source references and managed-source
+bindings; preparation, inference, cache reads/writes and worker re-entry derive
+the integrity gate from those source references rather than trusting a caller
+option. The executor derives this guard from the bound record/manifest/journal
+and forces it into PoliteFetcher; managed raw and observation admissions plus
+request-evidence bindings persist it in their inventory identity. Reads
+rederive the marker from authenticated inventory, require each reference to
+match the latest completed journal URL/source ID/digest, and require the exact
+changed release for a previously quarantined tuple. A caller cannot introduce
+or substitute the guard. Mixed, absent or mismatched R2 provenance is refused.
+A missing release keeps the representation held. Neither acquisition approval
+nor the ten-document batch review releases changed bytes.
+The ten-document checkpoint binds journal
+sequence, record hash and the complete digest set; a raw-hash-pinned review
+issued after that checkpoint is single-use. This mechanism covers already-known
+R1 original digests; it does not claim a semantic detector for anomalous
+MIME/template/mass-host changes or independent review of high-impact additions.
+The executor journal is fsynced after each attempt-state transition and each
+response byte, binds its record/manifest hashes, and is protected by a
+cross-process exclusive lock. Budget usage is reconstructed from the journal
+on resume; completed URLs are not refetched. A torn or mismatched journal and a
+second concurrent executor fail closed.
 
 ## Findings and dispositions
 
@@ -27,9 +93,9 @@ that a source, host, parser or historical result was compromised.
 | R2-F02 | High, conditional transport integrity | HTTPS requests relied on Node's default certificate verification, which an inherited `NODE_TLS_REJECT_UNAUTHORIZED=0` can disable. | Fixed: HTTPS options explicitly set `rejectUnauthorized:true` and `minVersion:'TLSv1.2'`; DNS pinning, URL hostname/SNI and `agent:false` remain. Synthetic test intercepts the transport constructor under the insecure environment and verifies exact options; no handshake or public host probe is claimed. |
 | R2-F03 | Medium, source-integrity downgrade | A same-host HTTPS document redirect could change to HTTP; hostname equality alone did not preserve transport security. | Fixed before destination dispatch: HTTPS→HTTP is `invalid_redirect` for documents and standardized TDM policy redirects. HTTP→HTTPS and same-host HTTPS path changes remain; R2's exact allowlist itself contains HTTPS only. |
 | R2-F04 | Medium, stale launcher / runtime drift | Identity-only body handling removed Brotli exposure but did not stop a stale launcher from using a Node runtime with the advisory's other HTTP/TLS/DNS flaws. | Fixed: live `wire()` requires a fixed22/24 LTS version before initialization/DNS/transport. Tests reject24.21.0,24.22.0,22.23.3,unknown majors and malformed/prerelease versions. v3 must additionally pin the actual24.22.1 binary/hash; the version floor is not a signed runtime review. |
-| R2-F05 | High, authorization/budget prerequisite | Generic `crawlHtmlSource` can expand discovered links; its public `requestCount` and maxRequests count logical fetch calls, not every robots/TDM/redirect wire attempt. It has no run-wide byte ceiling and scheduling is exact-host, not a global42-source rate pool. | v3 stays unissued until the reviewed R2 executor enforces exact request membership and all-wire request/byte/global-rate/time limits. The draft supplies exact URLs and caps; the old R1 crawler CLI is **not** a substitute. No unexercised budget enforcement is claimed by this branch. |
-| R2-F06 | High, SS-02 integrity / inference prerequisite | Exact quotes, strict schemas and same-model faithfulness do not establish source truth. Crawler digest replacement lacks an independent defacement/high-impact-change hold. | Not waived. Draft requires quarantine of changed known prior digests, anomalous MIME/template/mass-host changes and independent review of high-impact additions before inference. Acquisition approval gives zero model calls and no publication permission. A separately reviewed integrity gate/clearance is still required; no unimplemented semantic detector is claimed. |
-| R2-F07 | Medium, representation-boundary prerequisite | Generic fetch supports several native/API/structured formats and may retain a representation before the HTML adapter later labels it unsupported. Generic MIME acceptance is broader than a district HTML/PDF campaign. Host-side HTML discovery still uses Cheerio. | v3 narrows document response types to HTML/XHTML/PDF, forbids archive/executable/unsupported outputs, and requires a reviewed executor's MIME/size admission before downstream use; policy JSON/directives remain separate. Unknown types must hold, never be treated as an empty successful crawl. PDFs/ZIP/XML still have their existing sandbox bounds. No JavaScript/browser execution path was found. |
+| R2-F05 | High, authorization/budget prerequisite | Generic `crawlHtmlSource` can expand discovered links; its public `requestCount` and maxRequests count logical fetch calls, not every robots/TDM/redirect wire attempt. It has no run-wide byte ceiling and scheduling is exact-host, not a global42-source rate pool. | Implemented by the separate `R2AcquisitionExecutor`, not the R1 CLI: exact HTTPS document/policy URL admission, every wire attempt counted, global request serialization/spacing, no retries/model calls, all-wire body and retained-byte/time/document limits, batch pause, durable resume journal and cross-process exclusion. Behavioral tests use only the explicit localhost test seam. The v3 record remains unissued; this executor does not lift the live-source stop. |
+| R2-F06 | High, SS-02 integrity / inference prerequisite | Exact quotes, strict schemas and same-model faithfulness do not establish source truth. Crawler digest replacement lacks an independent defacement/high-impact-change hold. | Implemented known-R1-digest quarantine: representation and `changed_since_r1` state are durably recorded before downstream admission, and preparation/extraction recheck the exact URL/source/new/R1 tuple against a separate reviewer/date/reason release. No semantic detector for anomalous MIME/template/mass-host changes or review mechanism for high-impact additions is claimed; those remain independent review requirements. Acquisition approval gives zero model calls and no publication permission. |
+| R2-F07 | Medium, representation-boundary prerequisite | Generic fetch supports several native/API/structured formats and may retain a representation before the HTML adapter later labels it unsupported. Generic MIME acceptance is broader than a district HTML/PDF campaign. Host-side HTML discovery still uses Cheerio. | The executor admits only the reviewed document representation types and body caps before downstream use; policy JSON/directives remain separate. Unknown types must hold, never be treated as an empty successful crawl. PDFs/ZIP/XML still have their existing sandbox bounds. No JavaScript/browser execution path was found. |
 | R2-F08 | Low / defense in depth | The image contract does not explicitly pin custom seccomp/AppArmor profiles; Debian package versions/SBOM are absent from the old review. Original HTTP encoding is not retained in historical observation/request records. | Preserve all current containment checks; require actual inventory/review and monitoring metadata in the new R2 run. No claim that Docker defaults equal an independently reviewed profile, or that historical unknown encodings were identity. |
 
 ## Current controls versus scrape-safety-20261022
@@ -109,15 +175,20 @@ the current old installed image patched or authorized for the changed worker.
 
 ## Exact draft scope and caps
 
-The offline manifest was frozen byte-exactly at
-`/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/R2_ACQUISITION_MANIFEST.snapshot.json`,
-SHA256 `ea0478d57d7b68a105772fbe46b3bcc1e355c89bf5314aa96d6314388f2ffba5`.
-It contains120 candidate source bindings but112 distinct HTTPS GET URLs, from18
-selected source scopes on11hosts. The draft enumerates every document URL,
-method, permitted document MIME and source/candidate binding, plus22 exact
-robots/TDM policy URLs. No hostname wildcard, subtree prefix, query mutation,
-automatic redirect target or discovery expansion is allowed. Unlisted policy
-references also stop pending a genuine reviewed amendment.
+The current unissued scope references the V2 manifest at
+`/home/max/.local/state/stadtstack-data/r2-planning/R2_ACQUISITION_MANIFEST_V2_DRAFT.json`,
+SHA256 `c23a739b27dd85e2a67cef0d14826f2c1c5407e1caf7c5049b7c451262543e1c`.
+It contains221 unique candidate URLs, each bound to exactly one admitted
+sourceId, and17 selected source scopes. The 8 duplicate URL/source listings
+were resolved by deterministic precedence (council, gazette, participation,
+website, structured; ties use alphabetically first sourceId); other listings
+are informational `alsoListedUnder`, never admitted or policy-checked. The
+draft enumerates every document URL, method, permitted document MIME and exact
+candidate/source binding, plus22 exact robots/TDM policy URLs. No hostname
+wildcard, subtree prefix, query mutation, automatic redirect target or dynamic
+discovery expansion is allowed. The changed manifest hash requires separate
+owner approval; the release draft remains unissued with the source-fetch stop
+set.
 
 The source count is reconciled: **43 total registered routes =41 district
 document registrations +2 structured routes**. The wording42was outdated:
@@ -156,26 +227,72 @@ The three candidate cached hashes are retained as known prior baselines, not
 current source-policy/admission receipts. Other previously known representations
 must also be bound during final review, not silently treated as new identities.
 
-Proposed, **not approved**, maxima:140documents; review after the first10;
-600total actual network attempts including policy/redirect/failure requests;
-22initial policy-probe requests;24MiB per HTTP body,2MiB HTML before host
-discovery and1MiB policy bodies; a proposed1GiB controller memory boundary;
-1GiB total HTTP-body bytes;
-1GiB retained source bytes;8h campaign wall;25s DNS and25s wire;5redirects;
-1global/host in-flight and at least5s global spacing (or longer robots delay);
-zero automatic retries, zero model calls, zero paid micro-USD. The byte measure
-is HTTP body bytes supplied by Node, not encrypted packet/TLS framing counts.
-Parsing keeps the fixed sandbox caps. Stop rather than reset a consumed budget.
+Since merge `e962c1b` (r2-structured-sources) the registry has **44 routes**:
+the 43 above plus the discovery-only `mastr` registration, which grants no
+fetch right. The final V2 manifest's 221 URL/source pairs are unique (one
+admitted sourceId per URL; `alsoListedUnder` entries are informational only)
+and supersede the 112-URL/18-scope v1 selection described above once the owner
+approves V2. Final R1 inventory bytes must bind every exact URL/source pair,
+including known previous representations.
 
-Monitoring proposal: private append-only per-attempt journal and30s aggregation
-of exact/canonical request identity, status/failure, times, body byte counts,
-Content-Encoding/MIME, Retry-After/cooldown, provenance/HTTP/policy hashes,
-parser image/contract/outcome and remaining budgets. Alerts are content-free;
-no source text, cookies, authorization/account material. Stop on unavailable
-accounting, authority/runtime/manifest drift, any unsupported encoding/MIME,
-network/security/access/policy failure, parser isolation/resource/protocol failure,
-changed prior digest, operator interrupt, or disk below a proposed10GiB floor.
-The journal/executor is a precondition, not something implemented or run here.
+#### Issuance record schema for the later issuer
+
+Issuance is a separate owner action; the executor only reads this record. The
+issuer starts from this exact v3 draft and adds the following strict fields
+(no additional or omitted issuance fields):
+
+```json
+{
+  "status": "ISSUED",
+  "issuedAt": "<RFC3339 timestamp>",
+  "approver": "<non-empty owner approver>",
+  "sourceFetchStopLifted": true,
+  "validFrom": "<RFC3339 timestamp>",
+  "expiresAt": "<RFC3339 timestamp>",
+  "ownerApprovalReference": {
+    "sha256": "<sha256 of exact acquisition manifest bytes>",
+    "approvalRecordPath": "<absolute path to owner approval record>",
+    "approvalRecordSha256": "<sha256 of raw owner approval record bytes>"
+  },
+  "r1DigestInventoryReference": {
+    "sha256": "<sha256 of exact R1 digest inventory bytes>"
+  }
+}
+```
+
+`ownerApprovalReference.sha256` must equal the CLI-bound manifest SHA-256 and
+the approved manifest hash inside the independently hashed approval record.
+The record also contains `executorCaps` exactly as the unissued draft. The
+executor CLI requires record path and expected SHA-256, manifest path and
+expected SHA-256, and R1 digest inventory path and expected SHA-256; none is
+inferred. It validates the raw record file digest, strict issuance fields,
+approval/inventory binding, current time within `validFrom`/`expiresAt`, and
+byte-for-byte equivalence to the draft after issuance-only fields are removed.
+Draft records, missing approvers, false stop-lift fields, not-yet-valid or
+expired records, manifest mismatch and unlisted URLs fail closed. Issuing this
+record and lifting the stop are not performed by this executor change.
+
+`executorCaps` is a strict record-bound object with exactly
+`maxDocuments`, `maxNetworkAttemptsIncludingPolicyRedirectFailure`,
+`maxTotalBodyBytes`, `maxBodyBytes`, `maxHtmlBytes`, `maxCampaignHours`,
+`maxInFlight`, `minSpacingSeconds`, `maxRedirects`, `automaticRetries`,
+`reviewAfterFirstDocuments`, `modelCalls`, and `paidMicroUsd`. The V2 draft
+sets them to250,1200,2684354560,25165824,2097152,16,1,5,5,0,10,0,0. Code enforces
+hard ceilings of300 documents,1500 attempts,3GiB total body bytes,24MiB per
+response,2MiB HTML,24 hours,one in-flight request,at least5s spacing, exactly5
+redirects, zero retries/model calls/spend, and review after exactly10 documents.
+The one per response cap applies to policy and document bodies alike. Total
+body bytes count all response-body bytes observed on policy, redirect, failed,
+and document attempts; they do not measure encrypted packet/TLS framing.
+Parsing keeps its separate fixed sandbox caps. Stop rather than reset a consumed budget.
+
+The executor adds a private append-only, fsync-per-entry journal of attempted
+wire URLs, timestamps, response-body byte counts, HTTP statuses/failures,
+completed and quarantined representation digests, applied changed-source
+release hashes and tuples, plus retained/wire byte counters. Budgets derive
+from this journal on resume; torn or inconsistent records fail closed. A
+changed-source review is appended and hash-chained into the journal, not added
+to the stable `{journalPath,recordSha256,manifestSha256}` source guard.
 
 ## Required approvals and receipts before acquisition
 
@@ -227,39 +344,33 @@ The installed old parser review must fail against the new runner contract.
 No root review or historical fingerprint/receipt was edited. Main must measure
 all affected contracts in the actual integrated runtime before issuing v3.
 
-All14 actual contract functions were measured against33fa1d3. Seven changed:
-preparationExtractor, residualPreparation, residualJob, acquisition,
-structuredStateGauges, parserOutput, parserIsolation; seven are unchanged.
-Evidence: `r2-fetch-security-evidence/contracts.json`, SHA256
-`dd79a20c3f541d87abe3227fd1f55520194038a06ee338a99ba7e8a2971bc421`.
-Acquisition is
-`fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c`;
-parser isolation is
-`0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268`.
-These are prepared branch fingerprints, not integrated-image approvals.
+The historical all14-contract report below is not a fresh integrated-runtime
+measurement for this executor branch. The acquisition contract was freshly
+measured in a separate Node24.22.1 process using this worktree's
+`src/district-r1.ts`: SHA256
+`b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd`.
+Measurement record `reports/r2-acquisition-contract-measurement.json` SHA256
+`e5173c09a7fba90883dc7747091656bbc525567a8496823faa9b6f84706ec9b6`.
+Other preparation/parser contracts, installed image/runtime review and the
+integrated 14-contract set remain for the main integration review before
+issuance.
 
 ## Exercised verification
 
-Every Node check used
-`flock /home/max/.local/state/stadtstack-data/test-cpu.lock taskset -c 2-7 nice -n 10`,
-Node24.22.1 and umask022. `tsc --noEmit` completed exit0 with no output.
-The combined focused run used `--test-concurrency=1 --test-isolation=none` for
-polite-fetch, district-parser-worker and district-parser-isolation tests:
-**117 total,92 passed,0 failed/cancelled,25 skipped**,39.63s test duration.
-The25 skips are the non-Linux path and opt-in real-image/container sentinels;
-`STADTSTACK_PARSER_SECURITY_TESTS=0` deliberately prevented production/Docker
-sentinels. TLS testing intercepted constructor options and did not establish a
-real handshake. The Python worker test mocked the bounded source-free version
-probe and proved no readiness message on failure; it did not run the image.
-The all14 measurement completed exit0 under the same lock.
+`tsc --noEmit` passed. The focused executor suite reports **9 total, 9 passed,
+0 failed/cancelled/skipped**. It covered localhost fake HTTP, exact allowlist
+and redirect rejection, duplicate manifest URL refusal, budget stops, policy
+attempt accounting, ten-document review pause, changed-R1 quarantine, crash
+resume and stop-file handling. The fixture used explicit test-only localhost
+wire substitution and isolated fixture authority; no civic source was fetched.
+The suite ran under `/home/max/.local/bin/stadtstack-cpu-slot` with
+`umask 022`, Node24.22.1 and worktree-local dependencies.
 
-Exact commands/results and limitations are in
-`/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json`,
-SHA256 `fe82293f67922769ce28fd31fa3f3566645f8ad4a84990db5697d1ab87298e76`.
-The initial300s typecheck call timed out during shared-lock contention without
-output; the successful retry used a3600s lock-inclusive deadline. No test or
-compiler failure is inferred from that wait timeout. No live-source, real TLS,
-parser build/SBOM, privileged review, production CLI/DB or full-suite check ran.
+
+No live-source fetch, issuance, source-fetch-stop lift, parser build/SBOM,
+privileged review, production CLI/DB write or full-suite check was run. The
+executor implementation is an unissued gate only; the main integration review
+must still verify the full affected contract set and runtime/image boundary.
 
 Root `docs/ontology.yaml` and `docs/ONTOLOGY.md` were read. No civic concept,
 assessment truth claim or DocumentDisposition semantics changes here; both
