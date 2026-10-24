@@ -1,0 +1,23 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-1",
+ "amends": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15",
+  "path": "stadtstack-data/reports/approvals/r1-lead-hold-resume-policy-2026-10-15.json",
+  "sha256": "c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"
+ },
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-autonomy-and-release-2026-10-14 and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-15T09:20:00Z",
+ "ownerConsultation": {
+  "basePolicy": "Owner task #87 unanswered at 2026-10-15T06:00Z; stated default applied (comment on #87 at 06:01Z).",
+  "thisAmendment": "Reported as a comment on Vikunja #87. A NO on #87 revokes the base policy and this amendment."
+ },
+ "change": {
+  "addEligibleReasons": {
+   "residual_prepare": ["isolation_unavailable"]
+  },
+  "unchanged": "All other eligible reasons, the never-resumed list, maxResumesPerJobKey 2, counting from committed hold receipts, new stage authorization per resume, effectiveFrom, the guarded DistrictJobStore.resume mechanism and the operator flag stay as in the base record."
+ },
+ "reason": "Two residual_prepare jobs (ratzeburg-participation, ratzeburg-gazette) were held isolation_unavailable at 2026-10-15T08:46-08:48Z because the lead fast-forwarded the processing checkout (c24a49d -> c1aca12) while their parser jobs ran, so the per-job parser review check no longer matched. This reason comes from a pre-parse check (ParserIsolationError before any parsing or output). A resumed job runs the same isolation and review checks again, so a resume cannot bypass parser isolation; if isolation is genuinely unavailable the job holds again and the two-resume limit applies.",
+ "notAdded": "assessment_b omp_security_review_required stays never-resumed. The one affected B job already holds a claimed lease and a submission intent, which the broker never retries; the B contract change in the next processing pin gives that item a new canonical job instead."
+}

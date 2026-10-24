@@ -1,4 +1,5 @@
 type Access = { identity: string | null; getAccessToken: () => Promise<string | null>; generation: number };
+export type AuthorizedReadOptions = { signal?: AbortSignal };
 
 /** Rejects responses from a signed-out or replaced account without replaying requests. */
 export async function authorizedRequest<T>(
@@ -6,7 +7,10 @@ export async function authorizedRequest<T>(
   body: unknown,
   identity: string | null,
   current: () => Access | null,
+  options?: AuthorizedReadOptions,
 ): Promise<T> {
+  const readSignal = body ? undefined : options?.signal;
+  readSignal?.throwIfAborted();
   const access = current();
   if (!identity || !access || access.identity !== identity) throw new Error('Sign in again to continue.');
   const isCurrent = () => {
@@ -15,12 +19,15 @@ export async function authorizedRequest<T>(
   };
   const token = await access.getAccessToken();
   if (!isCurrent() || !token) throw new Error('Sign in again to continue.');
+  readSignal?.throwIfAborted();
   const response = await fetch(path, {
     method: body ? 'POST' : 'GET',
     headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
     body: body ? JSON.stringify(body) : undefined,
+    ...(readSignal ? { signal: readSignal } : {}),
   });
   const data = await response.json();
+  readSignal?.throwIfAborted();
   if (!isCurrent()) throw new Error('Account changed while loading. Please try again.');
   if (!response.ok) throw Object.assign(new Error(data.error || 'Please try again.'), { code: data.code, status: response.status });
   return data as T;

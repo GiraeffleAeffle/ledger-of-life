@@ -13,6 +13,7 @@ import { AccessError, ConflictError } from './errors.ts';
 import { WorkflowError } from '../domain/errors.ts';
 import { shareActions, requireShareActionRole } from './share-deposit.ts';
 import { createBaseSolanaGateway, type BaseSolanaGateway } from './solana-rpc.ts';
+import { solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredSolanaOperations, type SolanaOperations } from './solana-operations.ts';
 import { solanaSharesConfiguration, type SolanaSharesManifest } from './solana-shares-config.ts';
 import type { Store } from './store.ts';
@@ -45,10 +46,7 @@ async function manifest(deps: SolanaShareDepositDependencies) { return (deps.man
 function readGateway(config: SolanaSharesManifest, deps: SolanaShareDepositDependencies): ShareDepositReadGateway {
   if (deps.gateway) return deps.gateway;
   const environment = deps.environment ?? process.env;
-  requireCondition(environment.SOLANA_RPC_URL, 'Solana shares RPC is not configured.');
-  const url = new URL(environment.SOLANA_RPC_URL);
-  requireCondition(url.protocol === 'https:' || (url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)), 'RPC must use HTTPS or loopback.');
-  return createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: config.genesisHash, maximumSponsorLamports: '10000000' });
+  return createBaseSolanaGateway({ ...solanaRpcConfiguration(environment, config), maximumSponsorLamports: '10000000' });
 }
 async function operationContext(store: Store, config: SolanaSharesManifest, deps: SolanaShareDepositDependencies) {
   if (deps.operations && deps.sponsor) return { operations: deps.operations, sponsor: { address: deps.sponsor } };

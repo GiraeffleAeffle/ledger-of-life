@@ -1,0 +1,46 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-lead-b-sonnet-medium-thinking-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-b-model-sonnet-2026-10-17 (#88) and the owner escalation statement; not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T16:01:51Z",
+ "basis": [
+  {
+   "id": "r1-b-model-sonnet-2026-10-17",
+   "path": "stadtstack-data/reports/approvals/r1-b-model-sonnet-2026-10-17.json",
+   "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+  },
+  {
+   "id": "r1-owner-escalation-latitude-2026-10-17",
+   "path": "stadtstack-data/reports/approvals/r1-owner-escalation-latitude-2026-10-17.json",
+   "sha256": "57b65f432bacc055899f9d7c995202f9fcabb2f10d22c9921f464401bb6d7081"
+  },
+  {
+   "id": "r1-b-sonnet-classification-reasoning-diagnostic-2026-10-17",
+   "path": "stadtstack-data/reports/approvals/r1-b-sonnet-classification-reasoning-diagnostic-2026-10-17.json",
+   "sha256": "f6a8976ec90337e7d0d3661bf211e4f25b48232ffc09fa5962dd922d07981c8c"
+  },
+  {
+   "id": "r1-b-sonnet-medium-labelled-diagnostic-2026-10-17",
+   "path": "stadtstack-data/reports/approvals/r1-b-sonnet-medium-labelled-diagnostic-2026-10-17.json",
+   "sha256": "3cc9434c207a201632380317151ecd387d74ab8459cb0ed5656b38702f0c4565"
+  },
+  {
+   "id": "r1-b-sonnet-cross-locator-diagnostic-2026-10-17",
+   "path": "stadtstack-data/reports/approvals/r1-b-sonnet-cross-locator-diagnostic-2026-10-17.json",
+   "sha256": "854a4c49ae84999d61432cdabef751906f80a48dddbe3327298c04c95d1ffad4"
+  }
+ ],
+ "decision": "Production lane B stays on anthropic/claude-sonnet-5-5 with concurrency 1/1, but runs with omp thinking level medium (image sha256:dd69ecb7b015c572b66453b6dc8c3e1b513b97455c7edd73842d6a2b44cb2b81, FROM e61fc252, entry.sh only) and the B-owned cross-property locator directive (commit e483592). Queue contract 0f8f88aa, PROMPTS.B, output schema, checker, projection and decoder strictness for the final JSON are unchanged; the native stream decoder admits thinking blocks only before exactly one final text block.",
+ "evidence": {
+  "productionBaseline": "30 B receipts 2026-10-17 11:10Z-13:10Z: 9 supported, 6 invalid_json (leading prose), 14 whole-item abstentions all leaving /caseType (quote null) unasserted; independent source adjudication: 11 of 14 over-conservative, 2 genuine gaps, 1 ambiguous.",
+  "controlOnly": "12 calls: supported 0, invalid_json 6 to 4.",
+  "sonnetMedium": "20 calls: 20 bare JSON accepted; prose 0 of 6; expected supports 1 of 11; both genuine gaps held.",
+  "sonnetMediumDirective": "13 calls: expected supports 7 of 11; 1 output_json rejection (two top-level objects); genuine gaps 1 of 2 held (58559528df6d supported despite an omitted GRZ qualification; its earlier holds left /caseType unasserted, so they did not test the omission); all 9 caseType assertions bound to semantically relevant title/entity/summary quotes.",
+  "callTime": "paired mean whole-call 24.3 s (medium) and 23.4 s (medium plus directive); no observed slowdown."
+ },
+ "knownLimits": [
+  "B can accept a summary that omits a material qualification (58559528df6d); A and mandatory C remain independent checks.",
+  "Stage-evidence negation guards do not cover 'ausstehenden' (district-stage-evidence.ts, protected replay file, unchanged until after release)."
+ ],
+ "consequence": "All lane-B jobs re-run under the new B contract; A, assessment preparation, residual preparation/extraction and Codex allowances are reused unchanged."
+}

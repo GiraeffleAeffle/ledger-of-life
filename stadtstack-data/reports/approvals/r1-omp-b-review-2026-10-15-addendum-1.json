@@ -1,0 +1,23 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15-addendum-1",
+ "amends": {
+  "id": "r1-omp-b-review-2026-10-15",
+  "path": "stadtstack-data/reports/approvals/r1-omp-b-review-2026-10-15.json"
+ },
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval and not a human review",
+ "issuedAt": "2026-10-15T16:25:00Z",
+ "installedReview": {
+  "path": "/etc/stadtstack/omp-b-review.json",
+  "owner": "root:root 0644",
+  "sha256": "50461fbab1d9e15a7d5aff3ac6d2b6b0df10d88f7cd52bd243d15e74401b0163",
+  "codeCommit": "5dd6e368117578bdbb2e9e2e48c30ad2638651a6",
+  "runnerContractSha256": "ffc418db22c3db48ac520956eb09b1f62659ba1d55bd7adaeca16b030bce8b8e",
+  "unchangedFields": "imageId, ompBinarySha256 (container omp/18.9.2), hostResolverBinarySha256/hostResolverVersion (omp/18.10.4 root copy), dockerDaemonId, dockerSocket",
+  "validation": "Parsed with OmpReviewSchema of 5dd6e36 and compared with ompRunnerContractSha256() of the checkout: schema valid, contract match, reviewedAt not in the future."
+ },
+ "reviewsCovered": [
+  "Everything listed in r1-omp-b-review-2026-10-15",
+  "B failure diagnostics a92001b/2edb8a6 (OmpPinReview): closed-vocabulary failure kinds, no provider text or credentials persisted; diagnostics never change dispositions"
+ ]
+}

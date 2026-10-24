@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "r2-acquisition-contract-measurement-v1",
+  "branch": "r2-executor-regressions",
+  "runtimeNode": "24.22.1",
+  "measurement": "Fresh-process import of src/district-r1.ts and call to acquisitionContract()",
+  "priorDraftAcquisitionContractSha256": "fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c",
+  "acquisitionContractSha256": "b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5",
+  "issues": "The prior executor pin b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd is superseded by restoring constructor-time fixture authority checks and serializing body accounting before response completion. This pins the running acquisition contract only; it is not a full integrated 14-contract report, test evidence, or independent runtime/image approval."
+}

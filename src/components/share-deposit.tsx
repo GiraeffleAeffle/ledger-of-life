@@ -1,13 +1,16 @@
 'use client';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRentalWallet } from '@/wallets';
 import { belowGasDripThreshold } from '@/domain/gas-threshold';
 import type { ShareDepositPlan, SolanaShareDepositPlan, ShareDepositView, ShareDepositAction } from '@/domain/share-deposit';
 import { TestDollars } from './test-dollars';
-import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, requireBoundSolanaShareReview, formatDepositShares, shareDepositReceiptUrl, type ShareReviewParties, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance, shareReceiptPollDelay } from './share-deposit-logic';
+import { nextShareDepositAction, pendingShareDepositReceipt, requireBoundShareReview, requireBoundSolanaShareReview, formatDepositShares, shareDepositReceiptUrl, type ShareReviewParties, shareDepositAmount, shareRefreshIsCurrent, showShareClaim, showTenantFunding, shareFeeBalance } from './share-deposit-logic';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
+import { boundedBuildingRead } from './building-read';
+import type { AuthorizedRequest } from './use-city-signals';
 
-type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+type Request = AuthorizedRequest;
 type Receipt = { planId: string; transactionHash: string };
 export const depositShares = (raw: string, decimals: 6 | 18 = 18) => decimals === 6 ? formatDepositShares(raw, 6) : (Number(raw) / 1e18).toLocaleString('en-US', { maximumFractionDigits: 8 });
 export const depositUsd = (raw: string) => `$${(Number(raw) / 1e6).toLocaleString('en-US', { maximumFractionDigits: 6 })}`;
@@ -43,7 +46,7 @@ function EvmShareDeposit({ rentalId, request, reload }: DepositProps) {
   const [evidence, setEvidence] = useState('');
   const [records, setRecords] = useState<{ name: string; body: string }[]>([]);
   const revision = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async () => {
     const current = ++revision.current;
     try {
       const result = await request<{ view: ShareDepositView }>(`/api/share-deposit?rentalId=${encodeURIComponent(rentalId)}`);
@@ -59,23 +62,8 @@ function EvmShareDeposit({ rentalId, request, reload }: DepositProps) {
       if (!shareRefreshIsCurrent(current, revision.current)) return;
       setError(cause instanceof Error ? cause.message : 'Deposit unavailable'); setEthBalance(undefined);
     }
-  }, [request, rentalId, walletIds]);
-  useEffect(() => {
-    const timer = setTimeout(() => { void refresh(); }, 0);
-    const invalidate = () => { revision.current++; };
-    return () => { clearTimeout(timer); invalidate(); };
-  }, [refresh]);
-  useEffect(() => {
-    const read = () => { if (!busy && !plan && !pending && document.visibilityState === 'visible') void refresh(); };
-    const timer = setInterval(read, 60_000);
-    window.addEventListener('ledger-balances-changed', read);
-    document.addEventListener('visibilitychange', read);
-    return () => {
-      clearInterval(timer);
-      window.removeEventListener('ledger-balances-changed', read);
-      document.removeEventListener('visibilitychange', read);
-    };
-  }, [refresh, busy, plan, pending]);
+  }, [request, rentalId, walletIds]));
+  useFinancialRefresh(async () => { if (!busy && !plan && !pending) await refresh(); }, { identity: rentalId, chain: 'evm' });
   const prepare = useCallback(async (operation: ShareDepositAction, side?: 'tenant' | 'landlord') => {
     revision.current++;
     setBusy(true); setError(''); setPlan(null);
@@ -106,40 +94,18 @@ function EvmShareDeposit({ rentalId, request, reload }: DepositProps) {
     await reload(); await refresh();
     window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'evm' } }));
   }, [reload, refresh]);
-  const reconcile = useCallback(async (input: Receipt) => {
+  const reconcile = useSerializedRead(useCallback(async (input: Receipt) => {
     const result = await request<{ status: 'pending' | 'confirmed' | 'failed'; view: ShareDepositView }>('/api/share-deposit', { action: 'submit', ...input });
     setView(result.view);
     if (result.status === 'confirmed') { setPending(null); await confirmed(); }
     else if (result.status === 'failed') { setPending(null); await reload(); setError('Transaction failed on chain. Review the refreshed deposit before trying another action.'); }
     return result.status;
-  }, [request, confirmed, reload]);
-  useEffect(() => {
-    if (!pending) return;
-    let stopped = false;
-    let running = false;
-    let failures = 0;
-    let timer: number;
-    const poll = async () => {
-      if (stopped || running || document.visibilityState !== 'visible') return;
-      running = true;
-      try {
-        const status = await reconcile(pending);
-        failures = 0;
-        if (status !== 'pending') return;
-      } catch (cause) {
-        failures++;
-        if (!stopped) setError(cause instanceof Error ? cause.message : 'Receipt unavailable; retrying.');
-      } finally { running = false; }
-      if (!stopped) timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(failures));
-    };
-    const visible = () => {
-      clearTimeout(timer);
-      if (document.visibilityState === 'visible') void poll();
-    };
-    timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(0));
-    document.addEventListener('visibilitychange', visible);
-    return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
-  }, [pending, reconcile]);
+  }, [request, confirmed, reload]));
+  useFinancialRefresh(async () => {
+    if (!pending || busy) return;
+    try { await reconcile(pending); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Receipt unavailable; check the saved transaction again.'); }
+  }, { enabled: Boolean(pending), pendingKey: pending?.planId, initial: false, chain: 'evm' });
   async function sign() {
     if (!plan || !view || busy) return;
     revision.current++;
@@ -227,12 +193,12 @@ function SolanaShareDeposit({ rentalId, request, reload }: DepositProps) {
   const [evidence, setEvidence] = useState('');
   const signed = useRef<{ planId: string; signedTransactionBase64: string } | null>(null);
   const revision = useRef(0);
-  const refresh = useCallback(async () => {
+  const refresh = useSerializedRead(useCallback(async () => {
     const current = ++revision.current;
     try {
       const [result, agreement] = await Promise.all([
-        request<{ view: ShareDepositView }>(`/api/share-deposit?rentalId=${encodeURIComponent(rentalId)}`),
-        request<{ agreement: { parties: Record<'tenant' | 'landlord' | 'arbitrator', { wallet?: { address: string } } | null>; records: { name: string; body: string }[] } }>(`/api/agreements/${encodeURIComponent(rentalId)}`),
+        boundedBuildingRead(signal => request<{ view: ShareDepositView }>(`/api/share-deposit?rentalId=${encodeURIComponent(rentalId)}`, undefined, { signal })),
+        boundedBuildingRead(signal => request<{ agreement: { parties: Record<'tenant' | 'landlord' | 'arbitrator', { wallet?: { address: string } } | null>; records: { name: string; body: string }[] } }>(`/api/agreements/${encodeURIComponent(rentalId)}`, undefined, { signal })),
       ]);
       if (!shareRefreshIsCurrent(current, revision.current)) return;
       if (result.view.network !== 'solana-devnet') throw new Error('This is not a Solana share deposit.');
@@ -249,20 +215,9 @@ function SolanaShareDeposit({ rentalId, request, reload }: DepositProps) {
     } catch (cause) {
       if (shareRefreshIsCurrent(current, revision.current)) setError(cause instanceof Error ? cause.message : 'Deposit unavailable');
     }
-  }, [request, rentalId, walletIds]);
-  useEffect(() => {
-    const timer = setTimeout(() => { void refresh(); }, 0);
-    const invalidate = () => { revision.current++; };
-    return () => { clearTimeout(timer); invalidate(); };
-  }, [refresh]);
-  useEffect(() => {
-    const read = () => { if (!busy && !plan && !pending && document.visibilityState === 'visible') void refresh(); };
-    const timer = setInterval(read, 60_000);
-    window.addEventListener('ledger-balances-changed', read);
-    document.addEventListener('visibilitychange', read);
-    return () => { clearInterval(timer); window.removeEventListener('ledger-balances-changed', read); document.removeEventListener('visibilitychange', read); };
-  }, [refresh, busy, plan, pending]);
-  const reconcile = useCallback(async (receipt: Receipt) => {
+  }, [request, rentalId, walletIds]));
+  useFinancialRefresh(async () => { if (!busy && !plan && !pending) await refresh(); }, { identity: rentalId, chain: 'solana' });
+  const reconcile = useSerializedRead(useCallback(async (receipt: Receipt) => {
     const result = await request<{ transactionHash: string; status: 'pending' | 'confirmed' | 'failed'; view: ShareDepositView }>('/api/share-deposit', {
       action: 'submit', network: 'solana-devnet', planId: receipt.planId,
       ...(signed.current?.planId === receipt.planId ? { signedTransactionBase64: signed.current.signedTransactionBase64 } : {}),
@@ -275,31 +230,12 @@ function SolanaShareDeposit({ rentalId, request, reload }: DepositProps) {
       else setError('Transaction failed on chain. Review the refreshed deposit before trying another action.');
     } else if (result.transactionHash && !receipt.transactionHash) setPending({ ...receipt, transactionHash: result.transactionHash });
     return result.status;
-  }, [request, reload, refresh]);
-  useEffect(() => {
-    if (!pending) return;
-    let stopped = false;
-    let running = false;
-    let failures = 0;
-    let timer: number;
-    const poll = async () => {
-      if (stopped || running || document.visibilityState !== 'visible') return;
-      running = true;
-      try {
-        const status = await reconcile(pending);
-        failures = 0;
-        if (status !== 'pending') return;
-      } catch (cause) {
-        failures++;
-        if (!stopped) setError(cause instanceof Error ? cause.message : 'Receipt unavailable; retrying.');
-      } finally { running = false; }
-      if (!stopped) timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(failures));
-    };
-    const visible = () => { clearTimeout(timer); if (document.visibilityState === 'visible') void poll(); };
-    timer = window.setTimeout(() => { void poll(); }, shareReceiptPollDelay(0));
-    document.addEventListener('visibilitychange', visible);
-    return () => { stopped = true; clearTimeout(timer); document.removeEventListener('visibilitychange', visible); };
-  }, [pending, reconcile]);
+  }, [request, reload, refresh]));
+  useFinancialRefresh(async () => {
+    if (!pending || busy) return;
+    try { await reconcile(pending); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Receipt unavailable; check the same signed transaction again.'); }
+  }, { enabled: Boolean(pending), pendingKey: pending?.planId, initial: false, chain: 'solana' });
   async function prepare(operation: ShareDepositAction, side?: 'tenant' | 'landlord') {
     if (!view || !parties || busy || pending) return;
     revision.current++; setBusy(true); setError('');

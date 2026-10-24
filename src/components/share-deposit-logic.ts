@@ -28,9 +28,6 @@ export function shareFeeBalance(assets: { robinhood: { value?: { ethBalance?: st
   return assets.robinhood?.value?.ethBalance;
 }
 
-export function shareReceiptPollDelay(errors: number) {
-  return Math.min(5_000 * 2 ** Math.min(errors, 4), 60_000);
-}
 
 /** Only the current wallet's genuinely pending receipt may block its next signature. */
 export function pendingShareDepositReceipt(receipts: ShareDepositView['receipts'], walletIds: readonly string[]) {

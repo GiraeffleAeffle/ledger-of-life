@@ -1,5 +1,5 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ArrowRight, Loader2 } from 'lucide-react';
 import { useRentalWallet } from '@/wallets';
 import type { TenancyJourney } from '@/server/journey';
@@ -10,12 +10,15 @@ import { HomeNode } from './home-node';
 import { ShareWorkflows, SolanaOperationReview, useReviewedSolanaOperation } from './share-workflows';
 import { LocalInvestments } from './local-investments';
 import { LocalAiWorkspace } from './local-ai';
-import { SectionTabs, useSectionTabActive } from './section-tabs';
+import { SectionTabs } from './section-tabs';
+import { useFinancialRefresh, useSerializedRead } from './use-financial-refresh';
+import { boundedBuildingRead } from './building-read';
+import type { AuthorizedRequest } from './use-city-signals';
 import { TestDollars } from './test-dollars';
 import { ScreenNote } from './blocks';
 import './money-area.css';
 
-type Request = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+type Request = AuthorizedRequest;
 const b64 = (value: string) => Uint8Array.from(atob(value), (c) => c.charCodeAt(0));
 const toB64 = (bytes: Uint8Array) => btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join(''));
 
@@ -93,18 +96,14 @@ function TestTslaWallet({ request, account }: { request: Request; account: strin
   const [availability, setAvailability] = useState<TestTslaAvailability | null>(null);
   const [error, setError] = useState('');
   const [now, setNow] = useState<number | null>(null);
-  const refresh = useCallback(async () => {
-    try { setAvailability(await request<TestTslaAvailability>('/api/share-workflows/faucet')); setError(''); }
+  const readFaucet = useSerializedRead(useCallback(() => boundedBuildingRead(signal => request<TestTslaAvailability & { network?: string }>('/api/share-workflows/faucet', undefined, { signal })), [request]), false);
+  const refresh = useSerializedRead(useCallback(async () => {
+    setNow(Math.floor(Date.now() / 1000));
+    try { setAvailability(await readFaucet()); setError(''); }
     catch (cause) { setAvailability(null); setError(cause instanceof Error ? cause.message : 'Test-share faucet availability could not be read.'); }
-  }, [request]);
-  const operation = useReviewedSolanaOperation(request, '/api/share-workflows/faucet', account, refresh);
-  useEffect(() => {
-    const read = () => { if (document.visibilityState === 'visible') { setNow(Math.floor(Date.now() / 1000)); void refresh(); } };
-    const firstRead = setTimeout(read, 0);
-    const timer = setInterval(read, 60_000);
-    document.addEventListener('visibilitychange', read);
-    return () => { clearTimeout(firstRead); clearInterval(timer); document.removeEventListener('visibilitychange', read); };
-  }, [refresh]);
+  }, [readFaucet]));
+  const operation = useReviewedSolanaOperation(request, '/api/share-workflows/faucet', account, refresh, readFaucet);
+  useFinancialRefresh(refresh, { chain: 'solana' });
   const hasWallet = wallet.wallets.some(item => item.chainType === 'solana');
   const coolingDown = Boolean(availability && (now === null || availability.availableAt > now));
   const budgetEmpty = Boolean(availability && BigInt(availability.remainingTodayAtomic) < 5_000_000n);
@@ -158,67 +157,43 @@ export function TestUsdc({ request }: { request: Request }) {
 function Portfolio({ request }: { request: Request }) {
   const read = useHoldingsRead();
   const wallet = useRentalWallet();
-  const activeTab = useSectionTabActive();
   const { view, checkedAt, unavailable } = read.portfolio;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [purchase, setPurchase] = useState<'none' | 'pending'>('none');
   const [signedAttempt, setSignedAttempt] = useState<{ id: string; signedTxBase64: string } | null>(null);
-  useEffect(() => {
-    if (!activeTab) return;
-    let active = true;
-    request<{ result: { state: string } }>('/api/portfolio', { action: 'purchase_status' })
-      .then(({ result }) => { if (active && result.state === 'pending') setPurchase('pending'); })
-      .catch(() => {});
-    return () => { active = false; };
-  }, [request, activeTab]);
-  useEffect(() => {
-    if (purchase !== 'pending') return;
-    let active = true;
-    let checking = false;
-    const timer = setInterval(() => {
-      if (checking || !activeTab || document.visibilityState === 'hidden') return;
-      checking = true;
-      request<{ result: { state: 'none' | 'pending' | 'finalized' | 'failed' } }>('/api/portfolio', { action: 'purchase_status' })
-        .then(async ({ result }) => {
-          if (!active) return;
-          let state = result.state;
-          if (state === 'pending') return;
-          if (state === 'none' && signedAttempt) {
-            try {
-              const response = await request<{ result: { state: 'none' | 'pending' | 'finalized' | 'failed' } }>('/api/portfolio', {
-                action: 'submit_buy', ...signedAttempt,
-              });
-              if (!active) return;
-              state = response.result.state;
-              if (state === 'pending') return;
-            } catch (error) {
-              if (!active) return;
-              if (!(error && typeof error === 'object' && 'code' in error && error.code === 'operation_expired')) return;
-              setMessage('The signed test purchase expired without broadcast. You can try again.');
-            }
-          }
-          if (state === 'finalized') {
-            setMessage('Bought. Checking your updated test holding.');
-            window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'solana' } }));
-          } else if (state === 'failed') {
-            setMessage('The test purchase failed on the network. You can try again.');
-          } else if (state === 'none') {
-            setMessage('The purchase was not broadcast. You can try again.');
-          }
-          setSignedAttempt(null);
-          setPurchase('none');
-        })
-        .catch(() => { /* A status timeout is not evidence that the purchase failed. */ })
-        .finally(() => { checking = false; });
-    }, 4000);
-    return () => { active = false; clearInterval(timer); };
-  }, [purchase, request, signedAttempt, activeTab]);
-  if (!view) return unavailable ? (
-    <div className="solana-buy-row" role="status">
-      <span>Solana test portfolio temporarily unavailable; checking again…</span>
-    </div>
-  ) : <div className="solana-buy-row" role="status">Loading Solana test portfolio…</div>;
+  const checkPurchase = useSerializedRead(useCallback(async () => {
+    try {
+      let { result } = await request<{ result: { state: 'none' | 'pending' | 'finalized' | 'failed' } }>('/api/portfolio', { action: 'purchase_status' });
+      if (result.state === 'pending') { setPurchase('pending'); return; }
+      if (result.state === 'none' && signedAttempt) {
+        // Recovery may resend only the exact locally retained bytes and original operation id.
+        try {
+          const response = await request<{ result: typeof result }>('/api/portfolio', { action: 'submit_buy', ...signedAttempt });
+          result = response.result;
+          if (result.state === 'pending') { setPurchase('pending'); return; }
+        } catch (error) {
+          if (!(error && typeof error === 'object' && 'code' in error && error.code === 'operation_expired')) return;
+          setMessage('The signed test purchase expired without broadcast. You can try again.');
+        }
+      }
+      if (purchase === 'pending') {
+        if (result.state === 'finalized') {
+          setMessage('Bought. Checking your updated test holding.');
+          window.dispatchEvent(new CustomEvent('ledger-balances-changed', { detail: { chain: 'solana' } }));
+        } else if (result.state === 'failed') setMessage('The test purchase failed on the network. You can try again.');
+        else setMessage('The purchase was not broadcast. You can try again.');
+      }
+      setSignedAttempt(null); setPurchase('none');
+    } catch { /* An unavailable status never proves failure or permits a replacement. */ }
+  }, [request, signedAttempt, purchase]));
+  useFinancialRefresh(checkPurchase, { chain: 'solana', pendingKey: purchase === 'pending' ? signedAttempt?.id ?? 'saved-purchase' : null });
+  const purchaseRecovery = purchase === 'pending' && <button type="button" className="text-button" disabled={busy} onClick={() => void checkPurchase()}>Check the same pending purchase</button>;
+  if (!view) return <div className="solana-buy-row" role="status">
+    <span>{unavailable ? 'Solana test portfolio temporarily unavailable.' : 'Loading Solana test portfolio…'}</span>
+    {purchaseRecovery}
+    <button type="button" className="text-button" onClick={() => void read.refresh().catch(() => {})}>Refresh holdings</button>
+  </div>;
   async function invest() {
     if (busy || purchase === 'pending') return;
     setBusy(true);
@@ -271,6 +246,7 @@ function Portfolio({ request }: { request: Request }) {
       ) : view.referencePriceStale && (
         <p className="note" role="status">Reference price as of {new Date(view.referencePriceObservedAt).toLocaleString()}; live price temporarily unavailable. Buying resumes when refreshed.</p>
       )}
+      {purchaseRecovery}
       <button className="button primary" disabled={busy || purchase === 'pending' || unavailable || view.referencePriceStale || BigInt(view.testUsdcAtomic) < 5_000_000n} onClick={invest}>
         {busy ? <Loader2 className="spin" size={16} /> : null} {purchase === 'pending' ? 'Purchase pending, checking' : 'Buy tSPYx with 5 test USDC'} <ArrowRight size={16} />
       </button>

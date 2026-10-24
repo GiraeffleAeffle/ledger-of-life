@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-k1-retry4-2026-10-14",
+  "related": [
+    {
+      "id": "r1-k1-retry3-2026-10-14",
+      "sha256": "55a7713242aabe6c36cc6035ecd88fec4f27b21fd353ce8011c7416d209bea1b"
+    },
+    {
+      "id": "r1-k1-retry3-2026-10-14-amendment-1",
+      "sha256": "e725d6f1ba75b23033ef9d91c9f2da94bf4f55dd9935029fcdf51c9511e10bd2"
+    },
+    {
+      "id": "r1-k1-retry3-stage-structured-parse-2026-10-14",
+      "sha256": "dc69da730db4d0a5d83c2522c830e52148c6ad950b502fab52d96ff100928920"
+    },
+    {
+      "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+      "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+    },
+    {
+      "id": "r1-genesis-api-robots-2026-10-13",
+      "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7"
+    }
+  ],
+  "recordedAt": "2026-10-14T13:15:13.832Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session",
+  "questionShownToOwner": "(End of the lead status message) The full K1 run finished: the data was saved and parsed without a new request (6 of 6 jobs). However, regionalstatistik returned \"no objects for this selection\" (status 104), so table 12411-02-03 has no 2024 data for Strausberg. The town-level table probably has a different name, likely 12411-02-03-5; trying that would need one more request and your approval.",
+  "ownerStatementsVerbatim": [
+    "Yes approve"
+  ],
+  "approved": {
+    "k1Retry4": "One more GENESIS data/table POST via the owner-account lane for Strausberg (AGS 12064472, regionalvariable GEMEIN, year 2024) with the town-level table name 12411-02-03-5 (otherwise identical request), followed by the structured parse of the admitted representation.",
+    "jobs": "K1 jobs 7 (acquisition) and 8 (parse); a reviewed code change admitting the 12411-02-03-5 table name is a precondition",
+    "timeBudget": "within the remaining K1 process wall time (1500 s total; 782 s used)",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "unchangedRules": "Facts with source attribution only; no republication of whole tables; credentials never read into logs, chat, parser, CAS, receipts, observations or notifications; robots exemption only per r1-genesis-api-robots-2026-10-13."
+  },
+  "interpretation": "\"Yes approve\" answers the closing question of the lead message (one more request with table 12411-02-03-5). If that request also returns no data, K1 ends with an honest negative result; no further request without a new approval."
+}

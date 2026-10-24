@@ -2,13 +2,20 @@ import {strict as assert} from 'node:assert';
 import {test} from 'node:test';
 import {cities} from '../src/cities.ts';
 import {canonicalOparlUrl,councilId} from '../src/dedupe.ts';
-import {traverseCouncilList,loadCouncilJson} from '../src/council-cache.ts';
+import {traverseCouncilList,createCouncilAcquisition,isCouncilPermissionFailure} from '../src/council-cache.ts';
 import {CouncilBindingError,bodyIdMatchesCity,bodyMatchesCity,councilCoverage,councilEventDate,councilLicence,councilWindow,inCouncilWindow,mergeCouncilRecords,parseOparlList,recordMatchesBody,selectCouncilBody} from '../src/council-oparl.ts';
 import type {CouncilLoader,CouncilSegment,CouncilStorage} from '../src/council-cache.ts';
 import type {CouncilCheckpoint,OparlBody,OparlRecord,StoredCouncilRecord} from '../src/council-oparl.ts';
-import {councilBindingFailure} from '../src/council.ts';
-import {setImmediate as nextTurn} from 'node:timers/promises';
+import {councilBindingFailure,collectOparl} from '../src/council.ts';
 import {PoliteFetcher,PoliteFetchError} from '../src/polite-fetch.ts';
+import type {FetchOptions} from '../src/polite-fetch.ts';
+import {readFile,writeFile,mkdir,stat,readdir,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {hash} from '../src/common.ts';
+import {recordHostOptOut} from '../src/civic-opt-out.ts';
+import {createCivicPolicyTestContext} from './fixtures/civic-policy.ts';
+import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
+import {CrawlRequestEvidenceCaptureError} from '../src/district-crawl-request.ts';
 
 const at='2026-10-10T12:00:00.000Z';
 const body:OparlBody={id:'https://council.example/body/1',name:'Example',type:'https://schema.oparl.org/1.1/Body',paper:'https://council.example/body/1/paper'};
@@ -22,23 +29,39 @@ function pageLoader(pages:Record<string,unknown>,requests:string[]=[]):CouncilLo
  return async url=>{requests.push(url);assert.ok(Object.hasOwn(pages,url),`Unexpected source URL ${url}`);return {...evidence,url,data:pages[url]};};
 }
 
-test('Interrupted public GETs back off twice, then preserve the failure for durable resume',async t=>{
+test('Scoped public GET failures remain durable-resume failures without a hidden reconnect loop',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy});
  let requests=0;
- t.mock.method(PoliteFetcher.prototype,'fetch',async()=>{requests++;throw new PoliteFetchError('network_error','Public request failed');});
- t.mock.timers.enable({apis:['setTimeout']});
- const failed=assert.rejects(loadCouncilJson(body.paper!),/Public request failed/);
- await nextTurn();assert.equal(requests,1);
- t.mock.timers.tick(14_999);await nextTurn();assert.equal(requests,1);
- t.mock.timers.tick(1);await nextTurn();assert.equal(requests,2);
- t.mock.timers.tick(30_000);await failed;assert.equal(requests,3);
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{requests++;throw new PoliteFetchError('network_error','Public request failed');});
+ await assert.rejects(acquisition.loadJson(city.endpoint!),/Public request failed/);
+ assert.equal(requests,1);
+ assert.ok((await readFile(join(root,'raw','.civic-acquisition-lane.json'))).length);
 });
 
-test('Policy, HTTP and integrity failures are never retried as connection failures',{timeout:1000},async t=>{
+test('Scoped council loader never retries policy, HTTP or integrity failures',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy});
  let failure:Error=new PoliteFetchError('robots_blocked','Blocked'),requests=0;
- t.mock.method(PoliteFetcher.prototype,'fetch',async()=>{requests++;throw failure;});
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{requests++;throw failure;});
  for(const error of [failure,new PoliteFetchError('tdm_reserved','Reserved'),new PoliteFetchError('http_error','HTTP 429',429),new Error('Council source cache digest mismatch')]){
-  failure=error;const before=requests;await assert.rejects(loadCouncilJson(body.paper!),error);assert.equal(requests,before+1);
+  failure=error;const before=requests;await assert.rejects(acquisition.loadJson(city.endpoint!),error);assert.equal(requests,before+1);
  }
+});
+
+test('council JSON and text loaders reject cross-host redirects without destination retention',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy}),seen:string[]=[];
+ const bytes=Buffer.from('{"data":[]}'),destination='https://different.stadt.de/oparl';
+ t.mock.method(acquisition.fetcher as unknown as {wire(url:URL):Promise<unknown>},'wire',async(url:URL)=>{
+  seen.push(url.href);
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return {status:302,headers:{location:destination},body:Buffer.alloc(0)};
+ });
+ for(const load of [acquisition.loadJson,acquisition.loadText])await assert.rejects(load(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='cross_host_redirect');
+ assert.ok(!seen.some(value=>new URL(value).hostname==='different.stadt.de'));
+ await assert.rejects(readFile(join(root,'raw','sha256',hash(bytes))),{code:'ENOENT'});
+ await assert.rejects(readdir(join(root,'raw','collections')),{code:'ENOENT'});
 });
 
 test('Düsseldorf selects exact approved municipality and body ID, never the first two shared bodies',()=>{
@@ -202,7 +225,7 @@ test('Incremental pagination resumes after network failure and advances watermar
 
 test('Rejected municipality becomes release-checkable failed binding metadata, not an empty successful source',()=>{
  const city=cities.find(city=>city.id==='duesseldorf')!,wrong={id:'https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009',name:'Stadt Neuss'};
- const result=councilBindingFailure(city,new CouncilBindingError(city,[wrong]),'oparl');
+ const result=councilBindingFailure(city,new CouncilBindingError(city,[wrong]));
  assert.equal(result.features.length,0);assert.equal(result.sources[0].status,'failed');assert.equal(result.sources[0].recordCount,0);
  assert.equal(result.sources[0].bodyBinding.id,wrong.id);assert.equal(result.sources[0].bodyBinding.name,wrong.name);assert.equal(result.sources[0].bodyBinding.matched,false);
  assert.equal(result.sources[0].coverage.state,'failed');assert.match(result.sources[0].coverage.reason,/Stadt Neuss/);
@@ -251,4 +274,215 @@ test('Duplicate full-list rows cannot conceal missing IDs or authorize withdrawa
   const completed=await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('a'),paper('b')],pagination:{totalElements:2}}}),{now:at});
   assert.equal(completed.state.active,null);assert.equal(completed.records.size,2);
  }
+});
+
+interface CouncilWireSeam {wire(url:URL):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>}
+test('council inspection fixture seam cannot authorize a production acquisition context',()=>{
+ const city=cities.find(city=>city.id==='koeln')!;
+ assert.throws(()=>createCouncilAcquisition(city,{cacheRoot:'/unused-before-inspection',fixtureInspection:fixturePolicyInspection}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+});
+
+test('registered council discovery and traversal retain managed provenance and stop cache reuse on objection',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw'),acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection});
+ const selectedBody:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper',meeting:city.councilBodyId+'/meeting'},bodiesUrl=new URL('/oparl/bodies',city.endpoint).href;
+ const record:OparlRecord={id:selectedBody.paper+'/1',body:selectedBody.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic municipal council submission',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ let wireCalls=0;
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  wireCalls++;
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  const data=url.href===city.endpoint?{id:city.endpoint,type:'https://schema.oparl.org/1.1/System',body:bodiesUrl,license:'https://www.govdata.de/dl-de/zero-2-0'}:url.href===bodiesUrl?{data:[selectedBody]}:url.href===selectedBody.paper?{data:[record]}:url.href===selectedBody.meeting?{data:[]}:undefined;
+  assert.ok(data,`Unexpected synthetic URL ${url.href}`);
+  return {status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(data))};
+ });
+ const collection=await collectOparl(city,{acquisition,maxPages:5,now:new Date(at)});
+ assert.equal(collection.features.length,1);assert.equal(collection.features[0].properties.kind,'council_paper');
+ const storage=acquisition.storage(selectedBody.id,'paper'),checkpoint=await storage.load();assert.equal(checkpoint?.backfillComplete,true);
+ const segment=await storage.readSegment(0),path=join(cacheRoot,'oparl',hash(canonicalOparlUrl(selectedBody.id)),'paper','page-0.json'),persisted=JSON.parse(await readFile(path,'utf8'));
+ assert.equal(persisted.sourceBindings.length,1);assert.equal(persisted.sourceBindings[0].sha256,segment.evidence.sha256);
+ assert.ok((await readFile(join(cacheRoot,'sha256',segment.evidence.sha256))).length);
+ const signalPath=await acquisition.persistCollection('signals.geojson',{type:'FeatureCollection',features:collection.features});
+ const summaryPath=await acquisition.persistCollection('collection.json',{cityId:city.id,sources:collection.sources});
+ const before=wireCalls,objection=await recordHostOptOut({host:new URL(city.endpoint!).hostname,reason:'municipality_objection',reference:'synthetic-council-test'},policy);
+ assert.equal(objection.purge.status,'purged');
+ await assert.rejects(stat(path),{code:'ENOENT'});
+ await assert.rejects(stat(signalPath),{code:'ENOENT'});await assert.rejects(stat(summaryPath),{code:'ENOENT'});
+ await assert.rejects(storage.load(),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ await assert.rejects(storage.readSegment(0),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ await assert.rejects(acquisition.loadJson(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ assert.equal(wireCalls,before);
+});
+
+test('managed preloaded council pages cannot survive a current document exclusion as stale collector results',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});
+ await acquisition.fetcher.initialize();
+ const selectedBody:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper',meeting:city.councilBodyId+'/meeting'},bodiesUrl=new URL('/oparl/bodies',city.endpoint).href;
+ const record:OparlRecord={id:selectedBody.paper+'/1',body:selectedBody.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic previously admitted council submission',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ let excluded=false,paperRequests=0;
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  if(url.pathname===new URL(selectedBody.paper!).pathname){
+   paperRequests++;
+   return {status:200,headers:{'content-type':'application/json',...(excluded?{'tdm-reservation':'1'}:{})},body:Buffer.from(JSON.stringify({data:[excluded?{...record,body:undefined}:record]}))};
+  }
+  const data=url.href===city.endpoint?{id:city.endpoint,type:'https://schema.oparl.org/1.1/System',body:bodiesUrl,license:'https://www.govdata.de/dl-de/zero-2-0'}:url.href===bodiesUrl?{data:[selectedBody]}:url.pathname===new URL(selectedBody.meeting!).pathname?{data:[]}:undefined;
+  assert.ok(data,`Unexpected synthetic URL ${url.href}`);
+  return {status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(data))};
+ });
+ const initial=await collectOparl(city,{acquisition,maxPages:5,now:new Date(at)});
+ assert.equal(initial.features.length,1);assert.equal(initial.features[0].geometry,null);
+ const storage=acquisition.storage(selectedBody.id,'paper');
+ assert.equal((await storage.readSegment(0)).records[0].id,record.id);
+ excluded=true;
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await collectOparl(city,{acquisition,maxPages:5,now:new Date('2026-10-11T12:00:00.000Z')}));},error=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
+ assert.match((await storage.load())!.error!,/Current source permission/);
+ await assert.rejects(async()=>{returned.push(await collectOparl(city,{acquisition,maxPages:5,now:new Date('2026-10-11T12:01:00.000Z'),reuseCompleteMs:48*60*60_000}));},error=>error instanceof PoliteFetchError&&error.failure==='document_excluded');
+ assert.deepEqual(returned,[]);assert.equal(paperRequests,3);
+});
+
+test('council live context rejects forged registration and never adopts a named historical cache',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'owner-policy-2026-10-11');
+ assert.throws(()=>createCouncilAcquisition({...city,endpoint:'https://other-council.de/system'},{cacheRoot,policy}),/registered City endpoint/);
+ assert.throws(()=>createCouncilAcquisition({...city,id:'unregistered-city'},{cacheRoot,policy}),/registered City endpoint/);
+ await mkdir(cacheRoot);await writeFile(join(cacheRoot,'frozen.json'),'retained historical snapshot');
+ const acquisition=createCouncilAcquisition(city,{cacheRoot,policy});let calls=0;
+ t.mock.method(acquisition.fetcher,'fetch',async()=>{calls++;throw Error('Unmarked root must fail first');});
+ await assert.rejects(acquisition.loadJson(city.endpoint!),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+ assert.equal(calls,0);assert.equal(await readFile(join(cacheRoot,'frozen.json'),'utf8'),'retained historical snapshot');
+ await assert.rejects(stat(join(cacheRoot,'.civic-acquisition-lane.json')),{code:'ENOENT'});
+ assert.ok((await stat(policy.stateDir!)).isDirectory());
+ assert.throws(()=>acquisition.storage('https://other-council.de/body/1','paper'),/registered City/);
+});
+
+
+test('licence-page acquisition keeps its own origin assessment instead of inheriting OParl Body authorship',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t);
+ const city=cities.find(city=>city.id==='koeln')!,acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ acquisition.bindBody(selected);
+ const seen:Array<{registeredSourceUrl?:string;originEvidence:FetchOptions['oparlContext']}>= [];
+ const governedFetch=acquisition.fetcher.fetch.bind(acquisition.fetcher);
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  return url.href===selected.paper?{status:200,headers:{'content-type':'application/json'},body:Buffer.from('{"data":[]}')}:{status:200,headers:{'content-type':'text/html'},body:Buffer.from('<html><body>Municipal copyright notice.</body></html>')};
+ });
+ t.mock.method(acquisition.fetcher,'fetch',async(url:string,options:FetchOptions={})=>{
+  seen.push({registeredSourceUrl:options.registeredSourceUrl,originEvidence:options.oparlContext});
+  return governedFetch(url,options);
+ });
+ await acquisition.loadJson(selected.paper!);
+ await acquisition.loadText('https://www.stadt-koeln.de/impressum');
+ assert.deepEqual(seen[0].originEvidence,{bodyId:selected.id,bodyName:selected.name,apiUrl:selected.paper});assert.equal(seen[1].originEvidence,undefined);
+ assert.ok(seen.every(item=>item.registeredSourceUrl===city.endpoint));
+});
+
+test('current council permission denial cannot return loaded records or regain a completed-cache shortcut',async()=>{
+ for(const failure of ['document_excluded','tdm_reserved','tdm_unavailable','access_barrier','host_opted_out','host_state_unsafe','cross_host_redirect'] as const){
+  const storage=memoryStorage();
+  await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('previously-permitted')]}}),{now:at});
+  const denial=new PoliteFetchError(failure,'Synthetic current permission denial');let attempts=0;
+  const denied:CouncilLoader=async()=>{attempts++;throw denial;};
+  await assert.rejects(traverseCouncilList(body,'paper',storage,denied,{now:'2026-10-11T12:00:00.000Z'}),error=>error===denial);
+  const state=await storage.load();assert.match(state!.error!,/Current source permission/);
+  await assert.rejects(traverseCouncilList(body,'paper',storage,denied,{now:'2026-10-11T12:01:00.000Z',reuseCompleteMs:24*60*60_000}),error=>error===denial);
+  assert.equal(attempts,2);
+ }
+ const storage=memoryStorage();
+ await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('network-partial-only')]}}),{now:at});
+ const partial=await traverseCouncilList(body,'paper',storage,async()=>{throw new PoliteFetchError('network_error','Synthetic temporary network failure');},{now:'2026-10-11T12:00:00.000Z'});
+ assert.equal(partial.records.size,1);assert.equal(isCouncilPermissionFailure(new PoliteFetchError('network_error','Synthetic')),false);
+});
+test('permission denial remains structured when its durable metadata checkpoint also fails',async()=>{
+ const storage=memoryStorage();
+ await traverseCouncilList(body,'paper',storage,pageLoader({[body.paper!]:{data:[paper('old')]}}),{now:at});
+ const failing:CouncilStorage={...storage,checkpoint:async()=>{throw Error('Synthetic unavailable checkpoint');}},denial=new PoliteFetchError('http_error','Synthetic HTTP403',403);
+ await assert.rejects(traverseCouncilList(body,'paper',failing,async()=>{throw denial;},{now:'2026-10-11T12:00:00.000Z'}),error=>error instanceof AggregateError&&error.errors[0]===denial&&isCouncilPermissionFailure(error));
+});
+
+for(const phase of ['robots','tdm'] as const)test(`council ${phase} transport failures cannot reuse preloaded records or completed cache`,async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!;
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic preloaded council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'},storage=memoryStorage();
+ const initial=await traverseCouncilList(selected,'paper',storage,pageLoader({[selected.paper!]:{data:[record]}}),{now:at});assert.equal(initial.records.size,1);
+ const acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});acquisition.bindBody(selected);
+ const denial=new PoliteFetchError('network_error','Synthetic mandatory policy transport failure'),seen:string[]=[];
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  seen.push(url.pathname);
+  if(url.pathname===(phase==='robots'?'/robots.txt':'/.well-known/tdmrep.json'))throw denial;
+  assert.equal(url.pathname,'/robots.txt');return {status:404,headers:{},body:Buffer.alloc(0)};
+ });
+ const returned:unknown[]=[];
+ for(const [now,reuseCompleteMs] of [['2026-10-11T12:00:00.000Z',0],['2026-10-11T12:01:00.000Z',48*60*60_000]] as const){
+  await assert.rejects(async()=>{returned.push(await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now,reuseCompleteMs}));},error=>error===denial&&denial.policyPhase===phase&&isCouncilPermissionFailure(error));
+  assert.match((await storage.load())!.error!,/Current source permission/);
+ }
+ assert.deepEqual(returned,[]);assert.equal(acquisition.fetcher.requestCount,2);
+ assert.deepEqual(seen,phase==='robots'?['/robots.txt']:['/robots.txt','/.well-known/tdmrep.json']);
+});
+
+test('ordinary council document transport errors keep partial availability without policy-phase context',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!;
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic preloaded council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'},storage=memoryStorage();
+ await traverseCouncilList(selected,'paper',storage,pageLoader({[selected.paper!]:{data:[record]}}),{now:at});
+ const acquisition=createCouncilAcquisition(city,{cacheRoot:join(root,'raw'),policy,fixtureInspection:fixturePolicyInspection});acquisition.bindBody(selected);
+ const failure=new PoliteFetchError('network_error','Synthetic ordinary document transport failure');
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  throw failure;
+ });
+ const partial=await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:'2026-10-11T12:00:00.000Z'});
+ assert.equal(partial.records.size,1);assert.equal(failure.policyPhase,null);assert.equal(isCouncilPermissionFailure(failure),false);
+});
+
+test('OParl capture failure aborts without returning cached records or checkpointing a permission denial',async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id==='koeln')!,cacheRoot=join(root,'raw');
+ const acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection}),selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases![0],type:'https://schema.oparl.org/1.1/Body',paper:city.councilBodyId+'/paper'};
+ acquisition.bindBody(selected);
+ const record:OparlRecord={id:selected.paper+'/1',body:selected.id,type:'https://schema.oparl.org/1.1/Paper',name:'Synthetic cached council record',date:'2026-09-01',modified:'2026-09-02T00:00:00Z'};
+ const initialBytes=Buffer.from(JSON.stringify({data:[record]})),updatedBytes=Buffer.from(JSON.stringify({data:[{...record,name:'Synthetic newly fetched council record'}]}));let refresh=false;
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  assert.equal(url.pathname,new URL(selected.paper!).pathname);return {status:200,headers:{'content-type':'application/json'},body:refresh?updatedBytes:initialBytes};
+ });
+ const storage=acquisition.storage(selected.id,'paper'),first=await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:at});assert.equal(first.records.size,1);
+ const checkpointPath=join(cacheRoot,'oparl',hash(canonicalOparlUrl(selected.id)),'paper','checkpoint.json'),checkpointBytes=await readFile(checkpointPath),originalCheckpoint=storage.checkpoint.bind(storage);let checkpoints=0;
+ t.mock.method(storage,'checkpoint',async(...args:Parameters<CouncilStorage['checkpoint']>)=>{checkpoints++;return originalCheckpoint(...args);});
+ await rm(cacheRoot+'-request-evidence',{recursive:true,force:true});await writeFile(cacheRoot+'-request-evidence','SYNTHETIC_COUNCIL_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});refresh=true;
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await traverseCouncilList(selected,'paper',storage,acquisition.loadJson,{now:'2026-10-11T12:00:00.000Z'}));},(error:unknown)=>{assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(isCouncilPermissionFailure(error),false);return true;});
+ assert.deepEqual(returned,[]);assert.equal(checkpoints,0);assert.deepEqual(await readFile(checkpointPath),checkpointBytes);assert.equal((await storage.readSegment(0)).records[0].name,record.name);
+ assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(initialBytes))),initialBytes);assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(updatedBytes))),updatedBytes);
+ const observations=await Promise.all((await readdir(join(cacheRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(cacheRoot,'observations',name),'utf8')))),fresh=observations.filter(row=>row.sha256===hash(updatedBytes));
+ assert.equal(fresh.length,1);assert.equal(fresh[0].state,'fetched');assert.equal(fresh[0].status,200);assert.equal(fresh[0].failure,undefined);
+});
+
+for(const [cityId,rightsUrl] of [
+ ['duesseldorf','https://opendata.duesseldorf.de/dataset/oparl-schnittstelle-zum-ratsinformationsystem-der-stadt-d%C3%BCsseldorf'],
+ ['freiburg','https://www.freiburg.de/pb/224613.html'],
+ ['castrop-rauxel','https://www.castrop-rauxel.de/impressum'],
+] as const)test(`${cityId} rights-page capture failure propagates instead of reporting unavailable rights`,async t=>{
+ const {root,policy}=await createCivicPolicyTestContext(t),city=cities.find(city=>city.id===cityId)!,cacheRoot=join(root,'raw'),acquisition=createCouncilAcquisition(city,{cacheRoot,policy,fixtureInspection:fixturePolicyInspection});
+ const selected:OparlBody={id:city.councilBodyId!,name:city.councilBodyAliases?.[0]??city.name,type:'https://schema.oparl.org/1.1/Body'},bodiesUrl=new URL('/capture-test/bodies',city.endpoint).href,rightsBytes=Buffer.from('<html><body>Synthetic municipal Urheberrecht notice.</body></html>'),seen:string[]=[];
+ t.mock.method(acquisition.fetcher as unknown as CouncilWireSeam,'wire',async(url:URL)=>{
+  if(url.pathname==='/robots.txt'||url.pathname==='/.well-known/tdmrep.json')return {status:404,headers:{},body:Buffer.alloc(0)};
+  seen.push(url.href);
+  if(url.href===rightsUrl)return {status:200,headers:{'content-type':'text/html'},body:rightsBytes};
+  const data=url.href===canonicalOparlUrl(city.endpoint!)?{id:city.endpoint,type:'https://schema.oparl.org/1.1/System',body:bodiesUrl}:url.href===bodiesUrl?{data:[selected]}:undefined;
+  assert.ok(data,`Unexpected synthetic rights-discovery URL ${url.href}`);return {status:200,headers:{'content-type':'application/json'},body:Buffer.from(JSON.stringify(data))};
+ });
+ const loadText=acquisition.loadText.bind(acquisition);
+ t.mock.method(acquisition,'loadText',async(url:string)=>{
+  assert.equal(url,rightsUrl);await rm(cacheRoot+'-request-evidence',{recursive:true,force:true});await writeFile(cacheRoot+'-request-evidence','SYNTHETIC_RIGHTS_CAPTURE_OBSTRUCTION',{mode:0o600,flag:'wx'});
+  return loadText(url);
+ });
+ const returned:unknown[]=[];
+ await assert.rejects(async()=>{returned.push(await collectOparl(city,{acquisition,maxPages:1,now:new Date(at)}));},(error:unknown)=>{assert.ok(error instanceof CrawlRequestEvidenceCaptureError);assert.equal(isCouncilPermissionFailure(error),false);return true;});
+ assert.deepEqual(returned,[]);assert.equal(seen.at(-1),rightsUrl);assert.deepEqual(await readFile(join(cacheRoot,'sha256',hash(rightsBytes))),rightsBytes);
+ const observations=await Promise.all((await readdir(join(cacheRoot,'observations'))).map(async name=>JSON.parse(await readFile(join(cacheRoot,'observations',name),'utf8')))),rights=observations.filter(row=>row.url===rightsUrl);
+ assert.equal(rights.length,1);assert.equal(rights[0].state,'fetched');assert.equal(rights[0].status,200);assert.equal(rights[0].failure,undefined);
+ await assert.rejects(stat(join(cacheRoot,'collections')),{code:'ENOENT'});
 });

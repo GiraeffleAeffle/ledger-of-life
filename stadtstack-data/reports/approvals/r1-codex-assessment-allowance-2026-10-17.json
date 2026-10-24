@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "r1-codex-assessment-allowance-v1",
+  "id": "r1-codex-assessment-allowance-2026-10-17",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "issuedAt": "2026-10-17T02:01:45Z",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  "delegationApproval": {
+    "id": "r1-b-model-sonnet-2026-10-17",
+    "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+  },
+  "cohort": {
+    "path": "stadtstack-data/reports/approvals/r1-frozen-assessment-cohort-2026-10-17.json",
+    "sha256": "24c8629ec588f4898988c7ee7a61eb7e7b2809d0b0ab052fc34669512e789965"
+  },
+  "assessment": {
+    "projectionVersion": "assessment-source-record-v2",
+    "queueContractSha256": "253c32cf907b21d6381834db397768075facfb60bbd5df81ef2a5ab9d406d438",
+    "steps": [
+      "assessment_a",
+      "assessment_c"
+    ]
+  },
+  "bounds": {
+    "baseMaxCallsPerOriginal": 48,
+    "maxExtraCallsPerOriginal": 24,
+    "maxExtraCallsCohort": 100,
+    "provider": "openai-subscription",
+    "paidMicroUsd": 0,
+    "normalSubscriptionOnly": true
+  },
+  "scope": "Only authenticated fresh projection-v2 source-record A/C re-assessment of the pinned frozen cohort. Historical/value/B/preparation/extraction jobs cannot borrow this allowance. Lifetime intents and excess are never refunded or reset by failure, ambiguity, retries or reissued records. Stored or declared base bounds narrower than 48 remain narrower; extraction and selectors remain capped at 48. All lease, source-policy, subscription usage/settlement and authorization gates remain mandatory."
+}

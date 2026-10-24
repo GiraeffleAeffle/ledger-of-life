@@ -1,0 +1,3578 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "previous": "c48fa67fd045f6d9e51d87309ea6082100061f6c0aafe06a93a1e7a6059cb30c",
+      "current": "76291a6bceb92dcdc5dd943410b09ea805010fd18e2ae2c5c22035593f4f3b93",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25300",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "62c1237cd3ca359804d6311373ba3759ebe13f10da86249387e76c731813b973",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25301",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8ebbdee54f3d3dbb62e197e977a6c8380cdf3bb4f09a856eeb423cf09f72dd68",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25302",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c8d70f63f7ada749d0131d8a2a67301e10c6d9d3efd76d7636fb743537752b51",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25303",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "245883a844e4df68ba7d52e440eee2b57a88453738dc2f43a51ed86c6555f0f1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25304",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b3b221c69bbafad2a0877550e2cca67bb13ecab0b7085a7191a968907426fe04",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25305",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "32d3caa35db1ec57d24ae34147a56a346fbe3b945472a2f9344745238ff88fe0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25306",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "26613ff99e966cfa68e91f65db41651349f58cb80d997f0bf9b9f411a5bdcbc8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "e2479801d4bb1860725e526d9f914294dcac00676f7ee04046ea4863b51298ff",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25307",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "285e35282f2139999783c715333d576412a94fea3979f3cdefb975ceb346a0ba",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6e88076671bcf43707df715c0b4aff2984378ec01bce1116ae0861cf670e0373",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25308",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0962570721b9ab13b1fbe6e707a71690adb57b29d3ab0855a469472c33f5af32",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "366e8ffc17eb9c63d31c3aa5b636677bfda1c75ecdfe244c7dae4308e5ded130",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25309",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "990fde9a7e3ddb228cf0cc82c865e0fa9bcecfaba1f7b6ac62826c3909755ee2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3",
+          "f53ce301c5605dd279b5ca41f0eeb8a6e51065fe8f1f9d3dbc16d654f8ae3f9e"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25310",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4c611c82b48434e3be3f21699ac84552b0bdda2b931a442e589b78d9821dd9b7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "d2f87b9723c4a399ad6b39c0d9ecc3777cf444c7b854b8e24bfb65a7c12fd48a",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25311",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1723cab3d03c6838404ae5f1843b8049e8df71942c7de8da2a1b2d8435a61c26",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3",
+          "ef8399af0a7b9f1d183d3e0fde4a048e15b77041aa9dad377506ce1385fa1c82"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25312",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2badb35af2d8cbb3c6d05f3b56ad54b95931aac7a092cefa6fdbfb9380e63242",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "d4de5d0a20d87536ca07f4950a009fdca005a5be21d5d9efdbddad1c3dcfde9a",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25313",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f1fb3cb206c7802e0e5a01b4427dae680b636e9ea84f32e34e0c9e29a7c84821",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "41cd63a15b366afc13ce1de851c69a26b1aac7ed4f04a099e4c8eb64b0c5bfb2",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25337",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "dce426a016e70f1de686cb8e4b8d04d860d31d0afec40f33d6bb7ab0500b6601",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25338",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "690e175835720e7cc1283bf75658d0c20ba76bfe544b5d164c2e9f137d030786",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25339",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "40afc212e4df2a7850d3df212872f502072676d5f4bfb42de619c86c5be9d8fe",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25340",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0ccedd6123e316bedee90a01a11921f8f60634e3d7a6bd98d47517b5192b0e5c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25341",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "619a0ad47e07aaea801f89b9339db277c5496b36b52dd85ad78e061ab0d402b1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25342",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d4601ee4df5e0d92633f25e414c198ba96f264190017a3bea342190234315a7a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25343",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "649c2f0989826fb5334cff2ddb2ec912b0d471fda30219e7a4ee2e8bdd3f179c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25345",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ad61717e8958337157c76c0dc47f7996ac8c0cc25df506e9efef1a269165ed4e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25346",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cd603a18985f8cf21478e794a1da799e00dc33d8d2c59682c23625328387dbc4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25347",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "db80e2070d72f6e539738af199f822b3dca8ade506eb64013408024a01c1ee2e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25348",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f56ede879078823a17c4ee299d6e49db8f4e72d4405e97b818ea419502d5e148",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25349",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3514e2b38dbfe18fb843029d137990a2d2a76947a1c5421e2033bef1ca94fc2b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25350",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5211c3475573adf0c81a22e6a18bd2390a87ad8902f5838d9c7c8373d891ecb8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "808582d84c41bc4f6e5a3221782ccf0ea8633a44e7f536e363c0ee26dd002b06",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25351",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e3cb053a1c6b52ee63018879a8f69d42225de8c07341e333cae48f57fab70d0a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "691820270307059b056c833662f2724bd106e0691e12e2bbd41a324e002d51c9",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25352",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2149cbb3a00bd4f52418c200eace80daae94b2d90aedb6507ca679f838993372",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "7e2e9c5546f52707df6a66af2225f8af2e496404cb64503f9df9753c913bb04b",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25353",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7d78fde35f842db91559f21e2bce290e2e294112994729f394038f4ef5e1c6b4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "49e0c739597ba034c6d5fdb21083540093bd624de581e0ff8ad1b6b0c10503b9",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25354",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2472167741f31a5420a59ba256ff7e7f835b2ecae1088921f819a0391947cfdc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "afdf956dc1498eeb0be56044f83e46247ef1280f4dfa6de7e8b0a0d5630a0cd8",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25355",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6ba317e0937ff133b6608fb48dd2ff8059c26778a787610b48bbabac327ad170",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a6df87a76028fee20fac79aa2357a058ea1b4d261f87cceadec8e3eed5056195",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25356",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "db7b766c3c34d6af8f7d704d1cfefc2112a9a73f2aae2cad59be6fd115333be9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1b6887088865c37db95920cdb1d055faa447dd21831e46d8d464c86d72d29c45",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25357",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b9bc082065d5d2c0f2d3c5abc98beddf0e794e4737cdace5bb0b935441c1fee2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "7529f6b9cef5492f7a20851e59ae685a9a9870c746b9e2adfe272dde2a7681cc",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25358",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f95d3e08852c35ae091207428ef24e520eb82b9105eb1fa900e422f681da864c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c88110d565ac3b10690987635a0584dd43a4b3ad8b1135e88b06ba58b0d133d7",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25359",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0f4536fbb1106c22888eade6f80212bc3284f4ff0887185c577f8e68b6532a8d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25369",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "685d0a044af8466185c834bed9c30c21b56b9c335c2cd8ba285ef923d89648cc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25370",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0cfaa27a44d2e4ae41255410bb4f32905eb711c2fa7ce7bbc1717e89b29b535f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25371",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a53071a70537e9a83dd838e4a7c836f4e9327470debc27b89656c6c47a1499ec",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25372",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d36cc7061da168faffa039fd73ec2b2486cd97af733990debc78a55b56debfd0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25373",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "11e97ef1397bcb094228d71c5fd28afe3139be48b4f0eeb31b0fb85801c17240",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25374",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b6a799e1569e1ca23388b8f59663c33e35f0fe89a502d630626df1dc9bedf471",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25375",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2a0fcc0fb51e8c168914b6bd9ab97adbd0f795aaeb90dac0f2ddb456cee2f81d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25376",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "df61a4c6605ca5e11a91348f51788be93d61e3274513914f4a71adf0ce9728ff",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25377",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7e8c29f8213a7b785bcb9d2b7ab1bf6e4947a0127b26fb5ae73b2f95f8f239f8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25378",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "da0e1180abb4caf38423e22276c34aedbb64fe6c9f160879dfe2498ff4647515",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25379",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cc865831b4b0d387c1902f0bbc3f08939dd0ebc1ca9ac3af11aefda6696cdc13",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25380",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c4db191827bee48248d9a7353d549dcad1b520174c6dafd761fad1ab43ec330d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25381",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "07c7f43b0673d56ef07b81ba0bce1b3f4d0ec272dd04892b5ef43bf3d4e23035",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25382",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8a8d575879dd319d9924f287bf6cdfc736fe9864801e9c151a99f0f9cf9b2928",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25383",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "80be3b618c51db257d9a9e49e88e183d8c11755406cfbf6f2bbcb11697a2309a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "672b995bcc36d283b956dc864dc2df1462f9db20b561f982585f6e9c8dc550e3",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25384",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b29669ef736a6fcc50a63eb2e76c9fb0a19da32daf7e10ef5a083659ee87ff0e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3d824297cc6baedad3355655851f6baa040f3833f045cee928faf6055ae2d215",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25385",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "77e183eac25c31ec7acb03aadb0adf0a79745d1d30299d6cf7414150e5fc58da",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1f6c9a7022848e0911ce7546dba560b18c896dec950851fff51e31aba0164013",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25386",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "00cce00f82e48e60c419595a3771b00952c22a8ebe62fb97808b81777173a131",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6bbf362ff8de8f5eb92ecf51d2e8f8a26bef5b8e0d9862f193cd51424d6303b7",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25387",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3a17a5d598adcfb486ccbd2f0498ec1d21012c05fee617651ac5300847b01fc5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3",
+          "f34b7f4a1f523133c75078dd8de236e961a4b4dda3eeacefe99287f00e04b78f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25388",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f6e19b8fe84a980c88a16b850a0dcdbbf09cf3880a0f2039c3c233cdcd5d1634",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "8cd454d0fb3534f7fecff5b7bbf2ad178cb8d9921dd7a7db5a04d0cd6c902c8c",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25389",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e55022a1a5236d61d80c197efe0cfce4cb231ef7f04c8d714a89b46f7c43c32d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1771bbac23fa84e47730bc7d05c0bb3a3dc968f3c3354b43f5552f9c5522dc98",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25390",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5427ff1a74df2fbe0b9bd6370eea5f168a03b4094405ce49954799ecb29b67b8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "42a2f2f20231a7ca2f1555515d04520e830eee5c3e77e586cfcd21f22e355c33",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25434",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1c439e4f82e1d3e75b5f6607211e12434f524396440e96ac8b180f3493b4fd44",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25435",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "235ea37160bf2771090468dba263e00843493f3d00dc308837f800d659ffcf79",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25436",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a6e7c738ee209105b45fd9c4663b700308e67f9b0d0a6454415d2b6db97e2c2a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25437",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5826052598236d0e266d6df034147ee5cf1a80fc818509a7533d9ab5dfcf65b7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25438",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "79f095f5ef91a7d29368465c59746bf2db73b5b01ad3f0190cdabfbf22b6668b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25445",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "00c5ec2729008a42670539e9b4350e009f19a4fc13b83cfdc4acb47a3c3baf52",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25446",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f9d67eb4c93559c4a0e2a669dbd3cfc726f0cc6828e96af0d636631540cfa1a2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25447",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6b5685a29dfbfe4cb61b2fe137006d2de5f836195c01bf7a95eed40000952a23",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25448",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5b7279eca21d1cbe7de9384b226b177525190eb862986b817708b1907da7e4ff",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25449",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "58690da06712939e5cfc78a48ecbbdca3d07fd85c3a6ca48111d20eb7b49d0df",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25450",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "85e632929ae69021b9a231542a97d9f784ff661fd0a1aff6fe67174a7211d246",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25451",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e6f1b851e0bbe1a81b812a0caec96afe24cf13b2e0230c7049787fbd24291575",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25452",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bf6100a3f3838535541bc8fae4f6dcde511b5589e9b4017f083660440f9b0b4f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25453",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b6efcd45537b552cbd57ac40c92efc148f8183656cbc88be7522fc9d7b0a4595",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "eac8c8523eca77ca6ea936008714d711df196bc3be5aa561bf5cd14a3aa6111a",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25454",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f1705b15d226bfd40beb7d84d1db1211295b88cc5548eee4c32a4efe3dd52bae",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b68664fe4388971d6d0f72c090c88ff0c314510ab3ff33d974e4f7a388d2a399",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25455",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "97782ffa3502f1edca4de5585340edba27678b312b8d10203be873b19aaf7e6c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b162b5b82e60f823e54584211c09149f1260e1297aa8f3425e8cdc6aedc2410a",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25456",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0fc26e5d5761174e473d6ccd1ad29c63c25d11685578a71f525a5d63299522f1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3f52492a1203bea51f0f0ec2042fbc6a79f3022e79d9d892dbf080d75c22e5a0",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25457",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3d18dde08e897411b4d8c7c13baa2f5436ddbfde83a1199727c640912005c5f8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c4d80163bf276c2ec071ca943bcdfb5ec2bfd206ff1fbde72d288fafa0851f4a",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25458",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f25d9c9e54ad7b89c714f65c5c46480636947dba78b109ef9aaacc0bbafb42c9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "eaeb85acc9ec850143958bff2bf6551f39e1240ece7227e7a01db4a98e4b4040",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25459",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2d489d1556fb58d85b407942052cd48fe63b9346e2388d1da5377aaceb56470b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "de9e05740f5513c28d7edd0ceb24323d5dcce43cfb2f7e61a30a7a0233a18169",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25460",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bef03f821cdd48567806ae7a3e4eb8141370de4f3bb9a2b19b6efb7d2df14aa0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1f8f2cded8661fd21f6bfabbf4f718c767c1659da4d97ec0cf8e7452aabcf23e",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25461",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d511bbbf356428db4b9934ee65fc5bd498293a6915c99598b5541db79ba5e151",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "bdfb1a70bf9f407ab4cb07fab0e58aed2da45a1a29b18801fc4cc1a091029f2d",
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25467",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c18cc7a4b5679f757d10b3c5fd9676336e49fab1005d9b71f625c8d2ec49186f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25468",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4bd0971296a8c2c7e2ebe9808a579deb11bc95f2c72646845eb467c85a932827",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25469",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "eb869b9f6c02886e68b46a56f8afca1aee9fdc113ddd04b5e897edd6d457e74b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25470",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9c9aabe6d66bd9d19e16d294bdfa44d304706c097773f7f63c435f0ab52e3761",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25471",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a2cf558170c8d87729d1433520a2cd6d2f98b53c2ef3612380f8102828f23e40",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25472",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aeb71a74ba4ea5741a495a99fac5eaf6069ef85de83ef7f9552e604f8f4d5947",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25473",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0b506c8603c7ef43c26fdb157578da7955cfc3cf96896822730c585fb3e6dd39",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25474",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ba9825993fbcb0ee9630aa6af79149cd0a490aa1921a3089aae55a69f44f02af",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25475",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "47e8f36381713f48c8e896a163d2400bde0ca8c9e676f14089358c978b4b6c1d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25476",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3a5d67eb65b3afdb7d4ae35bead946532e8192605959bd054a1040f9d795d4e5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25477",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "df63d3353d40f2f83c03c5257da041ceda7e7ed4ffbfb41bf9d03ab9edb586be",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25478",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f976d65b0a6f201238fe88bb15c262a524e49987f3758a8384208f148673681f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25479",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7856721c6cdb9277d1dcb26f93e6e3bd45f6b713ac9bdef21ae70867e23093fd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25480",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3325012fe3361ae50430a07972c7ffcead5c198e9e4971753e0d090dff838988",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25481",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "09b353de056dd60eda94da1cfbb6d97e7a10ccca5953ce4a9fbffde11d5d60a0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25482",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "017cb5681b6c8dd517d66dd69d2602ea71e7f55cee4fb6913654d1acddf0282a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25483",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1a31c610d55d960fffacc9a4bf643de226f3697fc25c571a1f3b6721a1a9f4c4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25484",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0bda195b3a01616d3be9bf4c9507104efba255f4ae1a4a829ebf8e961e611048",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25485",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9c68d79e88e694e0dc3908962519b1390073769b1c196ae9df11dfbcd2ba5b5c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ee93e0658b96515a1c67331961ded0db671ab75e02fe8d7381e8eed00be7ade3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25486",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "faf562f423b981c9a704d4a35fa606793f572bbfc4231e02f7382fde51402d7c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25487",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fec5bbff585e4db5156573791e99e2281ea96306c13ff4c76b389e4c54652e4c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25488",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fb901c5ad8db96f2081c44b6f078131ace5fef6dc5445c146b40252127ff6c4e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25489",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a5310bc093d1b94076d74ee4bf88479e3eb27f49cd4d7efd2a572b551d2589f6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25490",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fd537b03804f8762d2595606812aecd9ced9521fb99fad32b44359f272aea584",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25491",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "51ddbc0196c521ec1f6ac2052927d401d7ca73dea9853bfc041aa7aa39d0f182",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25536",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fe0b7364000338fb692979360a7ef1b64e3d489f1802c45f9216cd2e4a149bf0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25537",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2a173d8cfe4986f23af7ea01d2a27a88817ef8199c0ce5c469d656cda949cb16",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25538",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4b95ed602a58c7c99f422c1177c978e8926d000ce2197ef6407e848b44c6fa42",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25539",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d3804e74ecf60bec3a290515671ae3991f525970588e0c418b992d42d49a2c0e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25540",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "90d715c02e35c92026372047901e2dc9a3a7112604439451d02c4d8c5eaefa30",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25541",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0e380c2859b3779759ffaafc0d51a6dcec598fc0792cf855a67d1785e2523487",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25551",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e172cce577c1b44e8201a737e02ea278974bb43f28832c695a0f47d8c0c26730",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25552",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "49c7e092f4c36d25cf55dcc093f5e5dedd9d0762836f4daf45a66b244b5c6b30",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25553",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "88646740c7fc32af303477a2170164a761fd45b2a9e360f843dda4ea6cf63178",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25554",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a6084da17dd882d3541aa2d52f89111dcef4aa3801fd07f73e919f6fbec7029a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25555",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9ea75764108ba5c5bf017222cb173c578f30263a4c29b42a2f5fbdf1fa3435e2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25556",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "19e7294ad4f112e88511b4ad5a57c0cbf29afe437ee061e98a00c9647cd90255",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25576",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "88ac010ba3c4ed7e2febd4055124aae06cc799d2285f60cb505eff0e95d63e8a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25609",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9bf0b49777c825b7eeeba63367d3538d9befe3dc20a9cabfc3160ef7975a0d00",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25610",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "07f2ca7fb68e3dcabe88adba45620b2635c0047837689408511eb2823bab3d08",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25611",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "209645e3ad41aa03f1ddacc393474bc04b352f56267042051f2ae81a00481274",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25612",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4749aa69a41b0439d98af4dbf626096ea5dea9b161649e190f87ef28ca6da620",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25613",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b7531ce91094ff2e25d92be85318dbc3e2f383be5be43562b90336261479c065",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25614",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6f01417680e22bdc04ae1036c5927854ee6f6f0361ec9f3eac8500252947c24b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25616",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "41bcf79e65e269d3443b321a139db05b9bf713d77205a520be3cae6b7580bba1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25617",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "dee6ed2dfa4fad937db48de9782bb928a01e2669eb84ff9d4e605d83d53dc5ea",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25621",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ba12c3434efcc264bb2b5fc4544a2923bf4727b6b96c0dc407a28d110b593282",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25622",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a8578636a885b0413cacd4ecd39547b1d6fcf7d0b4ad7bd24ade01d12ed946bc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25623",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "12032aca7f7566d9e3bcbefeb867ec460a9cc960ba6a387f91b22fcb5e707fe7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25624",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "eece2d35737be7507c4e73d9db8b0fd12c710666a5b100f838fb9850e624f667",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25625",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d21ff5b65a741d11415963a7e4373aca0e6c89e8bbc29e7f644a84d6e0f70e1e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25661",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d9f9313b227d548578109d50029ebaf31c912766fd0b8ccdc5b4ddd87b2386fb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25662",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9ec6f7c480353b38fbeed6b3fea9cb65cb40791ee486d91dd48e139b8bd36fd1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25663",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7d423370ef8c80ae2e262bacadc9a69e05a7a1f7d219947108f6622f1251631d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25664",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b7d5decfdde53660f9bf21bf07c8f76ac0a3e484a49308ebaa98bb12799c9508",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25665",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "733be1e1f9f223b2eb66c4ced63993139dcbe33a87da9b86d03b0d81bc7f717e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25666",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ab006cf019d62eb01ccbcc4340826c7356c00ba272d296b911512d6022e1cc9a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25667",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4933ffb710831449323e95c2c16abaf8764b7669d5842011cc758763f62c1961",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25668",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d67560e6fa785f130bf1502171f175e89f050594e01efbb581da95a2f4cc8f6b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39fa19c7e1fac57b597c7d55143bbfe11f96ec471a2e9f86be49ec927a98fe58",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25669",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "316684141fe38882e1ba0e143eda4fa745f897f3325ce67d22e13b37d70cfa61",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3bbe021cf72fef52ccc2d232a49bcc47964001dc48a04fa71df0edd37de64e5a",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25670",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a68848c320c84101e2b3a92b0dbc4fe05cd9161c00e154c34f3f3d23f8a4d570",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "7e3a839ff7a45cb7ef524c4d40b6ca09e004184574cccc6713a18f0cecfcb6af",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25671",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6a68365d0c22541537e1816de1027e43966e8e4d069c05e29935f654af6fe581",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "06cecc997ca4b822de509f93457d82704797bed5c8262688e1d6c296c1a51388",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25672",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a302b2e57e040863022dfac294e332ed209bc460a639d81093d46b7bca2b2d38",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "23bc3ba8713ee856ee16cbbcc6e81ae7f6b8007dac26e59809bf2ba886fc8708",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25673",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "13f8199940f77b20bdaf06344c39547177da7a58b7b99d9b3d12b2a6cf00395b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "753477422ada382ae5f749cf6c51e538fde87dcef8eaf4fcf3aa6cda6d5c94c1",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25674",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5baacab4435651ba101cdde756f4f15d65dfed8b5a41b169e783c6a330161ef3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "eec5fead677dcd78eb4247f709a337a11dbfc2028501b95ce57bdae2d1e9f6db"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25675",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e1060ee37afa238edfeaafc03da957d90d958c472050836d7a39032754cdce59",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "904d32d7577a82948d55a1465f590e62ad95f2ebf698bcf1f312d53bac1c80c5",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25676",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f3e5907738adc43934ec6474478534fdbbc9d250ffb2fbf9f8da96145b8c5537",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "984efc2c05414a1b5adf6a8f9a703dadd2414dc5c52f30aa99cd5d5e64b63271",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25677",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0739aeba0418ce9e6b4013b447c593d79fab14b540b56a3fbe4a12fe6dabf232",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25678",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ef3bdc6940844be981f687dd3b64382ed426c9baabd44ab570bb66ff88f0507b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25679",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2556d007b4d0c352bf4f5785770cb0a990053bb5001019f64413a834e036e177",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25680",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c07f48edfc20134effac1c34bdd50ffc19f4cea5c0b60590ac1aabeada95745d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25681",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "99e99e3783f4f0a31c91b20caefbdfecc9629671ca5f0e9dc9489f7f7bcecc70",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25682",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6cac75b681c5748b2284536d40bdbabaefce55dbd24e0c1d271c8c6b9ef92483",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25683",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "27a2d2fcf59a7441712ac600fa36a209c0cdee363b40d756566849b1fd1b1650",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25684",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "749d6c42a1e531452c74562bffe80b890373f38e8f3bff833b6d7b245f6457ea",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25685",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9a07821ed7b5709aac07b256b338aa036f0abc98c94be44b59211d69dd7b93a3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "eae2e33cd359de08770129e5704c6d1b38f88e433b2ecae9de7f5e99376c6ef3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25686",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3e6ed23da75879b489882ad732fcfb1917da67d0bca5b9ad5ed40051270d637d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "86e68c3fc0f7d3837a4d6698ebf3c6f0440ca416083e9c7b64888b9e270e5a6c",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25687",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "da709dee1db386ae529145303c4f9d291c2b8ae2df7e0cc3bcd4438d3edaac8b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "eb53c87e2306f30a19f44e96a91bfa75f19d4d16f446bb9fd617d9aa9e5b9b76"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25688",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "243ee7caf164af65cf1e73edf450bb94977e5dde871930d5b0c6ccf483fcf7b4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "159d0ff9052a2df48197a30f327a0c8b71b5779300c89b15671404a60766a987",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25689",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "05d180fa256f4c7e898337a30a9d9b1eed6fdbdaaf5776342f0b612410fd3763",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a443da0d59b0d6241a07126432a835442cc7c3469715db586f00bbcf36db0a51",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25690",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f43864a9140491f20c3b50bb40560efc7c35753b3e02aac05807843312409cf8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "d88477fe84ed8037eb56cdb9c14f4b352c8d0900422f4ed588ffed3f7f90111e"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25691",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2c9f6f38231a28156f2c66597925a61e5b5f55ecbbe2cadcc5a364156a25996c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1d42c530673f595a4e1673e6df8375372d521c515d2ebee4a6765d6a6255a77b",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25692",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3b7502f1f6de5a61db78c6bb083847b458843d86030508c56a76abcd02e2dfcd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "bf3a61ee583615207fad3a0164847cb1443222a157aa26c26fcde97c1b7ae7e6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25693",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c3cd75204782bb451f4dc4952c62b2ce1ff0ab93fa0efa042992a0f6a5584092",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1d3f26cf96e3c7186ae06125d37feee55b39d2305f55c69bbd3e4389306e3368",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25694",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3972e920357eebc0e71219f224f0419ffe60746b45d3d1ecc17a295ab767b320",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25695",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9ddfca92b67ecacdb205c7d033d44f82f5ec85f4e4156bcdf75ec6905c2e2883",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25696",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cb6d4a7b41849e9b09ad42143c797ceb252ccdadf99f7c6dffd5ba2a1493c9a5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25697",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d6c874528c977b3ed20dd3a34708511429a33e4e10785a2c351d02b4f2e2f9a4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25698",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "603ac83b17c83ef0b78a6020fa7f8d2d40a422b9164c4ae7722d111bb303bd18",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25699",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1178456ab4f8ddd00ab14b19a0fcee1a247644639464d9da8f2380d763956a0e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25700",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "26fba5a414e775171585bb711adfc37bd83274c548203ad49418e9eeed51eb6a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25701",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d34305d9814dc7ff72c6614a971bc26a72357fad5304e20fab95e5a4627fedf7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25702",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e64125be0a52f25ce6c99ff8c0b9fec3e26bb323716911a17b07b4a5d336ad2b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1c7c546a551b6fd9d99e441688c8ea63007ad8a9066e9892d63e37abdcc42c8b",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25703",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "02c1cf2994eb0f4d96999802aafde8158ac3a2ff04f233b633b065132273b3ee",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "b8f04ca554390691e2d6fdeb504cbc935693f7b1f1e4e78314141c85135138fb"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25704",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "17b6e653e6b5151ca6eceac0424a1b0a711885a1a2eef89ad0aa0bcf2becee12",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "16d02d1f5047e035219db35a90076ec1dd26889a214d008172bbc9fc8a2475e4",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25705",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "515e28251a3b5b9b9be5b6aed1fa09090cc1ae6ac49d1c657676060909c5dfcd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "4999539b20361e3cd3209c654203e17299fcb3d6acc21d0d56a39769a07ab8aa",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25706",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "63174ae3e4429b220a4e0f96ce9f208db64b7a59f89c9a1d0312eb16bb157d4f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3226306bf4459b6457f0514e3ad69ad6684de98867e5a45673044b65bd3096e8",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25707",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "62010ec62c6f51d46bc105d0c6acb518e85337099a3a7af0cacfc5b0df712f5a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "f61434cebcfcaefeec5ce2bdef80ac4d6a0a7715b235fa72f421e8e584cb0704"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25708",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c060a6e062f768156c1a811607f190b768409e5dca1feb4c5d29b784e11c9f21",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a",
+          "ee7980873f8b033f11b81604fa9cb9317f3df951ef48628a75e586c347f96f5d"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25709",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "91d37b0e9972e491ec7551f22a26dc925fcc06bad60ccb030e9596443f107172",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2f53071275254969079ba144e9e0f6b75c694b09bc73c6c15caedd87c39bb3ab",
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25710",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "df29ef809750c37236598172db66340b3bdcf9306e4338e7dc25d0965d02ffbb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25711",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aed2e3668d00b3dc247f34582acddfee79b43a3cf608f2c6a61f1f85fa7b5844",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25712",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "88159d797bac6cdca2ba351f7f2548465cf3191b0ce18ac2c4c4a398a87f20c4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25713",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e4446c36ae5fe1665c87b58ee4da9dab2eb0b58531d10ed0cb49da8b1e3a7c88",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25714",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "249f16520e5c4df069f9587fa7d3e6afe5559f526a32968fe5c6a8cbd601813a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25715",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6dbc5595abde11aadfb9f2c1eb7e66936168c5e2d72120a5819eed99a88a5d87",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25716",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "56cfb035da83209781eab03015e0b1f55a6822db7dbe161106439d571ccdc7c3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25717",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ae471868ed9e65042bf82afb27c20bbf9ed370950468959fb15b230f526bdf10",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25718",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ab94a9776ae239b15d1b2c6db1bee1dc4acd309699f329fe1d956aba9cf507b3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25719",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "87804007cc447f0ecdb2e2fec42b5d6638646dd1eb12e7a747669d0cb9f8e36a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25741",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3004a988e1f392d30339b311d19418c5b7b3144621c0c96aafd699ef2c463cf9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25753",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2c0c14cffc787703e37499ce76630d298ed545b84e9cd2a087dbf50123bc5ccb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fmeetings%2F25766",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a99537728e1ee5050d7005796717a0d33be2f7fef9c86edc2e3c0ab7cba0d62b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "b5183ebc6b02cb218700a79e631d4365b6b545708ac13f6f2e0c3eaf0cb5353a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.wuppertal.de%2Foparl%2Fbodies%2F0001%2Fpapers%2Fvo%2F36329",
+      "cityId": "wuppertal",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "b08495c47e45c3968ad48f394a639127165b149b955d94a36ca2e66a0d81f6f6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+          "3b3165b5c035484a919a6857c6da82fbe4792ec54d1a6866f0cda55a409ee1a7",
+          "bf1d079c3205b50a1dbcadbe2ccfd39fc43d9747b9cdf60a875010dad0f5b1ff"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "fd148a2f1750adf8f96d40c48438c28c81aa65b9ffaa040949168403d0617536",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1b500b57877939a9d1afed68326750bab4a72559d996b8b731f60a5070c34788",
+          "3b3165b5c035484a919a6857c6da82fbe4792ec54d1a6866f0cda55a409ee1a7",
+          "bf1d079c3205b50a1dbcadbe2ccfd39fc43d9747b9cdf60a875010dad0f5b1ff"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

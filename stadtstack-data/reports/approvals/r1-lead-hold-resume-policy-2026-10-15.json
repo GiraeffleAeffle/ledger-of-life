@@ -1,0 +1,41 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-lead-hold-resume-policy-2026-10-15",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-autonomy-and-release-2026-10-14 and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-15T03:08:00Z",
+ "parentApprovals": [
+  {
+   "id": "r1-autonomy-and-release-2026-10-14",
+   "path": "stadtstack-data/reports/approvals/r1-autonomy-and-release-2026-10-14.json",
+   "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5",
+   "clause": "approved.autonomy"
+  },
+  {
+   "id": "r1-nine-town-models-2026-10-13",
+   "path": "stadtstack-data/reports/approvals/r1-nine-town-models-2026-10-13.json",
+   "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b",
+   "clause": "#81 model caps and expiry (unchanged by this record)"
+  }
+ ],
+ "ownerConsultation": {
+  "channel": "ntfy topic pipeline (HTTP 200 at 2026-10-15T03:08Z) and Vikunja task #87 in bucket Entscheidung Max",
+  "statedDefault": "If unanswered by 2026-10-15T06:00:00Z the policy below applies. A NO on #87 at any time revokes it for all later resumes; holds then stay held and are reported as known gaps.",
+  "ownerAnswerAtIssue": "none"
+ },
+ "effectiveFrom": "2026-10-15T06:00:00Z",
+ "policy": {
+  "mechanism": "Only the existing guarded DistrictJobStore.resume(jobKey) (src/district-jobs.ts), which refuses jobs with unresolved provider reservations (reserved, held_uncertain, pending_usage). No raw job-state updates, no rewritten receipts or attempts.",
+  "eligibleReasons": {
+   "residual_prepare": ["execution_exception", "max_time_reached", "lease_expired", "lease_lost", "host_capacity", "host_delay", "host_paused", "notification_failed"],
+   "residual_extract": ["execution_exception", "max_time_reached", "lease_expired", "lease_lost"],
+   "assessment_*": ["execution_exception", "max_time_reached", "lease_expired", "lease_lost"]
+  },
+  "neverResumed": ["held_quality", "held_origin", "blocked_policy", "blocked_access", "budget/usage holds", "usage_unknown", "structured_schema_rejected", "omp_* typed holds", "any reason not listed as eligible"],
+  "maxResumesPerJobKey": 2,
+  "counting": "Committed hold receipts in PostgreSQL for the job key (current hold included); more than two refuses.",
+  "afterResume": "The stage re-runs only under a new lead-issued stage authorization through the canonical authorize path; old authorization clocks and budgets are never extended.",
+  "records": "Each resume writes a lead disposition record (job key, prior receipt id and sha256, reason, ordinal n/2, this record's id and sha256) with before/after journals in the source's processing generation.",
+  "gate": "Operator tooling env R1_RESUME_TRANSIENT_HOLDS=1; refuses before effectiveFrom."
+ },
+ "reason": "Full processing on dd675e2 (2026-10-15 00:51-02:02Z) produced holds and failed commands from shared civic-policy inventory lock contention (5 s lock budget). The fix (120 s bounded wait, cached CAS reconciliation, content-free R1_FAILURE diagnostics) passed review. Without a bounded resume, every transient infrastructure hold stops its source permanently and the R1 release cannot complete while the owner is unavailable."
+}

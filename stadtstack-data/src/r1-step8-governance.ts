@@ -1,0 +1,85 @@
+import {mkdir,open,lstat,readFile,realpath} from 'node:fs/promises';
+import {randomUUID} from 'node:crypto';
+import {parse} from 'pg-connection-string';
+import {isAbsolute} from 'node:path';
+import {z} from 'zod';
+import {HashSchema,canonicalJson} from './district-adapter-contract.ts';
+import {loadFrozenCorpusBytes,R1_NINE_TOWN_2026_10_13_CORPUS_SHA256} from './district-corpus.ts';
+import type {CivicPolicyOptions} from './civic-opt-out.ts';
+import {assertCivicPolicyAuthority} from './civic-opt-out.ts';
+import {DuplicateSourceContentExceptionSchema,assertDuplicateSourceContentReceipt} from './district-duplicate-source-content.ts';
+import {encodeStepReceipt,type StepReceipt} from './district-step-receipt.ts';
+import {ImportRejectionReasonSchema,ImportRejectionDispositionSchema,type ImportRejectionDisposition} from './r1-step8-import-disposition-contract.ts';
+
+const nativeCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256:HashSchema,jobKey:HashSchema}).strict();
+const importCampaignDocumentSchema=z.object({documentId:z.string().min(1),sha256:HashSchema,importDisposition:z.object({decisionSha256:HashSchema,reasonCode:ImportRejectionReasonSchema}).strict()}).strict();
+export const Step8CampaignSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-v1'),sources:z.array(z.object({municipalityId:z.string().min(1),sourceId:z.string().min(1),corpus:z.object({path:z.string().min(1),sha256:HashSchema}).strict(),documents:z.array(z.union([nativeCampaignDocumentSchema,importCampaignDocumentSchema])).min(1)}).strict()).min(1)}).strict();
+export type Step8Campaign=z.infer<typeof Step8CampaignSchema>;
+const relocationPin=z.object({path:z.string().refine(isAbsolute),sha256:HashSchema}).strict();
+export const Step8CampaignRelocationSchema=z.object({schemaVersion:z.literal('stadtstack-r1-step8-campaign-relocation-v1'),
+ from:relocationPin,to:relocationPin,verifiedSha256:HashSchema}).strict().refine(value=>
+ value.from.path!==value.to.path&&value.from.sha256===value.to.sha256&&value.to.sha256===value.verifiedSha256,
+ 'Campaign relocation must preserve the exact authenticated bytes');
+export async function authenticateStep8Campaign(raw:unknown,read:(path:string)=>Promise<Uint8Array>,policy:CivicPolicyOptions){
+ const campaign=Step8CampaignSchema.parse(raw),mode=(await assertCivicPolicyAuthority(policy)).mode,identities=new Set<string>(),jobs=new Set<string>();
+ const corpora=campaign.sources.map(source=>source.corpus.sha256);
+ if(new Set(corpora).size!==corpora.length)throw Error('Duplicate campaign corpus');
+ if(mode!=='isolated-fixture'&&canonicalJson([...corpora].sort())!==canonicalJson([...R1_NINE_TOWN_2026_10_13_CORPUS_SHA256].sort()))throw Error('Campaign must equal the complete frozen nine-town corpus set');
+ for(const source of campaign.sources){
+  const identity=canonicalJson([source.municipalityId,source.sourceId]);if(identities.has(identity))throw Error('Duplicate campaign source identity');identities.add(identity);
+  const corpus=loadFrozenCorpusBytes(await read(source.corpus.path),source.corpus.sha256),documents=new Map<string,string>();
+  for(const document of corpus.documents){if(document.municipalityId!==source.municipalityId||document.sourceId!==source.sourceId||documents.has(document.id))throw Error('Campaign corpus contains another scope or duplicate document identity');documents.set(document.id,document.sha256);}
+  if(source.documents.length!==documents.size||new Set(source.documents.map(document=>document.documentId)).size!==documents.size)throw Error('Campaign omits or duplicates frozen documents');
+  for(const document of source.documents){
+   if(documents.get(document.documentId)!==document.sha256)throw Error('Campaign document/job membership mismatch');
+   if('jobKey' in document){if(jobs.has(document.jobKey))throw Error('Campaign document/job membership mismatch');jobs.add(document.jobKey);}
+  }
+ }
+ return campaign;
+}
+export function assertStep8ExportMembership(source:Step8Campaign['sources'][number],results:readonly {documentId:string;corpusSha256:string;result:{taskId:string;municipalityId:string;sourceSha256:string}}[],exceptions:readonly {documentId:string;jobKey:string;sourceSha256:string;municipalityId:string;sourceId:string;corpusSha256:string;reasonCode?:string}[]=[],steps:readonly {receipt:StepReceipt;sha256:string}[]=[],imports:readonly ImportRejectionDisposition[]=[]){
+ const expected=source.documents.map(document=>canonicalJson('jobKey' in document?[document.documentId,document.sha256,document.jobKey]:[document.documentId,document.sha256,'import_rejection',document.importDisposition.decisionSha256,document.importDisposition.reasonCode])).sort();
+ const actual=results.map(result=>{if(result.corpusSha256!==source.corpus.sha256||result.result.municipalityId!==source.municipalityId)throw Error('Exported campaign source scope mismatch');return canonicalJson([result.documentId,result.result.sourceSha256,result.result.taskId]);}).sort();
+ for(const exception of exceptions){if(exception.corpusSha256!==source.corpus.sha256||exception.municipalityId!==source.municipalityId||exception.sourceId!==source.sourceId)throw Error('Terminal campaign source scope mismatch');actual.push(canonicalJson([exception.documentId,exception.sourceSha256,exception.jobKey]));}actual.sort();
+ for(const raw of imports){
+  const disposition=ImportRejectionDispositionSchema.parse(raw);
+  if(disposition.corpusSha256!==source.corpus.sha256||disposition.municipalityId!==source.municipalityId||disposition.sourceId!==source.sourceId)throw Error('Import campaign source scope mismatch');
+  actual.push(canonicalJson([disposition.documentId,disposition.sourceSha256,'import_rejection',disposition.decision.sha256,disposition.reasonCode]));
+ }actual.sort();
+ if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Exported campaign document/job set mismatch');
+ const nativeDocuments=source.documents.filter(document=>'jobKey' in document),groups=new Map<string,typeof nativeDocuments>();
+ for(const document of nativeDocuments){const group=groups.get(document.sha256);if(group)group.push(document);else groups.set(document.sha256,[document]);}
+ for(const group of groups.values()){
+  const canonical=group.reduce((selected,document)=>document.documentId<selected.documentId?document:selected);
+  if(group.length>1&&!results.some(result=>result.documentId===canonical.documentId))throw Error('Duplicate group lacks its canonical native document');
+  for(const document of group){
+   const exception=exceptions.find(entry=>entry.documentId===document.documentId);
+   if(document===canonical){if(exception?.reasonCode==='duplicate_source_content')throw Error('Duplicate group lacks its canonical native document');continue;}
+   const duplicate=DuplicateSourceContentExceptionSchema.parse(exception);assertDuplicateSourceContentReceipt(duplicate);
+   if(duplicate.canonical.documentId!==canonical.documentId||duplicate.canonical.jobKey!==canonical.jobKey||duplicate.canonical.sourceSha256!==canonical.sha256||duplicate.sourceSha256!==canonical.sha256||duplicate.selectionRule!=='smallest_document_id_v1')throw Error('Duplicate disposition changes canonical document or byte identity');
+   for(const pin of [duplicate,duplicate.canonical]){
+    const selected=steps.find(step=>step.receipt.jobKey===pin.jobKey&&step.receipt.id===pin.receiptId);
+    if(!selected||selected.sha256!==pin.receiptSha256||encodeStepReceipt(selected.receipt).sha256!==selected.sha256||selected.receipt.step!=='residual_extract'||selected.receipt.municipalityId!==source.municipalityId||selected.receipt.sourceId!==source.sourceId||!selected.receipt.inputHashes.includes(canonical.sha256)||selected.receipt.outputHashes.length!==1||selected.receipt.outputHashes[0]!==pin.extractionArtifactSha256)throw Error('Duplicate disposition extraction pin is not in the authenticated seal');
+   }
+  }
+ }
+}
+/** mkdir is the atomic generation reservation; the sibling claim is non-source control metadata. */
+export async function reserveStep8Generation(output:string){
+ await mkdir(output,{mode:0o700});
+ const directory=await lstat(output),path=output+'.claim',nonce=randomUUID(),file=await open(path,'wx',0o600);
+ try{await file.writeFile(nonce);await file.sync();}finally{await file.close();}
+ const claim=await lstat(path);
+ return {nonce,async assertOwned(){const current=await lstat(output),owner=await lstat(path);if(!current.isDirectory()||current.ino!==directory.ino||current.dev!==directory.dev||await realpath(output)!==output||!owner.isFile()||owner.ino!==claim.ino||owner.dev!==claim.dev||(await readFile(path,'utf8'))!==nonce)throw Error('Step8 generation claim changed');}};
+}
+export function classifyStep8Exception(value:unknown){
+ const reasons:string[]=[];let criticalKind=false;
+ const visit=(entry:unknown):void=>{if(Array.isArray(entry)){entry.forEach(visit);return;}if(entry&&typeof entry==='object')for(const [key,child] of Object.entries(entry)){if(key==='criticalKinds'&&Array.isArray(child)&&child.some(value=>typeof value==='string'))criticalKind=true;if(['reason','holdReasons','criticalKinds'].includes(key))reasons.push(...(Array.isArray(child)?child.filter((value):value is string=>typeof value==='string'):typeof child==='string'?[child]:[]));else visit(child);}};
+ visit(value);const text=reasons.join(' ').toLowerCase();
+ return {critical:criticalKind||/critical|assessment_held|assessment_missing/.test(text),rights:/rights|policy|robots|tdm|licen/.test(text),disagreement:/disagreement|unresolved|assessment_held|assessment_missing/.test(text)};
+}
+export function step8SocketConnection(dsn:string){const host=parse(dsn).host;if(!host||!isAbsolute(host))throw Error('Offline step8 requires a PostgreSQL Unix-domain socket');return dsn;}
+export function assertNativeContributorCoverage(bindings:readonly {url:string;sourceSha256:string}[],sources:readonly {url:string;sha256:string}[]){
+ const expected=[...new Set(sources.map(source=>canonicalJson([source.url,source.sha256])))].sort(),actual=bindings.map(binding=>canonicalJson([binding.url,binding.sourceSha256])).sort();
+ if(canonicalJson(expected)!==canonicalJson(actual))throw Error('Native primary/supporting contributor coverage mismatch');
+}

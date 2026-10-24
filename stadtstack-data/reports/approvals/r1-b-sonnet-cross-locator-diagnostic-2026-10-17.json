@@ -1,0 +1,52 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-cross-locator-diagnostic-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-nine-town-models-2026-10-13 (#81) and r1-b-model-sonnet-2026-10-17 (#88) and the owner escalation statement; not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T15:39:57Z",
+ "fromProposal": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-b-cross-locator-diagnostic/authority.proposal.json",
+  "sha256": "a79b7f6c2055a6681528f79bec57231a0a366bdcd904e588552b68dcbe514e40"
+ },
+ "ownerEscalationStatement": {
+  "id": "r1-owner-escalation-latitude-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-owner-escalation-latitude-2026-10-17.json",
+  "sha256": "57b65f432bacc055899f9d7c995202f9fcabb2f10d22c9921f464401bb6d7081"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "thinking": "medium",
+   "streamVersion": "omp-native-stream-v2",
+   "itemsSha256": "4a7bdcd02f334caf652686ffd0d80a6286d9071d356a762b6ca15d32d2f464ff",
+   "maxModelCalls": 13,
+   "maxNewCallsPerItem": 1,
+   "expiresAt": "2026-10-17T20:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true,
+   "retainAssertionLocatorMapping": true
+  }
+ },
+ "executionRequirements": [
+  "Issue this draft as genuine lead authority before execution; Main explicitly authorizes the confirmation after BrokerReview and frozen candidate manifest.",
+  "Freeze exact candidate commit e483592, unchanged medium image/entrypoint, B/runner/output/control/schema and harness hashes; assessment queue remains 0f8f. No production activation or installed review edit.",
+  "Exactly thirteen fixed source-adjudicated cases: eleven expected supports and two genuine source gaps, at most one invocation per selected item. No ambiguous or format-only case, fresh baseline, fallback, retry or extra calls. Evaluation labels/reasons and prior outcomes never enter the provider input.",
+  "Use the existing exclusive B-stage flock interleaved with the campaign, verify zero leased B jobs and zero live omp-b containers, run serially with a twenty-minute lock-hold cap and release immediately after confirmed cleanup. No PG slot/lease manipulation.",
+  "Keep raw provider stream, thinking, final answer values, source quote text and rationale only in transient private diagnostic memory. Retain closed counters/hashes plus each assertion claimId, sourceId, locatorId, quote hash/UTF-8 byte length, and structural selectors of properties sharing that supplied quote; retain unasserted claim IDs/selectors. These public municipal source bindings may be re-read privately for AI semantic-sufficiency review; no thinking or source values in receipts/notifications.",
+  "For each supported result, independently review whether each selected locator itself semantically establishes the claim, reporting strongest relevant selector/length and closed sufficiency findings; checker success alone is not semantic validation. Review all caseType bindings explicitly. AI evaluation is not human verification or production admission.",
+  "Keep native-stream-v2 bare-object JSON/schema/checker/projection unchanged, no normalization or arbitrary new locators; historical versions immutable. Stop on any usage limit, policy/custody failure, execution error or unconfirmed cleanup. No production DB/CAS/authority changes."
+ ],
+ "reason": "Confirm the B-only directive that null suggested quote never alone bars support, all existing locators must be inspected, and every assertion uses the strongest quote whose own words establish that specific claim. Prior medium output fixed prose but supported only one of eleven expected supports; production evidence identified dedicated-quote misunderstanding and an unrelated DS-reference classification binding.",
+ "evidence": "Sonnet-medium labelled diagnostic 3cc9434c: 20/20 bare JSON, prose 0/6, but expected supports 1/11; production receipts on 76af5c41 after 15:04Z leave only /caseType unasserted, with rationales citing the null suggested quote.",
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ }
+}

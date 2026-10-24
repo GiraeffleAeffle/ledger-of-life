@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-genesis-api-robots-2026-10-13",
+  "recordedAt": "2026-10-13T13:10:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, answering Vikunja task 82",
+  "questionShownToOwner": "regionalstatistik.de: the login with your account works (the server returned the data), but the site's robots.txt blocks everything. Your robots override only covers official works, and a statistics table isn't one, so the data was not kept. A (recommended): the pipeline may use their data interface with your account despite robots.txt, on that one site only, under the same rules as before; repeat K1 with exactly one request. B: no, statistics only from other sources.",
+  "vikunjaText": "A (empfohlen): Ja, nur für www.regionalstatistik.de, nur GENESIS data/table und tablefile, nur mit deinem Konto, sonst alle Regeln unverändert (Opt-out, Fakten mit Quelle, keine Weitergabe). Ich trage das als eng begrenzte, geprüfte Code-Entscheidung ein und wiederhole K1 einmal (1 Anfrage).",
+  "ownerStatementsVerbatim": [
+    "Yes please A"
+  ],
+  "approved": {
+    "decision": "The site-wide robots.txt disallow on www.regionalstatistik.de does not exclude responses from the operator's registered-account machine interface: HTTPS POST /genesisws/rest/2020/data/table and /data/tablefile, sent with the owner's own account under decision owner-2026-10-13-regionalstatistik-account.",
+    "unchanged": "TDM reservations, document-origin classification records, access/echo screening, opt-out/purge, facts with source attribution only, no republication of whole tables or datasets, all other hosts and paths (including the regionalstatistik.de web pages and metadata endpoints), and guest/unauthenticated requests",
+    "k1Retry": "One more data/table POST for the original K1 scope (12411-02-03, 2024, Strausberg 12064472) after the reviewed code change, sentinels and gate; within the K1 limits (at most 5 jobs, 25 min) and the K1 expiry 2026-10-14T21:59:59Z"
+  },
+  "notApproved": [
+    "Any other host, path or unauthenticated request despite robots.txt",
+    "Republication of GENESIS tables or datasets",
+    "Treating GENESIS responses as official works under §5 UrhG"
+  ]
+}

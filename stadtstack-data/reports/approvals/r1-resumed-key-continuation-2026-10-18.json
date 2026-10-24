@@ -1,0 +1,196 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-resumed-key-continuation-2026-10-18",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-18T01:05:15Z",
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "autonomyApproval": {
+  "id": "r1-autonomy-and-release-2026-10-14",
+  "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+ },
+ "holdPolicy": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15",
+  "sha256": "c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"
+ },
+ "holdPolicyAmendment": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-1",
+  "sha256": "4ef8a73624eeb33672dc41b367f4c56c7ef9dcbd9df77bff30fffc9d5648befe"
+ },
+ "expiresAt": "2026-10-18T21:59:59Z",
+ "bounds": {
+  "maxExecutionsPerJobKey": 1,
+  "maxResumesPerJobKey": 2,
+  "maxModelCallsPerDocument": 48,
+  "paidMicroUsd": 0
+ },
+ "reason": "Authorize one bounded execution of exactly the20 original, still-never-started Parchim-Council extraction siblings from consumed epoch a501f4141702a784fd91b07dba4cf4c375ffc1e07b27665918200c3827b8b578. The original four already-terminal extraction members (including its resumed event) and every preparation job are excluded. This is not a resume, renewal, refund or new model-call allowance: old namespace, claim, grant, receipts and clocks remain unchanged; existing #81 cumulative extraction cap48, paid0, policy/usage/provider-settlement/idle/live-overlap gates and unchanged two-resume policy remain mandatory. New authority must cite the exact issued record, expire no later than this record/#81/current policy and use canonical authorize/run only.",
+ "sources": [
+  {
+   "source": "parchim-council",
+   "step": "residual_extract",
+   "scope": {
+    "publisherId": "parchim",
+    "sourceId": "parchim-council",
+    "municipalityId": "parchim",
+    "ags": "13076108",
+    "tenant": null,
+    "observationWindow": "2026-10-13"
+   },
+   "claim": {
+    "epoch": "a501f4141702a784fd91b07dba4cf4c375ffc1e07b27665918200c3827b8b578",
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/resume-epoch-ledger/epochs/a501f4141702a784fd91b07dba4cf4c375ffc1e07b27665918200c3827b8b578.json",
+    "sha256": "37c473c7ef90f0910af26d419f34cbfe486285525a55269f50e7feeb364d1dad"
+   },
+   "originalStageRecord": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/parchim-council/generations/a4782c42a3b7781380b5cfafa3f4439164eea2fe/continuations/prep-76c46890f89067a3146bb9087efcbcdf8fa94b6e41eff422e23581766bb6e298/extract.resume-a501f4141702a784fd91b07dba4cf4c375ffc1e07b27665918200c3827b8b578.stage-record.json",
+    "sha256": "bbfa0d2d9c08b18ff3d8b3ddcff02d16c0082751dd97c54a341ef9694665f486"
+   },
+   "originalAuthorizationId": "b4660f45-68ea-498e-9a82-5d3344286aa8",
+   "jobs": [
+    {
+     "jobKey": "2322a11170fc2e8adea11fd3c4b88f4e73754dfdf93921f0feb3d3b88425c4bf",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "507b1af228e349a3119fdd5a784bb4effb5f3d9436ae2647247bb07a2d8e2b93",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "5172a9e769f7594bbe4bce6037a226390742b021f56d67009091d145792ae2de",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "54ccdf5b1952fc0a691df515a240675e1a59aed5f8aac598a21f93e5bb1a1e40",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "584f9d0ce3ae3b66ec7e9c40b54471c2bb168fb4a9df3a32b894f57ac538971e",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "647896881364af3668d113c12f473e943108e7ff64626b5fc6af324fb1cccfab",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "7baab4de1f2d064258d36e53512c5fc6eb4fd6485e3a297d9a11e919b6a56225",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "7eb96e81f896e6f13e9f9cf7bae6392fcac6ec20c53250e873d0338048439b05",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "8b945342ba2dbe34d13bb62dfa2843337bf5a35bc71c58adb1512162fd6bb758",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "8db72482fb8570608194cc11dda13df4b4af9cb0c8a3383c4ca186522a91d49f",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "ab126fcb0c943cd0012912099b999861339a94737126f77c28e45d9d9bfd9a28",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "b0238669b6dbf642439fd1d97739b52dd19a72f76b4e63e1377d98d3379580e4",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "b845ba3fdeccd122626002233a4b275dbe59696ca0fb97dbb0805a6b939adbb8",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "c5e581ad2475c0ed2ce202a1b24341f4119058b3438c1ca7b74a29fc59998951",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "d0470cd1563d51529462d56ce9548689b57f014b947fa4d59a82995781d970b2",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "dafba985aa514ecff41379b7df1e1caf3640f82d771e6f89d36aaa2b0e070974",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "ea7c25f10ee2bb1c2df79f0e8f5f4e80974c0c04dffc55f1e281d0d9adfef0ac",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "f39aab63aaec182cd55dbd80d312d66fb9ad4c21b14189c82b135c00b35902c1",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "f44a8bbe9ea8598aeb694f69236b995ef96c5e60a9028605e470fb0747742330",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    },
+    {
+     "jobKey": "fb2cba11f128ebcaa4fd24b4c0728b0bb5d1b47d076c6889b8cd09c1252f859a",
+     "attempt": 0,
+     "priorReceiptId": null,
+     "priorReceiptSha256": null,
+     "resumeOrdinal": 0
+    }
+   ]
+  }
+ ]
+}

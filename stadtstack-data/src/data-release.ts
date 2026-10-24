@@ -5,12 +5,12 @@ import {join} from 'node:path';
 import {z} from 'zod';
 
 const sha=z.string().regex(/^[a-f0-9]{64}$/);
-export const releasePathSchema=z.string().regex(/^(?:catalogue\.json|quality-report\.json|cities\/[a-z0-9-]+\/(?:signals(?:\.min)?\.geojson|feed\.json|changes\.json)|regions\/[a-z0-9-]+\/topics\.json|core\/(?:strausberg-facts|release-manifest|handover-draft)\.json|knowledge\/(?:registry|records|coverage|graph)\.json)$/);
+export const releasePathSchema=z.string().regex(/^(?:catalogue\.json|quality-report\.json|cities\/[a-z0-9-]+\/(?:signals(?:\.min)?\.geojson|feed\.json|changes\.json)|regions\/[a-z0-9-]+\/topics\.json|core\/(?:strausberg-facts|release-manifest|handover-draft)\.json|knowledge\/(?:registry|records|coverage|graph|changes|publication-inputs|assessment-admissions)\.json)$/);
 const fileSchema=z.object({path:releasePathSchema,sha256:sha,bytes:z.number().int().nonnegative().max(512*1024*1024)});
 export const dataReleaseSchema=z.object({
  schemaVersion:z.literal('stadtstack-data-release-v1'),id:sha,generatedAt:z.string().datetime(),
  files:z.array(fileSchema).min(1).max(10000),
- quality:z.object({publishedRecords:z.number().int().nonnegative(),quarantinedRecords:z.number().int().nonnegative(),cities:z.number().int().positive(),knowledgeMunicipalities:z.number().int().nonnegative().optional(),districts:z.number().int().nonnegative().optional()}),
+ quality:z.object({publishedRecords:z.number().int().nonnegative(),quarantinedRecords:z.number().int().nonnegative(),cities:z.number().int().positive(),knowledgeMunicipalities:z.number().int().nonnegative().optional(),districts:z.number().int().nonnegative().optional(),knowledgeTextModelRecords:z.number().int().nonnegative().optional(),knowledgeStructuredRecords:z.number().int().nonnegative().optional()}),
 });
 export type DataRelease=z.infer<typeof dataReleaseSchema>;
 export function dataReleaseId(files:DataRelease['files']){
@@ -42,7 +42,7 @@ export async function readReleaseFile(directory:string,manifest:DataRelease,path
 export async function verifyDataRelease(directory:string):Promise<DataRelease>{
  const manifest=dataReleaseSchema.parse(JSON.parse(await readFile(join(directory,'release-manifest.json'),'utf8')));
  if(dataReleaseId(manifest.files)!==manifest.id)throw Error('Whole-data release identity mismatch');
- requireReleaseFiles(manifest,['catalogue.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','regions/brandenburg-mol/topics.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json']);
+ requireReleaseFiles(manifest,['catalogue.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json','regions/brandenburg-mol/topics.json','knowledge/registry.json','knowledge/records.json','knowledge/coverage.json','knowledge/graph.json','knowledge/changes.json','knowledge/publication-inputs.json','knowledge/assessment-admissions.json']);
  for(const expected of manifest.files){
   const actual=await fileEvidence(directory,expected.path);
   if(actual.sha256!==expected.sha256||actual.bytes!==expected.bytes)throw Error(`Release file mismatch: ${expected.path}`);

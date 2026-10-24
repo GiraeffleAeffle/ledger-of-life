@@ -72,3 +72,14 @@ test('expired consultation overrides stale source status and expired roadworks d
   assert.match(explanation, /end/i);
   assert.doesNotMatch(explanation, active);
 });
+
+test('unlocated measurements remain dated civic records, not places or a live reading', () => {
+  const base = fixture.features.find((feature) => feature.properties.id === 'fictional-budget')!;
+  const measurement = { ...base, properties: { ...base.properties, id: 'fictional-measurement', kind: 'measurement' as const,
+    title: 'Straussee historical reading', category: 'Historischer Wasserstand', statement: 'Synthetic historical measurement for a test.',
+    status: 'Historical measurement', startDate: '2026-09-14', endDate: '2026-09-14' } };
+  const rings = matchPersonalRings([measurement], {}, '2026-10-10', ['nature']);
+  assert.equal(rings.city.length, 1);
+  assert.match(rings.city[0].explanation, /^Dated measurement, not a live reading:/);
+  assert.equal(rings.home.length, 0);
+});

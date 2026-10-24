@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "stadtstack-r1-import-disposition-decision-v1",
+  "id": "r1-import-dispositions-permanent-2026-10-19",
+  "issuedBy": "owner",
+  "issuedAt": "",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "nativeSealSelection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window17/selection/native-seal-selection-23b6c2502593b3a8e1fd2c783dabcf79705645abf862572ecbd2712cd8ea9a1d.json",
+    "sha256": "23b6c2502593b3a8e1fd2c783dabcf79705645abf862572ecbd2712cd8ea9a1d"
+  },
+  "catalogue": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/catalogue.json",
+    "sha256": "63e180b1601ffc9f23e1e52614b1b14e9167ac1ead7614b8fbe9c01089182ed3"
+  },
+  "policy": {
+    "kind": "permanent_only",
+    "enabledReasons": [
+      "unsupported_mime",
+      "scope_mismatch"
+    ]
+  },
+  "sources": [
+    {
+      "municipalityId": "ruedersdorf-bei-berlin",
+      "sourceId": "ruedersdorf-bei-berlin-website",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-ruedersdorf-bei-berlin-website-index/index.json",
+        "sha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/seal-result.json",
+        "sha256": "007874b3fc20a1d9ea41c4b59aa45ebdc9a6556cc113b9c8b121bf6700250fbc"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-crawl-corpus.json",
+        "sha256": "88a56fe4f019b0c292f39e345b820af7ffbd3867ed6d44c8c9d534abd0cac4c9"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-result.json",
+        "sha256": "2d93961be3701542a1cfce320e4a61ef7f4a522bc6cf5bd136b9c7e944d96b42"
+      },
+      "documents": [
+        {
+          "documentId": "document-2dec1b7b4e81cb2502e1f2cf",
+          "sourceSha256": "42ab932642c25e2cdd491a88cf7fe3907437c06f2ae94cca45a085221075f0bd",
+          "reasonCode": "scope_mismatch"
+        }
+      ]
+    },
+    {
+      "municipalityId": "strausberg",
+      "sourceId": "strausberg-planning",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-strausberg-planning-index/index.json",
+        "sha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/seal-result.json",
+        "sha256": "0abb7d7113cb1d86159789fed1247f33aad3f2f744914113e833c50b1c1eccc3"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/import-crawl-corpus.json",
+        "sha256": "70b849529a0658b3c0d7f886d3f2fc9abab5d51e8a123486295f22f262916209"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/import-result.json",
+        "sha256": "15ccaa82620558a5401158bae2a104e028d7c3a2ba5c65810223ebe3a3f94ce2"
+      },
+      "documents": [
+        {
+          "documentId": "document-f5f3c6cdc1afb34cef583a92",
+          "sourceSha256": "b8ba1f9cf8aff593c20f28838e71549ae5de75a65aac23da30677d5358699fc1",
+          "reasonCode": "unsupported_mime"
+        }
+      ]
+    }
+  ]
+}

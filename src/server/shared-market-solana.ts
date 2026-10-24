@@ -9,6 +9,7 @@ import { buildLendingInstruction, decodePrice, decodePool, decodeLoanPosition, d
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { createBaseSolanaGateway, type BaseSolanaGateway } from './solana-rpc.ts';
+import { solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredSolanaOperations, type SolanaOperations, type PreparedSolanaOperation, type SolanaOperationResult } from './solana-operations.ts';
 import { solanaSharesConfiguration, type SolanaSharesManifest } from './solana-shares-config.ts';
 import { ensureSolanaSharesPrice, type SolanaPriceMirrorOptions } from './solana-price-mirror.ts';
@@ -40,10 +41,7 @@ async function manifestFor(options: SolanaMarketOptions) {
   return manifest;
 }
 function readGateway(manifest: SolanaSharesManifest, environment: Record<string, string | undefined>) {
-  if (!environment.SOLANA_RPC_URL) throw new Error('Solana shares RPC is not configured.');
-  const url = new URL(environment.SOLANA_RPC_URL);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('RPC must use HTTPS or loopback.');
-  return createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: manifest.genesisHash, maximumSponsorLamports: '10000000' });
+  return createBaseSolanaGateway({ ...solanaRpcConfiguration(environment, manifest), maximumSponsorLamports: '10000000' });
 }
 async function contextFor(store: Store, options: SolanaMarketOptions, signing = false) {
   const manifest = await manifestFor(options), environment = options.environment ?? process.env;

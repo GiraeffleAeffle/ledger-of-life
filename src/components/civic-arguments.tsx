@@ -2,6 +2,7 @@
 import { useId, useMemo, useRef, useState } from 'react';
 import { CIVIC_LIMITS, type CivicContribution } from '@/data/civic';
 import type { CivicAiSource } from '@/data/civic-ai';
+import { sourceAssertionLabel, sourceReviewLabel } from '@/data/city-source-evidence';
 import { civicArgumentLayout, civicArgumentTree, CIVIC_STANCE_LABEL, type CivicArgumentNode } from './civic-argument-layout';
 
 export function CivicArguments({ contributions, canReply, onReply }: {
@@ -75,7 +76,9 @@ export function CivicArguments({ contributions, canReply, onReply }: {
 
 export function CivicAiSources({ sources }: { sources: readonly CivicAiSource[] }) {
   return <div className="civic-ai-sources"><p className="small-copy">Server-selected source context, not independent fact-checking:</p>
-    {sources.length ? <ul>{sources.map((source) => <li key={source.id}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a><span className="small-copy"> · as of {source.asOf} · {source.kind} · {source.reviewState}</span></li>)}</ul> : <p className="small-copy">No sources were attached. Do not treat this answer as source-backed.</p>}
+    {sources.length ? <ul>{sources.map((source) => <li key={source.id}><a href={source.url} target="_blank" rel="noopener noreferrer">{source.title}</a><span className="small-copy"> · {source.assertion ? 'document date' : 'as of'} {source.asOf} · {source.kind} · {sourceReviewLabel(source.reviewState, source.verification)}{source.assertion && ` · ${sourceAssertionLabel(source.assertion)}`}</span>
+      {source.verification && <details><summary>Automated verification evidence</summary><p className="small-copy">{source.verification.meaning}. {source.verification.evidenceBasis}. {source.verification.metric} {source.verification.metricVersion} · {source.verification.model} · score {source.verification.score}, threshold {source.verification.threshold} · checked {source.verification.evaluatedAt}.</p><p className="small-copy">Source SHA-256: <code>{source.verification.sourceSha256}</code><br />Assertion SHA-256: <code>{source.verification.assertionHash}</code><br />Evaluation receipt SHA-256: <code>{source.verification.evidenceHash}</code></p></details>}
+    </li>)}</ul> : <p className="small-copy">No sources were attached. Do not treat this answer as source-backed.</p>}
   </div>;
 }
 

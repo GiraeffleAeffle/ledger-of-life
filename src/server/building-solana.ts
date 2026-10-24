@@ -8,6 +8,7 @@ import type { ExpectedTokenDelta } from '../finance/solana/reconcile.ts';
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { createBaseSolanaGateway } from './solana-rpc.ts';
+import { solanaRpcConfiguration } from './solana-provider-pool.ts';
 import { configuredSolanaOperations, type PreparedSolanaOperation, type SolanaOperationResult } from './solana-operations.ts';
 import { loadSolanaHouseManifest, type SolanaHouseManifest } from './solana-house-config.ts';
 import { SolanaServiceError } from './solana-service.ts';
@@ -35,11 +36,8 @@ export function solanaHouseId(value: unknown): SolanaHouseId {
   if (value === 'workshop' || value === 'demo-retrofit-workshop') return 'workshop';
   throw new Error('Unknown Solana house.');
 }
-function readGateway(manifest: SolanaHouseManifest, environment: Record<string, string | undefined>) {
-  if (!environment.SOLANA_RPC_URL) throw new Error('Solana house RPC is not configured.');
-  const url = new URL(environment.SOLANA_RPC_URL);
-  if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname))) throw new Error('RPC must use HTTPS or loopback.');
-  return createBaseSolanaGateway({ rpcUrl: url.toString(), genesisHash: manifest.genesisHash, maximumSponsorLamports: '10000000' });
+function readGateway(manifest: SolanaHouseManifest, environment: Record<string, string | undefined>, signal?: AbortSignal, fetcher: typeof fetch = fetch) {
+  return createBaseSolanaGateway({ ...solanaRpcConfiguration(environment, manifest), maximumSponsorLamports: '10000000' }, fetcher, signal);
 }
 function tokenBalance(row: AccountObservation | null, mint: string, owner: string, missingAllowed = false): bigint {
   if (!row) { if (missingAllowed) return 0n; throw new Error('House token account is missing.'); }
@@ -50,37 +48,51 @@ function tokenBalance(row: AccountObservation | null, mint: string, owner: strin
 
 /** One finalized bank for the house, vaults and user's balances. Missing ATAs are genuinely zero. */
 export async function readSolanaHouseSnapshot(manifest: SolanaHouseManifest, id: SolanaHouseId, gateway: HouseReadGateway, owner?: string): Promise<SolanaHouseSnapshot> {
+  return (await readSolanaHouseSnapshots(manifest, [id], gateway, owner))[0];
+}
+
+/** Both holdings use one finalized bank, including their shared cash account and Clock. */
+export async function readSolanaHouseSnapshots(manifest: SolanaHouseManifest, ids: readonly SolanaHouseId[], gateway: HouseReadGateway, owner?: string): Promise<SolanaHouseSnapshot[]> {
   if (await gateway.checkedGenesis() !== manifest.genesisHash) throw new Error('House RPC genesis mismatch.');
-  const configured = manifest.houses[id], derived = await houseAddresses(id, manifest.programId);
-  for (const field of ['house', 'unitMint', 'deskVault', 'rewardVault', 'stakeVault'] as const) if (configured[field] !== derived[field]) throw new Error('House deployment PDA mismatch.');
   const cashAccount = owner ? (await findAssociatedTokenPda({ owner: address(owner), mint: address(manifest.cashMint), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0] : null;
-  const unitAccount = owner ? (await findAssociatedTokenPda({ owner: address(owner), mint: address(configured.unitMint), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0] : null;
-  const positionKey = owner ? await positionAddress(configured.house, owner, manifest.programId) : null;
-  const keys = [manifest.programId, configured.house, configured.unitMint, manifest.cashMint, configured.deskVault, configured.rewardVault, configured.stakeVault, ...(owner ? [positionKey!, cashAccount!, unitAccount!] : []), clockAddress];
-  const observed = await gateway.multiple(keys), rows = observed.accounts;
-  if (rows.length !== keys.length || !rows[0]?.executable || !rows[1] || rows[1].executable || rows[1].owner !== manifest.programId) throw new Error('Solana house program or account is unavailable.');
-  const clock = rows.at(-1);
-  if (!clock || clock.owner !== 'Sysvar1111111111111111111111111111111111111' || clock.executable || clock.data.length !== 40) throw new Error('Finalized house clock is unavailable.');
-  const clockView = new DataView(clock.data.buffer, clock.data.byteOffset, clock.data.byteLength);
-  const nowSeconds = clockView.getBigInt64(32, true);
-  if (nowSeconds < 0n || nowSeconds > BigInt(Number.MAX_SAFE_INTEGER) || clockView.getBigUint64(0, true).toString() !== observed.slot) throw new Error('House clock does not match its finalized bank.');
-  const house = decodeHouse(rows[1].data);
-  if (house.id !== id || house.cashMint !== manifest.cashMint || house.unitMint !== configured.unitMint || house.priceCashPerUnit <= 0n || house.revenueBySource.reduce((total, amount) => total + amount, 0n) !== house.revenueTotal) throw new Error('House account differs from its reviewed deployment.');
-  if (house.rewardDuration !== 604_800n) throw new Error('House rewards require the reviewed seven-day stream.');
-  for (const [row, unit] of [[rows[2], true], [rows[3], false]] as const) {
-    if (!row || row.owner !== TOKEN_PROGRAM_ADDRESS || row.executable || row.data.length !== 82 || row.data[44] !== 6 || row.data[45] !== 1) throw new Error('House requires initialized classic six-decimal token mints.');
-    if (unit && (new DataView(row.data.buffer, row.data.byteOffset).getUint32(0, true) !== 1 || getAddressDecoder().decode(row.data.subarray(4, 36)) !== configured.house)) throw new Error('House unit mint authority mismatch.');
-  }
-  const deskCash = tokenBalance(rows[4], manifest.cashMint, configured.house), rewardCash = tokenBalance(rows[5], manifest.cashMint, configured.house);
-  if (tokenBalance(rows[6], configured.unitMint, configured.house) < house.totalStaked) throw new Error('House stake vault is below accounted units.');
-  let position: PositionAccount | null = null;
-  if (owner && rows[7]) {
-    if (rows[7].owner !== manifest.programId || rows[7].executable) throw new Error('House position program owner mismatch.');
-    position = decodePosition(rows[7].data);
-    if (position.house !== configured.house || position.owner !== owner || position.staked > house.totalStaked) throw new Error('House position identity mismatch.');
-    if (pendingOwed(house, position, nowSeconds) > rewardCash) throw new Error('House reward vault is below the claimable balance.');
-  }
-  return { house, position, walletUnits: owner ? tokenBalance(rows[9], configured.unitMint, owner, true) : 0n, cash: owner ? tokenBalance(rows[8], manifest.cashMint, owner, true) : 0n, deskCash, rewardCash, unitSupply: new DataView(rows[2]!.data.buffer, rows[2]!.data.byteOffset).getBigUint64(36, true), cashAccount, unitAccount, slot: observed.slot, nowSeconds };
+  const groups = await Promise.all(ids.map(async id => {
+    const configured = manifest.houses[id], derived = await houseAddresses(id, manifest.programId);
+    for (const field of ['house', 'unitMint', 'deskVault', 'rewardVault', 'stakeVault'] as const) if (configured[field] !== derived[field]) throw new Error('House deployment PDA mismatch.');
+    const unitAccount = owner ? (await findAssociatedTokenPda({ owner: address(owner), mint: address(configured.unitMint), tokenProgram: TOKEN_PROGRAM_ADDRESS }))[0] : null;
+    const positionKey = owner ? await positionAddress(configured.house, owner, manifest.programId) : null;
+    const keys = [manifest.programId, configured.house, configured.unitMint, manifest.cashMint, configured.deskVault, configured.rewardVault, configured.stakeVault, ...(owner ? [positionKey!, cashAccount!, unitAccount!] : []), clockAddress];
+    return { id, configured, unitAccount, keys };
+  }));
+  const union = [...new Set(groups.flatMap(group => group.keys))];
+  const observed = await gateway.multiple(union);
+  if (observed.accounts.length !== union.length) throw new Error('Solana house bank is incomplete.');
+  const bank = new Map(union.map((key, index) => [key, observed.accounts[index]]));
+  return groups.map(({ id, configured, unitAccount, keys }) => {
+    const rows = keys.map(key => bank.get(key) ?? null);
+    if (rows.length !== keys.length || !rows[0]?.executable || !rows[1] || rows[1].executable || rows[1].owner !== manifest.programId) throw new Error('Solana house program or account is unavailable.');
+    const clock = rows.at(-1);
+    if (!clock || clock.owner !== 'Sysvar1111111111111111111111111111111111111' || clock.executable || clock.data.length !== 40) throw new Error('Finalized house clock is unavailable.');
+    const clockView = new DataView(clock.data.buffer, clock.data.byteOffset, clock.data.byteLength);
+    const nowSeconds = clockView.getBigInt64(32, true);
+    if (nowSeconds < 0n || nowSeconds > BigInt(Number.MAX_SAFE_INTEGER) || clockView.getBigUint64(0, true).toString() !== observed.slot) throw new Error('House clock does not match its finalized bank.');
+    const house = decodeHouse(rows[1].data);
+    if (house.id !== id || house.cashMint !== manifest.cashMint || house.unitMint !== configured.unitMint || house.priceCashPerUnit <= 0n || house.revenueBySource.reduce((total, amount) => total + amount, 0n) !== house.revenueTotal) throw new Error('House account differs from its reviewed deployment.');
+    if (house.rewardDuration !== 604_800n) throw new Error('House rewards require the reviewed seven-day stream.');
+    for (const [row, unit] of [[rows[2], true], [rows[3], false]] as const) {
+      if (!row || row.owner !== TOKEN_PROGRAM_ADDRESS || row.executable || row.data.length !== 82 || row.data[44] !== 6 || row.data[45] !== 1) throw new Error('House requires initialized classic six-decimal token mints.');
+      if (unit && (new DataView(row.data.buffer, row.data.byteOffset).getUint32(0, true) !== 1 || getAddressDecoder().decode(row.data.subarray(4, 36)) !== configured.house)) throw new Error('House unit mint authority mismatch.');
+    }
+    const deskCash = tokenBalance(rows[4], manifest.cashMint, configured.house), rewardCash = tokenBalance(rows[5], manifest.cashMint, configured.house);
+    if (tokenBalance(rows[6], configured.unitMint, configured.house) < house.totalStaked) throw new Error('House stake vault is below accounted units.');
+    let position: PositionAccount | null = null;
+    if (owner && rows[7]) {
+      if (rows[7].owner !== manifest.programId || rows[7].executable) throw new Error('House position program owner mismatch.');
+      position = decodePosition(rows[7].data);
+      if (position.house !== configured.house || position.owner !== owner || position.staked > house.totalStaked) throw new Error('House position identity mismatch.');
+      if (pendingOwed(house, position, nowSeconds) > rewardCash) throw new Error('House reward vault is below the claimable balance.');
+    }
+    return { house, position, walletUnits: owner ? tokenBalance(rows[9], configured.unitMint, owner, true) : 0n, cash: owner ? tokenBalance(rows[8], manifest.cashMint, owner, true) : 0n, deskCash, rewardCash, unitSupply: new DataView(rows[2]!.data.buffer, rows[2]!.data.byteOffset).getBigUint64(36, true), cashAccount, unitAccount, slot: observed.slot, nowSeconds };
+  });
 }
 
 export function solanaHouseReadModel(manifest: SolanaHouseManifest, id: SolanaHouseId, snapshot: SolanaHouseSnapshot) {
@@ -100,9 +112,12 @@ export function solanaHouseReadModel(manifest: SolanaHouseManifest, id: SolanaHo
     observedSlot: snapshot.slot, observedChainTimestampRaw: snapshot.nowSeconds.toString(),
   };
 }
-export async function readSolanaBuilding(id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env) {
+export async function readSolanaBuilding(id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env, signal: AbortSignal = AbortSignal.timeout(3_000)) {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
-  return solanaHouseReadModel(manifest, id, await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment)));
+  const deadline = AbortSignal.any([signal, AbortSignal.timeout(3_000)]);
+  const snapshot = await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment, deadline));
+  deadline.throwIfAborted();
+  return solanaHouseReadModel(manifest, id, snapshot);
 }
 
 /** All displayed actions derive from verified atomic balances; no browser quote authorizes money. */
@@ -223,6 +238,7 @@ export async function cancelSolanaHouseReview(store: Store, identity: VerifiedId
 }
 export async function readSolanaBuildingPosition(store: Store, identity: VerifiedIdentity, id: SolanaHouseId = 'neighbourhood-homes', environment: Record<string, string | undefined> = process.env) {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
+  // This GET also reconciles financial operations; retain its original RPC defaults.
   const wallet = walletFor(identity, 'solana'), snapshot = await readSolanaHouseSnapshot(manifest, id, readGateway(manifest, environment), wallet.address), lane = await journal(store, identity);
   const receipts: { planId: string; operation: string; quantityRaw: string | null; claimedRaw: string | null; hash: string; status: 'pending' | 'confirmed' | 'failed'; explorerUrl: string }[] = [];
   let plan: SolanaHousePlan | null = null;
@@ -232,7 +248,11 @@ export async function readSolanaBuildingPosition(store: Store, identity: Verifie
     for (const entry of lane.entries.filter(entry => entry.houseId === id)) {
       const prepared = await operations.get(entry.id, identity);
       assertSolanaHouseOperation(prepared, entry);
-      const result = await operations.reconcile({ identity, id: entry.id });
+      // Stored terminal history is not an instruction to refresh expired unsigned
+      // blockhashes forever. Explicit pre-sign reconciliation remains fresh.
+      const result = prepared.state === 'prepared' || prepared.state === 'broadcast'
+        ? await operations.reconcile({ identity, id: entry.id })
+        : prepared;
       if (entry.id === lane.active) activeOperation = { ...result, operation: entry.operation };
       if (entry.id === lane.active && result.state === 'prepared') plan = { ...prepared, review: entry.review };
       if (result.signature) receipts.push({ planId: entry.id, operation: entry.operation, quantityRaw: entry.quantityRaw, claimedRaw: null, hash: result.signature, status: result.state === 'confirmed' ? 'confirmed' : result.state === 'failed' || result.state === 'expired' ? 'failed' : 'pending', explorerUrl: `https://explorer.solana.com/tx/${result.signature}?cluster=devnet` });
@@ -243,8 +263,8 @@ export async function readSolanaBuildingPosition(store: Store, identity: Verifie
 }
 export async function readSolanaLocalInvestments(identity: VerifiedIdentity, environment: Record<string, string | undefined> = process.env): Promise<LocalInvestmentView> {
   const manifest = loadSolanaHouseManifest(environment); if (!manifest) throw new Error('Solana house is not configured.');
-  const wallet = walletFor(identity, 'solana'), gateway = readGateway(manifest, environment);
-  const snapshots = await Promise.all((['neighbourhood-homes', 'workshop'] as const).map(id => readSolanaHouseSnapshot(manifest, id, gateway, wallet.address)));
+  const wallet = walletFor(identity, 'solana'), gateway = readGateway(manifest, environment, AbortSignal.timeout(3_000));
+  const snapshots = await readSolanaHouseSnapshots(manifest, ['neighbourhood-homes', 'workshop'], gateway, wallet.address);
   return { state: 'ready', network: { chainId: 'solana-devnet', name: 'Solana devnet', explorerUrl: 'https://explorer.solana.com' }, owner: wallet.address, cashAddress: manifest.cashMint, cashAtomic: snapshots[0].cash.toString(), nativeAtomic: null, assets: snapshots.map((snapshot, index) => ({ projectId: index === 0 ? 'demo-neighbourhood-homes' : 'demo-retrofit-workshop', unitAddress: snapshot.house.unitMint, marketAddress: manifest.houses[index === 0 ? 'neighbourhood-homes' : 'workshop'].house, unitDecimals: 6, priceAtomic: snapshot.house.priceCashPerUnit.toString(), holdingRaw: snapshot.walletUnits.toString(), stakedRaw: (snapshot.position?.staked ?? 0n).toString(), totalSupplyRaw: snapshot.unitSupply.toString(), availableUnitsRaw: null, error: null })), order: null, error: null };
 }
 

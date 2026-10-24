@@ -3,13 +3,12 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import {
   address,
+  fetchEncodedAccounts,
   getAddressEncoder,
   appendTransactionMessageInstructions,
   compileTransaction,
   createKeyPairSignerFromBytes,
   createNoopSigner,
-  createDefaultRpcTransport,
-  createSolanaRpcFromTransport,
   createTransactionMessage,
   getBase64EncodedWireTransaction,
   getTransactionDecoder,
@@ -27,7 +26,9 @@ import {
 import {
   TOKEN_2022_PROGRAM_ADDRESS,
   fetchMint,
-  fetchMaybeToken,
+  decodeMint,
+  decodeToken,
+  AccountState,
   findAssociatedTokenPda,
   getCreateAssociatedTokenIdempotentInstruction,
   getTransferCheckedInstruction,
@@ -35,6 +36,7 @@ import {
 import type { VerifiedIdentity } from '../wallets/identity-policy.ts';
 import { walletFor } from './agreements.ts';
 import { solanaConfiguration } from './solana-rpc.ts';
+import { createPooledSolanaRpc } from './solana-provider-pool.ts';
 import { SolanaServiceError } from './solana-service.ts';
 import { referencePrice, ReferencePriceUnavailable } from './reference-price.ts';
 import type { Store } from './store.ts';
@@ -84,24 +86,6 @@ async function buyAccount(store: Store, subject: string) {
   return key;
 }
 
-/** Public devnet RPC rate-limits bursts; rate-limited calls were not processed, so retry them. */
-function retryingTransport(url: string) {
-  const transport = createDefaultRpcTransport({ url });
-  return (async (config: Parameters<typeof transport>[0]) => {
-    for (let attempt = 0; ; attempt++) {
-      try {
-        return await transport(config);
-      } catch (error) {
-        const context = error && typeof error === 'object' && 'context' in error ? error.context : null;
-        const limited = Boolean(context && typeof context === 'object' && 'statusCode' in context && context.statusCode === 429);
-        if (!limited || attempt >= 5) throw error;
-        const pause = Promise.withResolvers<void>();
-        setTimeout(pause.resolve, 400 * 2 ** attempt);
-        await pause.promise;
-      }
-    }
-  }) as typeof transport;
-}
 
 async function marketRead(environment: Record<string, string | undefined>) {
   const config = solanaConfiguration(environment);
@@ -109,7 +93,7 @@ async function marketRead(environment: Record<string, string | undefined>) {
   const dir = resolve(/* turbopackIgnore: true */ environment.SOLANA_TEST_SIGNER_DIR || '.testnet-secrets/test-signer');
   try {
     const { mint } = JSON.parse(await readFile(/* turbopackIgnore: true */ resolve(/* turbopackIgnore: true */ dir, 'market.json'), 'utf8')) as { mint: string };
-    return { rpc: createSolanaRpcFromTransport(retryingTransport(config.rpcUrl)), rpcUrl: config.rpcUrl, mint: address(mint) };
+    return { rpc: createPooledSolanaRpc(config), rpcUrl: config.rpcUrl, mint: address(mint) };
   } catch {
     return null;
   }
@@ -157,17 +141,28 @@ export async function readPortfolioPosition(
 ): Promise<PortfolioView | PortfolioPartial> {
   const [usdcAta] = await findAssociatedTokenPda({ owner, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });
   const [stockAta] = await findAssociatedTokenPda({ owner, mint: stockMint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
-  const balance = async (account: typeof usdcAta) => {
-    const token = await fetchMaybeToken(rpc, account, { commitment: 'confirmed' });
-    return token.exists ? token.data.amount.toString() : '0';
-  };
-  const [testUsdcAtomic, rawAtomic, mint, quote] = await Promise.all([
-    balance(usdcAta), balance(stockAta), fetchMint(rpc, stockMint, { commitment: 'confirmed' }),
+  const [accounts, quote] = await Promise.all([
+    fetchEncodedAccounts(rpc, [usdcAta, stockAta, stockMint], { commitment: 'confirmed' }),
     referencePrice(SPYX_MAINNET).catch((error: unknown) => {
       if (!(error instanceof ReferencePriceUnavailable)) throw error;
       return null;
     }),
   ]);
+  const balance = (index: number, expectedMint: Address, program: Address) => {
+    const encoded = accounts[index];
+    if (!encoded) throw new Error('Portfolio account bank is incomplete.');
+    if (!encoded.exists) return '0';
+    if (encoded.programAddress !== program || encoded.executable) throw new Error('Portfolio token program mismatch.');
+    const token = decodeToken(encoded);
+    if (token.data.mint !== expectedMint || token.data.owner !== owner || token.data.state !== AccountState.Initialized)
+      throw new Error('Portfolio token owner, mint or state mismatch.');
+    return token.data.amount.toString();
+  };
+  const testUsdcAtomic = balance(0, TEST_USDC, CLASSIC_TOKEN), rawAtomic = balance(1, stockMint, TOKEN_2022_PROGRAM_ADDRESS);
+  const encodedMint = accounts[2];
+  if (!encodedMint?.exists || encodedMint.programAddress !== TOKEN_2022_PROGRAM_ADDRESS || encodedMint.executable) throw new Error('Portfolio mint is unavailable.');
+  const mint = decodeMint(encodedMint);
+  if (!mint.data.isInitialized || mint.data.decimals !== DECIMALS) throw new Error('Portfolio mint configuration mismatch.');
   const config = mint.data.extensions.__option === 'Some'
     ? mint.data.extensions.value.find((item) => item.__kind === 'ScaledUiAmountConfig')
     : undefined;
@@ -219,8 +214,13 @@ export async function prepareBuy(store: Store, identity: VerifiedIdentity, usdcI
   if (quote.stale) throw new SolanaServiceError(503, 'price_unavailable', 'A current reference price is required to prepare a purchase. Try again shortly.');
   const price = quote.usdPrice;
   const mint = await fetchMint(m.rpc, m.mint, { commitment: 'confirmed' });
-  const view = await readPortfolio(identity, environment);
-  const multiplier = 'multiplier' in view ? view.multiplier : 1;
+  if (mint.programAddress !== TOKEN_2022_PROGRAM_ADDRESS || mint.executable || !mint.data.isInitialized || mint.data.decimals !== DECIMALS)
+    throw new Error('Portfolio mint configuration mismatch.');
+  // Financial review uses the freshly fetched mint, never the display-result cache.
+  const scaling = mint.data.extensions.__option === 'Some'
+    ? mint.data.extensions.value.find(item => item.__kind === 'ScaledUiAmountConfig') : undefined;
+  const multiplier = !scaling || scaling.__kind !== 'ScaledUiAmountConfig' ? 1
+    : BigInt(Math.floor(Date.now() / 1000)) >= scaling.newMultiplierEffectiveTimestamp ? scaling.newMultiplier : scaling.multiplier;
   const rawOut = (BigInt(usdcInAtomic) * 10n ** 17n) / (BigInt(Math.round(price * 1e6)) * BigInt(Math.round(multiplier * 1e9)));
   if (rawOut <= 0n) throw new SolanaServiceError(400, 'invalid_amount', 'The amount is too small.');
   const [tenantUsdc] = await findAssociatedTokenPda({ owner: tenant, mint: TEST_USDC, tokenProgram: CLASSIC_TOKEN });

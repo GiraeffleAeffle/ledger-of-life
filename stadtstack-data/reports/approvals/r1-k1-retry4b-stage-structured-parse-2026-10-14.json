@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry4b-stage-structured-parse-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T19:59:56.197Z",
+  "parentApproval": {
+    "id": "r1-k1-retry4-2026-10-14-amendment-1",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry4-2026-10-14-amendment-1.json",
+    "sha256": "4bd2978145f6d8d7cc3b8d1c3358a4c15555e74e21b644973d1f14909a5d242e",
+    "clause": "approved.k1Retry4b (parse)"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k1-retry4b-stage-acquisition-2026-10-14",
+      "sha256": "8b237889489b28e956d9270f6adbb4e09f6a7f87c76d4843b5dbef1f93128331"
+    }
+  ],
+  "preconditionsMet": {
+    "acquisition": "run dd5fc119-38d8-417c-aa2d-8c1fc8518922 succeeded (receipt d2039d58-b8b2-4bb6-8bcf-5e1c2bc045a6)",
+    "code": "rebuild-r1 ec9f49e",
+    "parserAuthorization": "image sha256:d2506818…, contract c850509c…; sentinels green"
+  },
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "genesis",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-ec9f49e/operator-registry-config.json",
+      "sha256": "c565886b00b2ebd967ded484cc6eea55e5ee4fece6c310b0137a90069e869ed0"
+    },
+    "jobKeys": [
+      "18eb1618febe5b13ced081efdef417caa0f9369e989bedd3c6dd8d8e68b13113"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 240000,
+    "osDeadlineSeconds": 360,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 0
+  },
+  "cumulativeWithinK1": {
+    "wallSecondsUsedBefore": 994,
+    "note": "873 s + 121 s (run dd5fc119)",
+    "jobsIncludingThis": 9,
+    "k1MaxJobs": 9,
+    "k1TotalSeconds": 1500
+  }
+}

@@ -1,0 +1,3059 @@
+{
+  "schemaVersion": "stadtstack-publication-quality-v1",
+  "generatedAt": "2026-10-12T16:39:32.359Z",
+  "policy": {
+    "publicUrls": "required",
+    "councilBodyBinding": "required",
+    "emptySuccess": "forbidden",
+    "sourceEventDates": "required; unresolved comparison records quarantined",
+    "placeDates": "observation only; no invented event date",
+    "core": "authenticated retained release; no new raw PDF or model verification",
+    "authoritySha256": "e35c90d1b705a52d739f438ae80b0ab1217db86386826fd9feac2f32329e926f"
+  },
+  "cities": [
+    {
+      "cityId": "koeln",
+      "input": 5213,
+      "deduplicated": 5213,
+      "published": 5213,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:12:51.126Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=K%C3%B6ln%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:12:51.126Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 3074,
+          "publishedRecordCount": 3074,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:32:31.848Z",
+            "observedEnd": "2026-09-26T17:32:31.848Z",
+            "checkedAt": "2026-09-26T17:32:31.848Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:32:31.848Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:12:51.126Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=K%C3%B6ln%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:12:51.126Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "status": "ok",
+          "recordCount": 28,
+          "publishedRecordCount": 28,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-02-04",
+            "observedEnd": "2026-10-10",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A3-roadworks",
+          "status": "ok",
+          "recordCount": 38,
+          "publishedRecordCount": 38,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-11-22",
+            "observedEnd": "2026-10-12",
+            "checkedAt": "2026-09-27T10:02:28.423Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.423Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A3-closure",
+          "status": "ok",
+          "recordCount": 5,
+          "publishedRecordCount": 5,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-27",
+            "observedEnd": "2026-10-05",
+            "checkedAt": "2026-09-27T10:02:28.461Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.461Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A4-roadworks",
+          "status": "ok",
+          "recordCount": 37,
+          "publishedRecordCount": 37,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-11-19",
+            "observedEnd": "2026-10-07",
+            "checkedAt": "2026-09-27T10:02:28.695Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.695Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A4-closure",
+          "status": "ok",
+          "recordCount": 11,
+          "publishedRecordCount": 11,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-27",
+            "observedEnd": "2026-09-29",
+            "checkedAt": "2026-09-27T10:02:28.746Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.746Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A57-roadworks",
+          "status": "ok",
+          "recordCount": 4,
+          "publishedRecordCount": 4,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-10",
+            "observedEnd": "2026-08-31",
+            "checkedAt": "2026-09-27T10:02:28.781Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.781Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A57-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:28.811Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.811Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A59-roadworks",
+          "status": "ok",
+          "recordCount": 21,
+          "publishedRecordCount": 21,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-07-31",
+            "observedEnd": "2026-10-02",
+            "checkedAt": "2026-09-27T10:02:28.846Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.846Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A59-closure",
+          "status": "ok",
+          "recordCount": 15,
+          "publishedRecordCount": 15,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-05-20",
+            "observedEnd": "2026-10-02",
+            "checkedAt": "2026-09-27T10:02:28.881Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.881Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A555-roadworks",
+          "status": "ok",
+          "recordCount": 4,
+          "publishedRecordCount": 4,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-03-23",
+            "observedEnd": "2026-03-23",
+            "checkedAt": "2026-09-27T10:02:28.914Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A555/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.914Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A555-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:28.941Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A555/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.941Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-meeting",
+          "status": "not_checked",
+          "recordCount": 50,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:29.527Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:02:29.527Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-paper",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-17",
+            "observedEnd": "2026-09-23",
+            "checkedAt": "2026-09-27T10:02:32.848Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:02:32.848Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "not_checked",
+          "recordCount": 50,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:33.256Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings",
+            "checkedAt": "2026-09-27T10:02:33.256Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "not_checked",
+          "recordCount": 50,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:33.477Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/meetings?page=2",
+            "checkedAt": "2026-09-27T10:02:33.477Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-21",
+            "observedEnd": "2026-09-25",
+            "checkedAt": "2026-09-27T10:02:34.961Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/papers",
+            "checkedAt": "2026-09-27T10:02:34.961Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-21",
+            "observedEnd": "2026-09-25",
+            "checkedAt": "2026-09-27T10:02:40.836Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://buergerinfo.stadt-koeln.de/oparl/bodies/stadtverwaltung_koeln/papers?page=2",
+            "checkedAt": "2026-09-27T10:02:40.836Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-0",
+          "status": "ok",
+          "recordCount": 143,
+          "publishedRecordCount": 143,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2013-12-01",
+            "observedEnd": "2026-09-25",
+            "checkedAt": "2026-09-26T17:10:12.598Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=180&MAXFEATURES=180",
+            "checkedAt": "2026-09-26T17:10:12.598Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-180",
+          "status": "ok",
+          "recordCount": 158,
+          "publishedRecordCount": 158,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2021-10-18",
+            "observedEnd": "2026-09-24",
+            "checkedAt": "2026-09-26T17:10:12.775Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=180&COUNT=180&MAXFEATURES=180",
+            "checkedAt": "2026-09-26T17:10:12.775Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-360",
+          "status": "ok",
+          "recordCount": 161,
+          "publishedRecordCount": 161,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2021-05-17",
+            "observedEnd": "2026-09-26",
+            "checkedAt": "2026-09-26T17:10:13.056Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=360&COUNT=180&MAXFEATURES=180",
+            "checkedAt": "2026-09-26T17:10:13.056Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-baustelleneinrichtung-540",
+          "status": "ok",
+          "recordCount": 58,
+          "publishedRecordCount": 58,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-09-15",
+            "observedEnd": "2026-09-16",
+            "checkedAt": "2026-09-26T17:10:13.217Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abaustelleneinrichtung&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=540&COUNT=180&MAXFEATURES=180",
+            "checkedAt": "2026-09-26T17:10:13.217Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-strassenbauarbeiten-0",
+          "status": "ok",
+          "recordCount": 32,
+          "publishedRecordCount": 32,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-09-01",
+            "observedEnd": "2026-09-21",
+            "checkedAt": "2026-09-26T17:10:13.370Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Astrassenbauarbeiten&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=100&MAXFEATURES=100",
+            "checkedAt": "2026-09-26T17:10:13.370Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-ampelarbeiten-0",
+          "status": "ok",
+          "recordCount": 7,
+          "publishedRecordCount": 7,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-09-01",
+            "observedEnd": "2026-09-23",
+            "checkedAt": "2026-09-26T17:10:13.565Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/wss/service/baustellen_wfs/guest?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Aampelarbeiten&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=50&MAXFEATURES=50",
+            "checkedAt": "2026-09-26T17:10:13.565Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-0",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-07-31",
+            "observedEnd": "2023-05-17",
+            "checkedAt": "2026-09-26T17:07:41.606Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=0&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:41.606Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-200",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-07-14",
+            "observedEnd": "2020-03-18",
+            "checkedAt": "2026-09-26T17:07:41.807Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=200&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:41.807Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-400",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-07-14",
+            "observedEnd": "2020-06-10",
+            "checkedAt": "2026-09-26T17:07:42.044Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=400&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.044Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-600",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-05-05",
+            "observedEnd": "2021-08-25",
+            "checkedAt": "2026-09-26T17:07:42.248Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=600&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.248Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-800",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-05-13",
+            "observedEnd": "2022-04-27",
+            "checkedAt": "2026-09-26T17:07:42.421Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=800&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.421Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-1000",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-03-12",
+            "observedEnd": "2022-06-08",
+            "checkedAt": "2026-09-26T17:07:42.668Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1000&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.668Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-1200",
+          "status": "ok",
+          "recordCount": 39,
+          "publishedRecordCount": 39,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1966-04-29",
+            "observedEnd": "2024-03-20",
+            "checkedAt": "2026-09-26T17:07:42.774Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1200&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.774Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "koeln-bplan-1400",
+          "status": "ok",
+          "recordCount": 102,
+          "publishedRecordCount": 102,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-09-25",
+            "observedEnd": "2026-08-26",
+            "checkedAt": "2026-09-26T17:07:42.930Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0)",
+          "licenceEvidence": {
+            "url": "https://geoportal.stadt-koeln.de/arcgis/rest/services/planen_und_bauen/b_plan_uebersicht/MapServer/1/query?where=1%3D1&outFields=*&returnGeometry=true&outSR=4326&resultOffset=1400&resultRecordCount=200&f=geojson",
+            "checkedAt": "2026-09-26T17:07:42.930Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Zero 2.0 (dl-de/zero-2.0); retain its attribution and source-specific obligations."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "muenster",
+      "input": 1944,
+      "deduplicated": 1944,
+      "published": 1944,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:15:43.337Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=M%C3%BCnster%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:15:43.337Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 1166,
+          "publishedRecordCount": 1166,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:15:50.911Z",
+            "observedEnd": "2026-09-26T17:15:50.911Z",
+            "checkedAt": "2026-09-26T17:15:50.911Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:15:50.911Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:15:43.337Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=M%C3%BCnster%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:15:43.337Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "status": "ok",
+          "recordCount": 21,
+          "publishedRecordCount": 21,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-07-09",
+            "observedEnd": "2026-09-29",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A43-roadworks",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:41.863Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A43/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:41.863Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A43-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:41.898Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A43/services/closure",
+            "checkedAt": "2026-09-27T10:02:41.898Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-meeting",
+          "status": "partial",
+          "recordCount": 34,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-10T17:00:00+02:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
+            "checkedAt": "2026-09-27T10:02:41.911Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:02:41.911Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-paper",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-10",
+            "observedEnd": "2026-09-21",
+            "checkedAt": "2026-09-27T10:02:46.325Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:02:46.325Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "partial",
+          "recordCount": 34,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-10T17:00:00+02:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
+            "checkedAt": "2026-09-27T10:02:47.522Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/meetings",
+            "checkedAt": "2026-09-27T10:02:47.522Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "partial",
+          "recordCount": 34,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-10T17:00:00+02:00",
+            "observedEnd": "2026-09-10T17:00:00+02:00",
+            "checkedAt": "2026-09-27T10:02:48.029Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/meetings?page=2",
+            "checkedAt": "2026-09-27T10:02:48.029Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-12",
+            "observedEnd": "2026-09-21",
+            "checkedAt": "2026-09-27T10:02:50.047Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/papers",
+            "checkedAt": "2026-09-27T10:02:50.047Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "partial",
+          "recordCount": 50,
+          "publishedRecordCount": 50,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-12",
+            "observedEnd": "2026-09-21",
+            "checkedAt": "2026-09-27T10:02:53.347Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://oparl.stadt-muenster.de/bodies/0001/papers?page=2",
+            "checkedAt": "2026-09-27T10:02:53.347Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "muenster-bplan-0",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1952-07-28",
+            "observedEnd": "2025-03-21",
+            "checkedAt": "2026-09-26T17:07:47.113Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "licenceEvidence": {
+            "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=200&MAXFEATURES=200",
+            "checkedAt": "2026-09-26T17:07:47.113Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "muenster-bplan-200",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1955-05-18",
+            "observedEnd": "2025-06-13",
+            "checkedAt": "2026-09-26T17:07:47.359Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "licenceEvidence": {
+            "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=200&COUNT=200&MAXFEATURES=200",
+            "checkedAt": "2026-09-26T17:07:47.359Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "muenster-bplan-400",
+          "status": "ok",
+          "recordCount": 200,
+          "publishedRecordCount": 200,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1958-03-28",
+            "observedEnd": "2026-06-12",
+            "checkedAt": "2026-09-26T17:07:47.598Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "licenceEvidence": {
+            "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=400&COUNT=200&MAXFEATURES=200",
+            "checkedAt": "2026-09-26T17:07:47.598Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "muenster-bplan-600",
+          "status": "ok",
+          "recordCount": 86,
+          "publishedRecordCount": 86,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "1960-07-25",
+            "observedEnd": "2025-10-10",
+            "checkedAt": "2026-09-26T17:07:47.813Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "licenceEvidence": {
+            "url": "https://geo.stadt-muenster.de/mapserv/bplan_serv?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAME=ms%3Abplan2&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=600&COUNT=200&MAXFEATURES=200",
+            "checkedAt": "2026-09-26T17:07:47.813Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "muenster-baustellen-0",
+          "status": "ok",
+          "recordCount": 19,
+          "publishedRecordCount": 19,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-01-04",
+            "observedEnd": "2026-09-24",
+            "checkedAt": "2026-09-26T17:07:47.911Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster",
+          "licenceEvidence": {
+            "url": "https://geo.stadt-muenster.de/mapserv/odbaustellen_serv?SERVICE=WFS&VERSION=1.1.0&REQUEST=GetFeature&TYPENAME=baustellen&OUTPUTFORMAT=geojson&SRSNAME=EPSG%3A4326&STARTINDEX=0&COUNT=100&MAXFEATURES=100",
+            "checkedAt": "2026-09-26T17:07:47.911Z",
+            "note": "Recorded source licence: Datenlizenz Deutschland – Namensnennung 2.0 (dl-de/by-2-0), Attribution: Stadt Münster; retain its attribution and source-specific obligations."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "wuppertal",
+      "input": 1348,
+      "deduplicated": 1348,
+      "published": 1348,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:16:01.343Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Wuppertal%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:16:01.343Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 1012,
+          "publishedRecordCount": 1012,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:33:10.069Z",
+            "observedEnd": "2026-09-26T17:33:10.069Z",
+            "checkedAt": "2026-09-26T17:33:10.069Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:33:10.069Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:16:01.343Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Wuppertal%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:16:01.343Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A1-roadworks",
+          "status": "ok",
+          "recordCount": 102,
+          "publishedRecordCount": 102,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-02-04",
+            "observedEnd": "2026-10-10",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.316Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A1-closure",
+          "status": "ok",
+          "recordCount": 11,
+          "publishedRecordCount": 11,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-29",
+            "observedEnd": "2026-10-05",
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A1/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.365Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A46-roadworks",
+          "status": "ok",
+          "recordCount": 42,
+          "publishedRecordCount": 42,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2023-09-25",
+            "observedEnd": "2026-10-12",
+            "checkedAt": "2026-09-27T10:02:55.067Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:55.067Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A46-closure",
+          "status": "ok",
+          "recordCount": 7,
+          "publishedRecordCount": 7,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-09-01",
+            "observedEnd": "2026-10-01",
+            "checkedAt": "2026-09-27T10:02:55.101Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/closure",
+            "checkedAt": "2026-09-27T10:02:55.101Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-meeting",
+          "status": "not_checked",
+          "recordCount": 60,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:55.125Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:02:55.125Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-paper",
+          "status": "partial",
+          "recordCount": 100,
+          "publishedRecordCount": 100,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-26",
+            "observedEnd": "2026-09-23",
+            "checkedAt": "2026-09-27T10:03:01.061Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:03:01.061Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "partial",
+          "recordCount": 195,
+          "publishedRecordCount": 2,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-07T16:05:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
+            "checkedAt": "2026-09-27T10:03:02.240Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/meetings",
+            "checkedAt": "2026-09-27T10:03:02.240Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "partial",
+          "recordCount": 195,
+          "publishedRecordCount": 2,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-07T16:05:00+02:00",
+            "observedEnd": "2026-10-01T16:30:00+02:00",
+            "checkedAt": "2026-09-27T10:03:03.224Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/meetings?page=2",
+            "checkedAt": "2026-09-27T10:03:03.224Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "partial",
+          "recordCount": 172,
+          "publishedRecordCount": 172,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-03",
+            "observedEnd": "2026-09-23",
+            "checkedAt": "2026-09-27T10:03:06.457Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/papers",
+            "checkedAt": "2026-09-27T10:03:06.457Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "partial",
+          "recordCount": 172,
+          "publishedRecordCount": 172,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-03",
+            "observedEnd": "2026-09-23",
+            "checkedAt": "2026-09-27T10:03:16.572Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.wuppertal.de/oparl/bodies/0001/papers?page=2",
+            "checkedAt": "2026-09-27T10:03:16.572Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "castrop-rauxel",
+      "input": 295,
+      "deduplicated": 295,
+      "published": 295,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:18:00.138Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Castrop-Rauxel%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:18:00.138Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 157,
+          "publishedRecordCount": 157,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:19:44.197Z",
+            "observedEnd": "2026-09-26T17:19:44.197Z",
+            "checkedAt": "2026-09-26T17:19:44.197Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:19:44.197Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:18:00.138Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Castrop-Rauxel%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:18:00.138Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A2-roadworks",
+          "status": "ok",
+          "recordCount": 21,
+          "publishedRecordCount": 21,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-04-16",
+            "observedEnd": "2026-10-07",
+            "checkedAt": "2026-09-27T10:04:54.955Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A2/services/roadworks",
+            "checkedAt": "2026-09-27T10:04:54.955Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A2-closure",
+          "status": "ok",
+          "recordCount": 3,
+          "publishedRecordCount": 3,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2021-04-12",
+            "observedEnd": "2026-09-28",
+            "checkedAt": "2026-09-27T10:04:55.015Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A2/services/closure",
+            "checkedAt": "2026-09-27T10:04:55.015Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A42-roadworks",
+          "status": "ok",
+          "recordCount": 43,
+          "publishedRecordCount": 43,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-03-16",
+            "observedEnd": "2026-09-29",
+            "checkedAt": "2026-09-27T10:04:55.065Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A42/services/roadworks",
+            "checkedAt": "2026-09-27T10:04:55.065Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A42-closure",
+          "status": "ok",
+          "recordCount": 22,
+          "publishedRecordCount": 22,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2023-12-11",
+            "observedEnd": "2026-10-02",
+            "checkedAt": "2026-09-27T10:04:55.121Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A42/services/closure",
+            "checkedAt": "2026-09-27T10:04:55.121Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A45-roadworks",
+          "status": "ok",
+          "recordCount": 49,
+          "publishedRecordCount": 49,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2022-05-03",
+            "observedEnd": "2026-10-06",
+            "checkedAt": "2026-09-27T10:04:55.206Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/roadworks",
+            "checkedAt": "2026-09-27T10:04:55.206Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A45-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:04:55.330Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A45/services/closure",
+            "checkedAt": "2026-09-27T10:04:55.330Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-meeting",
+          "status": "not_checked",
+          "recordCount": 24,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:04:55.392Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:04:55.392Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "ccf-paper",
+          "status": "not_checked",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:04:55.443Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://github.com/komma-systems/ccf",
+            "checkedAt": "2026-09-27T10:04:55.443Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "failed",
+          "recordCount": 2,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:04:57.584Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://castroprauxel.gremien.info/oparl/body/EUV, not https://castroprauxel.gremien.info/oparl/body/CAS; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://castroprauxel.gremien.info/oparl/body/EUV/meeting",
+            "checkedAt": "2026-09-27T10:04:57.584Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "failed",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:04:57.958Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://castroprauxel.gremien.info/oparl/body/EUV, not https://castroprauxel.gremien.info/oparl/body/CAS; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://castroprauxel.gremien.info/oparl/body/EUV/paper",
+            "checkedAt": "2026-09-27T10:04:57.958Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "not_checked",
+          "recordCount": 22,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:01.875Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting",
+            "checkedAt": "2026-09-27T10:05:01.875Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "not_checked",
+          "recordCount": 22,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:06.015Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://castroprauxel.gremien.info/oparl/body/CAS/meeting/page/2",
+            "checkedAt": "2026-09-27T10:05:06.015Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "not_checked",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:06.490Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://castroprauxel.gremien.info/oparl/body/CAS/paper",
+            "checkedAt": "2026-09-27T10:05:06.490Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "duesseldorf",
+      "input": 2062,
+      "deduplicated": 2062,
+      "published": 2062,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:19:44.722Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=D%C3%BCsseldorf%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:19:44.722Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 1882,
+          "publishedRecordCount": 1882,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:19:52.529Z",
+            "observedEnd": "2026-09-26T17:19:52.529Z",
+            "checkedAt": "2026-09-26T17:19:52.529Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:19:52.529Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:19:44.722Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=D%C3%BCsseldorf%2C+Nordrhein-Westfalen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:19:44.722Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A3-roadworks",
+          "status": "ok",
+          "recordCount": 26,
+          "publishedRecordCount": 26,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-11-22",
+            "observedEnd": "2026-10-19",
+            "checkedAt": "2026-09-27T10:02:28.423Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.423Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A3-closure",
+          "status": "ok",
+          "recordCount": 9,
+          "publishedRecordCount": 9,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-10-29",
+            "observedEnd": "2026-09-28",
+            "checkedAt": "2026-09-27T10:02:28.461Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A3/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.461Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A44-roadworks",
+          "status": "ok",
+          "recordCount": 29,
+          "publishedRecordCount": 29,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-03-06",
+            "observedEnd": "2026-10-11",
+            "checkedAt": "2026-09-27T10:05:06.892Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A44/services/roadworks",
+            "checkedAt": "2026-09-27T10:05:06.892Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A44-closure",
+          "status": "ok",
+          "recordCount": 3,
+          "publishedRecordCount": 3,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-07-21",
+            "observedEnd": "2026-07-21",
+            "checkedAt": "2026-09-27T10:05:06.942Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A44/services/closure",
+            "checkedAt": "2026-09-27T10:05:06.942Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A46-roadworks",
+          "status": "ok",
+          "recordCount": 39,
+          "publishedRecordCount": 39,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2023-09-25",
+            "observedEnd": "2026-10-01",
+            "checkedAt": "2026-09-27T10:02:55.067Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:55.067Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A46-closure",
+          "status": "ok",
+          "recordCount": 4,
+          "publishedRecordCount": 4,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-09-01",
+            "observedEnd": "2025-11-07",
+            "checkedAt": "2026-09-27T10:02:55.101Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A46/services/closure",
+            "checkedAt": "2026-09-27T10:02:55.101Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A52-roadworks",
+          "status": "ok",
+          "recordCount": 8,
+          "publishedRecordCount": 8,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2022-06-15",
+            "observedEnd": "2026-10-08",
+            "checkedAt": "2026-09-27T10:05:06.986Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A52/services/roadworks",
+            "checkedAt": "2026-09-27T10:05:06.986Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A52-closure",
+          "status": "ok",
+          "recordCount": 11,
+          "publishedRecordCount": 11,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-11-08",
+            "observedEnd": "2026-09-25",
+            "checkedAt": "2026-09-27T10:05:07.024Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A52/services/closure",
+            "checkedAt": "2026-09-27T10:05:07.024Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A57-roadworks",
+          "status": "ok",
+          "recordCount": 10,
+          "publishedRecordCount": 10,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-04-02",
+            "observedEnd": "2026-08-31",
+            "checkedAt": "2026-09-27T10:02:28.781Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.781Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A57-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:02:28.811Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A57/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.811Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A59-roadworks",
+          "status": "ok",
+          "recordCount": 28,
+          "publishedRecordCount": 28,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2024-07-31",
+            "observedEnd": "2026-10-01",
+            "checkedAt": "2026-09-27T10:02:28.846Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.846Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A59-closure",
+          "status": "ok",
+          "recordCount": 13,
+          "publishedRecordCount": 13,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-05-05",
+            "observedEnd": "2026-10-02",
+            "checkedAt": "2026-09-27T10:02:28.881Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A59/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.881Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "failed",
+          "recordCount": 100,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:14.059Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/meetings",
+            "checkedAt": "2026-09-27T10:05:14.059Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "failed",
+          "recordCount": 100,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:25.417Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/meetings?page=2",
+            "checkedAt": "2026-09-27T10:05:25.417Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "failed",
+          "recordCount": 51,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:31.369Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/papers",
+            "checkedAt": "2026-09-27T10:05:31.369Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "failed",
+          "recordCount": 51,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:44.857Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0009, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0009/papers?page=2",
+            "checkedAt": "2026-09-27T10:05:44.857Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "failed",
+          "recordCount": 121,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:05:49.625Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0011, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/meetings",
+            "checkedAt": "2026-09-27T10:05:49.625Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "failed",
+          "recordCount": 121,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:03.861Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0011, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/meetings?page=2",
+            "checkedAt": "2026-09-27T10:06:03.861Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "failed",
+          "recordCount": 73,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:11.106Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0011, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/papers",
+            "checkedAt": "2026-09-27T10:06:11.106Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "failed",
+          "recordCount": 73,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:19.021Z",
+            "state": "failed",
+            "reason": "Retained source belongs to https://ris-oparl.itk-rheinland.de/Oparl/bodies/0011, not https://ris-oparl.itk-rheinland.de/Oparl/bodies/0015; its city records are quarantined. No replacement backfill used."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://ris-oparl.itk-rheinland.de/Oparl/bodies/0011/papers?page=2",
+            "checkedAt": "2026-09-27T10:06:19.021Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "dresden",
+      "input": 2276,
+      "deduplicated": 2276,
+      "published": 2276,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:20:01.621Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Dresden%2C+Sachsen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:20:01.621Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 2222,
+          "publishedRecordCount": 2222,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:28:26.278Z",
+            "observedEnd": "2026-09-26T17:28:26.278Z",
+            "checkedAt": "2026-09-26T17:28:26.278Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:28:26.278Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:20:01.621Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Dresden%2C+Sachsen%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:20:01.621Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A4-roadworks",
+          "status": "ok",
+          "recordCount": 23,
+          "publishedRecordCount": 23,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-04-22",
+            "observedEnd": "2026-10-05",
+            "checkedAt": "2026-09-27T10:02:28.695Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/roadworks",
+            "checkedAt": "2026-09-27T10:02:28.695Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A4-closure",
+          "status": "ok",
+          "recordCount": 7,
+          "publishedRecordCount": 7,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-04-22",
+            "observedEnd": "2026-10-05",
+            "checkedAt": "2026-09-27T10:02:28.746Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A4/services/closure",
+            "checkedAt": "2026-09-27T10:02:28.746Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A17-roadworks",
+          "status": "ok",
+          "recordCount": 3,
+          "publishedRecordCount": 3,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-05-13",
+            "observedEnd": "2026-09-28",
+            "checkedAt": "2026-09-27T10:06:19.786Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A17/services/roadworks",
+            "checkedAt": "2026-09-27T10:06:19.786Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A17-closure",
+          "status": "ok",
+          "recordCount": 1,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-21",
+            "observedEnd": "2026-09-21",
+            "checkedAt": "2026-09-27T10:06:19.843Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A17/services/closure",
+            "checkedAt": "2026-09-27T10:06:19.843Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "not_checked",
+          "recordCount": 20,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:20.797Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.dresden.de/bodies/0001/meetings",
+            "checkedAt": "2026-09-27T10:06:20.797Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "not_checked",
+          "recordCount": 20,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:21.049Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.dresden.de/bodies/0001/meetings?page=2",
+            "checkedAt": "2026-09-27T10:06:21.049Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "partial",
+          "recordCount": 20,
+          "publishedRecordCount": 20,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-04",
+            "observedEnd": "2026-09-24",
+            "checkedAt": "2026-09-27T10:06:27.277Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.dresden.de/bodies/0001/papers",
+            "checkedAt": "2026-09-27T10:06:27.277Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-1",
+          "status": "partial",
+          "recordCount": 20,
+          "publishedRecordCount": 20,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-04",
+            "observedEnd": "2026-09-24",
+            "checkedAt": "2026-09-27T10:06:34.555Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "http://oparl.dresden.de/bodies/0001/papers?page=2",
+            "checkedAt": "2026-09-27T10:06:34.555Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "freiburg",
+      "input": 1064,
+      "deduplicated": 1064,
+      "published": 1064,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:21:54.859Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Freiburg%2C+Baden-W%C3%BCrttemberg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:21:54.859Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 1031,
+          "publishedRecordCount": 1031,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-26T17:22:08.637Z",
+            "observedEnd": "2026-09-26T17:22:08.637Z",
+            "checkedAt": "2026-09-26T17:22:08.637Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-26T17:22:08.637Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:21:54.859Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Freiburg%2C+Baden-W%C3%BCrttemberg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:21:54.859Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A5-roadworks",
+          "status": "ok",
+          "recordCount": 21,
+          "publishedRecordCount": 21,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-04-26",
+            "observedEnd": "2026-10-12",
+            "checkedAt": "2026-09-27T10:06:36.200Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/roadworks",
+            "checkedAt": "2026-09-27T10:06:36.200Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A5-closure",
+          "status": "ok",
+          "recordCount": 4,
+          "publishedRecordCount": 4,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-14",
+            "observedEnd": "2026-10-05",
+            "checkedAt": "2026-09-27T10:06:36.239Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A5/services/closure",
+            "checkedAt": "2026-09-27T10:06:36.239Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-0",
+          "status": "partial",
+          "recordCount": 70,
+          "publishedRecordCount": 8,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-18T19:00:00+02:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
+            "checkedAt": "2026-09-27T10:06:45.153Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://ris.freiburg.de/oparl/body/FR/meeting",
+            "checkedAt": "2026-09-27T10:06:45.153Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-meeting-1",
+          "status": "partial",
+          "recordCount": 70,
+          "publishedRecordCount": 8,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-18T19:00:00+02:00",
+            "observedEnd": "2026-09-23T18:30:00+02:00",
+            "checkedAt": "2026-09-27T10:06:54.691Z",
+            "state": "partial",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://ris.freiburg.de/oparl/body/FR/meeting/page/2",
+            "checkedAt": "2026-09-27T10:06:54.691Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "oparl-paper-0",
+          "status": "not_checked",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-27T10:06:55.807Z",
+            "state": "not_checked",
+            "reason": "Existing published snapshot retained; identity checked against the pinned Body and retained source URLs, not a new request. 0 city council records withheld for missing/foreign binding. No new history window or upstream-empty claim."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://ris.freiburg.de/oparl/body/FR/paper",
+            "checkedAt": "2026-09-27T10:06:55.807Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        }
+      ]
+    },
+    {
+      "cityId": "strausberg",
+      "input": 147,
+      "deduplicated": 147,
+      "published": 147,
+      "quarantined": [],
+      "sources": [
+        {
+          "id": "nominatim",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:13:32.905Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:13:32.905Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "atlas",
+          "status": "ok",
+          "recordCount": 12,
+          "publishedRecordCount": 12,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2016-10-11",
+            "observedEnd": "2026-08-17",
+            "checkedAt": "2026-09-28T18:37:21.572Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://raw.githubusercontent.com/GiraeffleAeffle/ledger-of-life/26e1421270c67d6449afa8d4ddc908eff686595c/docs/research/STADTSTACK_ATLAS_AND_CCF_INTERFACES.md",
+            "checkedAt": "2026-09-28T18:37:21.572Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "atlas-map",
+          "status": "ok",
+          "recordCount": 12,
+          "publishedRecordCount": 12,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2016-10-11",
+            "observedEnd": "2026-08-17",
+            "checkedAt": "2026-09-28T18:37:21.590Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://raw.githubusercontent.com/GiraeffleAeffle/ledger-of-life/26e1421270c67d6449afa8d4ddc908eff686595c/docs/research/STADTSTACK_ATLAS_AND_CCF_INTERFACES.md",
+            "checkedAt": "2026-09-28T18:37:21.590Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "osm",
+          "status": "ok",
+          "recordCount": 110,
+          "publishedRecordCount": 110,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-28T18:37:25.186Z",
+            "observedEnd": "2026-09-28T18:37:25.186Z",
+            "checkedAt": "2026-09-28T18:37:25.186Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://www.openstreetmap.org/copyright",
+            "checkedAt": "2026-09-28T18:37:25.186Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "osm-boundary",
+          "status": "context_only",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-26T17:13:32.905Z",
+            "state": "not_checked",
+            "reason": "Auxiliary boundary context, not emitted civic records; no event coverage claimed."
+          },
+          "licence": "ODbL 1.0",
+          "licenceEvidence": {
+            "url": "https://nominatim.openstreetmap.org/search?q=Strausberg%2C+Brandenburg%2C+Deutschland&format=json&limit=1&polygon_geojson=1",
+            "checkedAt": "2026-09-26T17:13:32.905Z",
+            "note": "Recorded source licence: ODbL 1.0; retain its attribution and source-specific obligations."
+          }
+        },
+        {
+          "id": "autobahn-A10-roadworks",
+          "status": "ok",
+          "recordCount": 8,
+          "publishedRecordCount": 8,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-05-18",
+            "observedEnd": "2026-09-29",
+            "checkedAt": "2026-09-28T18:37:25.483Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/roadworks",
+            "checkedAt": "2026-09-28T18:37:25.483Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A10-closure",
+          "status": "ok",
+          "recordCount": 2,
+          "publishedRecordCount": 2,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-29",
+            "observedEnd": "2026-09-30",
+            "checkedAt": "2026-09-28T18:37:25.526Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A10/services/closure",
+            "checkedAt": "2026-09-28T18:37:25.526Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A11-roadworks",
+          "status": "ok",
+          "recordCount": 1,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-29",
+            "observedEnd": "2026-09-29",
+            "checkedAt": "2026-09-28T18:37:25.561Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/roadworks",
+            "checkedAt": "2026-09-28T18:37:25.561Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A11-closure",
+          "status": "empty",
+          "recordCount": 0,
+          "publishedRecordCount": 0,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": null,
+            "observedEnd": null,
+            "checkedAt": "2026-09-28T18:37:25.594Z",
+            "state": "empty",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A11/services/closure",
+            "checkedAt": "2026-09-28T18:37:25.594Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A12-roadworks",
+          "status": "ok",
+          "recordCount": 9,
+          "publishedRecordCount": 9,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-05-06",
+            "observedEnd": "2026-11-10",
+            "checkedAt": "2026-09-28T18:37:25.630Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/roadworks",
+            "checkedAt": "2026-09-28T18:37:25.630Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "autobahn-A12-closure",
+          "status": "ok",
+          "recordCount": 2,
+          "publishedRecordCount": 2,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-08-24",
+            "observedEnd": "2026-08-24",
+            "checkedAt": "2026-09-28T18:37:25.667Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://verkehr.autobahn.de/o/autobahn/A12/services/closure",
+            "checkedAt": "2026-09-28T18:37:25.667Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "straussee-monitoring",
+          "status": "ok",
+          "recordCount": 1,
+          "publishedRecordCount": 1,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2026-09-14",
+            "observedEnd": "2026-09-14",
+            "checkedAt": "2026-10-10T09:11:40.515Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "unknown",
+          "licenceEvidence": {
+            "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf",
+            "checkedAt": "2026-10-10T09:11:40.515Z",
+            "note": "No upstream redistribution licence is established in this source metadata; attribution-linked factual summaries only, not an open-licence assertion."
+          }
+        },
+        {
+          "id": "budget-ordinance",
+          "status": "ok",
+          "recordCount": 2,
+          "publishedRecordCount": 2,
+          "coverage": {
+            "requestedStart": null,
+            "requestedEnd": null,
+            "observedStart": "2025-01-01",
+            "observedEnd": "2026-01-01",
+            "checkedAt": "2026-10-10T09:11:40.645Z",
+            "state": "partial",
+            "reason": "Coverage derived from the retained dated snapshot; no complete requested history window was recorded."
+          },
+          "licence": "§ 5 UrhG – amtliches Werk",
+          "licenceEvidence": {
+            "url": "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf",
+            "checkedAt": "2026-10-10T09:11:40.645Z",
+            "note": "Recorded source licence: § 5 UrhG – amtliches Werk; retain its attribution and source-specific obligations."
+          }
+        }
+      ]
+    }
+  ],
+  "regional": {
+    "input": 44,
+    "published": 44,
+    "quarantined": []
+  },
+  "knowledge": {
+    "published": 232,
+    "municipalities": 9,
+    "districts": [
+      {
+        "id": "maerkisch-oderland",
+        "ags": "12064",
+        "municipalitiesRegistered": 45,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 3,
+        "municipalitiesAttempted": 3,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 3,
+        "publishedRecords": 117,
+        "quarantinedRecords": 10
+      },
+      {
+        "id": "herzogtum-lauenburg",
+        "ags": "01053",
+        "municipalitiesRegistered": 132,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 0,
+        "municipalitiesAttempted": 0,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 0,
+        "publishedRecords": 54,
+        "quarantinedRecords": 0
+      },
+      {
+        "id": "ludwigslust-parchim",
+        "ags": "13076",
+        "municipalitiesRegistered": 142,
+        "municipalitiesConfigured": 3,
+        "municipalitiesChecked": 0,
+        "municipalitiesAttempted": 0,
+        "municipalitiesWithRecords": 3,
+        "municipalitiesWithDatedStages": 3,
+        "documents": 0,
+        "publishedRecords": 61,
+        "quarantinedRecords": 0
+      }
+    ],
+    "models": [
+      {
+        "provider": "anthropic-subscription",
+        "model": "claude-haiku-5-5",
+        "tool": "claude-cli",
+        "toolVersion": "2.1.284",
+        "modelIdentitySha256": "6ae3029f7453e9d43b6063b78a71b0da9d005f0d153bf0bc37537fddf76f287d",
+        "modelIdentityBasis": "reported-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 160
+      },
+      {
+        "provider": "openai-subscription",
+        "model": "gpt-6-luna",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "528cdcfdb973025ede3e3d2363959b42c306767a9a4c8f6762ddc65db46bb35b",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 68
+      },
+      {
+        "provider": "openai-subscription",
+        "model": "gpt-6.1-sol",
+        "tool": "codex-cli",
+        "toolVersion": "0.160.0",
+        "modelIdentitySha256": "2b78e86c7ece3f127707a23a9296a0b502a546d95a8d4785eb968827761d39fc",
+        "modelIdentityBasis": "configured-cli-model-and-tool-version",
+        "faithfulnessThreshold": 0.8,
+        "publishedRecords": 4
+      }
+    ],
+    "graph": {
+      "entities": 178,
+      "edges": 9,
+      "recordsSha256": "bbf009635ce572ce27e0f7496bb3ac693ea54d5268d630b4a9f7d775598f32df"
+    },
+    "policy": "Original claims and actual model judgments, current source admission, sourced dates and authenticated multi-run lineage; no independent truth certification."
+  },
+  "summary": {
+    "publishedRecords": 14625,
+    "quarantinedRecords": 10,
+    "cities": 8,
+    "knowledgeMunicipalities": 9,
+    "districts": 3
+  }
+}

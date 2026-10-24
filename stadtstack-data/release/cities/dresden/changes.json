@@ -1,0 +1,375 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "dresden",
+      "recordType": "signal",
+      "previous": "8a14aca8a23ed18cb04383567e4850830c2d040b26672d6742d0f909ad0a93f3",
+      "current": "c931e91b4cd5805ff73fa9552ae90a7bc96029e56b3352ac855f37985d6ae441",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17012",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "143d4bc57f5b00e04ff9003d789f0c500680dcb6760f96c92ef695d130b5100d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17013",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "46d7466a1130165d07249e8282c9d2f41afccc2e888719204a35f1df606ddf46",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17014",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1bfee3f9236d383c6850659a4375bed80d200708d07fa36b9a651fedcf232d47",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17015",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c0b5f7971bd670eac87c4abb52dce2221c874ef04bbdfac6d4f2e89a2ffba1fd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17016",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d5f59aa303cdc76fdb47d6f2c003f07163f5ca09391d8e5cefea47fb68eb8fd1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17017",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e06879313cb9062c902d230d1cd4b83682b8a1e64b2d188ff85bf1d790264240",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17018",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5473b32e7100a3f1811992ca48d9ec3dab1e69b2c06761463abdf3780489f135",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17019",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2823e531541ce2f987da77693a8352908356aa32c1f9e8ff231b8d5578b74f14",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17020",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9a97be7187caf8559c682ec4fa4670e695739c371c3938342963eebeae54ab89",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17021",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6f6a5ec2b2017809934424efbe2c63d9b2e9b60b539024ad39ad8b730bf73d2d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ca38c4865e772c6cfdd5c66fd13c7cbb3af8c6192604541730acb2e492bcf39a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17022",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "64b729f28072cd07c908b7833ae22e07910f8021820105ea308a9c02c74feb0d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17023",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b5af3a02774c52fecb9efe3bc8405d5d8df2893f65530085ab73a0d645c4f9eb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17024",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "672d17b581b5f4286eb072268a5d2f4602a16da2071b756af325e5bf179e5de4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17025",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "73bf444181c1bba1e495205c73f8ff08d8fe77eb9b03b050bd515eae905036ef",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17026",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "03c6214306ca7a569490126cc52e0940ed58becd203af53f1dd538b58f7e289a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17027",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "dbfac5eb3ba7d6d56d5da5127ed27874f0249b6197653cdb66c19e828235066c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17028",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "858dce67e4471944ae4bf7202d9affe760245a827992bd374c195adac5b17190",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17029",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "826a84cee8ff09def2b1f23a2cf3b6db6367e96487cfe7b84fdef2d1b0098666",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17030",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f3ba2f4de36593511402022970d74481f58a5d8b223ce9d8b250120876e84803",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Foparl.dresden.de%2Fbodies%2F0001%2Fmeetings%2F17031",
+      "cityId": "dresden",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "255391a4b38e3661fbd12dd05e91224740dd554de50a3afffc8b1f91369dfa96",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c9654255cbc2389bdcdfd876bffa9145cb5c19fda2c27625ce2aece3fd929326"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

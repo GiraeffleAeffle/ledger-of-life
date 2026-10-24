@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry4c-stage-structured-parse-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T21:11:33.005Z",
+  "parentApproval": {
+    "id": "r1-k1-retry4-2026-10-14-amendment-2",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry4-2026-10-14-amendment-2.json",
+    "sha256": "29e763f3280a5b8c94c170e80f756edaa18b9732a8e26d8150ee021048ecb8f1",
+    "clause": "approved.additionalJobs[0]"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k1-retry4b-stage-acquisition-2026-10-14",
+      "sha256": "8b237889489b28e956d9270f6adbb4e09f6a7f87c76d4843b5dbef1f93128331"
+    },
+    {
+      "id": "r1-k1-retry4b-stage-structured-parse-2026-10-14",
+      "sha256": "63a92e0a838d89f113900c8beb295f4147d8d6d59bb88541fdc18a0c9361cffc"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 3a1e1b1 (municipal datencsv layout c578741+bca738c+2a2f950 reviewed YES after 3 rounds)",
+    "parserAuthorization": "image sha256:5bae2a15282fab6c81f9e35690703885705dbd2a656ce06e3490f996c53bbf08, contract 76b13fbc50a4b44ae825ed046df413261a000294a47376c91754ad4cf1f0dc3a; sentinels 29/30 (+1 Mac skip), 30/30, 17/17",
+    "representation": "f25ca9d224b5c7ab9646b196fee0d93d4785f806681aa1c0fbe19517a6b069f1 (run dd5fc119, source f6e0004c…)"
+  },
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "genesis",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-3a1e1b1/operator-registry-config.json",
+      "sha256": "bc8d96e10bd0b64401830c62529c07c4309c4556ced1345662475deadadd1284"
+    },
+    "jobKeys": [
+      "c52c9151c6815b6d1a6f618caa71ea86a610b665d50c093e94731c8f021014ca"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 240000,
+    "osDeadlineSeconds": 360,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 0
+  },
+  "cumulativeWithinK1": {
+    "wallSecondsUsedBefore": 1052,
+    "jobsIncludingThis": 10,
+    "k1MaxJobs": 10,
+    "k1TotalSeconds": 1500
+  }
+}

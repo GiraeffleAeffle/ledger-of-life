@@ -127,4 +127,3 @@ export function invitationPayload(value: string): { id: string; role: 'arbitrato
 }
 
 export const confirmationStalled = (startedAt: number, now: number) => now - startedAt >= 90_000;
-export const pollingPaused = (failures: number) => failures >= 3;

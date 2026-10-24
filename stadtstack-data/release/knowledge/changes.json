@@ -1,0 +1,797 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-12T16:39:32.359Z",
+  "snapshots": [
+    {
+      "cityId": "hagenow",
+      "recordType": "knowledge",
+      "previous": "ed3f9a9ceeea54ec43c318855424d8730489a7f7527c68f1122ad8d5c8a8a1d7",
+      "current": "c84defa0c024d9ba440815949fd0d918ac02186fc55d8e8d7a5d4585377aa24e",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "hoppegarten",
+      "recordType": "knowledge",
+      "previous": "1848388a9ab156277881dbf4125ff4230b0b7367e666a35dc94a160c1c721b81",
+      "current": "ffbbd64091d933bf856ed618ff2402ae33cf8274719a3fa248ffc577b610506e",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "previous": "0e5aa2c241e20b39a19e9929687eca56a174b00391c0014975877550ae7ea236",
+      "current": "2c8bd835e187f44dd07e25353026cf2792f9507e7fa78d1e51274a97407b3c84",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "moelln",
+      "recordType": "knowledge",
+      "previous": "4e9233510d651f286e8532c5eba0b52dcab504a6989261eef5cb0382b3d86544",
+      "current": "8d1ad5ec5c4348058a843947723f14316d25b374e095d2eb80a4192b870842f0",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "previous": "325acaf7b90d4453ac9e0763c4a1a47350905af90d0fec14774d8ebb116d0fa0",
+      "current": "34e3ca8129169f2451f898c5e8c1a1f18f52e9d3c24075363a3bfd3bfbd6c919",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "ratzeburg",
+      "recordType": "knowledge",
+      "previous": "6c1061710d6f89af2bf05ad02bdc385d93007b1f7ec147b56fac38afdd6d7cac",
+      "current": "6c1061710d6f89af2bf05ad02bdc385d93007b1f7ec147b56fac38afdd6d7cac",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "ruedersdorf-bei-berlin",
+      "recordType": "knowledge",
+      "previous": "efe1a6b3baad19eff57763e58a4bbd0d52f74f49c3c5ac2b644d9225c5db135b",
+      "current": "2bfe0ddd55ae6703ae7abf0faf82a7d81911fb7e8a2f88e989ab2c1f39e6ff73",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "schwarzenbek",
+      "recordType": "knowledge",
+      "previous": "2744311977da3198985d98c7ace2f027156df60d981249fff8a08c9b32d449cb",
+      "current": "2744311977da3198985d98c7ace2f027156df60d981249fff8a08c9b32d449cb",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    },
+    {
+      "cityId": "strausberg",
+      "recordType": "knowledge",
+      "previous": "2f316b2cbe170b81405be9f27eddca9ac43d4226cbd397276426074bb24b774b",
+      "current": "1f72d957fb4a7d09477ec4ca0ee3c44db51cb84694c8309b7c624a0ca102a8d1",
+      "generatedAt": "2026-10-12T16:39:32.359Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "knowledge:hagenow:a486dc62f60435dd2b652bef",
+      "cityId": "hagenow",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "5527474bd0fab7b915be2bed231bfac0c3bee0c672430cbaf8fde3928d0bbebc",
+        "sourceHashes": [
+          "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "cbe24b289ad0d4764c7e8203dcc8485e54ae98ccf3e5d0f9e8c8278046bd94c3",
+        "sourceHashes": [
+          "eb31f0734ec2d0c99a8e3879394e5fedbb9f18b4b49079f7ff32c847e477ecaf"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:hoppegarten:2df48a3f5e67a1a7479430e7",
+      "cityId": "hoppegarten",
+      "recordType": "knowledge",
+      "kind": "added",
+      "reason": "Record entered the published collection.",
+      "previous": null,
+      "current": {
+        "version": null,
+        "evidenceHash": "a636d3cd606795b115e57fcdebf5cc6a8cb54bdb3dd04a1056c4866289ea09e1",
+        "sourceHashes": [
+          "bf05f79ff385a3de82986d812e5f4405629b5445697f5c2ae853335a034d51ae"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:0931fb17ad835f47b914f4f4",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "3380e54f9685966e23c4e76f0b3f29b75ab36b88e6dcd1e326eb8c203e8b92df",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "c612c3a7a9545f2507f6629d3460fbdd04cb91e06ca4754d89f24edf9e38ee4b",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:279b952fdb4c8cec74455777",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "cc96ea9223a4ecfb2a8717692b329961e5ffe3549f1f930c099e8c586413c470",
+        "sourceHashes": [
+          "e6c2fd4052a76614dc7190257f4a07fb0f79da5523f8be20a43c47badef135e1"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "0006cf9f0e9cfa835bfae1d89595de84bd9be471c5d87b5f8dde42727f21c64f",
+        "sourceHashes": [
+          "e6c2fd4052a76614dc7190257f4a07fb0f79da5523f8be20a43c47badef135e1"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:7f7a8e32544cd657a9b5e61c",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "8c42f7bbf2d2e71e2d663d011e0570f220fda5801a78c72425a7d374b697a73d",
+        "sourceHashes": [
+          "ff631ebe94181637dfc97da006dd26edf917c9b1b498c76f66387eddc413d788"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "51e7b667132632a3e178571c70a0869d00832b942e98faed3b2caa3abcd2b0e8",
+        "sourceHashes": [
+          "ff631ebe94181637dfc97da006dd26edf917c9b1b498c76f66387eddc413d788"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:92571d07a37f004c82d62a06",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "c1571b0b85c0884a82142f5c463ca1fbc79c748e4db6050a2bd482381fb3f3b6",
+        "sourceHashes": [
+          "de1332202ea083799a513d0d2a5f84325cf5ee362b9e36c20e945f88b1167884"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "0cdbdbb6c8417715d8ad6610615a2f16d2a75cd1ad5fe12f5e34d8f4ebd42275",
+        "sourceHashes": [
+          "de1332202ea083799a513d0d2a5f84325cf5ee362b9e36c20e945f88b1167884"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:b10c0275f7da1c266bc7b9b7",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "4edbb989d8caed2aee7fabd99481d7e5c5d6a38bff8bcda61bd13d017d67237f",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "461d908949620c084db7f6e33c3faf925d8e91b86b5fec3bf3cbc2214425e1bf",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:b80505d7dd62fa0e3714849f",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "ac66ea9e4a6897cbb78fe3303a858d53152c172b3c2b682de88adba9de9874be",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "aa9cf5643e513ea1724d6e91555b5f5bcbc63bf0196099e9e4ee152048bdfcfe",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:c058b329a8f55b6a26a4304b",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "1cb2b3e0a8e2fbbd9ac1934f16c23356f4638caa73b360c915f15cc609d115ea",
+        "sourceHashes": [
+          "18ac8ad9c151f97ac31b3a37e5519a65edb54e510bae3156252f3a5c261449fd"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "c6d28bc89bab9664899b4bd38dd4906422b369aadc0ff4f83064b0df8cbd8097",
+        "sourceHashes": [
+          "18ac8ad9c151f97ac31b3a37e5519a65edb54e510bae3156252f3a5c261449fd"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ludwigslust:dc81ba0638c6291ecf518f66",
+      "cityId": "ludwigslust",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "b3eee8e17a8a73720a21b5f10b726cb563c3962ad80919983eaae5030a78b649",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "1d28fb2d9b9e03e89323910f9631fe6369a5ff6149485830f6c6f4a155b8b4ee",
+        "sourceHashes": [
+          "6481f7f3e8e134f56b4baefd1fef44c57eba1b98b34d63e16aaec2509ebd8185"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:moelln:179f5014236c930752747722",
+      "cityId": "moelln",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "3ab4241b182b38d57598f55f34024aec5a86c892cf648f624b0b9fbb83046d5e",
+        "sourceHashes": [
+          "4cd1bbfed520009bf5da5ddc6791ba1b84545d739d63ac3123fe861c973a9481"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "3100f7d6266baa8b564c0a90c2f22266514e8211b68d10891bfbe4abe14613c0",
+        "sourceHashes": [
+          "4cd1bbfed520009bf5da5ddc6791ba1b84545d739d63ac3123fe861c973a9481"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:moelln:8ae908afbba344a75e5c75fd",
+      "cityId": "moelln",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "8443063a71ea4088fa8af26f2da364f4a44a810e3fa374642afe9c8d3fe83007",
+        "sourceHashes": [
+          "e7c21c50f2d9de2b89472d1f593ead11e7c66476382e1398dd4813fd29043469"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "ba21a9390db4bb83d84aad6d977c5f1440af2e58bdda49313c5360e7c35ca130",
+        "sourceHashes": [
+          "e7c21c50f2d9de2b89472d1f593ead11e7c66476382e1398dd4813fd29043469"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:moelln:c3cb4f7d913d077b5ac1ed30",
+      "cityId": "moelln",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "e846752763fde8f272aa7cf4135faec55d1bc9c2f8a22b276085320986e3f08e",
+        "sourceHashes": [
+          "fe67bc2d1353ce82773790e8a777d385476cd3724c33d99d3f76972eedd08474"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "c7d6b7f2983c9cb9aed6ae364b219ba5574320f5627b79c6d0475024f5c956a0",
+        "sourceHashes": [
+          "fe67bc2d1353ce82773790e8a777d385476cd3724c33d99d3f76972eedd08474"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:moelln:e40ecd676cf04ba957c49427",
+      "cityId": "moelln",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "4be6ccf5675560f979a9478ab1c9dff9e549794fbe834dc66ff8726550abafba",
+        "sourceHashes": [
+          "5076a53d697f8905a4461d5d346e305c4c1697c51e0306de7b6cba009592ffd9"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "99b9461c0e78a77d9f97a7366ea220ee1e630c14798dd434c07025bac9dcb05b",
+        "sourceHashes": [
+          "5076a53d697f8905a4461d5d346e305c4c1697c51e0306de7b6cba009592ffd9"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:01f7f265ecde2bc598887f74",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "307628e095b2abb6c78671fa4ef5d640bb03605e016f90e217c55afb23d0377e",
+        "sourceHashes": [
+          "b3f8207b3da9dd8f2d6f7ace37e477a158475f288474774d82da31a609c31865"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "46e765f994cfdf3fc6192db316b5d35f9e0b4ebc9c880158b5ecf9f74015035a",
+        "sourceHashes": [
+          "b3f8207b3da9dd8f2d6f7ace37e477a158475f288474774d82da31a609c31865"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:0d1d6bfa9afc836ccba87121",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "7f60e0308318e385b3b3328c6713dc4879a1fc80a67fc35e8c5fc942513acddd",
+        "sourceHashes": [
+          "406777a7eb948721fddad091f4cf4b5d44950c9c4c26cee67cd21e90bf7effe0"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "f6f013a6634d93d6a016d38140e2d611ed6dcf71612e7992c95d250dbd47c2df",
+        "sourceHashes": [
+          "406777a7eb948721fddad091f4cf4b5d44950c9c4c26cee67cd21e90bf7effe0"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:5a08f67a7dadac5d32b3badf",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "054b30a5469516e27eeffd6694e1f4d6a2d92db9e0b470f204954dee879a1dd6",
+        "sourceHashes": [
+          "aa22c916e938f234dea0183c11f01badce1952cd0a52ec32fb967690e7c1f9fc"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "c852e122d1a2f588f02a8cc7d74301ac4bc8d67a4ace91a8abcb209296f3a3f9",
+        "sourceHashes": [
+          "aa22c916e938f234dea0183c11f01badce1952cd0a52ec32fb967690e7c1f9fc"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:7692484781a45fd3d759d7db",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "a00eec82df6356dbc08454aff66962ef577ad040363695eeee2cc98f667c4f06",
+        "sourceHashes": [
+          "e7fce03ccc4ae3a9d75066b009d5eaf782e84cb4c65026c7f8dfcfff0f298e9e"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "fe0bd66ba3c25441a012efe621abe291f58ff6dd7b5e3fbddc82c5a7758426cb",
+        "sourceHashes": [
+          "e7fce03ccc4ae3a9d75066b009d5eaf782e84cb4c65026c7f8dfcfff0f298e9e"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:a9cf88ad86fb463de0478250",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "2457edef61c7fd3b18775db1078e6c9197649aac1aec512ca9ba633466bd43e3",
+        "sourceHashes": [
+          "7bae89993cbca7e11dda9746f19e86c62d0a4df0dd6b2fdd1f009ce45b6ce2dd"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "4cf664a51d982925f5df2dc690ae30bdbe8704fe4a5d803c34036e665437a41b",
+        "sourceHashes": [
+          "7bae89993cbca7e11dda9746f19e86c62d0a4df0dd6b2fdd1f009ce45b6ce2dd"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:b0de2a2dc97318f8d61fbb26",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "72e318db9fd30d9281cd15d2ebb2ffffc0f9b8a44413e489bca8f34470c5d09e",
+        "sourceHashes": [
+          "c279768500ed5aad86664b88d48f8a6b31551325b3ed21a063212b0756de099e"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "f3c7d0120627b30244723e137b8e5174e4d8cc75d840a8f63f260e6c9df245e1",
+        "sourceHashes": [
+          "c279768500ed5aad86664b88d48f8a6b31551325b3ed21a063212b0756de099e"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:c456ad114d5671cbd21aa9c8",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "152f27e6ce9508761f987e58a75d66afac19535121cc0fa8238aa5cad0da75eb",
+        "sourceHashes": [
+          "969528e97b828192a24b349f3b32ac94c27e79759511496d33bf1d0bb7225d59"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "6edd6b3a28db8c51419a2f5c547f7f28bcc98263383335f2951bf8b7c7c49ed0",
+        "sourceHashes": [
+          "969528e97b828192a24b349f3b32ac94c27e79759511496d33bf1d0bb7225d59"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:c686955fbbf495d2dddd92e4",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "1123f941e49cffd4e3e74516c412cddf9832e9f1c4c66418f5e1e794d9dd2da0",
+        "sourceHashes": [
+          "112fc583dc7fb810742092150a1b56e7d97e119cf248d43cbfecd2689ce4836a"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "d17d95be84c5676ab6892084b97174abcf9d53802cc796b9b1288f789e79a9d0",
+        "sourceHashes": [
+          "112fc583dc7fb810742092150a1b56e7d97e119cf248d43cbfecd2689ce4836a"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:parchim:daacc1ecd554bf8e413f0652",
+      "cityId": "parchim",
+      "recordType": "knowledge",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": null,
+        "evidenceHash": "1a552c492d78bc51f68876cb8676799d9495dbfcc2aa832a581e60aa93b532c1",
+        "sourceHashes": [
+          "8c5e03b78ac09aea7167159f3b6a16bdd305d4e96cad386069cee0a48d64598a"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "5dffffc6aa21be95f535feaebdb1abca134bdfda645601ffa96ff05e8a7b8425",
+        "sourceHashes": [
+          "8c5e03b78ac09aea7167159f3b6a16bdd305d4e96cad386069cee0a48d64598a"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:ruedersdorf-bei-berlin:6830603afa7140836aefbaad",
+      "cityId": "ruedersdorf-bei-berlin",
+      "recordType": "knowledge",
+      "kind": "added",
+      "reason": "Record entered the published collection.",
+      "previous": null,
+      "current": {
+        "version": null,
+        "evidenceHash": "d90d56faf4f6b55bdff331f19b3402858190d14c51321ebf45be732148849bf7",
+        "sourceHashes": [
+          "52cb000660fcefdaadcf1204e49733f7ff54f0bacf3804bea868bcfce0c961a7"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:strausberg:312ccd92c53c6241c52e3349",
+      "cityId": "strausberg",
+      "recordType": "knowledge",
+      "kind": "superseded",
+      "reason": "The source explicitly replaces plan_area 68.6 ha with 41.5 ha for fnp:base:amendment:10 (2025-08-07).",
+      "previous": {
+        "version": null,
+        "evidenceHash": "a10003da8af7d63973ba0fc32a6ee6d9218a393afd2a17889dabc42bf6b838e6",
+        "sourceHashes": [
+          "5cb37bc02188cd24ad27884fb59163672b9860d05237e70cb2ad3e209437edc4"
+        ],
+        "metricClaims": [
+          {
+            "metric": "plan_area",
+            "unit": "ha",
+            "value": 68.6,
+            "scope": "fnp:base:amendment:10",
+            "scopeEvidence": {
+              "quote": "10. Änderung des Flächennutzungsplans",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            },
+            "instrument": "fnp:base:amendment:10",
+            "reportedAt": "2024-01-30",
+            "evidence": {
+              "quote": "Ziel des aktuell vorliegenden Änderungsentwurfes des FNP ist es, Baurecht\nfür die Errichtung einer großflächigen Freiflächen-Photovoltaikanlage\naktuell mit einer Gesamtfläche von ca. 68,6 ha zu schaffen.",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            }
+          }
+        ]
+      },
+      "current": {
+        "version": null,
+        "evidenceHash": "a10003da8af7d63973ba0fc32a6ee6d9218a393afd2a17889dabc42bf6b838e6",
+        "sourceHashes": [
+          "5cb37bc02188cd24ad27884fb59163672b9860d05237e70cb2ad3e209437edc4"
+        ],
+        "metricClaims": [
+          {
+            "metric": "plan_area",
+            "unit": "ha",
+            "value": 68.6,
+            "scope": "fnp:base:amendment:10",
+            "scopeEvidence": {
+              "quote": "10. Änderung des Flächennutzungsplans",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            },
+            "instrument": "fnp:base:amendment:10",
+            "reportedAt": "2024-01-30",
+            "evidence": {
+              "quote": "Ziel des aktuell vorliegenden Änderungsentwurfes des FNP ist es, Baurecht\nfür die Errichtung einer großflächigen Freiflächen-Photovoltaikanlage\naktuell mit einer Gesamtfläche von ca. 68,6 ha zu schaffen.",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            }
+          }
+        ]
+      },
+      "evidence": {
+        "recordId": "knowledge:strausberg:50a9c0720257cee32d5a37e7",
+        "sourceUrl": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347",
+        "sourceHash": "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55",
+        "replacementRecordId": "knowledge:strausberg:50a9c0720257cee32d5a37e7",
+        "kind": "text_model",
+        "quote": "In der Konkretisierung des Projektes wurde nach dem Vorentwurf der\nGeltungsbereich von ca. 68,6 ha auf nunmehr ca. 41,5 ha im südlichen Bereich\n\n2025-08-07_FNP-Strausberg-10-Änd_Entwurf\n\n5\n\nStadt Strausberg, 10. Änderung des Flächennutzungsplans\n\nAugust 2025\n\nreduziert."
+      },
+      "targetRevision": "current"
+    },
+    {
+      "id": "knowledge:strausberg:50a9c0720257cee32d5a37e7",
+      "cityId": "strausberg",
+      "recordType": "knowledge",
+      "kind": "added",
+      "reason": "Record entered the published collection.",
+      "previous": null,
+      "current": {
+        "version": null,
+        "evidenceHash": "bda69473128c9ee186ec9671f1a2fa4d1db767883bd4588f4e3765e51f123d5f",
+        "sourceHashes": [
+          "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55"
+        ],
+        "metricClaims": [
+          {
+            "metric": "plan_area",
+            "unit": "ha",
+            "value": 41.5,
+            "scope": "fnp:base:amendment:10",
+            "scopeEvidence": {
+              "quote": "10. Änderung des Flächennutzungsplans",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            },
+            "instrument": "fnp:base:amendment:10",
+            "reportedAt": "2025-08-07",
+            "evidence": {
+              "quote": "In der Konkretisierung des Projektes wurde nach dem Vorentwurf der\nGeltungsbereich von ca. 68,6 ha auf nunmehr ca. 41,5 ha im südlichen Bereich\n\n2025-08-07_FNP-Strausberg-10-Änd_Entwurf\n\n5\n\nStadt Strausberg, 10. Änderung des Flächennutzungsplans\n\nAugust 2025\n\nreduziert.",
+              "sourceIds": [
+                "strausberg-participation"
+              ]
+            },
+            "replaces": {
+              "value": 68.6,
+              "evidence": {
+                "quote": "In der Konkretisierung des Projektes wurde nach dem Vorentwurf der\nGeltungsbereich von ca. 68,6 ha auf nunmehr ca. 41,5 ha im südlichen Bereich\n\n2025-08-07_FNP-Strausberg-10-Änd_Entwurf\n\n5\n\nStadt Strausberg, 10. Änderung des Flächennutzungsplans\n\nAugust 2025\n\nreduziert.",
+                "sourceIds": [
+                  "strausberg-participation"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "knowledge:strausberg:6b1440a07dcb59a7efe8f26b",
+      "cityId": "strausberg",
+      "recordType": "knowledge",
+      "kind": "added",
+      "reason": "Record entered the published collection.",
+      "previous": null,
+      "current": {
+        "version": null,
+        "evidenceHash": "270ad5c4a65745b80fa9298d1df4d77b1c4e6740b1b413b48b9d316d5b2d3cb9",
+        "sourceHashes": [
+          "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

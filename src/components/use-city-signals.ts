@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react';
 import type { CityResult } from '../server/city';
 import type { SignalResult } from '../server/city-signals';
+import type { AuthorizedReadOptions } from './authorized-request';
 export { pinsKey } from './personal-map-storage.ts';
 
-export type AuthorizedRequest = <T = Record<string, unknown>>(path: string, body?: unknown) => Promise<T>;
+export type AuthorizedRequest = <T = Record<string, unknown>>(path: string, body?: unknown, options?: AuthorizedReadOptions) => Promise<T>;
 export const CITY_CHANGED_EVENT = 'ledger-personal-map-city-changed';
 export const PINS_CHANGED_EVENT = 'ledger-personal-map-pins-changed';
 let cityReads = new WeakMap<AuthorizedRequest, Promise<CityResult>>();

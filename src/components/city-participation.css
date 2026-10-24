@@ -64,6 +64,7 @@
 .civic-ai-job { padding: .85rem 0; border-bottom: 1px solid var(--line); }
 .civic-ai-attribution { padding: .8rem 1rem; background: var(--soft); border-left: 3px solid var(--trust); }
 .civic-ai-attribution > strong { color: var(--trust); }
+.civic-ai-sources { min-width: 0; overflow-wrap: anywhere; }
 .civic-ai-sources ul { padding-left: 1.2rem; margin: .5rem 0; }
 .civic-ai-sources li { padding: .35rem 0; }
 .civic-ai-recovery { margin: 1rem 0; padding: 1rem; border: 1px solid var(--line); border-radius: 10px; }

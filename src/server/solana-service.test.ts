@@ -1076,6 +1076,7 @@ test('RPC simulation atomically applies sponsor rent debit and fee without cross
     const fetcher = (async (_url: unknown, options?: RequestInit) => {
       const body = JSON.parse(String(options?.body));
       calls.push(body.method);
+      if (body.method === 'getGenesisHash') return Response.json({ result: f.config.genesisHash });
       assert.equal(body.method, 'simulateTransaction');
       const result = { context: { slot: bank }, value: {
         err: null,
@@ -1097,7 +1098,7 @@ test('RPC simulation atomically applies sponsor rent debit and fee without cross
     assert.equal((await gateway.simulate(bytes, payer, f.tenant.address)).slot, '51');
     completeEvidence = false;
     await assert.rejects(gateway.simulate(bytes, payer, f.tenant.address), /Atomic simulation native balances unavailable/);
-    assert.deepEqual(calls, Array(4).fill('simulateTransaction'));
+    assert.deepEqual(calls, ['getGenesisHash', ...Array(4).fill('simulateTransaction')]);
   } finally { await f.store.close(); }
 });
 

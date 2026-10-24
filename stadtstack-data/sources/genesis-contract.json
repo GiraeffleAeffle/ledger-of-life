@@ -1,0 +1,77 @@
+{
+  "contractVersion": "regionalstatistik-datencsv-v3",
+  "sourceId": "regionalstatistik-genesis",
+  "family": 1,
+  "wave": "A",
+  "implementation": "src/adapters/genesis.ts",
+  "exports": ["genesisAdapter", "createGenesisAdapter", "parseGenesisTable", "GENESIS_TABLES", "GENESIS_BASE", "GENESIS_VERSION"],
+  "catalogEvidence": {
+    "catalog": "CIVIC_SOURCE_CATALOG.md#regionalstatistik-genesis",
+    "csvSourceId": "regionalstatistik-genesis",
+    "publisher": "Statistische Ämter des Bundes und der Länder",
+    "documentationInspected": [
+      "https://www.statistikportal.de/de/open-data",
+      "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+      "https://www.statistikportal.de/sites/default/files/2026-05/%23%23Regio-Stat-Katalog2026.pdf",
+      "https://genesis.destatis.de/datenbank/online/docs/GENESIS-Webservices_Einfuehrung.pdf"
+    ],
+    "documentationCaveat": "The June 2026 Destatis manual applies analogously to GENESIS databases, but Regionalstatistik WADL remains authoritative for request parameters. Destatis-specific credentials, new flatfile schema and structureinformation availability are not assumed for Regionalstatistik."
+  },
+  "transport": {
+    "base": "https://www.regionalstatistik.de/genesisws/rest/2020/",
+    "operations": [
+      {"path": "metadata/table", "method": "POST", "contentType": "application/x-www-form-urlencoded", "role": "Native table metadata supplies the geographic variable code before data request discovery"},
+      {"path": "data/table", "method": "POST", "contentType": "application/x-www-form-urlencoded", "response": "JSON Ident/Status/Parameter/Object.Content containing native semicolon datencsv; optional Structure and TableLayout"},
+      {"path": "data/tablefile", "method": "POST", "contentType": "application/x-www-form-urlencoded", "response": "Native datencsv text or bounded ZIP containing exactly one CSV member", "format": "datencsv", "quality": "on"}
+    ],
+    "credentials": {"documentedHeaders": {"username": "GAST", "password": "GAST"}, "dataQueryExercised": false, "injectionOwner": "shared acquisition layer", "ownerAccount": {"decisionList": "src/source-policy.ts#APPROVED_OWNER_GENESIS_ACCESS", "default": "empty; no account use until explicit written owner approval is code-reviewed", "host": "www.regionalstatistik.de", "operations": ["data/table", "data/tablefile"], "permission": "facts_with_attribution", "credentialFile": "/home/max/.config/stadtstack/regionalstatistik/credentials.json", "tokenMode": "username header is the Regionalstatistik token; password header is empty", "passwordMode": "username and password headers are the owner's Regionalstatistik account", "audit": "authenticated_owner_account; decisionId; credentialKind token|password only", "redirects": "all authenticated redirects refused"}, "limitation": "ResourceReference never carries credentials or headers. Documented GAST/token header conventions are not assertions that live credentials, requests or quotas work."},
+    "networkInsideDiscoverOrParse": false,
+    "requestBounds": "Single explicit year, single exact GE AGS; native metadata must first confirm GEMEIN. Housing 31231-02-01 data/table explicitly requests format=datencsv and quality=on, compress=false, transpose=false, job=false. R2 draft covers all nine registered AGS for 2024; no guessed municipal-depth suffix, fallback data request or asynchronous source job.",
+    "cursor": "Adapter-owned request-reference pagination, not claimed publisher pagination. One reference per call, bound to admitted snapshot hash, full scope and request list."
+  },
+  "tables": [
+    {"id": "12411-06-01", "catalogPage": 44, "title": "Bevölkerung nach Geschlecht", "catalogGeography": "GE", "referenceDay": "06-30", "periodicity": "annual", "semantics": "Population stock at sole/main residence; sex dimensions remain source-coded. Not the year-end population table.", "methodology": "From reporting year 2022 population progression is based on Census 15 May 2022; comparability before/after 2016 is limited by method changes."},
+    {"id": "12411-02-03", "requestName": "12411-02-03-5", "requestNameBasis": "Explicit municipal-depth mapping admitted for owner-approved K1 retry4; live response remains unverified, no generic suffix inference.", "catalogPage": 46, "title": "Bevölkerung nach Geschlecht und Altersgruppen", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Source age-group and sex cells are distinct observations; no unobserved totals or denominator completion."},
+    {"id": "31231-02-01", "catalogPage": 190, "title": "Bestand an Wohngebäuden und Wohnungen in Wohn- und Nichtwohngebäuden", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Building/dwelling stock and housing-area measures are municipal reference-day context, not construction completion, occupancy, public ownership or impact. JSON requires exact corrected municipal GEMEIN selection/format; district rows and dates outside the requested reference year are held. All nine AGS are fixture-exercisable, not claimed source coverage."}
+  ],
+  "mapping": {
+    "nativeInputs": "Publisher WADL, native metadata/table JSON, native data/table JSON Object.Content, native tablefile datencsv; no normalized observations feed",
+    "tableIdentity": "GENESIS-Tabelle preamble and/or corrected Parameter.name resolve to the catalog ID; only 12411-02-03-5 maps explicitly to 12411-02-03. Full names are checked, unknown suffixes and conflicting catalog IDs fail closed. Native observation IDs retain the catalog ID.",
+    "geography": "Explicit eight-digit native AGS including leading zeroes; no name/postcode inference. Housing 31231 requires GE only and exact source scope: JSON Parameter.regionalkey must equal the requested town and matching GEMEIN Structure.Rows must be Selected=1. A district aggregate is held, not assigned to towns. Other catalog tables retain their existing separate GE/KR semantics.",
+    "referenceDate": "Exact source date must agree with catalog day. Year-only fields map via catalog table-specific reference day. RetrievedAt is never publication or reference date.",
+    "publicationDate": "Unknown/null, never borrowed from retrieval or table Stand timestamp",
+    "nativeDimensions": "Front columns and column headers stay in native observation identity, rowKey and exact source-cell evidence. TableLayout.FrontColumnsNumber is used where provided; bare datencsv requires explicit code+label front columns.",
+    "numericCells": "German decimal comma parsed without unit scaling; source lexeme retained. Anzahl, %, m², qm and 1000 m² unit labels are recognized only when explicit in native cells.",
+    "quality": "Missing/suppressed/non-applicable '.', '...', '/', 'x', 'X' and empty remain null with original sign. '-' alone is the statistical exact-zero sign. Unrecognized quality encodings hold the entire slice; no suppression recovery by subtraction.",
+    "structuredEvidence": "Original admitted bytes hash, archive member where applicable, decoded native CSV row/column coordinates (also for JSON Object.Content), raw values, header/front evidence, mapping/schema hash. No invented quotations, LLM or judge receipts.",
+    "coverage": "Successful nonempty slice is partial. A terminated recognized empty slice is empty, not universal absence. Native no-objects/error responses are held_quality or blocked_access, not withdrawal/tombstones. No parser result reports complete.",
+    "semanticProhibitions": ["project completion", "operator identity", "municipal asset ownership", "measured project effect", "town values derived from district totals"]
+  },
+  "bounds": {"inputBytes": 4194304, "expandedSelectedCsvBytes": 4194304, "rows": 20000, "columns": 128, "outputObservations": 10000, "zipSafety": "Shared readZip CRC/member/ratio/path/type/encryption validation; ambiguous multiple CSV members held"},
+  "rights": {
+    "documentedInterfaceLicence": "Datenlizenz Deutschland – Namensnennung – Version 2.0",
+    "evidence": "https://www.statistikportal.de/de/open-data",
+    "admission": "No R2 housing-stock distribution is admitted by this work. Caller must supply an admitted byte-bound current policy receipt; dataset exceptions and geobasis terms remain separate. Existing R1 population evidence does not establish housing coverage.",
+    "publicOutput": "Attributed facts only; no implied republication grant for whole snapshots"
+  },
+  "capabilityReceipt": {
+    "observed": ["Primary Open Data documentation read", "Regionalstatistik WADL methods/default GAST headers inspected", "Regio-Stat 2026 table geography and period definitions inspected", "Native GENESIS Object.Content/Structure/TableLayout examples inspected"],
+    "offlineImplemented": ["Snapshot-only metadata discovery", "Bounded POST request-reference pagination", "JSON/datencsv/ZIP parser", "Nine-town housing selection/year/format/date-role fixture definitions"],
+    "unverified": ["Current housing metadata query and table depth/layout", "Housing data/table POST", "Municipal filter behavior and real 31231 payloads", "All-town source completeness"],
+    "collectionPerformed": false,
+    "verificationRecord": "See docs/R2_STRUCTURED_SOURCES.md for actually exercised offline gates; no R2 source request or account use is implied.",
+    "limitations": ["No operational-adapter or source-completeness credit until admitted publisher snapshots are actually exercised", "Other CSV/flatfile schema versions, XLSX, GENML, opaque name-only tablefile geography and unknown quality markers are held rather than guessed", "Shared acquisition must set real identification, host lanes, policy and GAST headers", "No causal or civic stage conclusions from statistics"]
+  },
+  "pilotCoverage": [
+    {"municipality": "Strausberg", "ags": "12064472", "state": "not_checked"},
+    {"municipality": "Hoppegarten", "ags": "12064227", "state": "not_checked"},
+    {"municipality": "Rüdersdorf bei Berlin", "ags": "12064428", "state": "not_checked"},
+    {"municipality": "Ratzeburg", "ags": "01053100", "state": "not_checked"},
+    {"municipality": "Mölln", "ags": "01053090", "state": "not_checked"},
+    {"municipality": "Schwarzenbek", "ags": "01053116", "state": "not_checked"},
+    {"municipality": "Ludwigslust", "ags": "13076090", "state": "not_checked"},
+    {"municipality": "Parchim", "ags": "13076108", "state": "not_checked"},
+    {"municipality": "Hagenow", "ags": "13076060", "state": "not_checked"}
+  ],
+  "changelog": [{"date": "2026-10-11", "change": "Added deterministic native snapshot adapter and fixtures; all source coverage remained not_checked."}, {"date": "2026-10-14", "change": "Explicit 12411-02-03-5 municipal request mapping only; no generic depth suffix inference."}, {"date": "2026-10-24", "change": "R2: explicit datencsv/quality request and strict municipal selection/reference-year checks for existing housing table 31231-02-01, nine-town fixture/request-plan coverage; no acquisition, credentials read or source-completeness claim."}]
+}

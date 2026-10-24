@@ -1,0 +1,70 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
+import {ParserIsolationReasonSchema} from '../src/district-parser-isolation.ts';
+
+test('fixed parser worker classifies refusal and Node heap failures without exporting stderr',()=>{
+ const result=spawnSync('/usr/bin/python3',['-I','-S','-c',`
+import importlib.util, json, sys
+spec=importlib.util.spec_from_file_location('private_worker', sys.argv[1])
+worker=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(worker)
+policy='/opt/stadtstack/src/district-policy-inspection-worker.ts'
+cases=[
+ ('node',[policy],64,b'PRIVATE_SOURCE'),
+ ('node',['/another/worker.ts'],64,b'PRIVATE_SOURCE'),
+ ('node',[policy],1,b'PRIVATE_SOURCE'),
+ ('node',[policy],-6,b'FATAL ERROR: Reached heap limit Allocation failed - JavaScript heap out of memory PRIVATE_SOURCE'),
+ ('python3',[],1,b'FATAL ERROR: heap out of memory PRIVATE_SOURCE'),
+ ('node',[policy],1,b'heap out of memory PRIVATE_SOURCE'),
+]
+print(json.dumps([worker.command_failure_reason(*case) for case in cases]))
+`,fileURLToPath(new URL('../src/district-parser-worker.py',import.meta.url))],{encoding:'utf8',timeout:10000,maxBuffer:65536});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);
+ assert.deepEqual(JSON.parse(result.stdout),['request_rejected','command_failed','command_failed','heap_limit','command_failed','command_failed']);
+ assert.equal(result.stdout.includes('PRIVATE_SOURCE'),false);
+ assert.equal(ParserIsolationReasonSchema.safeParse('heap_limit').success,true);
+ assert.equal(ParserIsolationReasonSchema.safeParse('deadline').success,true);
+ assert.equal(ParserIsolationReasonSchema.safeParse('PRIVATE_SOURCE').success,false);
+});
+
+test('parser worker requires patched Node before readiness without parsing a source',()=>{
+ const result=spawnSync('/usr/bin/python3',['-I','-S','-c',`
+import importlib.util, json, sys, base64
+spec=importlib.util.spec_from_file_location('private_worker', sys.argv[1])
+worker=importlib.util.module_from_spec(spec)
+spec.loader.exec_module(worker)
+versions=['v22.23.4\\n','v22.24.0\\n','v24.22.1\\n','v24.23.0\\n','v22.23.3\\n','v22.22.99\\n','v24.21.0\\n','v24.22.0\\n','v20.99.99\\n','v25.0.0\\n','v24.22.1-rc.1\\n','24.22.1\\n','v24.022.1\\n']
+outcomes=[]
+for version in versions:
+ calls=[]
+ def probe(request):
+  calls.append(request)
+  return {'ok':True,'stdout':base64.b64encode(version.encode('ascii')).decode('ascii'),'stderr':''}
+ worker.run_tool=probe
+ try:
+  worker.assert_node_security_version()
+  outcomes.append(True)
+ except Exception:
+  outcomes.append(False)
+ assert calls==[{'tool':'node','args':['--version']}]
+worker.run_tool=lambda request: {'ok':False,'reason':'command_failed'}
+worker.assert_isolation=lambda: None
+worker.os.closerange=lambda *args: None
+worker.resource.setrlimit=lambda *args: None
+worker.signal.alarm=lambda *args: None
+worker.os.makedirs=lambda *args,**kwargs: None
+messages=[]
+worker.reply=lambda value: messages.append(value)
+try:
+ worker.main()
+ raise AssertionError('unpatched image became ready')
+except RuntimeError as error:
+ assert str(error)=='security_review_required'
+assert messages==[]
+print(json.dumps(outcomes))
+`,fileURLToPath(new URL('../src/district-parser-worker.py',import.meta.url))],{encoding:'utf8',timeout:10000,maxBuffer:65536});
+ assert.equal(result.error,undefined);assert.equal(result.status,0,result.stderr);
+ assert.deepEqual(JSON.parse(result.stdout),[true,true,true,true,false,false,false,false,false,false,false,false,false]);
+});

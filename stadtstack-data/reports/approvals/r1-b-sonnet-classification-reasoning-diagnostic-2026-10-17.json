@@ -1,0 +1,49 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-b-sonnet-classification-reasoning-diagnostic-2026-10-17",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-nine-town-models-2026-10-13 (#81) and r1-b-model-sonnet-2026-10-17 (#88) and the owner escalation statement; not a new owner approval and not a human review",
+ "issuedAt": "2026-10-17T13:19:51Z",
+ "fromProposal": {
+  "path": "/home/max/.local/state/stadtstack-data/r1-b-classification-reasoning-diagnostic/authority.proposal.json",
+  "sha256": "821bc40557a559d940201c6a78e4faa5074573973c79d66320ab4e0b84c6ecd7"
+ },
+ "ownerApproval": {
+  "id": "r1-b-model-sonnet-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-b-model-sonnet-2026-10-17.json",
+  "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+ },
+ "parentApproval": {
+  "id": "r1-nine-town-models-2026-10-13",
+  "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+ },
+ "ownerEscalationStatement": {
+  "id": "r1-owner-escalation-latitude-2026-10-17",
+  "path": "stadtstack-data/reports/approvals/r1-owner-escalation-latitude-2026-10-17.json",
+  "sha256": "57b65f432bacc055899f9d7c995202f9fcabb2f10d22c9921f464401bb6d7081"
+ },
+ "approved": {
+  "privateBModelDiagnostic": {
+   "models": [
+    "anthropic/claude-sonnet-5-5"
+   ],
+   "itemsSha256": "75e06ab8337c947052ed41138fef504dbb0000bd87d0909ce5f50efcedc5be19",
+   "maxModelCalls": 12,
+   "maxNewCallsPerItem": 1,
+   "expiresAt": "2026-10-17T20:00:00Z",
+   "normalSubscriptionOnly": true,
+   "extraUsage": false,
+   "productionEffects": false,
+   "serial": true
+  }
+ },
+ "executionRequirements": [
+  "Existing exclusive B-stage flock; verify zero leased B jobs and zero live omp-b containers before the first call; hold no longer than twenty minutes.",
+  "Exactly the frozen requests and evidence, compared against retained current outcomes; no new baseline, A or C calls.",
+  "B-owned control clarification only: exact source quotations may semantically establish normalized classifications; unsupported classification stays unresolved, not admitted.",
+  "Evaluate low/medium thinking only if the pinned runtime supports it without relaxing the decoder; freeze one candidate configuration and all reviewed hashes before any call.",
+  "PROMPTS.B, checker, schema, projection, protected replay set and assessment queue contract stay byte-identical.",
+  "Stop on subscription limits, policy/custody change, execution failure or unconfirmed cleanup; no retry/fallback; content-free diagnostics, actual token/time counters only."
+ ],
+ "reason": "Lead-requested paired comparison on six leading-prose JSON rejections and six caseType quote-null holds; determine whether B-only instruction/compatible thinking encoding improves valid source-grounded assessments without admitting unsupported classifications.",
+ "evidence": "BHoldAnalysis read-only decomposition of 30 B receipts 11:10Z-13:10Z: 9 supported; 6 invalid_json, all leading prose (1,323-2,826 UTF-16 units) before one complete JSON object; 14 accepted-JSON holds, all hold:insufficient_evidence with /caseType quote:null and no assertions emitted."
+}
