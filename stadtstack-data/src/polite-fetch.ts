@@ -34,6 +34,7 @@ import {persistCrawlRequestEvidence,persistOwnerAccountRequestEvidence,OwnerAcqu
 import {semanticHash} from './district-adapter-contract.ts';
 import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRobotsEvidence,readRegisteredRobotsAudit,registeredRobotsScope,registeredBobScope,REGISTERED_SOURCE_POLICY_VALIDITY_MS,PUBLIC_SOURCE_POLICY_VALIDITY_MS,type RegisteredRobotsAudit,type RegisteredSourceConfiguration} from './registered-source-policy.ts';
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
+import type {R2IntegrityGuard} from './r2-acquisition-integrity.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'inspection_failed'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
 export class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
@@ -41,12 +42,12 @@ export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
  status?:number;failure?:FetchFailure;retryAfter?:string;sha256?:string;bytes?:number;mimeType?:string;etag?:string;lastModified?:string;location?:string;policy?:SourceAccessPolicy;exclusion?:ExcludedDocument['exclusion'];
 }
-export interface FetchedDocument {url:string;sha256:string;localPath:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy?:SourceAccessPolicy}
+export interface FetchedDocument {url:string;sha256:string;localPath:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy?:SourceAccessPolicy;r2Integrity?:R2IntegrityGuard}
 type ValidatedPolicy={kind:'robots';value:RobotsPolicy}|{kind:'tdm';value:TdmRule[]};
 export interface ExcludedDocument {url:string;sha256:string;mimeType:string;retrievedAt:string;checkedAt:string;status:number;observationPath:string;policy:SourceAccessPolicy;sizeBytes:number;exclusion:{reason:'non_official_restricted';excludedAt:string;previousManagedCopy:'removed'|'retained_independent'|'not_managed'|'partial'}}
-export interface SourceContentBinding {url:string;sha256:string;observationPath:string;independentAllowed:boolean}
+export interface SourceContentBinding {url:string;sha256:string;observationPath:string;independentAllowed:boolean;r2Integrity?:R2IntegrityGuard}
 export function sourceContentBinding(document:FetchedDocument):SourceContentBinding {
- return {url:document.url,sha256:document.sha256,observationPath:document.observationPath,independentAllowed:!!document.policy&&effectiveSourcePermission(document.policy,document)};
+ return {url:document.url,sha256:document.sha256,observationPath:document.observationPath,independentAllowed:!!document.policy&&effectiveSourcePermission(document.policy,document),...(document.r2Integrity?{r2Integrity:document.r2Integrity}:{})};
 }
 export class PoliteFetchError extends Error {
  failure:FetchFailure;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;robotsEvidence?:PolicyEvidence;excludedDocument?:ExcludedDocument;
@@ -297,12 +298,13 @@ export class PoliteFetcher {
    catch(error){if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)throw error;throw new PoliteFetchError('host_state_unsafe','Immutable source observation is missing or invalid');}
    if(!sourceObservationMatches(observation,{url:binding.url,sha256:binding.sha256,mimeType:observation.mimeType,retrievedAt:observation.retrievedAt,checkedAt:observation.checkedAt,status:observation.status,sizeBytes:(await lstat(rawPath)).size,bodyState:'retained'}))throw new PoliteFetchError('host_state_unsafe','Immutable source observation binding mismatch');
    const proof:Extract<ManagedSourceBinding,{kind:'http_observation'}>={kind:'http_observation',url:binding.url,sourceSha256:binding.sha256,observationId:name,receiptSha256:hash(bytes)};
-   await assertManagedRawSourceBinding(rawPath,proof,this.policyOptions());
+   const r2Integrity=await assertManagedRawSourceBinding(rawPath,proof,this.policyOptions());
+   if(binding.r2Integrity&&JSON.stringify(binding.r2Integrity)!==JSON.stringify(r2Integrity))throw new PoliteFetchError('host_state_unsafe','Caller R2 guard differs from authenticated source provenance');
    const parsed=ContentFreeSourcePolicySchema.safeParse(observation.policy);
    if(!parsed.success)throw new PoliteFetchError('host_state_unsafe','Stored source policy is not safe complete metadata');
    if(!effectiveSourcePermission(parsed.data,binding))throw new PoliteFetchError('document_excluded','Stored source policy no longer permits derived-content reuse',undefined,parsed.data);
    for(const url of registeredSourcePolicyContextUrls(parsed.data,binding))await this.assertHostAllowed(url);
-   result.push(proof);
+   result.push({...proof,...(r2Integrity?{r2Integrity}:{})});
   }
   return result;
  }
@@ -529,8 +531,8 @@ export class PoliteFetcher {
   if(!this.publicPolicyFetcher||alreadyManaged)return persist();
   // A denial's actual observation bytes are inventoried as their OWN content
   // for custody/purge only, never as a fetched representation or admissible proof.
-  const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256;
-  return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false}],persist,this.policyOptions());
+  const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256,r2Integrity=this.policyOptions().r2Integrity;
+  return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false,...(r2Integrity?{r2Integrity}:{})}],persist,this.policyOptions());
  }
  private async policy(url:URL,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs):Promise<RobotsPolicy>{
   if(this.publicPolicyFetcher)return this.publicPolicyFetcher.policy(url,hostProfile,ttl);
@@ -874,17 +876,18 @@ export class PoliteFetcher {
      await this.observation(observation,observationPath,observationBytes,!!this.publicPolicyFetcher);
      if(!this.publicPolicyFetcher){await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=meta+'.'+randomUUID()+'.tmp';await writeFile(temporary,JSON.stringify(observation),{mode:0o600,flag:'wx'});await rename(temporary,meta);}
     };
-    const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256})};
+    const r2Integrity=this.policyOptions().r2Integrity;
+    const sourceEntry={kind:'http_observation' as const,relativePath:relative(this.cacheDir,localPath),contentSha256:sha256,sourceSha256:sha256,url:url.href,observationId:basename(observationPath),receiptSha256:hash(observationBytes),independentAllowed:checkTdm&&effectiveSourcePermission(policy,{url:url.href,sha256}),...(r2Integrity?{r2Integrity}:{})};
     await withManagedSourceWrite(this.cacheDir,[sourceEntry,...(this.publicPolicyFetcher?[{...sourceEntry,relativePath:relative(this.cacheDir,observationPath),contentSha256:hash(observationBytes),independentAllowed:false}]:[])],persist,this.policyOptions());
     if(checkTdm){
      try{
       const publicSelector=originalBody!==undefined&&![...new URLSearchParams(originalBody).keys()].some(key=>/^(?:username|user|password|secret|authorization|access_token|api_key|apikey|token|sessionid|phpsessid|cookie)$/i.test(key))&&String(policy.access)!=='authenticated_owner_account'?originalBody:null;
-      const evidence={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:{kind:'http_observation' as const,url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes)},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain};
+      const evidence={schemaVersion:'stadtstack-crawl-request-evidence-v1' as const,httpObservation:{kind:'http_observation' as const,url:url.href,sourceSha256:sha256,observationId:basename(observationPath),receiptSha256:hash(observationBytes),...(r2Integrity?{r2Integrity}:{})},request:{url:actualRedirectChain[0],method:originalMethod,contentType:originalBody===undefined?null:nativePublicRequestHeaders(publicUrl(actualRedirectChain[0]),originalMethod,originalBody,options.publicOperation)['Content-Type']??null,bodySha256:originalBody===undefined?null:hash(originalBody),publicSelector},redirectChain:actualRedirectChain};
       if(this.publicPolicyFetcher&&this.ownerAcquisitionProducer&&String(policy.access)==='authenticated_owner_account')await persistOwnerAccountRequestEvidence(this.cacheDir,{...evidence,producer:this.ownerAcquisitionProducer},this.policyOptions());
       else await persistCrawlRequestEvidence(this.cacheDir,evidence,this.policyOptions());
      }catch{throw new CrawlRequestEvidenceCaptureError();}
     }
-    return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(validatedPolicy?{validatedPolicy}:{})};
+    return {url:url.href,sha256,localPath,mimeType,retrievedAt,checkedAt,status:response.status,observationPath,policy:observation.policy,...(r2Integrity?{r2Integrity}:{}),...(validatedPolicy?{validatedPolicy}:{})};
    }catch(error){
     if(error instanceof CrawlRequestEvidenceCaptureError)throw error;
     if(error instanceof RequestAdmissionInterruption){Object.assign(policy,projectSourcePolicyMetadata(policy));observation.policy=policy;observation.state='failed';observation.failure='host_admission_deferred';await this.observation(observation);throw error;}

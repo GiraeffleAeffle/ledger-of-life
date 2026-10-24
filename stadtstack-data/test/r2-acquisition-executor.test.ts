@@ -8,13 +8,13 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {once} from 'node:events';
 import {R2AcquisitionExecutor,R2ExecutorError,type R2ManifestItem} from '../src/r2-acquisition-executor.ts';
-import {PoliteFetcher} from '../src/polite-fetch.ts';
+import {PoliteFetcher,sourceContentBinding} from '../src/polite-fetch.ts';
+import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import type {FetchObservation,FetchedDocument,PoliteFetcherOptions} from '../src/polite-fetch.ts';
 import {REVIEWED_REGISTERED_ROBOTS_SCOPES} from '../src/registered-source-policy.ts';
 import {assertR2ReferencesReleased} from '../src/r2-acquisition-integrity.ts';
-
 const sha=(bytes:Buffer|string)=>createHash('sha256').update(bytes).digest('hex');
 const draft=JSON.parse(await readFile(new URL('../reports/r2-district-source-fetch-security-release-v3.draft.json',import.meta.url),'utf8')) as Record<string,unknown>;
 function manifestRows():R2ManifestItem[]{const rows=draft.exactDocumentRequestAllowlist as Array<{url:string;candidateBindings:Array<{municipalityId:string;sourceId:string}>}>;return rows.flatMap(row=>row.candidateBindings.map(binding=>{const scope=REVIEWED_REGISTERED_ROBOTS_SCOPES.find(candidate=>candidate.municipalityId===binding.municipalityId&&candidate.sourceId===binding.sourceId);assert.ok(scope,`missing frozen test source ${binding.sourceId}`);return {url:row.url,sourceId:binding.sourceId,scope:{municipalityId:binding.municipalityId,sourceId:binding.sourceId,ags:scope.ags}};}));}
@@ -102,6 +102,35 @@ test('R2 executor refuses an off-list redirect before dispatch to localhost fixt
  assert.deepEqual(journal.at(-1).attempts.map((row:{url:string})=>new URL(row.url).pathname),['/robots.txt','/.well-known/tdmrep.json',new URL(manifestRows()[0]!.url).pathname]);
  assert.deepEqual(journal.at(-1).attempts.map((row:{status:number|null;failure:string|null;state:string})=>[row.status,row.failure,row.state]),[[200,null,'succeeded'],[404,'http_404','failed'],[302,null,'succeeded']]);
 });
+test('R2 fetch persists record-derived integrity through managed CAS and bound preparation reads',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'r2-executor-provenance-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const server=createServer((request,response)=>{if(request.url==='/robots.txt'){response.writeHead(200,{'content-type':'text/plain'});response.end('User-agent: *\nAllow: /\n');return;}if(request.url==='/.well-known/tdmrep.json'){response.writeHead(404);response.end();return;}response.writeHead(200,{'content-type':'text/html; charset=utf-8'});response.end('<!doctype html><html><body><p>Fixture civic source</p></body></html>');});
+ server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise<void>((resolve,reject)=>{server.closeAllConnections();server.close(error=>error?reject(error):resolve());}));
+ const address=server.address();assert.ok(address&&typeof address==='object');
+ const input=await options(root,true),policyOptions=await politeTestOptions({cacheDir:join(root,'cache'),fixtureInspection:fixturePolicyInspection});input.fetcherOptions=policyOptions;
+ interface ExecutorInternals{documents:Map<string,R2ManifestItem>;fetcher:PoliteFetcher}
+ const executor=await R2AcquisitionExecutor.open(input),internals=executor as unknown as ExecutorInternals,item=input.manifest[0]!,url=item.url;internals.documents.clear();internals.documents.set(url,item);
+ interface FixtureWire {
+  scheduled<T>(url:URL,work:(state:unknown)=>Promise<T>,onResult?:(result:T,state:unknown)=>void):Promise<T>;
+  wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},headers:Record<string,string>,onRefusedHeaders?:unknown,accountingUrl?:string):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>;
+  onWireAttemptResult(url:string,status:number|null,failure:string|null):Promise<void>;
+  onWireResponse(url:string,status:number,body:Buffer,contentType:string):Promise<void>;
+ }
+ const patch=t.mock.method(PoliteFetcher.prototype as unknown as {wire:(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined)=>Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>},'wire',async function(this:FixtureWire,requestUrl:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined){
+  const fixtureUrl=new URL(`http://127.0.0.1:${address.port}${requestUrl.pathname}${requestUrl.search}`);
+  return this.scheduled(requestUrl,async()=>{const response=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,requestUrl.href);await this.onWireAttemptResult(requestUrl.href,response.status,response.status>=400?`http_${response.status}`:null);await this.onWireResponse(requestUrl.href,response.status,response.body,response.headers['content-type']??'');return response;});
+ });
+ t.after(()=>patch.mock.restore());
+ const original=internals.fetcher.fetch.bind(internals.fetcher),fetched:FetchedDocument[]=[],capture=t.mock.method(internals.fetcher,'fetch',async(...args:Parameters<PoliteFetcher['fetch']>)=>{const document=await original(...args);fetched.push(document);return document;});
+ const run=await executor.run();assert.equal(run.completed,1);assert.equal(fetched.length,1);
+ const document=fetched[0]!,guard=document.r2Integrity;assert.ok(guard);assert.equal(guard.recordSha256,input.recordSha256);assert.equal(guard.manifestSha256,input.manifestSha256);assert.equal(guard.journalPath,input.journalPath);
+ const checked=await (internals.fetcher as unknown as {checkedSourceBindings(bindings:ReturnType<typeof sourceContentBinding>[]):Promise<Array<{r2Integrity?:typeof guard}>>}).checkedSourceBindings([sourceContentBinding({...document,r2Integrity:undefined})]);
+ assert.deepEqual(checked[0]?.r2Integrity,guard);
+ const bound=await readBoundSourceObservation({rawRoot:input.fetcherOptions.cacheDir,document:{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,checkedAt:document.checkedAt,status:document.status,observationPath:document.observationPath},policy:input.fetcherOptions.ownerPolicyLane});
+ assert.deepEqual(bound.binding.r2Integrity,guard);
+ await assert.rejects(readBoundSourceObservation({rawRoot:input.fetcherOptions.cacheDir,document:{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,checkedAt:document.checkedAt,status:document.status,observationPath:document.observationPath},policy:{...input.fetcherOptions.ownerPolicyLane,r2Integrity:{...guard,recordSha256:'0'.repeat(64)}}}));
+ capture.mock.restore();
+});
 
 test('R2 executor pauses after ten and quarantines changed R1 bytes without release',async t=>{
  const root=await mkdtemp(join(tmpdir(),'r2-executor-review-'));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -114,6 +143,7 @@ test('R2 executor pauses after ten and quarantines changed R1 bytes without rele
  const changedUrl=manifestRows()[0]!.url,changedInput=await options(changedRoot,true,{[changedUrl]:'0'.repeat(64)}),changedExecutor=await R2AcquisitionExecutor.open(changedInput),changedFetcher=(changedExecutor as unknown as {fetcher:PoliteFetcher}).fetcher;
  const changedMock=t.mock.method(changedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(body),localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath}));
  await assert.rejects(changedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1');
+ const changedState=changedExecutor as unknown as {current:{attempts:Array<{url:string;startedAt:string;bytes:number;status:number|null;failure:string|null;state:'started'|'succeeded'|'failed'}>;wireBytes:number};save():Promise<void>};changedState.current.attempts.push({url:changedUrl,startedAt:new Date().toISOString(),bytes:body.length,status:200,failure:null,state:'succeeded'});changedState.current.wireBytes+=body.length;await changedState.save();
  assert.equal((await changedExecutor.run()).paused,true);
  const sourceId=changedInput.manifest[0]!.sourceId,r1Sha256='0'.repeat(64),newSha256=sha(body),baseRelease={schemaVersion:'r2-changed-source-release-v1',id:'r2-changed-source-release',reviewedBy:'fixture reviewer',reviewedAt:new Date().toISOString(),reason:'Independent fixture review',representations:[{url:changedUrl,sourceId,sha256:newSha256,r1Sha256}]};
  await assert.rejects(assertR2ReferencesReleased([{id:sourceId,url:changedUrl,sha256:newSha256}],{journalPath:changedInput.journalPath,recordSha256:changedInput.recordSha256,manifestSha256:changedInput.manifestSha256}));
@@ -124,10 +154,18 @@ test('R2 executor pauses after ten and quarantines changed R1 bytes without rele
  }
  const releaseBytes=Buffer.from(JSON.stringify(baseRelease)),releasePath=join(changedRoot,'exact-release.json');await writeFile(releasePath,releaseBytes);const casRoot=join(changedInput.fetcherOptions.cacheDir,'sha256');await mkdir(casRoot,{recursive:true,mode:0o700});await writeFile(join(casRoot,newSha256),body);
  const released=await R2AcquisitionExecutor.open({...changedInput,changedReleasePath:releasePath,changedReleaseSha256:sha(releaseBytes)}),releasedFetcher=(released as unknown as {fetcher:PoliteFetcher}).fetcher,releasedCalls:string[]=[],releasedMock=t.mock.method(releasedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>{releasedCalls.push(url);return {url,sha256:newSha256,localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath};});
- const releasedRun=await released.run();assert.equal(releasedRun.paused,true);assert.equal(releasedRun.completed,10);assert.equal(releasedCalls.length,9);
+ const heldRun=await released.run();assert.equal(heldRun.paused,true);assert.equal(heldRun.completed,1);assert.equal(releasedCalls.length,0);
+ const heldJournal=JSON.parse((await readFile(changedInput.journalPath,'utf8')).trimEnd().split('\n').at(-1)!) as {checkpoint:{sequence:number;recordHash:string;digestSet:Record<string,string>}};
+ assert.equal(heldJournal.checkpoint!==null,true);
+ await new Promise(resolveDelay=>setTimeout(resolveDelay,3));
+ const resume={schemaVersion:'r2-acquisition-review-v1',releaseSha256:changedInput.recordSha256,manifestSha256:changedInput.manifestSha256,action:'resume',reviewedBy:'fixture reviewer',issuedAt:new Date().toISOString(),checkpointSequence:heldJournal.checkpoint.sequence,checkpointRecordHash:heldJournal.checkpoint.recordHash,digestSetSha256:sha(canonical(heldJournal.checkpoint.digestSet))},resumeBytes=Buffer.from(JSON.stringify(resume)),resumePath=join(changedRoot,'resume-review.json');await writeFile(resumePath,resumeBytes);
+ const resumed=await R2AcquisitionExecutor.open({...changedInput,changedReleasePath:releasePath,changedReleaseSha256:sha(releaseBytes),reviewPath:resumePath,reviewSha256:sha(resumeBytes)}),resumedFetcher=(resumed as unknown as {fetcher:PoliteFetcher}).fetcher,resumedMock=t.mock.method(resumedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>{releasedCalls.push(url);return {url,sha256:newSha256,localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath};});
+ const releasedRun=await resumed.run();assert.equal(releasedRun.paused,true);assert.equal(releasedRun.completed,10);assert.equal(releasedCalls.length,9);
  const journal=(await readFile(changedInput.journalPath,'utf8')).trimEnd().split('\n').map(row=>JSON.parse(row)).at(-1);
- assert.equal(journal.quarantined[changedUrl].reviewed,true);assert.equal(journal.completed[changedUrl].sha256,newSha256);changedMock.mock.restore();releasedMock.mock.restore();
+ assert.equal(journal.quarantined[changedUrl].reviewed,true);assert.equal(journal.completed[changedUrl].sha256,newSha256);changedMock.mock.restore();releasedMock.mock.restore();resumedMock.mock.restore();
  await assertR2ReferencesReleased([{id:sourceId,url:changedUrl,sha256:newSha256}],{journalPath:changedInput.journalPath,recordSha256:changedInput.recordSha256,manifestSha256:changedInput.manifestSha256,changedSourceReleasePath:releasePath,changedSourceReleaseSha256:sha(releaseBytes)});
+ await assert.rejects(assertR2ReferencesReleased([{id:'wrong-source',url:changedUrl,sha256:newSha256}],{journalPath:changedInput.journalPath,recordSha256:changedInput.recordSha256,manifestSha256:changedInput.manifestSha256,changedSourceReleasePath:releasePath,changedSourceReleaseSha256:sha(releaseBytes)}));
+ await assert.rejects(assertR2ReferencesReleased([{id:sourceId,url:changedUrl,sha256:'1'.repeat(64)}],{journalPath:changedInput.journalPath,recordSha256:changedInput.recordSha256,manifestSha256:changedInput.manifestSha256,changedSourceReleasePath:releasePath,changedSourceReleaseSha256:sha(releaseBytes)}));
 });
 
 test('R2 executor resumes a crash only after a checkpoint-bound review and skips completed URLs',async t=>{

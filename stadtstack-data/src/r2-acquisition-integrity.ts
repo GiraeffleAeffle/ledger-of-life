@@ -24,6 +24,12 @@ export async function assertR2ReferencesReleased(references:readonly {id:string;
   previousRecordHash=recordHash;latest=row;
  }
  if(!latest)throw Error('R2 acquisition journal is empty');
+ if(!latest.completed||typeof latest.completed!=='object'||Array.isArray(latest.completed))throw Error('R2 acquisition journal completed set is invalid');
+ const completed=latest.completed as Record<string,unknown>;
+ for(const reference of references){
+  const row=completed[reference.url];
+  if(!row||typeof row!=='object'||Array.isArray(row)||(row as Record<string,unknown>).sourceId!==reference.id||(row as Record<string,unknown>).sha256!==reference.sha256)throw Error('R2 source reference does not match the latest completed URL/source/digest journal entry');
+ }
  const held=Object.entries(latest.quarantined as Record<string,unknown>).map(([url,value])=>{
   if(!value||typeof value!=='object'||Array.isArray(value))throw Error('R2 quarantine journal entry is invalid');
   const row=value as Record<string,unknown>;

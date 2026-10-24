@@ -48,10 +48,11 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
     const acquired=await readBoundSourceObservation({rawRoot:options.rawRoot,document,policy,registeredSource:source});
     if(mimeType&&mimeType!==document.mimeType)throw Error('Source MIME conflict within identical-byte group');
     const bindingGuard='r2Integrity' in acquired.binding?acquired.binding.r2Integrity:undefined;
-    if(bindingGuard&&policy.r2Integrity&&JSON.stringify(bindingGuard)!==JSON.stringify(policy.r2Integrity))throw Error('Caller R2 integrity option differs from authenticated acquisition binding');
-    const r2Integrity=bindingGuard??policy.r2Integrity;
-    references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:acquired.policy,...(r2Integrity?{r2Integrity}:{})});
-    const bound= r2Integrity?{...acquired.binding,r2Integrity}:acquired.binding;
+    if(!bindingGuard)throw Error('R2 source is missing authenticated acquisition provenance');
+    if(policy.r2Integrity&&JSON.stringify(bindingGuard)!==JSON.stringify(policy.r2Integrity))throw Error('Caller R2 integrity option differs from authenticated acquisition binding');
+    const r2Integrity=bindingGuard;
+    references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:acquired.policy,...{r2Integrity}});
+    const bound={...acquired.binding,r2Integrity};
     sourceBindings.push(bound);
     acquisitionBindings.push(bound);
     bytes??=acquired.sourceBytes;mimeType??=document.mimeType;

@@ -757,7 +757,11 @@ async function locked<T>(options:CivicPolicyOptions,work:()=>Promise<T>,provisio
   }finally{const current=await lstat(path);if(!sameIdentity(original,current)||current.isSymbolicLink())throw new CivicPolicyStateError();await unlink(path);nextLockAttempt.set(state,performance.now()+50);}
  }finally{try{try{await stopWaiting();}finally{await handle?.close();}}finally{gate.resolve();finished.resolve();lifetime?.operations.delete(finished.promise);void queued.then(()=>{if(queues.get(state)===queued)queues.delete(state);});}}
 }
-function entryId(entry:Omit<Entry,'id'|'state'>):string{return digest(JSON.stringify([entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed]));}
+function entryId(entry:Omit<Entry,'id'|'state'>):string{
+ const identity=[entry.rootId,entry.relativePath,entry.contentSha256,entry.kind,entry.sourceSha256,entry.host,entry.urlSha256,entry.observationId??null,entry.receiptSha256??null,entry.publication??null,entry.snapshot??null,entry.purpose??null,entry.configurationSha256??null,entry.schemaContractSha256??null,entry.code??null,entry.approval??null,entry.independentAllowed];
+ if(entry.r2Integrity)identity.push(canonical(entry.r2Integrity));
+ return digest(JSON.stringify(identity));
+}
 function checkedRelative(root:Root,path:string,contentSha256:string,receiptSha256?:string):string{
  if(path.includes('\\')||path.includes('\0')||isAbsolute(path)||path.split('/').some(part=>!part||part==='.'||part==='..'||part.startsWith('.')))throw new CivicPolicyStateError();
  const derivedFetch=/^(?:oparl-bodies|frontiers)\/[a-f0-9]{64}\.json$/.test(path)||/^api-frontiers\/[a-f0-9]{64}-mv\.json$/.test(path)||/^oparl\/[a-f0-9]{64}\/(?:paper|meeting)\/page-\d+\.json$/.test(path)||/^observations\/[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json$/.test(path)||/^requests\/[a-f0-9]{64}\.json$/.test(path)||/^collections\/[a-z0-9][a-z0-9-]{0,159}-(?:collection\.json|signals\.geojson)$/.test(path);
@@ -1174,7 +1178,7 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
  await assertManagedSourceReadable(input,options);
  const authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  if(kind!==undefined&&(!bindings.length||bindings.some(binding=>binding.kind!==kind)))throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISMATCH');
- const key=(value:{kind:string;urlSha256:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.kind,value.urlSha256,value.sourceSha256,value.observationId??null,value.receiptSha256??null,value.publication??null,value.snapshot??null,value.purpose??null,value.configurationSha256??null,value.schemaContractSha256??null,value.code??null,value.approval??null]);
+ const key=(value:{kind:string;urlSha256:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown;r2Integrity?:R2IntegrityGuard})=>canonical([value.kind,value.urlSha256,value.sourceSha256,value.observationId??null,value.receiptSha256??null,value.publication??null,value.snapshot??null,value.purpose??null,value.configurationSha256??null,value.schemaContractSha256??null,value.code??null,value.approval??null,value.r2Integrity??null]);
  const registryDescriptorKey=(value:{kind:string;configurationSha256?:string;schemaContractSha256?:string;code?:unknown;approval?:unknown})=>canonical([value.configurationSha256,value.schemaContractSha256,value.code,value.approval]);
  await locked(policy,async()=>{
   const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('CONTENT_PROVENANCE_MISSING');
@@ -1235,6 +1239,7 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const relativePath=relative(root.path,path).split(sep).join('/'),entry=entriesAt(inventory,root.id,relativePath).find(item=>item.kind==='http_observation'&&item.state==='active'&&item.independentAllowed&&item.urlSha256===urlHash(binding.url)&&item.sourceSha256===proof.sourceSha256&&item.contentSha256===proof.sourceSha256&&item.observationId===binding.observationId&&item.receiptSha256===binding.receiptSha256);
   if(!entry||!/^sha256\/[a-f0-9]{64}$/.test(relativePath)||!/^[A-Za-z0-9][A-Za-z0-9._-]{0,159}\.json$/.test(binding.observationId))throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
+  if(binding.r2Integrity&&canonical(binding.r2Integrity)!==canonical(entry.r2Integrity))throw new CivicPolicyStateError('R2_SOURCE_PROVENANCE_MISMATCH');
   const observationBytes=(await fileBytes(join(root.path,'observations',binding.observationId),MAX_STATE)).bytes;
   if(digest(observationBytes)!==binding.receiptSha256)throw new CivicPolicyStateError('HTTP_OBSERVATION_BINDING_MISMATCH');
   let observation:z.infer<typeof observationSchema>;

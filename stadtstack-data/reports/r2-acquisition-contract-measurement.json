@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "r2-acquisition-contract-measurement-v1",
+  "branch": "r2-acquisition-executor",
+  "runtimeNode": "24.22.1",
+  "measurement": "Fresh-process import of src/district-r1.ts and call to acquisitionContract()",
+  "priorDraftAcquisitionContractSha256": "fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c",
+  "acquisitionContractSha256": "557404d95f1b77916eab6a6e2eae5c26013fe75f20b6d1a1d82ba25a28f116be",
+  "issues": "This pins the running acquisition contract only; it is not a full integrated 14-contract report, test evidence, or independent runtime/image approval."
+}

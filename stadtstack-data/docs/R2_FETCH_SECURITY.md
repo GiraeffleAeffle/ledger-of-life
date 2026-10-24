@@ -36,8 +36,13 @@ sha256}` entries; every exact manifest URL/source binding must be covered and
 `sha256:null` means no sealed R1 original was recorded for that URL. Its path
 and expected SHA-256 are explicit executor arguments and the record's inventory
 digest must match. The executor binds to SHA-256 of the complete raw issued
-record file. It rejects schema drift, hash mismatch, a not-yet-valid/expired
-window, or a manifest/inventory hash other than the issued reference. Paths and
+record file and rejects schema drift, hash mismatch, a not-yet-valid/expired
+window, or a manifest/inventory hash other than the issued reference. In
+addition, `runtimeRequirements.preparedContractsEvidence.acquisitionContractSha256`
+must equal the digest returned by the running `district-r1.ts` acquisition
+contract in a fresh process. `open()` checks that digest before constructing the
+fetcher; the complete raw issued-record hash consequently pins this runtime
+contract requirement together with the exact v3 draft values. Paths and
 expected hashes are explicit inputs, never inferred. The draft's
 `approvedBy:null`, empty issuance clock and `sourceFetchStopLifted:false` do not
 meet this contract. This describes the required later issuance record; it does
@@ -56,9 +61,16 @@ and rechecked against those limits immediately before release. The `r2Integrity`
 provenance is included in authenticated source references and managed-source
 bindings; preparation, inference, cache reads/writes and worker re-entry derive
 the integrity gate from those source references rather than trusting a caller
-option. Mixed, absent or mismatched R2 provenance is refused. A missing release
-keeps the representation held. Neither acquisition approval nor the ten-document
-batch review releases changed bytes. The ten-document checkpoint binds journal
+option. The executor derives this guard from the bound record/manifest/journal
+and forces it into PoliteFetcher; managed raw and observation admissions plus
+request-evidence bindings persist it in their inventory identity. Reads
+rederive the marker from authenticated inventory, require each reference to
+match the latest completed journal URL/source ID/digest, and require the exact
+changed release for a previously quarantined tuple. A caller cannot introduce
+or substitute the guard. Mixed, absent or mismatched R2 provenance is refused.
+A missing release keeps the representation held. Neither acquisition approval
+nor the ten-document batch review releases changed bytes.
+The ten-document checkpoint binds journal
 sequence, record hash and the complete digest set; a raw-hash-pinned review
 issued after that checkpoint is single-use. This mechanism covers already-known
 R1 original digests; it does not claim a semantic detector for anomalous

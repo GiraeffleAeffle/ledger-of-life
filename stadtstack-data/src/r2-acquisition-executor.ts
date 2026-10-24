@@ -5,6 +5,9 @@ import {chmod,copyFile,lstat,mkdir,open,readFile,realpath,rename,stat,writeFile}
 import {dirname,join,resolve} from 'node:path';
 import {PoliteFetcher,publicUrl,type PoliteFetcherOptions} from './polite-fetch.ts';
 import {z} from 'zod';
+import {acquisitionContract} from './district-r1.ts';
+import type {R2IntegrityGuard} from './r2-acquisition-integrity.ts';
+import {CIVIC_ACQUISITION_DECISION_ID} from './civic-opt-out.ts';
 
 const hash=(value:Buffer|string)=>createHash('sha256').update(value).digest('hex');
 const canonical=(value:unknown):string=>Array.isArray(value)?`[${value.map(canonical).join(',')}]`:value&&typeof value==='object'?`{${Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`:JSON.stringify(value);
@@ -104,7 +107,7 @@ export class R2AcquisitionExecutor{
   const priorR1:Record<string,string>={};
   for(const item of parsedManifest){const url=publicUrl(item.url).href,row=entries.get(url);if(url!==item.url||!row)throw new R2ExecutorError('R1_INVENTORY_COVERAGE','R1 digest inventory does not cover every exact manifest URL');if(!row.sourceIds.includes(item.sourceId))throw new R2ExecutorError('R1_INVENTORY_SCOPE','R1 digest inventory source binding differs from the acquisition manifest');if(row.sha256)priorR1[url]=row.sha256;}
   const path=resolve(options.recordPath),metadata=await lstat(path);if(!metadata.isFile()||metadata.isSymbolicLink()||await realpath(path)!==path)throw new R2ExecutorError('RELEASE_PATH_UNSAFE','Release record path is not a regular non-symlink file');
-  const record=await readIssuedRecord(path,options.recordSha256,options.manifestSha256,options.r1DigestInventorySha256);
+  const record=await readIssuedRecord(path,options.recordSha256,options.manifestSha256,options.r1DigestInventorySha256),contract=await acquisitionContract(),runtime=record.runtimeRequirements as {preparedContractsEvidence?:{acquisitionContractSha256?:string}}|undefined;if(runtime?.preparedContractsEvidence?.acquisitionContractSha256!==contract)throw new R2ExecutorError('ACQUISITION_CONTRACT_MISMATCH','Issued release acquisition contract digest differs from this runtime');
   return new R2AcquisitionExecutor(options,record,priorR1);
  }
  private constructor(options:R2ExecutorOptions,record:R2IssuedRecord,priorR1:Readonly<Record<string,string>>){
@@ -115,13 +118,15 @@ export class R2AcquisitionExecutor{
   this.documents=new Map(documentRows.map(row=>[row.url,options.manifest.find(item=>publicUrl(item.url).href===row.url)!]).filter((row):row is [string,R2ManifestItem]=>!!row[1]));
   if(this.documents.size!==documentRows.length||options.manifest.some(item=>!this.documents.has(publicUrl(item.url).href)||item.sourceId!==item.scope.sourceId||!candidateAllows(record,publicUrl(item.url).href,item)))throw new R2ExecutorError('MANIFEST_SCOPE_MISMATCH','Manifest URL/source/scope is not an exact released candidate binding');
   this.policies=new Set(policyRows.map(row=>row.url));
-  this.fetcher=new PoliteFetcher({...options.fetcherOptions,minDelayMs:Math.max(5000,options.fetcherOptions.minDelayMs??0),timeoutMs:25000,maxBytes:bounds.body,maxRedirects:bounds.redirects,beforeRequest:url=>this.beforeRequest(url),onResponseChunk:(url,bytes)=>this.onChunk(url,bytes),onWireAttemptResult:(url,status,failure)=>this.onWireAttemptResult(url,status,failure),onWireResponse:(url,status,body,contentType)=>this.onWireResponse(url,status,body,contentType)});
+  const guard:R2IntegrityGuard={journalPath:resolve(options.journalPath),recordSha256:options.recordSha256,manifestSha256:options.manifestSha256,...(options.changedReleasePath?{changedSourceReleasePath:resolve(options.changedReleasePath),changedSourceReleaseSha256:options.changedReleaseSha256}:{})};
+  const ownerPolicyLane={decisionId:CIVIC_ACQUISITION_DECISION_ID,...options.fetcherOptions.ownerPolicyLane,r2Integrity:guard};
+  this.fetcher=new PoliteFetcher({...options.fetcherOptions,ownerPolicyLane,minDelayMs:Math.max(5000,options.fetcherOptions.minDelayMs??0),timeoutMs:25000,maxBytes:bounds.body,maxRedirects:bounds.redirects,beforeRequest:url=>this.beforeRequest(url),onResponseChunk:(url,bytes)=>this.onChunk(url,bytes),onWireAttemptResult:(url,status,failure)=>this.onWireAttemptResult(url,status,failure),onWireResponse:(url,status,body,contentType)=>this.onWireResponse(url,status,body,contentType)});
  }
  async run():Promise<{completed:number;paused:boolean;stopped:boolean}>{
   if(this.running)throw new R2ExecutorError('GLOBAL_CONCURRENCY','Executor already has an active campaign');this.current=undefined;this.running=true;let releaseRunLock:(()=>Promise<void>)|undefined;
   try{
   releaseRunLock=await acquireRunLock(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256);
-  const journal=await loadJournal(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256);this.current=journal;if(journal.stopped)throw new R2ExecutorError('JOURNAL_STOPPED','Journal records a terminal stop');if(!recordWindowValid(this.record))return this.stop('RELEASE_EXPIRED');if(!this.startedProcess&&journal.attempts.length>0&&!journal.paused)await this.pauseWithCheckpoint(journal);if(!this.startedProcess&&journal.attempts.length)this.nextStart=Date.parse(journal.attempts.at(-1)!.startedAt)+bounds.spacing;this.startedProcess=true;
+  const journal=await loadJournal(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256);this.current=journal;if(journal.stopped)throw new R2ExecutorError('JOURNAL_STOPPED','Journal records a terminal stop');if(!recordWindowValid(this.record))return this.stop('RELEASE_EXPIRED');if(!this.startedProcess&&journal.attempts.length>0&&!journal.checkpoint)await this.pauseWithCheckpoint(journal);if(!this.startedProcess&&journal.attempts.length)this.nextStart=Date.parse(journal.attempts.at(-1)!.startedAt)+bounds.spacing;this.startedProcess=true;
   if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)return this.stop('TIME_BUDGET');
   if(await this.stopRequested())return this.stop('STOP_FILE');
   await this.releaseQuarantined(journal);
@@ -143,7 +148,7 @@ export class R2AcquisitionExecutor{
     if(journal.retainedBytes+bytes.length>bounds.retained)return this.stop('RETAINED_BYTE_BUDGET');
     journal.completed[url]={sha256:document.sha256,bytes:bytes.length,localPath:document.localPath,sourceId:item.sourceId};journal.retainedBytes+=bytes.length;journal.documentsSinceReview++;await this.save();
     if(journal.documentsSinceReview>=bounds.reviewBatch){await this.pauseWithCheckpoint(journal);return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};}
-   }catch(error){if(!(error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1'))journal.stopped=true;await this.save();throw error;}
+   }catch(error){if(journal.quarantined[url]){if(!(error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1'))throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is durably quarantined before normal source admission');throw error;}journal.stopped=true;await this.save();throw error;}
   }
   return {completed:Object.keys(journal.completed).length,paused:false,stopped:false};
   }finally{this.running=false;await releaseRunLock?.();}
@@ -158,7 +163,7 @@ export class R2AcquisitionExecutor{
   await mkdir(dirname(quarantinePath),{recursive:true,mode:0o700});
   try{const handle=await open(quarantinePath,'wx',0o600);try{await handle.writeFile(body);await handle.sync();}finally{await handle.close();}}
   catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await readFile(quarantinePath);if(hash(existing)!==sha256)throw new R2ExecutorError('QUARANTINE_CAS_MISMATCH','Existing quarantine object differs from changed representation');}
-  journal.quarantined[canonicalUrl]={sha256,r1Sha256:prior,bytes:body.length,localPath:quarantinePath,sourceId:item.sourceId,mimeType,reviewed:false};journal.paused=true;await this.save();
+  journal.quarantined[canonicalUrl]={sha256,r1Sha256:prior,bytes:body.length,localPath:quarantinePath,sourceId:item.sourceId,mimeType,reviewed:false};journal.paused=true;await this.save();throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is quarantined before managed source admission');
  }
  private async stopRequested(){try{await stat(this.options.stopFile);return true;}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return false;throw error;}}
  private async pauseWithCheckpoint(journal:Journal){
@@ -204,7 +209,7 @@ export class R2AcquisitionExecutor{
    if(journal.retainedBytes+held.bytes>bounds.retained)await this.stop('RETAINED_BYTE_BUDGET');
    held.reviewed=true;journal.completed[url]={sha256:held.sha256,bytes:held.bytes,localPath:casPath,sourceId:held.sourceId};journal.retainedBytes+=held.bytes;journal.documentsSinceReview++;
   }
-  if(Object.values(journal.quarantined).every(row=>row.reviewed)&&journal.documentsSinceReview<bounds.reviewBatch)journal.paused=false;
+  if(Object.values(journal.quarantined).every(row=>row.reviewed)&&journal.documentsSinceReview<bounds.reviewBatch&&!journal.checkpoint)journal.paused=false;
   await this.save();
  }
  private async stop(code:string):Promise<{completed:number;paused:boolean;stopped:boolean}>{this.current!.stopped=true;await this.save();throw new R2ExecutorError(code,`R2 acquisition stopped: ${code}`);}
