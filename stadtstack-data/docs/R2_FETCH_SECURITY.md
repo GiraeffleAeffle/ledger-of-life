@@ -369,7 +369,7 @@ used the explicit test-only localhost wire seam and isolated fixture authority;
 no civic source was fetched. All checks ran under
 `/home/max/.local/bin/stadtstack-cpu-slot` with `umask 022`, Node24.22.1 and
 worktree-local dependencies.
-The contract-cutover transition suite reports **6 tests: 5 passed, 0 failed,
+The contract-cutover transition suite reports **7 tests: 6 passed, 0 failed,
 1 skipped**; the skip is the explicitly pending Core v2 migration/old-reader
 integration and is not a passing gate. `tsc --noEmit` also passed after these
 cutover changes.
@@ -569,9 +569,12 @@ Follow this order:
   and every newly admitted R2 job must pass the current-generation check. The
   focused fixtures prove validator behavior, not live queue integration.
 - Core's v2 codec/migration source is not merged in this branch. The checker
-  fails closed until Core exposes its locked migration dry-run, and the valid
-  committed-v2 compatibility test is explicitly pending/skipped until that
-  source exists; after merge it must run and pass without a skip.
+  fails closed until Core exposes its locked migration dry-run. The committed-v2
+  integration, including a clock-advanced dry-run expiry case, remains
+  explicitly pending/skipped. Its negative reader is archived with historical
+  Core sources from pinned R1 commit `0526d11216592b23465f89cd7d780c956edcddff`;
+  after merge the test must run without a skip, retain the current Core positive
+  control and prove that pinned reader rejects v2.
 - The parser image must be rebuilt if its final image inputs/worker differ from
   the candidate, then independently reviewed with current real image/SBOM
   identity. The OMP runner/image/resolver/daemon review and both root-owned
@@ -582,6 +585,8 @@ Follow this order:
 - R2 v3 and the separate structured GENESIS v3 each need genuine owner/source
   proofs and explicit Main/lead issuance. Neither current draft status nor
   these offline tests imply permission to fetch or use GENESIS credentials.
-- This worktree's ordinary phase passed: **2,293 tests, 2,244 passed, 0 failed,
-  0 cancelled and 49 skipped**. One skip is the pending Core v2 integration
-  above; rerun ordinary on the clean integrated tree before freeze.
+- This worktree's ordinary phase reported **2,294 tests: 2,244 passed, 1 failed,
+  0 cancelled and 49 skipped**. The failure is the known base race in
+  `test/r1-step8-worker-diagnostics.test.ts:22`, addressed by the unmerged
+  `r2-step8-replay` slice. The skip is pending Core v2 integration. Rerun
+  ordinary on the clean integrated tree before freeze.

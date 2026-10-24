@@ -179,14 +179,17 @@ export function assertStep8R2DrainEvidence(input:Step8R2DrainEvidenceInput){
  * Core checks the current authority and raw inventory epoch under its exclusive
  * fence; callers cannot substitute a fabricated epoch result. */
 export async function assertStep8R2CutoverReady(input:Step8R2CutoverEvidenceInput){
- const evidence=assertStep8R2DrainEvidence({...input,now:Date.now()}),coreV2=civic as unknown as {
+ const pinnedInput:Step8R2CutoverEvidenceInput={observationBytes:Buffer.from(input.observationBytes),observationSha256:input.observationSha256,drainProofBytes:Buffer.from(input.drainProofBytes),drainSha256:input.drainSha256};
+ const evidence=assertStep8R2DrainEvidence({...pinnedInput,now:Date.now()});
+ const coreV2=civic as unknown as {
   migrateCivicPolicyInventoryV2:(options:CivicPolicyOptions&{drainPath:string;drainSha256:string;dryRun:true})=>Promise<unknown>;
  };
  if(typeof coreV2.migrateCivicPolicyInventoryV2!=='function')throw Error('R2 cutover requires the merged Core v2 migration validator');
  const current=R2CoreDryRunSchema.parse(await coreV2.migrateCivicPolicyInventoryV2({
   stateDir:evidence.observation.stateDir,authorityId:evidence.observation.authorityId,authoritySha256:evidence.observation.authoritySha256,
-  drainPath:evidence.observation.drainProofPath,drainSha256:input.drainSha256,dryRun:true,
+  drainPath:evidence.observation.drainProofPath,drainSha256:pinnedInput.drainSha256,dryRun:true,
  }));
  if(current.oldManifestSha256!==evidence.drain.inventorySha256)throw Error('R2 cutover requires fresh locked evidence and no active leases or old readers');
- return {observationSha256:input.observationSha256,authoritySha256:evidence.drain.authoritySha256,inventorySha256:evidence.drain.inventorySha256,drainSha256:input.drainSha256,observedAt:evidence.drain.observedAt,lockedInventorySha256:current.oldManifestSha256};
+ assertStep8R2DrainEvidence({...pinnedInput,now:Date.now()});
+ return {observationSha256:pinnedInput.observationSha256,authoritySha256:evidence.drain.authoritySha256,inventorySha256:evidence.drain.inventorySha256,drainSha256:pinnedInput.drainSha256,observedAt:evidence.drain.observedAt,lockedInventorySha256:current.oldManifestSha256};
 }

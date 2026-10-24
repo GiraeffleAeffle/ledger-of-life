@@ -3,20 +3,46 @@ import assert from 'node:assert/strict';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {createHash,randomUUID} from 'node:crypto';
 import {existsSync} from 'node:fs';
-import {mkdtemp,mkdir,readFile,rm,writeFile,lstat} from 'node:fs/promises';
-import {join} from 'node:path';
+import {mkdtemp,mkdir,readFile,rm,writeFile,lstat,symlink} from 'node:fs/promises';
+import {join,resolve} from 'node:path';
 import {tmpdir} from 'node:os';
-import {fileURLToPath} from 'node:url';
+import {fileURLToPath,pathToFileURL} from 'node:url';
 import {createStep8RecordedR1ProcessingPins,createStep8R2CurrentGeneration,assertStep8R1ReceiptRecordedPin,assertStep8R2JobCurrent,assertStep8R2DrainEvidence,assertStep8R2CutoverReady,STEP8_PROCESSING_CONTRACT_NAMES,STEP8_R2_DRAIN_EVIDENCE_MAX_AGE_MS} from '../src/r1-step8-current-policy.ts';
 import {StepReceiptSchema,encodeStepReceipt} from '../src/district-step-receipt.ts';
 import {digest} from '../src/district-adapter-contract.ts';
 import * as r1Core from '../src/civic-opt-out.ts';
-import {CivicPolicyStateError} from '../src/civic-opt-out.ts';
-import {createReadOnlyManagedSourceAudit} from '../src/r1-step8-managed-read-view.ts';
 import {ParserReviewSchema} from '../src/district-parser-isolation.ts';
 import {OmpReviewSchema} from '../src/district-omp-b-runner.ts';
 
-const repo=fileURLToPath(new URL('..',import.meta.url)),hash=(value:string)=>createHash('sha256').update(value).digest('hex');
+const repo=fileURLToPath(new URL('..',import.meta.url)),gitRoot=resolve(repo,'..'),hash=(value:string)=>createHash('sha256').update(value).digest('hex');
+const PINNED_R1_READER_COMMIT='0526d11216592b23465f89cd7d780c956edcddff';
+async function loadPinnedR1Reader(directory:string){
+ const archiveRoot=join(directory,'pinned-r1-reader');
+ await mkdir(archiveRoot,{mode:0o700});
+ const archive=execFileSync('git',['-C',gitRoot,'archive','--format=tar',PINNED_R1_READER_COMMIT,'stadtstack-data/package.json','stadtstack-data/src','stadtstack-data/regional'],{maxBuffer:64*1024*1024});
+ execFileSync('tar',['-xf','-','-C',archiveRoot],{input:archive});
+ const historicalRoot=join(archiveRoot,'stadtstack-data');
+ await symlink(join(repo,'node_modules'),join(historicalRoot,'node_modules'),'dir');
+ const core=await import(pathToFileURL(join(historicalRoot,'src/civic-opt-out.ts')).href) as unknown as {
+  readCivicPolicyInventory:(options:Record<string,unknown>)=>Promise<unknown>;
+  CivicPolicyStateError:new(code?:string)=>Error&{code:string};
+ };
+ const reader=await import(pathToFileURL(join(historicalRoot,'src/r1-step8-managed-read-view.ts')).href) as unknown as {
+  createReadOnlyManagedSourceAudit:(options:Record<string,unknown>)=>Promise<{finish:()=>Promise<void>}>;
+ };
+ return {core,reader};
+}
+test('pinned R1 reader loads its historical Core modules from the base commit',async()=>{
+ const directory=await mkdtemp(join(tmpdir(),'r1-pinned-reader-')),stateDir=join(directory,'policy'),authorityId='fixture:'+randomUUID();
+ try{
+  const historical=await loadPinnedR1Reader(directory),authority=await r1Core.provisionCivicPolicyAuthority({stateDir,authorityId}),policy={stateDir,authorityId,authoritySha256:authority.authoritySha256};
+  const current=await r1Core.readCivicPolicyInventory(policy),historicalInventory=await historical.core.readCivicPolicyInventory(policy) as {inventoryId:string};
+  assert.equal(historicalInventory.inventoryId,current.inventoryId);
+  const before=await readFile(join(stateDir,'inventory.json')),audit=await historical.reader.createReadOnlyManagedSourceAudit(policy);
+  await audit.finish();assert.deepEqual(await readFile(join(stateDir,'inventory.json')),before);
+ }finally{await rm(directory,{recursive:true,force:true});}
+});
+
 const contractSet=Object.fromEntries(STEP8_PROCESSING_CONTRACT_NAMES.map((name,index)=>[name,hash('R1:'+index)])) as Record<(typeof STEP8_PROCESSING_CONTRACT_NAMES)[number],string>;
 const receipt=()=>StepReceiptSchema.parse({version:'district-step-receipt-v1',canonicalizationVersion:'district-json-v1',id:randomUUID(),runId:randomUUID(),jobKey:hash('old-r1-job'),step:'residual_extract',lane:'residual_extraction',sourceId:'fixture-source',municipalityId:'fixture-town',attempt:1,leaseToken:'1',category:'production',dependencyReceiptIds:[],enqueuedAt:'2026-10-24T00:00:00.000Z',startedAt:'2026-10-24T00:00:00.000Z',finishedAt:'2026-10-24T00:00:01.000Z',queueWaitMs:0,elapsedMs:1000,cpuUserMicros:10,cpuSystemMicros:5,outcome:'succeeded',reasonCode:'completed',inputHashes:[],outputHashes:[],policyProofSha256:null,originProofSha256:null,versions:{},cache:{disposition:'miss',originalGenerationReceiptId:null},provider:null,counts:{bytes:null,pages:null,ocrPages:null,rows:null,spans:null,candidates:null,acceptedFacts:null,heldFacts:null,distinctCases:null}});
 
@@ -41,6 +67,7 @@ const v2CodecPath=new URL('../src/civic-inventory-codec-v2.ts',import.meta.url);
 test('PENDING Core v2 integration: valid committed manifest round-trips before the old R1 reader rejects it',{skip:existsSync(fileURLToPath(v2CodecPath))?false:'Pending merge of the Core v2 codec and migration API'},async()=>{
  const directory=await mkdtemp(join(tmpdir(),'r2-core-v2-reader-')),stateDir=join(directory,'policy'),authorityId='fixture:'+randomUUID();
  try{
+  const historical=await loadPinnedR1Reader(directory);
   // Core's v2 migration API is not exported in the R1 branch; this integration loads only after the v2 codec source is merged.
   const core=r1Core as unknown as {
    provisionCivicPolicyAuthority:(options:Record<string,unknown>)=>Promise<{authorityId:string;authoritySha256:string}>;
@@ -53,6 +80,9 @@ test('PENDING Core v2 integration: valid committed manifest round-trips before t
   const policy={stateDir,authorityId},authority=await core.provisionCivicPolicyAuthority(policy),corePolicy={...policy,authoritySha256:authority.authoritySha256},root=join(directory,'managed-root');
   await mkdir(root,{mode:0o700});await core.registerManagedCacheRoot(root,{...corePolicy,kind:'fetch'});
   const before=await core.readCivicPolicyInventory(corePolicy) as {inventoryId:string},inventoryPath=join(stateDir,'inventory.json'),oldInventoryBytes=await readFile(inventoryPath);
+  const historicalBefore=await historical.core.readCivicPolicyInventory(corePolicy) as {inventoryId:string};
+  assert.equal(historicalBefore.inventoryId,before.inventoryId,'pinned R1 Core reads the pre-migration inventory');
+  const historicalAudit=await historical.reader.createReadOnlyManagedSourceAudit(corePolicy);await historicalAudit.finish();
   const drain={schemaVersion:'civic-inventory-drain-v2',authoritySha256:authority.authoritySha256,inventorySha256:digest(oldInventoryBytes),observedAt:new Date().toISOString(),noReaders:true,noWriters:true,reference:'reviewed-fixture-drain',pendingScratch:[]};
   const drainProofBytes=Buffer.from(JSON.stringify(drain)),drainProofPath=join(directory,'drain.json'),drainSha256=digest(drainProofBytes);
   await writeFile(drainProofPath,drainProofBytes,{mode:0o600});
@@ -60,6 +90,12 @@ test('PENDING Core v2 integration: valid committed manifest round-trips before t
   await writeFile(observationPath,observationBytes,{mode:0o600});
   const script=join(repo,'scripts/r2-cutover-check.mjs'),check=JSON.parse(execFileSync(process.execPath,['--experimental-strip-types',script,observationPath,digest(observationBytes),drainSha256],{cwd:repo,encoding:'utf8'}));
   assert.equal(check.status,'cutover-ready');assert.equal(check.lockedInventorySha256,digest(oldInventoryBytes));
+  const originalDateNow=Date.now,validTime=Date.parse(drain.observedAt)+1000,expiredTime=validTime+STEP8_R2_DRAIN_EVIDENCE_MAX_AGE_MS+1;let dateReads=0;
+  try{
+   Date.now=()=>dateReads++===0?validTime:expiredTime;
+   await assert.rejects(assertStep8R2CutoverReady({observationBytes,observationSha256:digest(observationBytes),drainProofBytes,drainSha256}),/fresh locked evidence/);
+   assert.ok(dateReads>1,'Core dry-run crossed the pinned evidence validity window');
+  }finally{Date.now=originalDateNow;}
   const migrated=await core.migrateCivicPolicyInventoryV2({...corePolicy,drainPath:drainProofPath,drainSha256});
   assert.equal(migrated.status,'committed');
   const after=await core.readCivicPolicyInventory(corePolicy) as {inventoryId:string};
@@ -67,8 +103,10 @@ test('PENDING Core v2 integration: valid committed manifest round-trips before t
   assert.deepEqual(after,before,'Core v2 reader accepts the exact migrated logical inventory');
   const manifestBytes=await readFile(inventoryPath),manifest=codec.V2ManifestSchema.parse(JSON.parse(manifestBytes.toString('utf8')));
   assert.equal(manifest.inventoryId,before.inventoryId);
-  await assert.rejects(createReadOnlyManagedSourceAudit(corePolicy),error=>error instanceof CivicPolicyStateError);
-  assert.ok((await readFile(inventoryPath)).equals(manifestBytes),'the old R1 reader rejects without rewriting the committed v2 manifest');
+  const historicalRejection=(error:unknown)=>error instanceof historical.core.CivicPolicyStateError&&error.code==='CIVIC_POLICY_INVENTORY_UNAVAILABLE';
+  await assert.rejects(historical.core.readCivicPolicyInventory(corePolicy),historicalRejection);
+  await assert.rejects(historical.reader.createReadOnlyManagedSourceAudit(corePolicy),historicalRejection);
+  assert.ok((await readFile(inventoryPath)).equals(manifestBytes),'the pinned old R1 reader rejects without rewriting the committed v2 manifest');
  }finally{await rm(directory,{recursive:true,force:true});}
 });
 
