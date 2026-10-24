@@ -261,7 +261,7 @@ crash-resume without refetching completed URLs, and changed-byte quarantine
 without automatic release. The redirect integration test used a deterministic
 localhost HTTP fixture; budget, pause and resume tests exercised the explicit
 test seam. A fresh-process `acquisitionContract()` measurement is
-`256cf5a95c52cd1ce73127b6d6256f9de4dc3cd49a10b9ae61d243b1ce3e4c6b`.
+`5946022a8fa4d1098d19d09963efddbc519e97a498d349c4a0d059cc1023187e`.
 Still untested or not implemented: changed-source review release, refusal of
 quarantined representations by preparation/inference, cross-instance global
 in-flight exclusion and exact failure/status journal updates. These remain
