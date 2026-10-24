@@ -1,6 +1,6 @@
 # R1 VM lead resume brief
 
-Handoff requested by Main on **12 October 2026, Berlin**; status updated **23 October 2026**. This brief records the current R1 resume checkpoint. The active processing pin is `5a9a14c`; Step 7's 27 source seals and Window 20 policy refresh/reseals are complete. Step 8's latest attempt produced only a scratch candidate and stopped at the shared Core inventory cap; no `release/` was persisted. Step 9's static value-test forecast is **NO-GO**, not an executed evaluation. R1 is **not released**: deployment remains conditional on all gates, the frozen value test and owner sample audit. Never treat simulated values as real.
+Handoff requested by Main on **12 October 2026, Berlin**; status updated **24 October 2026**. R1 has completed Step 7's 27 source seals and Window 20 refresh/reseals, and demonstrated a chain from source acquisition through scratch publication. Step 8 did not persist an immutable candidate or replay; Step 9's static value forecast is **NO-GO**, not an executed evaluation. Owner decision #103 selected option C for R2. R1 is **not released**: release acceptance remains conditional on all gates, the frozen value test and owner sample audit. Never treat simulated values as real.
 Sections 5–7 preserve earlier handoff notes and are not current execution authorization; use §4 and the current Main-reviewed runbooks for the live sequence.
 
 ### VM lead checkpoint — 12 October 2026
@@ -150,10 +150,40 @@ Source-policy authority is VM-only: `/home/max/.local/state/stadtstack-data/civi
 3. **SS-01 security stop and SS-02 scope.** The `CVE-2026-111497` stop was addressed by identity-only response-encoding handling in `2a013a0`, with the review correction in `9e79524`; runtime is Node **24.22.1**, and Main issued security releases v1/v2. These are source-fetch/security controls, not a processing-pin change or R1 release. The acquisition contract changed; the other 13 processing contracts did not. SS-02 records changed Ludwigslust/Ratzeburg source representations later used by inference (17 Ludwigslust and one Ratzeburg cached inference record). This establishes changed bytes and subsequent use, not defacement, false claims, or admission to a release; no SS-02 gate has been implemented.
 4. **Structured renewal.** Owner decision **#96** authorized the bounded PEGEL/GENESIS renewal. The completed selection is `4d99aca3`; it binds selected parser evidence, not publication admission. The earlier K1 population remains complete: GENESIS `12411-02-03-5`, Strausberg, 31 December 2024, 27,719 residents, 18 rows/54 observations (request run `dd5fc119-38d8-417c-aa2d-8c1fc8518922`; parse run `3fe33cb6-fb63-4151-b56d-e94271c0d0af`).
 5. **Step 8 execution history and current boundary.** The 21 October execute first exited with a generic canonical-worker code 1 and no underlying worker diagnostic; later worker diagnostics preserve the original failure, and a synthetic heap failure was exercised, but the historical exit is not established as an OOM. The `w1` retry then refused because its controls omitted authenticated original-corpus inputs and the combined provenance exceeded Core's unchanged 16 MiB guard; the fix bound the full original corpus and partitioned provenance without relaxing that guard. `v3b` failed because the scrubbed environment supplied no PostgreSQL username; the retry used the explicit socket DSN/user. `v3c` found original `document:` aliases that did not join to an admission/disposition, leaving a document with neither; the fix added the alias join and carried publication-intake holds, composition-selected run/record/original-policy custody, and assessment identity through the projection. `v3d` hit `RangeError: Invalid string length` while serializing roughly 683 MB of duplicated disposition evidence; the fix uses compact shared `source-dispositions.json` / `exception-inventory.json` evidence and bounded artifact budgets. `v3e` passed its static precheck but execution stopped when the existing Core loader found **500,040** inventory entries against its **500,000** limit. This is a cardinality limit, not a worker-heap failure. Its measured scratch output covers seven municipalities (59 text and 54 structured records); no `release/` was persisted. The v3e failure is not fixed; the run is held pending an inventory design/owner decision.
-6. **Step 8 inventory and Step 9 value.** A read-only pin-original forecast estimates an upper bound of **739,605** inventory entries after a complete successful Step 8, versus the current 500,000 limit; a proposed 750,000 ceiling would leave only 10,395 entries, with no demonstrated Step 9 reserve. This is a forecast, not authorization to raise the limit or retire historical roots. The static Step9Harness value forecast is **NO-GO** on the current projected corpus; no frozen value test was executed. Owner decision **#103** on the next inventory/R2 course remains open; the current proposal recommends option **C** (straight to R2), with no source collection authorized by this status.
+6. **Step 8 inventory and Step 9 value.** A read-only pin-original forecast estimates an upper bound of **739,605** inventory entries after a complete successful Step 8, versus the current 500,000 limit; a proposed 750,000 ceiling would leave only 10,395 entries, with no demonstrated Step 9 reserve. This is a forecast, not authorization to raise the limit or retire historical roots. The static Step9Harness value forecast is **NO-GO** on the current projected corpus; no frozen value test was executed. Owner decision **#103**, answered on 24 October with “Please then continue with your recommendation,” selected option **C** (straight to R2). This does not authorize source collection.
 7. **Release sequence.** Owner release option B remains in force: deploy only if all gates, including the frozen value test, pass; owner sample audit follows. After that, Ops #84 and then Buzz. Neither Step 8 scratch output nor the Step 9 forecast constitutes release acceptance or hosted rollout authority.
 8. **Evidence pointers and gates.** Window-20 authorities, continuations and seals are captured in the private window-20 operator evidence and Vikunja #94; SS-01/SS-02 evidence is summarized in `docs/R1_FETCH_SAFETY.md`; the Step 8 execution and forecast are in the private session receipts, `docs/R1_STEP8_OPERATOR.md`, `R2-INVENTORY-NOTES.md` and `complete-pin-original-forecast.json`. The recorded full gate at `c24a49d` passed TypeScript with 0 errors and 1,827 tests (1,779 pass, 0 fail, 48 skipped). Parser authorization: image `sha256:d967b826a38f424e80a80ebac93e448caff791a0af7b0f24689a5660a1dc09e1`, contract `d89affbdb5c27b063f361e42843927db481360cdf265b53f1a1b005f377aeb1d`; sentinels 29/30 (+1 skip), 30/30 and 17/17. The omp-B review runner contract is `73ca00c82fb7542fbc4b5e41656ae17c6d84e688a83e79bec36f31279f50c0ad` (image `91c2c2c4…` unchanged). Owner records also include `r1-lead-hold-resume-policy-2026-10-15.json`, `r1-lock-recovery-2026-10-15.json`, `r1-autonomy-and-release-2026-10-14.json`, `r1-subscription-usage-autoresume-2026-10-14.json`, and K1 `r1-k1-retry3*` / `r1-k1-retry4*`.
    
+
+
+## R1 closure
+
+**Demonstrably achieved**
+
+- A source-evidence chain from acquisition through policy refresh, extraction/assessment, 27-source/208-document sealing and Step 8 scratch publication. The measured scratch projection covered seven municipalities, with 59 text and 54 structured records.
+- Step 8 defects were corrected as they were identified: worker diagnostics now retain failure information (the original generic worker exit is not proven to have been an OOM); original-corpus controls and provenance partitioning preserve the existing 16 MiB guard; the PostgreSQL connection uses an explicit socket DSN user; `document:` aliases, publication-intake holds, selected-run/original-policy custody and assessment identity are projected correctly; and duplicated disposition JSON was replaced by compact bounded evidence.
+- SS-01's identity-only response-encoding security fix, review correction and Node 24.22.1 cutover; Main issued source-fetch security releases v1/v2. This does not itself constitute an R1 publication or release.
+
+**Not achieved, and why**
+
+- No immutable persisted candidate, exact replay, frozen value test or R1 release. The v3e output remained in scratch; execution stopped because the actual inventory had **500,040** entries, exceeding Core's unchanged **500,000** limit by 40.
+- The capacity issue remains after reducing fan-out: pin-original avoids **484** copied assessment artifacts / **256,416** assessment bindings. Even with those copies avoided, the complete Step 8 upper-bound forecast is **739,605** entries. A proposed 750,000-entry limit leaves only **10,395** entries and no demonstrated Step 9 reserve. These are inventory measurements/forecasts, not a reason to raise the cap or remove historical roots without authorization.
+- Step 9's **NO-GO** is a static forecast from projected evidence, not a machine-executed value-test verdict. No published candidate or value-test result is claimed.
+
+**Moved to R2**
+
+The remaining Step 8 and Step 9 work, release acceptance, the Ops #84 package, Buzz agents and the owner decision on SS-02 move to R2. Owner #103 selected option C (straight to R2); this status grants no source collection or deployment authority.
+
+**Open closure work — läuft**
+
+- Full gate on `33fa1d3` — **läuft**; no result claimed here.
+- Overflow maintenance of failed Step 8 roots — **läuft**; no retirement or cleanup result claimed here.
+- SDK bump for Vikunja #95 — **läuft**; no result claimed here.
+- PR #7 integration — **läuft**; no merge result claimed here.
+- Remaining closure cleanup — **läuft**; no completion result claimed here.
+
+The ontology check found no R1 release/Step 8 realness claim needing correction: `docs/ONTOLOGY.md` explicitly labels the R1 Step 8 artifacts as implementation/prototype tooling, not a published or deployed release. `docs/ontology.yaml` and `docs/ONTOLOGY.md` remain unchanged.
+
 
 ## 5. Child slices frozen at handoff
 
@@ -328,3 +358,7 @@ Updated §4 to the active `5a9a14c` processing pin and `c3edd6cd…` catalogue; 
 ### 23 October 2026
 
 Updated §4 through the current checkpoint: Window 20 refresh/reseals and owner #90 disposition are complete; documented the SS-01 fixes/releases and limited SS-02 evidence; recorded structured renewal, Step 8 failures and fixes through the v3e 500,040-entry Core limit, scratch-only candidate counts, and the Step 9 static NO-GO forecast. The pin-original inventory forecast leaves inadequate/unmeasured Step 9 headroom under the proposed cap; owner decision #103 remains open with recommendation C. No release, hosted rollout, or actual frozen value-test result is claimed. No ontology concept changed; ontology files and the frozen rebuild plan remain untouched.
+
+### 24 October 2026 — R1 closure
+
+Recorded the owner's 24 October choice of option C for #103 and added an R1 closure summary distinguishing the acquisition-to-scratch-publication achievement from the missing immutable candidate, replay, value test and release. Explained the v3e inventory stop and fan-out/forecast limits; moved the remaining Step 8/9 and release sequence to R2, and marked the five open closure tasks **läuft** without claiming results. Checked ontology realness wording: it already distinguishes Step 8 tooling from a published release, so neither ontology file changed.
