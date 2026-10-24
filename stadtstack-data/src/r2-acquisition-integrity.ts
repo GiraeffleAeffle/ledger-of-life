@@ -20,7 +20,12 @@ export async function assertR2ReferencesReleased(references:readonly {id:string;
  let latest:Record<string,unknown>|undefined,sequence=0,previousRecordHash:string|null=null;
  for(const line of text.trimEnd().split('\n')){
   const row=JSON.parse(line) as Record<string,unknown>,recordHash=row.recordHash,{recordHash:_omit,...payload}=row;
-  if(row.schemaVersion!=='r2-acquisition-progress-v3'||row.sequence!==++sequence||row.previousRecordHash!==previousRecordHash||typeof recordHash!=='string'||sha(canonical(payload))!==recordHash||row.recordSha256!==guard.recordSha256||row.manifestSha256!==guard.manifestSha256||!row.quarantined||typeof row.quarantined!=='object'||Array.isArray(row.quarantined))throw Error('R2 acquisition journal identity, sequence, hash chain, or shape mismatch');
+  if(row.schemaVersion!=='r2-acquisition-progress-v3')throw Error('R2 acquisition journal schema mismatch');
+  if(row.sequence!==++sequence)throw Error(`R2 acquisition journal sequence mismatch (${String(row.sequence)} != ${sequence})`);
+  if(row.previousRecordHash!==previousRecordHash)throw Error('R2 acquisition journal previous-record hash mismatch');
+  if(typeof recordHash!=='string'||sha(canonical(payload))!==recordHash)throw Error('R2 acquisition journal record hash mismatch');
+  if(row.recordSha256!==guard.recordSha256||row.manifestSha256!==guard.manifestSha256)throw Error('R2 acquisition journal identity differs from the source guard');
+  if(!row.quarantined||typeof row.quarantined!=='object'||Array.isArray(row.quarantined))throw Error('R2 acquisition journal quarantine set is invalid');
   previousRecordHash=recordHash;latest=row;
  }
  if(!latest)throw Error('R2 acquisition journal is empty');

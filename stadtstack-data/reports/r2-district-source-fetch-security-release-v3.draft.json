@@ -134,8 +134,8 @@
     },
     "preparedContractsEvidence": {
       "path": "reports/r2-acquisition-contract-measurement.json",
-      "sha256": "306bce107a9c7cd8c16d25ea92eec7e9219603ee5af25e4340f0478d9af60a57",
-      "acquisitionContractSha256": "557404d95f1b77916eab6a6e2eae5c26013fe75f20b6d1a1d82ba25a28f116be",
+      "sha256": "5710b81394464a131e3f8b68a427314f97d55ac7e0d81effad3b51795eee86e2",
+      "acquisitionContractSha256": "990dff67d12796758e6c630a2e4aa821d53ca049af798008dd35dbf47f2eaa38",
       "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
       "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
       "meaning": "Acquisition contract freshly measured in Node24.22.1 on r2-acquisition-executor; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"

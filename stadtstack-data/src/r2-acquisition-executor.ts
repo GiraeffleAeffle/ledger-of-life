@@ -89,7 +89,7 @@ async function acquireRunLock(path:string,recordSha256:string,manifestSha256:str
 }
 export class R2ExecutorError extends Error{readonly code:string;constructor(code:string,message:string){super(message);this.name='R2ExecutorError';this.code=code;}}
 export class R2AcquisitionExecutor{
- private readonly documents:Map<string,R2ManifestItem>;private readonly policies:Set<string>;private readonly record:R2IssuedRecord;private readonly priorR1:Readonly<Record<string,string>>;private readonly fetcher:PoliteFetcher;private readonly options:R2ExecutorOptions;private current?:Journal;private nextStart=0;private running=false;private startedProcess=false;
+ private readonly documents:Map<string,R2ManifestItem>;private readonly policies:Set<string>;private readonly record:R2IssuedRecord;private readonly priorR1:Readonly<Record<string,string>>;private readonly fetcher:PoliteFetcher;private readonly options:R2ExecutorOptions;private current?:Journal;private nextStart=0;private running=false;private startedProcess=false;private saveTail:Promise<void>=Promise.resolve();
  static async open(options:R2ExecutorOptions):Promise<R2AcquisitionExecutor>{
   if(!/^[a-f0-9]{64}$/.test(options.recordSha256)||!/^[a-f0-9]{64}$/.test(options.manifestSha256)||!/^[a-f0-9]{64}$/.test(options.r1DigestInventorySha256))throw new R2ExecutorError('RELEASE_HASH_MISMATCH','Expected SHA-256 values are malformed');
   if(!!options.reviewPath!==!!options.reviewSha256||!!options.changedReleasePath!==!!options.changedReleaseSha256)throw new R2ExecutorError('REVIEW_BINDING_INCOMPLETE','Review and changed-source release paths require their exact expected file hashes');
@@ -183,7 +183,7 @@ export class R2AcquisitionExecutor{
    return digest;
   }catch{return;}
  }
- private async save(){if(this.current)await persistJournal(this.options.journalPath,this.current);}
+ private async save(){const journal=this.current;if(journal){const queued=this.saveTail.then(()=>persistJournal(this.options.journalPath,journal));this.saveTail=queued;await queued;}}
  private async releaseQuarantined(journal:Journal){
   const pending=Object.entries(journal.quarantined).filter(([,row])=>!row.reviewed);if(!pending.length)return;
   if(!this.options.changedReleasePath||!this.options.changedReleaseSha256)return;
