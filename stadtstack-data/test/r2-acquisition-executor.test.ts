@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
+import {spawn} from 'node:child_process';
 import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
@@ -149,11 +150,14 @@ test('R2 executor resumes a crash only after a checkpoint-bound review and skips
 test('R2 executor excludes a second instance on the same bound journal',async t=>{
  const root=await mkdtemp(join(tmpdir(),'r2-executor-lock-'));t.after(()=>rm(root,{recursive:true,force:true}));
  const input=await options(root,true),body=Buffer.from('<html>lock</html>'),bodyPath=join(root,'lock.html');await writeFile(bodyPath,body);
- const first=await R2AcquisitionExecutor.open(input),second=await R2AcquisitionExecutor.open(input);
+ const first=await R2AcquisitionExecutor.open(input);
  const fetcher=(first as unknown as {fetcher:PoliteFetcher}).fetcher;let enter!:()=>void,unlock!:()=>void,waiting=true;
  const entered=new Promise<void>(resolveEntered=>{enter=resolveEntered}),gate=new Promise<void>(resolveGate=>{unlock=resolveGate});
  const mock=t.mock.method(fetcher,'fetch',async(url:string):Promise<FetchedDocument>=>{if(waiting){waiting=false;enter();await gate;}return {url,sha256:sha(body),localPath:bodyPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:bodyPath};});
  const active=first.run();await entered;
- await assert.rejects(second.run(),error=>error instanceof R2ExecutorError&&error.code==='RUN_LOCKED');
- unlock();await active;mock.mock.restore();
+ const script=`import {pathToFileURL} from 'node:url';const {R2AcquisitionExecutor}=await import(pathToFileURL(process.cwd()+'/src/r2-acquisition-executor.ts'));const executor=await R2AcquisitionExecutor.open(JSON.parse(process.env.R2_EXECUTOR_OPTIONS));executor.fetcher.fetch=async()=>{throw Error('unexpected network seam invocation')};try{await executor.run();console.log('RUN_COMPLETED')}catch(error){console.log(error.code??error.message)}`;
+ const child=spawn(process.execPath,['--input-type=module','-e',script],{cwd:process.cwd(),env:{...process.env,R2_EXECUTOR_OPTIONS:JSON.stringify(input)},stdio:['ignore','pipe','pipe']});
+ const outcome=await new Promise<{code:number|null;stdout:string;stderr:string}>((resolveChild,rejectChild)=>{let stdout='',stderr='';child.stdout.setEncoding('utf8').on('data',chunk=>stdout+=chunk);child.stderr.setEncoding('utf8').on('data',chunk=>stderr+=chunk);child.once('error',rejectChild);child.once('exit',code=>resolveChild({code,stdout,stderr}));});
+ try{assert.equal(outcome.code,0,outcome.stderr);assert.equal(outcome.stdout.trim(),'RUN_LOCKED');}finally{unlock();}
+ await active;mock.mock.restore();
 });
