@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mkdtemp,readFile,rm,writeFile,realpath,mkdir,chmod,readdir} from 'node:fs/promises';
 import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
-import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl,sourceContentBinding} from '../src/polite-fetch.ts';
+import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl,sourceContentBinding,assertSourceFetchNodeVersion} from '../src/polite-fetch.ts';
 import {isPublicAddress} from '../src/public-address.ts';
 import type {FetchObservation,ExcludedDocument,PoliteFetcherOptions,RobotsPolicy} from '../src/polite-fetch.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
@@ -25,6 +25,28 @@ import {genesisOwnerAccountRoot} from '../src/genesis-owner-acquisition.ts';
 import {recordedPolicyIdentity} from '../src/district-policy-refresh.ts';
 import {createServer} from 'node:http';
 import zlib from 'node:zlib';
+import https from 'node:https';
+import {syncBuiltinESMExports} from 'node:module';
+
+test('source acquisition requires a patched reviewed LTS Node runtime',()=>{
+ for(const version of ['22.23.4','22.24.0','24.22.1','24.23.0'])assert.doesNotThrow(()=>assertSourceFetchNodeVersion(version));
+ for(const version of ['22.23.3','22.22.99','24.21.0','24.22.0','20.99.99','23.99.99','25.0.0','24.22.1-rc.1','v24.22.1','24.022.1','24.22.9007199254740992'])assert.throws(()=>assertSourceFetchNodeVersion(version),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+});
+
+test('HTTPS wire explicitly verifies certificates and enforces TLS1.2 even with an insecure host environment',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'polite-tls-options-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ const fetcher=await createPoliteFetcher({cacheDir:root}),sentinel=new Error('fixture stops before TLS/network');
+ let received:unknown;
+ const spy=t.mock.method(https,'request',(_url:unknown,options:unknown)=>{received=options;throw sentinel;});
+ syncBuiltinESMExports();
+ const previous=process.env.NODE_TLS_REJECT_UNAUTHORIZED;process.env.NODE_TLS_REJECT_UNAUTHORIZED='0';
+ t.after(()=>{spy.mock.restore();syncBuiltinESMExports();if(previous===undefined)delete process.env.NODE_TLS_REJECT_UNAUTHORIZED;else process.env.NODE_TLS_REJECT_UNAUTHORIZED=previous;});
+ interface TlsWireSeam {wireRequest(url:URL,method:'GET',body:undefined,validators:undefined,pinned:{address:string;family:number},headers:Record<string,string>):Promise<WireResult>}
+ await assert.rejects((fetcher as unknown as TlsWireSeam).wireRequest(new URL('https://stadt.de/fixture'),'GET',undefined,undefined,{address:'127.0.0.1',family:4},{}),error=>error===sentinel);
+ assert.equal(spy.mock.callCount(),1);
+ assert.ok(received&&typeof received==='object'&&'rejectUnauthorized' in received&&'minVersion' in received&&'agent' in received);
+ assert.equal(received.rejectUnauthorized,true);assert.equal(received.minVersion,'TLSv1.2');assert.equal(received.agent,false);
+});
 
 test('wire enforces identity before body handling and never constructs a decoder',async t=>{
  const root=await mkdtemp(join(tmpdir(),'polite-identity-'));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -220,6 +242,23 @@ test('same-host scheme and path redirects retain normal admission and private re
  });
  assert.equal((await fetcher.fetch('http://stadt.de/start')).url,'https://stadt.de/final');
  await assert.rejects(fetcher.fetch('https://stadt.de/private'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsafe_url');
+});
+test('HTTPS redirects never downgrade a document or standardized TDM policy to HTTP',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'polite-no-downgrade-'));t.after(()=>rm(root,{recursive:true,force:true}));
+ for(const target of ['document','tdm'] as const){
+  const cache=join(root,target),fetcher=await createPoliteFetcher({cacheDir:cache}),seen:string[]=[];
+  t.mock.method(fetcher as unknown as WireSeam,'wire',async(url:URL)=>{
+   seen.push(url.href);
+   if(url.pathname==='/robots.txt')return {status:404,headers:{},body:Buffer.alloc(0)};
+   if(url.pathname==='/.well-known/tdmrep.json'&&target==='document')return {status:404,headers:{},body:Buffer.alloc(0)};
+   return {status:302,headers:{location:`http://stadt.de/${target}-insecure`},body:Buffer.alloc(0)};
+  });
+  await assert.rejects(fetcher.fetch('https://stadt.de/document'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='invalid_redirect'&&/downgrade/.test(error.message));
+  assert.ok(seen.length>0);assert.equal(seen.some(url=>url.startsWith('http:')),false);
+  assert.deepEqual(await readdir(join(cache,'sha256')).catch(()=>[]),[]);
+  const observations=await Promise.all((await readdir(join(cache,'observations'))).map(async name=>JSON.parse(await readFile(join(cache,'observations',name),'utf8'))));
+  assert.equal(observations.some(row=>row.state==='fetched'||row.state==='not_modified'),false);
+ }
 });
 test('host scheduler serializes concurrent work and respects minimum spacing',async t=>{
  const cache=await realpath(await mkdtemp(join(tmpdir(),'polite-schedule-')));t.after(()=>rm(cache,{recursive:true,force:true}));
