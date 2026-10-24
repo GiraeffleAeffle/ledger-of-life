@@ -89,7 +89,7 @@ async function acquireRunLock(path:string,recordSha256:string,manifestSha256:str
 }
 export class R2ExecutorError extends Error{readonly code:string;constructor(code:string,message:string){super(message);this.name='R2ExecutorError';this.code=code;}}
 export class R2AcquisitionExecutor{
- private readonly documents:Map<string,R2ManifestItem>;private readonly policies:Set<string>;private readonly record:R2IssuedRecord;private readonly caps:ExecutorCaps;private readonly priorR1:Readonly<Record<string,string>>;private readonly fetcher:PoliteFetcher;private readonly options:R2ExecutorOptions;private current?:Journal;private nextStart=0;private running=false;private startedProcess=false;private saveTail:Promise<void>=Promise.resolve();
+ private readonly documents:Map<string,R2ManifestItem>;private readonly policies:Set<string>;private readonly record:R2IssuedRecord;private readonly caps:ExecutorCaps;private readonly priorR1:Readonly<Record<string,string>>;private readonly fetcher:PoliteFetcher;private readonly options:R2ExecutorOptions;private current?:Journal;private nextStart=0;private running=false;private startedProcess=false;private saveTail:Promise<void>=Promise.resolve();private beforeRunUnlockForTest?:()=>Promise<void>;
  static async open(options:R2ExecutorOptions):Promise<R2AcquisitionExecutor>{
   if(!/^[a-f0-9]{64}$/.test(options.recordSha256)||!/^[a-f0-9]{64}$/.test(options.manifestSha256)||!/^[a-f0-9]{64}$/.test(options.r1DigestInventorySha256))throw new R2ExecutorError('RELEASE_HASH_MISMATCH','Expected SHA-256 values are malformed');
   if(!!options.reviewPath!==!!options.reviewSha256||!!options.changedReleasePath!==!!options.changedReleaseSha256)throw new R2ExecutorError('REVIEW_BINDING_INCOMPLETE','Review and changed-source release paths require their exact expected file hashes');
@@ -127,33 +127,33 @@ export class R2AcquisitionExecutor{
   if(this.running)throw new R2ExecutorError('GLOBAL_CONCURRENCY','Executor already has an active campaign');this.current=undefined;this.running=true;let releaseRunLock:(()=>Promise<void>)|undefined;
   try{
   releaseRunLock=await acquireRunLock(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256);
-  const journal=await loadJournal(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256,this.caps);this.current=journal;if(journal.stopped)throw new R2ExecutorError('JOURNAL_STOPPED','Journal records a terminal stop');if(!recordWindowValid(this.record))return this.stop('RELEASE_EXPIRED');if(!this.startedProcess&&journal.attempts.length>0&&!journal.checkpoint)await this.pauseWithCheckpoint(journal);if(!this.startedProcess&&journal.attempts.length)this.nextStart=Date.parse(journal.attempts.at(-1)!.startedAt)+this.caps.spacing;this.startedProcess=true;
-  if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)return this.stop('TIME_BUDGET');
-  if(await this.stopRequested())return this.stop('STOP_FILE');
+  const journal=await loadJournal(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256,this.caps);this.current=journal;if(journal.stopped)throw new R2ExecutorError('JOURNAL_STOPPED','Journal records a terminal stop');if(!recordWindowValid(this.record))return await this.stop('RELEASE_EXPIRED');if(!this.startedProcess&&journal.attempts.length>0&&!journal.checkpoint)await this.pauseWithCheckpoint(journal);if(!this.startedProcess&&journal.attempts.length)this.nextStart=Date.parse(journal.attempts.at(-1)!.startedAt)+this.caps.spacing;this.startedProcess=true;
+  if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)return await this.stop('TIME_BUDGET');
+  if(await this.stopRequested())return await this.stop('STOP_FILE');
   await this.releaseQuarantined(journal);
   if(journal.documentsSinceReview>=this.caps.reviewBatch&&!journal.checkpoint)await this.pauseWithCheckpoint(journal);
   if(Object.values(journal.quarantined).some(row=>!row.reviewed))return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};
   if(journal.paused){const reviewHash=await this.validReview(journal);if(!reviewHash)return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};journal.consumedReviews.push(reviewHash);journal.paused=false;journal.checkpoint=null;if(journal.documentsSinceReview>=this.caps.reviewBatch)journal.documentsSinceReview=0;await this.save();}
   for(const [url,item] of this.documents){
    if(journal.completed[url])continue;
-   if(Object.keys(journal.completed).length>=this.caps.documents)return this.stop('DOCUMENT_BUDGET');
-   if(await this.stopRequested())return this.stop('STOP_FILE');
+   if(Object.keys(journal.completed).length>=this.caps.documents)return await this.stop('DOCUMENT_BUDGET');
+   if(await this.stopRequested())return await this.stop('STOP_FILE');
    try{
     const document=await this.fetcher.fetch(url,{registeredSourceUrl:url,registeredMunicipalityId:item.scope.municipalityId,registeredSourceId:item.sourceId});
-    if(await this.stopRequested())return this.stop('STOP_FILE');
-    if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)return this.stop('TIME_BUDGET');
+    if(await this.stopRequested())return await this.stop('STOP_FILE');
+    if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)return await this.stop('TIME_BUDGET');
     if(journal.quarantined[url])throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is quarantined for explicit independent review');
     if(!['text/html','application/xhtml+xml','application/pdf'].includes(document.mimeType))throw new R2ExecutorError('UNSUPPORTED_MIME','R2 permits only HTML, XHTML, and PDF');
     const bytes=await readFile(document.localPath);if(bytes.length>this.caps.body)throw new R2ExecutorError('BODY_BUDGET','Per-document body cap reached');
     const prior=this.priorR1[url];if(prior&&prior!==document.sha256)throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is quarantined for explicit independent review');
     if(document.mimeType.startsWith('text/html')&&bytes.length>this.caps.html)throw new R2ExecutorError('HTML_BUDGET','HTML discovery cap reached');
-    if(journal.retainedBytes+bytes.length>this.caps.retained)return this.stop('RETAINED_BYTE_BUDGET');
+    if(journal.retainedBytes+bytes.length>this.caps.retained)return await this.stop('RETAINED_BYTE_BUDGET');
     journal.completed[url]={sha256:document.sha256,bytes:bytes.length,localPath:document.localPath,observationPath:document.observationPath,sourceId:item.sourceId};journal.retainedBytes+=bytes.length;journal.documentsSinceReview++;await this.save();
     if(journal.documentsSinceReview>=this.caps.reviewBatch){await this.pauseWithCheckpoint(journal);return {completed:Object.keys(journal.completed).length,paused:true,stopped:false};}
-   }catch(error){if(journal.quarantined[url]){if(!(error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1'))throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is durably quarantined before normal source admission');throw error;}journal.stopped=true;await this.save();throw error;}
+   }catch(error){if(journal.quarantined[url]){if(!(error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1'))throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is durably quarantined before normal source admission');throw error;}if(!journal.stopped){journal.stopped=true;await this.save();}throw error;}
   }
   return {completed:Object.keys(journal.completed).length,paused:false,stopped:false};
-  }finally{this.running=false;await releaseRunLock?.();}
+  }finally{this.running=false;await this.beforeRunUnlockForTest?.();await releaseRunLock?.();}
  }
  async beforeRequest(url:string){const journal=this.current!,canonicalUrl=publicUrl(url).href;if(!recordWindowValid(this.record))await this.stop('RELEASE_EXPIRED');if(!this.documents.has(canonicalUrl)&&!this.policies.has(canonicalUrl))throw new R2ExecutorError('URL_NOT_ALLOWLISTED','Wire request is outside exact release allowlist');if(journal.attempts.length>=this.caps.requests)await this.stop('REQUEST_BUDGET');if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)await this.stop('TIME_BUDGET');const delay=Math.max(0,this.nextStart-Date.now());if(delay)await new Promise(resolve=>setTimeout(resolve,delay));if(!recordWindowValid(this.record))await this.stop('RELEASE_EXPIRED');if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=this.caps.elapsed)await this.stop('TIME_BUDGET');this.nextStart=Date.now()+this.caps.spacing;journal.attempts.push({url:canonicalUrl,startedAt:new Date().toISOString(),bytes:0,status:null,failure:null,state:'started'});await this.save();}
  async onWireAttemptResult(url:string,status:number|null,failure:string|null){const attempt=this.current!.attempts.at(-1);if(!attempt||attempt.url!==publicUrl(url).href||attempt.state!=='started')throw new R2ExecutorError('JOURNAL_ACCOUNTING','Wire result has no matching started attempt');attempt.status=status;attempt.failure=failure;attempt.state=failure?'failed':'succeeded';await this.save();}
@@ -218,5 +218,5 @@ export class R2AcquisitionExecutor{
   if(Object.values(journal.quarantined).every(row=>row.reviewed)&&journal.documentsSinceReview<this.caps.reviewBatch&&!journal.checkpoint)journal.paused=false;
   await this.save();
  }
- private async stop(code:string):Promise<{completed:number;paused:boolean;stopped:boolean}>{this.current!.stopped=true;await this.save();throw new R2ExecutorError(code,`R2 acquisition stopped: ${code}`);}
+ private async stop(code:string):Promise<never>{this.current!.stopped=true;await this.save();throw new R2ExecutorError(code,`R2 acquisition stopped: ${code}`);}
 }

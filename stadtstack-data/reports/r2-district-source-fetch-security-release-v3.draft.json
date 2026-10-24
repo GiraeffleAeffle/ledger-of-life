@@ -134,7 +134,7 @@
     },
     "preparedPoliteFetch": {
       "path": "stadtstack-data/src/polite-fetch.ts",
-      "sha256": "8d5e748ae0f5fe9a73690fb59b3d60ce3674258c9d88accd21b05ef011decf45",
+      "sha256": "f514622d4842f940e05b2c60536ccc63bd3b281164e08a8b8d81ddec14745060",
       "meaning": "prepared branch bytes, not integrated runtime approval"
     },
     "preparedParserWorker": {
@@ -143,11 +143,11 @@
     },
     "preparedContractsEvidence": {
       "path": "reports/r2-acquisition-contract-measurement.json",
-      "sha256": "1744396cf6c85030a45cf092992f7c5e3d952413328a7860bfdd4036068fdf41",
-      "acquisitionContractSha256": "b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5",
+      "sha256": "282c21ea480cd8fda8db4a3cc41b9bc70e74f9b41eb6a2957b2bddf09befa3e9",
+      "acquisitionContractSha256": "016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607",
       "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
       "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
-      "meaning": "Acquisition contract freshly measured in a separate Node24.22.1 process on r2-executor-regressions after restoring constructor-time fixture authority checks and serializing accounted response bytes; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
+      "meaning": "Acquisition contract freshly measured in a separate Node 24.22.1 process on r2-policy-reuse after job-bound policy snapshot reuse; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
     },
     "preparedCheckSummary": {
       "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json",

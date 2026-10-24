@@ -150,6 +150,14 @@ least1h cooldown plus longer Retry-After;5xx backs off and three failures in10mi
 open the persistent circuit. Never convert a hold into automatic retries.
 Global all-source5s/one-in-flight and total request/byte/time budgets require the
 new executor; existing host locks alone do not prove those proposed caps.
+The executor's single `PoliteFetcher` may reuse an immutable robots/TDM policy
+snapshot only within that one run. Its key binds the authority epoch, exact
+source permission and owner decision, canonical origin, exact policy URL and
+validity horizon; the response, observation receipt and parsed rules are
+integrity-bound and expire at the existing policy TTL. Nothing is persisted as
+a cross-run policy cache. A hit skips only an otherwise-required policy wire
+attempt: every document still checks live objection and source permission and
+continues through ordinary request accounting, cancellation and pacing.
 
 ### Content and PDF isolation
 

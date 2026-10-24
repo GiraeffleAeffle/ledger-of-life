@@ -51,7 +51,7 @@ export function sourceContentBinding(document:FetchedDocument):SourceContentBind
 }
 export class PoliteFetchError extends Error {
  failure:FetchFailure;status?:number;policy?:SourceAccessPolicy;retryAfter?:string;robotsEvidence?:PolicyEvidence;excludedDocument?:ExcludedDocument;
- observationCheckedAt?:string;observationUrl?:string;inspectionReason?:ParserIsolationReason;
+ observationCheckedAt?:string;observationUrl?:string;inspectionReason?:ParserIsolationReason;policyResponseSha256?:string|null;policyReceiptSha256?:string;
  policyPhase:'robots'|'tdm'|null=null;
  constructor(failure:FetchFailure,message:string,status?:number,policy?:SourceAccessPolicy,retryAfter?:string,cause?:unknown){super(message,cause===undefined?undefined:{cause});this.name='PoliteFetchError';this.failure=failure;this.status=status;this.policy=policy;this.retryAfter=retryAfter;}
 }
@@ -68,6 +68,10 @@ export function assertSourceFetchNodeVersion(version=process.versions.node):void
 const pdfSourceMetadataFailures:Readonly<Record<string,true>>={size_limit:true,encrypted_pdf:true,parse_error:true,metadata_parse_error:true,metadata_unreadable:true,metadata_size_limit:true,invalid_xml_reference:true,invalid_tdm_reservation:true,metadata_structure_limit:true};
 interface RobotsGroup {agents:string[];rules:{allow:boolean;pattern:string}[];delay:number}
 export interface RobotsPolicy {rules:{allow:boolean;pattern:string}[];delayMs:number;evidence?:PolicyEvidence}
+type PolicySnapshot<T>={readonly contextSha256:string;readonly origin:string;readonly policyUrl:string;readonly expiresAt:number;readonly value:T;readonly responseSha256:string|null;readonly receiptSha256:string;readonly rulesSha256:string;readonly snapshotSha256:string};
+type PolicyCacheEntry<T>={readonly contextSha256:string;readonly origin:string;readonly policyUrl:string;readonly expiresAt:number;response:Promise<PolicySnapshot<T>>};
+const stablePolicyJson=(value:unknown):string=>Array.isArray(value)?`[${value.map(stablePolicyJson).join(',')}]`:value&&typeof value==='object'?`{${Object.entries(value as Record<string,unknown>).sort(([left],[right])=>left.localeCompare(right)).map(([key,item])=>`${JSON.stringify(key)}:${stablePolicyJson(item)}`).join(',')}}`:JSON.stringify(value);
+function freezePolicyValue<T>(value:T):T{if(value&&typeof value==='object'&&!Object.isFrozen(value)){Object.freeze(value);for(const item of Object.values(value as Record<string,unknown>))freezePolicyValue(item);}return value;}
 const RobotsAbsenceObservationSchema=z.object({
  url:z.url(),method:z.literal('GET'),checkedAt:z.iso.datetime(),retrievedAt:z.null(),state:z.literal('failed'),status:z.union([z.literal(404),z.literal(410)]),failure:z.literal('http_error'),policy:ContentFreeSourcePolicySchema.optional(),
 }).strict();
@@ -150,8 +154,8 @@ export class PoliteFetcher {
  private readonly inventoryTimeoutMs:number;
  private readonly ownerGenesisTableTimeoutMs:number;
  private delays=new Map<string,number>();
- private robots=new Map<string,{expiresAt:number;response:Promise<RobotsPolicy>}>();
- private machinePolicies=new Map<string,{expiresAt:number;response:Promise<{rules:TdmRule[];evidence:PolicyEvidence}>}>();
+ private robots=new Map<string,PolicyCacheEntry<RobotsPolicy>>();
+ private machinePolicies=new Map<string,PolicyCacheEntry<{rules:TdmRule[];evidence:PolicyEvidence}>>();
  private fetchCount=0;
  private initialization?:Promise<void>;private readonly lane:PoliteFetcherOptions['ownerPolicyLane'];private activeLane?:NonNullable<PoliteFetcherOptions['ownerPolicyLane']>;
  private authorityMode?:CivicPolicyAuthorityReceipt['mode'];
@@ -164,6 +168,7 @@ export class PoliteFetcher {
  /** Host controller only, after the existing pinned operator-registry admission. */
  registerRegisteredSources(registry:RegisteredSourceConfiguration,registrySha256:string):void {
   this.registeredScopes.clear();this.registeredDiscoveries.clear();
+  this.robots.clear();this.machinePolicies.clear();
   for(const audit of admittedRegisteredRobotsScopes(registry,registrySha256))this.registeredScopes.set(this.registeredKey(audit),audit);
  }
  registeredSourceEligibility(options:FetchOptions):RegisteredRobotsAudit|undefined {
@@ -548,63 +553,87 @@ export class PoliteFetcher {
   const contentSha256=hash(bytes),sourceSha256=value.sha256??contentSha256,r2Integrity=this.policyOptions().r2Integrity;
   return withManagedSourceWrite(this.cacheDir,[{kind:'http_observation',relativePath:relative(this.cacheDir,path),contentSha256,sourceSha256,url:value.url,observationId:basename(path),receiptSha256:contentSha256,independentAllowed:false,...(r2Integrity?{r2Integrity}:{})}],persist,this.policyOptions());
  }
- private async policy(url:URL,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs):Promise<RobotsPolicy>{
-  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.policy(url,hostProfile,ttl);
-  const cacheKey=url.origin+':'+ttl;let cached=this.robots.get(cacheKey);
-  if(!cached||Date.now()>=cached.expiresAt){const pending=(async()=>{
-   const attemptedAt=new Date().toISOString();let result:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined;
-   try{
-    result=await this.fetchInternal(new URL('/robots.txt',url).href,{hostProfile},'robots');
-    if(result.validatedPolicy?.kind!=='robots')throw new PoliteFetchError('robots_unavailable','Validated robots policy missing');
-    const policy=result.validatedPolicy.value;policy.evidence={url:result.url,locator:'robots.txt applicable StadtstackData group',value:'checked',sha256:result.sha256,checkedAt:result.checkedAt};this.delays.set(url.hostname,Math.max(this.delays.get(url.hostname)??0,policy.delayMs));return policy;
-   }catch(error){
-    if(error instanceof RequestAdmissionInterruption)throw error;
-    // RFC 9309 unavailable 404/410 allows access; 401/403/429 and failures fail closed.
-    if(error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410))return {rules:[],delayMs:0,evidence:{url:new URL('/robots.txt',url).href,locator:'robots.txt HTTP absence',value:String(error.status),checkedAt:error.observationCheckedAt??new Date().toISOString()}};
-    // Transport/runtime errors (including network_error) and unknown exceptions
-    // are not evidence that a fetched policy is unavailable or invalid.
-    const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Robots policy check failed',undefined,undefined,undefined,error);
-    failure.policyPhase??='robots';
-    if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='robots_unavailable'))throw failure;
-    const unavailable=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${failure.status?` (policy HTTP ${failure.status})`:''}; source existence is unknown`,failure.status,undefined,failure.retryAfter,failure);
-    unavailable.policyPhase=failure.policyPhase;
-    unavailable.observationUrl=failure.observationUrl??result?.url??new URL('/robots.txt',url).href;
-    unavailable.observationCheckedAt=failure.observationCheckedAt??result?.checkedAt??attemptedAt;
-    unavailable.robotsEvidence=failure.robotsEvidence??{url:new URL('/robots.txt',url).href,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw unavailable;
-   }
-  })();cached={expiresAt:Date.now()+ttl,response:pending};this.robots.set(cacheKey,cached);}
-  return cached.response;
+ private policyContext(url:URL,policyUrl:string,options:FetchOptions,hostProfile:FetchOptions['hostProfile'],ttl:number,override?:OwnerRobotsOverride):string{
+  const lane=this.policyOptions(),sourceUrl=options.registeredSourceUrl??url.href,audit=this.registeredAudit(sourceUrl,options);
+  return stablePolicyJson({authority:{id:lane.authorityId??null,sha256:lane.authoritySha256??null,stateDir:lane.stateDir?resolve(lane.stateDir):null,recordSha256:lane.r2Integrity?.recordSha256??null,manifestSha256:lane.r2Integrity?.manifestSha256??null},permission:{registeredMunicipalityId:options.registeredMunicipalityId??null,registeredSourceId:options.registeredSourceId??null,registeredRoot:audit?.root??new URL(sourceUrl).origin,audit:audit??null,registeredApproval:Boolean(audit)||ownerRobotsOverrideApplies(url.href,override),ownerOverride:override??options.ownerRobotsOverride??null,hostProfile:hostProfile??'default'},origin:url.origin,policyUrl,ttl});
  }
- private async machinePolicy(url:URL,knownUrl?:string,ownerRobotsOverride?:OwnerRobotsOverride,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs):Promise<{rules:TdmRule[];evidence:PolicyEvidence}>{
-  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.machinePolicy(url,knownUrl,ownerRobotsOverride,hostProfile,ttl);
-  const policyUrl=knownUrl?publicUrl(knownUrl).href:new URL('/.well-known/tdmrep.json',url).href;
-  const cacheKey=`${knownUrl?'required':'standard'}:${policyUrl}:${ownerRobotsOverrideApplies(policyUrl,ownerRobotsOverride)?ownerRobotsOverride!.id:'no-override'}:${ttl}`;
-  let cached=this.machinePolicies.get(cacheKey);
-  if(!cached||Date.now()>=cached.expiresAt){
-   const pending=(async()=>{
-    // Standardized location, not a guessed municipal API: W3C TDMRep 2024 §6.1.
-    const redirectChain=knownUrl?undefined:[policyUrl];
-    const attemptedAt=new Date().toISOString();let response:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined;
+ private policyFetchOptions(options:FetchOptions,hostProfile:FetchOptions['hostProfile'],ownerRobotsOverride?:OwnerRobotsOverride):FetchOptions{
+  const override=ownerRobotsOverride??options.ownerRobotsOverride;
+  return {...(options.registeredSourceUrl!==undefined?{registeredSourceUrl:options.registeredSourceUrl}:{}),...(options.registeredMunicipalityId!==undefined?{registeredMunicipalityId:options.registeredMunicipalityId}:{}),...(options.registeredSourceId!==undefined?{registeredSourceId:options.registeredSourceId}:{}),...(hostProfile?{hostProfile}:{}),...(override?{ownerRobotsOverride:override}:{})};
+ }
+ private policySnapshot<T>(entry:PolicyCacheEntry<T>,value:T,responseSha256:string|null,receiptSha256:string|null):PolicySnapshot<T>{
+  if(!receiptSha256||!/^[a-f0-9]{64}$/.test(receiptSha256)||responseSha256!==null&&!/^[a-f0-9]{64}$/.test(responseSha256))throw new PoliteFetchError('host_state_unsafe','Policy snapshot is missing a valid response receipt');
+  const immutable=freezePolicyValue(value),rulesSha256=hash(stablePolicyJson(immutable)),payload={contextSha256:entry.contextSha256,origin:entry.origin,policyUrl:entry.policyUrl,expiresAt:entry.expiresAt,responseSha256,receiptSha256,rulesSha256};
+  return Object.freeze({...payload,value:immutable,snapshotSha256:hash(stablePolicyJson(payload))});
+ }
+ private policySnapshotValid<T>(snapshot:PolicySnapshot<T>,entry:PolicyCacheEntry<T>):boolean{
+  const payload={contextSha256:snapshot.contextSha256,origin:snapshot.origin,policyUrl:snapshot.policyUrl,expiresAt:snapshot.expiresAt,responseSha256:snapshot.responseSha256,receiptSha256:snapshot.receiptSha256,rulesSha256:snapshot.rulesSha256};
+  return Date.now()<entry.expiresAt&&snapshot.contextSha256===entry.contextSha256&&snapshot.origin===entry.origin&&snapshot.policyUrl===entry.policyUrl&&snapshot.expiresAt===entry.expiresAt&&snapshot.rulesSha256===hash(stablePolicyJson(snapshot.value))&&snapshot.snapshotSha256===hash(stablePolicyJson(payload));
+ }
+ private evictPolicyContext<T>(cache:Map<string,PolicyCacheEntry<T>>,key:string,origin:string,policyUrl:string):void{
+  for(const [candidate,entry] of cache)if(candidate!==key&&entry.origin===origin&&entry.policyUrl===policyUrl)cache.delete(candidate);
+ }
+ private async policy(url:URL,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs,requestOptions:FetchOptions={}):Promise<RobotsPolicy>{
+  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.policy(url,hostProfile,ttl,requestOptions);
+  const policyUrl=new URL('/robots.txt',url).href,context=this.policyContext(url,policyUrl,requestOptions,hostProfile,ttl,ownerRobotsOverrideFor(url.href)??undefined),contextSha256=hash(context);
+  let cached=this.robots.get(contextSha256);
+  if(cached&&Date.now()>=cached.expiresAt){this.robots.delete(contextSha256);cached=undefined;}
+  if(!cached){
+   this.evictPolicyContext(this.robots,contextSha256,url.origin,policyUrl);
+   const entry:PolicyCacheEntry<RobotsPolicy>={contextSha256,origin:url.origin,policyUrl,expiresAt:Date.now()+ttl,response:Promise.resolve(undefined as never)};
+   entry.response=(async()=>{
+    const attemptedAt=new Date().toISOString();let result:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined,responseSha256:string|null=null,receiptSha256:string|null=null,value:RobotsPolicy;
     try{
-     response=await this.fetchInternal(policyUrl,{ownerRobotsOverride,hostProfile},'tdm',redirectChain);
-     if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
-     return {rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};
+     result=await this.fetchInternal(policyUrl,this.policyFetchOptions(requestOptions,hostProfile),'robots');
+     if(result.validatedPolicy?.kind!=='robots')throw new PoliteFetchError('robots_unavailable','Validated robots policy missing');
+     value=result.validatedPolicy.value;value.evidence={url:result.url,locator:'robots.txt applicable StadtstackData group',value:'checked',sha256:result.sha256,checkedAt:result.checkedAt};responseSha256=result.sha256;receiptSha256=hash(await readFile(result.observationPath));this.delays.set(url.hostname,Math.max(this.delays.get(url.hostname)??0,value.delayMs));
     }catch(error){
      if(error instanceof RequestAdmissionInterruption)throw error;
-     if(!knownUrl&&error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410))return {rules:[],evidence:{url:redirectChain?.at(-1)??policyUrl,locator:`TDMRep standardized location HTTP absence${redirectChain&&redirectChain.length>1?' after same-host redirect':''}`,value:String(error.status),checkedAt:new Date().toISOString()}};
-     // Only actual HTTP/policy-representation failures become policy unavailability.
-     // Preserve network_error, DNS/timeout, cache/limit/redirect and unknown errors.
-     const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','TDM policy check failed',undefined,undefined,undefined,error);
-     failure.policyPhase??='tdm';
-     if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='tdm_unavailable'))throw failure;
-     const unavailable=new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${failure.status?` (policy HTTP ${failure.status})`:''}; ask municipality`,failure.status,undefined,failure.retryAfter,failure);
-     unavailable.policyPhase=failure.policyPhase;
-     unavailable.observationUrl=failure.observationUrl??response?.url??redirectChain?.at(-1)??policyUrl;
-     unavailable.observationCheckedAt=failure.observationCheckedAt??response?.checkedAt??attemptedAt;throw unavailable;
+     if(error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410)){value={rules:[],delayMs:0,evidence:{url:policyUrl,locator:'robots.txt HTTP absence',value:String(error.status),checkedAt:error.observationCheckedAt??attemptedAt}};receiptSha256=error.policyReceiptSha256??null;}
+     else{
+      const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Robots policy check failed',undefined,undefined,undefined,error);
+      failure.policyPhase??='robots';
+      if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='robots_unavailable'))throw failure;
+      const unavailable=new PoliteFetchError('robots_unavailable',`Robots policy unavailable${failure.status?` (policy HTTP ${failure.status})`:''}; source existence is unknown`,failure.status,undefined,failure.retryAfter,failure);
+      unavailable.policyPhase=failure.policyPhase;unavailable.observationUrl=failure.observationUrl??result?.url??policyUrl;unavailable.observationCheckedAt=failure.observationCheckedAt??result?.checkedAt??attemptedAt;unavailable.robotsEvidence=failure.robotsEvidence??{url:policyUrl,locator:'Actual robots retrieval/interpretation attempt unavailable',value:'unavailable',checkedAt:result?.checkedAt??attemptedAt,...(result?{sha256:result.sha256}:{})};throw unavailable;
+     }
     }
-   })();cached={expiresAt:Date.now()+ttl,response:pending};this.machinePolicies.set(cacheKey,cached);
+    return this.policySnapshot(entry,value,responseSha256,receiptSha256);
+   })();
+   this.robots.set(contextSha256,entry);cached=entry;
   }
-  return cached.response;
+  const snapshot=await cached.response;if(!this.policySnapshotValid(snapshot,cached)){if(this.robots.get(contextSha256)===cached)this.robots.delete(contextSha256);throw new PoliteFetchError('robots_unavailable','Cached robots policy snapshot is expired or inconsistent');}return snapshot.value;
+ }
+ private async machinePolicy(url:URL,knownUrl?:string,ownerRobotsOverride?:OwnerRobotsOverride,hostProfile?:FetchOptions['hostProfile'],ttl=this.options.policyTtlMs,requestOptions:FetchOptions={}):Promise<{rules:TdmRule[];evidence:PolicyEvidence}>{
+  if(this.publicPolicyFetcher)return this.publicPolicyFetcher.machinePolicy(url,knownUrl,ownerRobotsOverride,hostProfile,ttl,requestOptions);
+  const policyUrl=knownUrl?publicUrl(knownUrl).href:new URL('/.well-known/tdmrep.json',url).href,context=this.policyContext(url,policyUrl,requestOptions,hostProfile,ttl,ownerRobotsOverride)+'\n'+(knownUrl?'required':'standard'),contextSha256=hash(context);
+  let cached=this.machinePolicies.get(contextSha256);
+  if(cached&&Date.now()>=cached.expiresAt){this.machinePolicies.delete(contextSha256);cached=undefined;}
+  if(!cached){
+   this.evictPolicyContext(this.machinePolicies,contextSha256,url.origin,policyUrl);
+   const entry:PolicyCacheEntry<{rules:TdmRule[];evidence:PolicyEvidence}>={contextSha256,origin:url.origin,policyUrl,expiresAt:Date.now()+ttl,response:Promise.resolve(undefined as never)};
+   entry.response=(async()=>{
+    const redirectChain=knownUrl?undefined:[policyUrl];let response:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined,responseSha256:string|null=null,receiptSha256:string|null=null,value:{rules:TdmRule[];evidence:PolicyEvidence};
+    try{
+     response=await this.fetchInternal(policyUrl,this.policyFetchOptions(requestOptions,hostProfile,ownerRobotsOverride),'tdm',redirectChain);
+     if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
+     value={rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};responseSha256=response.sha256;receiptSha256=hash(await readFile(response.observationPath));
+    }catch(error){
+     if(error instanceof RequestAdmissionInterruption)throw error;
+     if(!knownUrl&&error instanceof PoliteFetchError&&error.failure==='http_error'&&(error.status===404||error.status===410)){value={rules:[],evidence:{url:redirectChain?.at(-1)??policyUrl,locator:`TDMRep standardized location HTTP absence${redirectChain&&redirectChain.length>1?' after same-host redirect':''}`,value:String(error.status),checkedAt:error.observationCheckedAt??new Date().toISOString()}};receiptSha256=error.policyReceiptSha256??null;}
+     else{
+      const failure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','TDM policy check failed',undefined,undefined,undefined,error);
+      failure.policyPhase??='tdm';
+      if(failure.status===429||(failure.failure!=='http_error'&&failure.failure!=='tdm_unavailable'))throw failure;
+      const unavailable=new PoliteFetchError('tdm_unavailable',`Machine-readable TDM policy could not be checked${failure.status?` (policy HTTP ${failure.status})`:''}; ask municipality`,failure.status,undefined,failure.retryAfter,failure);
+      unavailable.policyPhase=failure.policyPhase;unavailable.observationUrl=failure.observationUrl??response?.url??redirectChain?.at(-1)??policyUrl;unavailable.observationCheckedAt=failure.observationCheckedAt??response?.checkedAt??new Date().toISOString();throw unavailable;
+     }
+    }
+    return this.policySnapshot(entry,value,responseSha256,receiptSha256);
+   })();
+   this.machinePolicies.set(contextSha256,entry);cached=entry;
+  }
+  const snapshot=await cached.response;if(!this.policySnapshotValid(snapshot,cached)){if(this.machinePolicies.get(contextSha256)===cached)this.machinePolicies.delete(contextSha256);throw new PoliteFetchError('tdm_unavailable','Cached TDM policy snapshot is expired or inconsistent');}return snapshot.value;
  }
  /** Authorized current-proof operation: policy endpoints only, never the original body.
   * A new operation bypasses in-memory TTLs, but retains genuine HTTP validators.
@@ -697,7 +726,7 @@ export class PoliteFetcher {
     if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(url.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication endpoint is outside public acquisition');}
     if(checkRobots){
      let robots:RobotsPolicy|undefined;
-     try{robots=await this.policy(url,options.hostProfile,policyTtlMs);}
+     try{robots=await this.policy(url,options.hostProfile,policyTtlMs,options);}
      catch(error){
       if(!(error instanceof PoliteFetchError)||error.failure!=='robots_unavailable'||!registeredApproval)throw error;
       if(error.robotsEvidence?.checkedAt)policy.robots.checkedAt=error.robotsEvidence.checkedAt;if(error.robotsEvidence?.sha256)policy.robots.sha256=error.robotsEvidence.sha256;
@@ -716,7 +745,7 @@ export class PoliteFetcher {
      const knownPolicies=[...new Set((options.machinePolicyUrls??[]).map(value=>publicUrl(value)).filter(candidate=>candidate.pathname!=='/robots.txt'&&candidate.origin===url.origin).map(candidate=>candidate.href))];
      for(const knownUrl of [undefined,...knownPolicies]){
       let originPolicy:{rules:TdmRule[];evidence:PolicyEvidence};
-      try{originPolicy=await this.machinePolicy(url,knownUrl,registeredApproval?ownerRobotsOverrideFor(url.href)??undefined:undefined,options.hostProfile,policyTtlMs);}catch(error){policy.tdm.state='unavailable';policy.tdm.evidence.push({url:knownUrl??new URL('/.well-known/tdmrep.json',url).href,locator:'Machine policy retrieval or interpretation failed',value:'inaccessible',checkedAt});throw error;}
+      try{originPolicy=await this.machinePolicy(url,knownUrl,registeredApproval?ownerRobotsOverrideFor(url.href)??undefined:undefined,options.hostProfile,policyTtlMs,options);}catch(error){policy.tdm.state='unavailable';policy.tdm.evidence.push({url:knownUrl??new URL('/.well-known/tdmrep.json',url).href,locator:'Machine policy retrieval or interpretation failed',value:'inaccessible',checkedAt});throw error;}
       policy.tdm.evidence.push(originPolicy.evidence);const rule=tdmRuleForUrl(originPolicy.rules,url.href);
       if(rule){if(policy.tdm.state!=='reserved')policy.tdm.state=rule['tdm-reservation']===1?'reserved':'not_reserved';policy.tdm.evidence.push({...originPolicy.evidence,locator:'TDMRep matching location',value:String(rule['tdm-reservation'])});}
       if(policy.tdm.state==='reserved'&&!registeredApproval)throw new PoliteFetchError('tdm_reserved','Machine-readable TDM reservation; no owner-authorized official-work exception');
@@ -929,7 +958,7 @@ export class PoliteFetcher {
     // Authentication drops remote error strings, causes, filesystem paths and headers, not public observation attribution.
     const failure=ownerCredentials?new PoliteFetchError(original.failure,'Authenticated GENESIS request held',original.status):original;
     if(ownerCredentials){failure.observationUrl=original.observationUrl;failure.observationCheckedAt=original.observationCheckedAt;}
-    failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;await this.observation(observation);failure.observationCheckedAt??=observation.checkedAt;failure.observationUrl??=observation.url;
+    failure.policyPhase??=policyPhase;failure.policy=policy;observation.state='failed';observation.failure=failure.failure;observation.retryAfter=ownerCredentials?undefined:failure.retryAfter;const failurePath=join(this.cacheDir,'observations',`${Date.now()}-${randomUUID()}.json`),failureBytes=this.encodeObservation(observation);await this.observation(observation,failurePath,failureBytes);failure.observationCheckedAt??=observation.checkedAt;failure.observationUrl??=observation.url;if(resource!=='document'){failure.policyReceiptSha256=hash(failureBytes);failure.policyResponseSha256=null;}
     // A failed admission does not undo a 304's representation-header update.
     if(observation.status===304&&observation.sha256&&observation.retrievedAt&&requestMetadataPath){
      await mkdir(join(this.cacheDir,'requests'),{recursive:true});const temporary=requestMetadataPath+'.'+randomUUID()+'.tmp';
