@@ -291,9 +291,9 @@ This is not a production integration/image/source gate. Exact exercised results
 and draft/fingerprint SHAs accompany the handoff; no live availability, metadata,
 account success, payload counts or source coverage is asserted here.
 
-### Exercised fresh-process evidence
+### Pre-review cbf21bd evidence (historical)
 
-Compilation `tsc --noEmit` exited0. The final focused custody file passed
+Before security review, compilation `tsc --noEmit` exited0 and the custody file passed
 **13/13**, zero failures/skips/cancellations (2,037.02688ms), using exact
 Node24.22.1, the CPU-slot helper,3072MiB old-space, strip-only TypeScript,
 isolation `none`, concurrency1 and30s per-test timeout. Preliminary syntax,
@@ -308,7 +308,7 @@ It invokes14 native functions plus MaStR and GENESIS structured functions with
 actual historical Git blobs/current file hashes. **Only acquisition changes**;
 the other13 native and both adapter-specific identities remain unchanged.
 
-| Current identity | SHA256 |
+| Pre-review cbf21bd identity | SHA256 |
 |---|---|
 | Acquisition |`fdb3a0f6abcfc57e8b7aaf2f52cf9f0e10cf379609b5321d21eb73c6c20e0aaa`|
 | GENESIS adapter |`f63616d5041aa8f10f193b0262f956c747a410630bc687b5ee66870df23095cf`|
@@ -325,14 +325,14 @@ The permanent measurement script in that private evidence directory is
 The terminal-contract snapshot is updated only to the measured acquisition
 identity; no frozen receipt or historical measurement is rewritten.
 
-### Generated unissued pins
+### Current integrated unissued pins
 
 - `reports/r2-genesis-31231-request-plan-v3.draft.json`:
   `581c69fb0e97d37566317515176dcf875ddb9b23430dddbaebc632881d7ef542`.
 - `reports/r2-genesis-structured-security-release-v3.draft.json`:
-  `d5356274f5423d6912607d5808ea4d60f1dd4217f4c0854f74ce08dfc73eb465`.
+  `99872ca07e56e12d81e2d606281d972ca68e46adda0d62e26c751387bae17dd8`.
 - Draft executable security-code manifest:
-  `0fc31594c3c81e8f0afa1d69967ef6e209ef92b5a3cb1c7e910a88db83aad4b1`.
+  `a0a9f1022b395b8754b825687c9131c7a338ef6195377a6f63f67264090d38b9`.
 - Actual pinned Node24.22.1 binary:
   `e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb`.
 - Exact registry configuration:
@@ -343,19 +343,19 @@ stop **not lifted**. No actual parser authorization or review is invented.
 The fresh generation launched no parser/image, read no credentials, accessed no
 DB and sent no source request.
 
-The shared native acquisition dependency also makes the existing district
-draft's old prepared-contract pin stale. With the district executor owner's
-agreement, only that **unissued preparedContractsEvidence** block is advanced to
-`reports/r2-genesis-acquisition-contract-measurement.json`, SHA256
-`fc1b09cc8b6e7dff828f9c76f24fd768517a832540be644cdb8e4f31c2b8e767`.
-It binds the actual full measurement above and current parser values, not a new
-runtime/image approval. `reports/r2-acquisition-contract-measurement.json` and all
-issued/historical records stay unchanged. Other prepared district evidence is
-still historical. Main must remeasure and regenerate on the **integrated head**
-after merging the independent policy-reuse/codec slices; neither branch's
-prepared SHA may silently authorize another checkout.
+After merging `rebuild-r1` at6ac22aa, the district draft's
+**preparedPoliteFetch** and **unissued preparedContractsEvidence** now bind the
+integrated bytes and `reports/r2-genesis-integrated-contract-measurement.json`,
+SHA256 `64b19b06cc8940c28aa9eab856e185cd5a9774db585247a34771d6f1b13f3f5a`.
+Its acquisition contract is
+`0a7bbfa29e22ec41bae105214b8ca85f9b8ea76272b0f5397607fed85a1e192d`.
+No prior measurement is relabelled and no image/review authority is created.
+The district draft itself is
+`df8f446709ddb47c2a7e28788dba0635cd55fcfe419ebb33cc235ebd760f2137`.
+Any later source integration requires remeasurement/regeneration; prepared
+hashes never silently authorize a different checkout.
 
-### Ordinary-gate correction and affected-fixture coverage
+### Pre-review ordinary correction and affected-fixture coverage
 
 The first complete ordinary run, with a fresh disposable PG, recorded2,292
 tests:2,227 passed,16 failed,1 cancelled and48 skipped. Preserve its actual TAP:
@@ -382,9 +382,9 @@ isolation `none`, concurrency1 and120s timeout were used. Loopback synthetic
 HTTP fixtures are not live source requests. These focused results do not
 relabel the first failed full run.
 
-### Final complete ordinary gate
+### Pre-review complete ordinary gate (cbf21bd, historical)
 
-The final **complete** `scripts/r1-verify.sh ordinary` run exited0:
+Before FetchSecurityReview, the **complete** `scripts/r1-verify.sh ordinary` run exited0:
 **2,300 tests,2,252 passed,0 failed,0 cancelled,48 skipped**, test duration
 1,938,839.541227ms. It used a new disposable PostgreSQL cluster, CPU-slot
 affinity, nice10,3072MiB Node old-space and concurrency1. Every ordinary test
@@ -392,20 +392,200 @@ remained selected; the per-test ceiling was5min so the complete nested
 crawl-continuation case could finish rather than being cancelled at120s.
 No assertion, source policy, lease/production bound or test was removed.
 
-Final TAP:
+Pre-review TAP:
 `/home/max/.local/state/stadtstack-data/r2-genesis-release/verify-ordinary-final/tests-20261024T213118Z.tap`,
 SHA256 `af0c4ad0d1eb01dd43bd30a1474836fdc4f3018fd196f008790bc71f94d43a70`.
 The private `run-ordinary-final.sh` retains the exact reproducible invocation.
 The earlier failed log remains intact; it is not relabelled or replaced.
 
-The branch-local district draft's prepared-contract-only dependency update has
-SHA256 `f4f1ad4e845dc234a6ad5799aa81d53c61099e91ddb47b37b2053b3e7e9ce32f`.
-The GENESIS draft and security-code pins above are unchanged by fixture-only
-migration, checkout permission corrections or documentation/report updates.
+The pre-review district draft's prepared-contract dependency had SHA256
+`f4f1ad4e845dc234a6ad5799aa81d53c61099e91ddb47b37b2053b3e7e9ce32f`.
+That old pin and gate describe cbf21bd, not the post-review integrated tree.
+The credential fix and integration deliberately advance the current GENESIS
+security-code and draft pins. No production DB, live source, owner credential,
+parser image, retained-staging/integration or hosted publication gate was
+exercised. Main's reviewed matching parser authorization and genuine separate-
+worktree issuance remain prerequisites before the first request.
 
-This is ready for Main's **review**, not issuance/execution. No production DB,
-live source, owner credential, parser image, retained-staging/integration or
-hosted publication gate was exercised. Main must review/merge, remeasure the
-integrated immutable checkout, install the current matching patched parser
-authorization through its real gates, and issue in the separate authority
-worktree before the first request.
+## Security-review integration of rebuild-r1 6ac22aa
+
+FetchSecurityReview's P3 eager credential reads are removed: the controller has
+no credential import, helper or readiness call. Only the existing PoliteFetcher
+owner-account branch loads credentials just in time, after selector/policy
+checks, for an exact data POST. The dedicated architectural regression refuses
+reintroduction of that controller reader/probe; existing anonymous/profile and
+owner-child hook tests remain intact.
+
+Merge parent: `6ac22aa95ab3108002e17386fed9dacaefb04a67`; merge commit prefix
+`2aa7ad5`. The merged `polite-fetch.ts` differs from that parent only by the
+credential-free actual wire identity interface and its propagation through
+`scheduled`, the pre-dispatch hook and `wire`. The existing owner-child hook
+pass-through remains intact. All `PolicySnapshot`, `policyContext`,
+`policyFetchOptions`, immutable rules/receipt/snapshot integrity validation and
+option projection in `policy`/`machinePolicy` are retained. The new policy-reuse
+fixture's scheduler and callback seams now receive the same actual identity;
+no snapshot assertion or source policy is weakened.
+
+Fresh-process complete contract report:
+`/home/max/.local/state/stadtstack-data/r2-genesis-release/contracts-6ac22aa-integrated.json`,
+SHA256 `6212fe7b65ff696ed327c071703ecd05a92eaedaeec8c22ee67f4a47e8611fa3`.
+Against6ac22aa, **only acquisition changes** among14 native functions plus
+GENESIS/MaStR structured functions, from `016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607`
+to `0a7bbfa29e22ec41bae105214b8ca85f9b8ea76272b0f5397607fed85a1e192d`.
+All other identities in the historical table above remain unchanged.
+
+Current integrated `polite-fetch.ts` SHA256:
+`afb3add27e0975b06c280a581720eb6cc64d5529cd491ccb68d4956db905942b`.
+The regenerated request plan remains byte-identical; the security draft and
+code manifest have the new integrated pins listed above. All records remain
+DRAFT, issuedAt empty and sourceFetchStopLifted false.
+
+Existing prepared parser-image evidence is preserved as evidence of its actual
+image, not edited into current authorization. Its recorded runner/output
+contracts `04edb466…`/`79999b46…` differ from the current checkout's
+`281f2cab…`/`3024a2b8…`; installed historical authorization was also not current.
+Main must use a genuinely matching reviewed image/authorization rather than
+relabel either record. This branch performs no image build/install or request.
+
+### Post-review focused verification
+
+Package `tsc --noEmit` exited0. The integrated seven-file focused run passed
+**153/153,0 failed,0 cancelled,0 skipped**, duration86,411.227328ms:
+`district-terminal-exceptions`, `genesis-adapter`, `mcp-token-config`,
+`polite-fetch`, `r2-acquisition-executor`, `r2-genesis-release` and
+`r2-policy-reuse`. This includes the new no-eager-credential regression and the
+four snapshot/reuse tests. It used Node24.22.1, the CPU-slot helper,3072MiB
+old-space, strip-only TypeScript, module mocks, isolation `none`, concurrency1
+and300s per-test timeout. The loopback/synthetic fixtures sent no live source
+request, and the controller was not run against production or real credentials.
+
+### Post-review complete ordinary gate (failed, not relabelled)
+
+The new complete ordinary run exited1: **2,305 tests,2,253 passed,2 failed,
+2 cancelled,48 skipped**, duration2,112,831.307159ms. It used its own disposable
+PostgreSQL cluster, CPU slot,3072MiB old-space, concurrency1 and300s per-test
+ceiling. The complete ordinary selection remained intact.
+
+TAP:
+`/home/max/.local/state/stadtstack-data/r2-genesis-release/verify-ordinary-integrated/tests-20261024T222752Z.tap`,
+SHA256 `9ef37b08093bd07211f47f5c44abb962f05873985c8f0a9347e657b7a128130c`.
+The reproducible wrapper is `run-ordinary-integrated.sh` in the same private
+evidence directory.
+
+The nested `district-crawl-import` unchanged-current-refresh case reached its
+300s parent deadline, cancelling the final historical held-quality seal child
+and failing its outer case. The worker-diagnostics error-mode test then observed
+zero progress messages instead of one at `test/r1-step8-worker-diagnostics.test.ts:31`.
+Main identifies the latter as the known base race corrected by slice2; this
+branch does not alter that worker/test. These failures are genuine and remain
+in the retained full log; the passing focused result is not a replacement.
+No unrelated assertion, policy check, deadline or selected test was weakened.
+
+### Main-requested isolated crawl comparison
+
+The same complete `test/district-crawl-import.test.ts` file was run alone, with
+the unchanged300s ceiling, sequentially on this integrated branch and on
+detached base `d90de0e0ded5158cd40b45f015c45bee112d9c96`. Each run had a new
+disposable PostgreSQL cluster, CPU slot,3072MiB old-space and `free -g` captured
+immediately before Node. The created control worktree and its offline-installed
+dependencies were removed afterwards; retained evidence is outside it.
+
+| Run | Tests | Passed | Failed | Cancelled | Skipped | Duration |
+|---|---:|---:|---:|---:|---:|---:|
+| Integrated branch |66|63|1|2|0|440,818.115358ms|
+| d90de0e control |66|66|0|0|0|400,586.943804ms|
+
+The branch again reached the refresh parent's300s deadline
+(300,000.380562ms), cancelling the final historical held-quality seal child.
+The control's same parent finished in283,986.827361ms, including that final
+child's17,341.790897ms. Branch isolation therefore **did not prove a
+load-only timeout**. No crawl assertion or policy failure preceded its deadline;
+the comparison alone does not establish a cause, particularly since the
+control uses the newer Main base rather than6ac22aa.
+
+`free -g`: both runs had15GiB total and no swap; branch6used/4free/5buff-cache/
+9available, control5used/4free/6buff-cache/10available. These are start-of-run
+snapshots, not claims about peak memory.
+
+Evidence under
+`/home/max/.local/state/stadtstack-data/r2-genesis-release/`:
+
+- `crawl-isolated-branch/tests.tap`:
+  `e4dac1ffa29d5a0669d19865af11efd2774fc834548a0ec084bcc995012a242d`.
+- `crawl-isolated-branch/free-before.txt`:
+  `4eb7fdb17baf847f8c9c542597abeb654af3cd715789f893fee1e799a3ecf764`.
+- `crawl-isolated-d90de0e/tests.tap`:
+  `bab9ce2f88091a2db61976be1ae717fa6abaff5bec8271c8c82e9e6b58287899`.
+- `crawl-isolated-d90de0e/free-before.txt`:
+  `04fd741a30de66645bb78db96e78b7d01828e1bfa9655184d68e9e61506d4379`.
+- Reproducible `run-crawl-isolated.sh`:
+  `543f6645503ce5ed6fda31907b2d2801d21b6d4512bd8e443cbcd61c5977f355`.
+
+The full ordinary gate remains failed; neither isolated run rewrites that
+outcome. Main subsequently requested the observer-only comparison below.
+
+### Observer-only phase and IO comparison; no GENESIS regression
+
+Without changing repository source, the isolated file was profiled on both
+trees using private `profile-crawl.mjs`/`run-crawl-profile.sh`, the same300s
+ceiling and CPU-slot/memory limits. The unchanged branch **passed66/66**
+(410,499.189716ms). The control then hit the parent deadline: **66 tests,
+64 passed,1 failed,1 cancelled,0 skipped** (423,065.018615ms). Together with
+the uninstrumented runs, this demonstrates the near-deadline variability;
+the failed complete ordinary run is still not relabelled green.
+
+| Refresh-parent observer metric | Branch | d90de0e control |
+|---|---:|---:|
+| Duration |288,529.792334ms|300,001.197446ms|
+| FileHandle.sync/datasync calls |9,313|9,295|
+| Time in those calls |23,870.152142ms|23,411.908192ms|
+| lstat calls |1,401,837|1,398,466|
+| Time in lstat |83,571.454884ms|87,582.028756ms|
+| Synthetic mocked policy-wire calls |7|6|
+| Actual scheduled wire calls |0|0|
+| Admission-hook calls |0|0|
+| Writes to journal/progress-labelled paths |0|0|
+
+These parent totals are **not work-equivalent**: the control's deadline
+prevents final parent work. The retained matched14 direct-child phase table
+provides individual durations and IO counts without attributing existing
+authority/CAS fsyncs to network requests. Counts observe FileHandle APIs, not
+strace kernel counters; journal/progress labels are path classifications.
+There are zero actual admission-hook/reservation calls per synthetic policy
+request, not zero existing authority durability operations.
+
+The decisive boundary is `test/district-crawl-import.test.ts:464`: this entire
+refresh case replaces `PoliteFetcher.prototype.wire` with synthetic robots/TDM
+responses. Thus the real wire selector construction, scheduler and GENESIS
+durable reservation cannot run. Whole-file CPU profiles on branch/control show
+the same Core hotspots: `loadInventory`15.8%/15.4%, `directory`13.8%/13.6% and
+GC10.7%/10.7% of on-CPU time. Main agreed this is the load-dependent,
+near-deadline Core-v1 case, **not a GENESIS regression**. No speculative Core
+permission cache, wire redesign, deadline increase or unrelated source edit
+was made. The separately owned Core-v2 work is not claimed as included.
+
+Full phase/counter comparison:
+`/home/max/.local/state/stadtstack-data/r2-genesis-release/crawl-profile-comparison.json`,
+SHA256 `8d33afada1b8fb0b507fe09bc92e608455d506bef63346323167454ff785f496`.
+This includes all14 matched direct-child phase times, fsync/lstat counts and
+hook/request/journal counts. Raw evidence in the same directory:
+
+- `crawl-profile-branch/tests.tap`:
+  `40db7de16963c6f5453aadb0cf64673b13b006958d2371b5ee4b4991ef86164f`.
+- `crawl-profile-branch/profile-2277956.json`:
+  `d0cfd677ebfaac362ebc9fc4e722a0e7cecb50a0c825cafc21a5bfd9e27d726f`.
+- `crawl-profile-branch/cpu-2277956.cpuprofile`:
+  `3888d6e2ed06fa62466bcd5ddfd5c9cb6cce57a2fc62c9a56b970b8aa1bfc11f`.
+- `crawl-profile-d90de0e/tests.tap`:
+  `cdddfc6f9ac33733ac2f0a356696123967897b97157c039310aed573eaa36b99`.
+- `crawl-profile-d90de0e/profile-2279650.json`:
+  `0bce9b493da2a0d38e027f4acdba0bdff3ab17bac2c8f7cdcd6b98dddf0860ed`.
+- `crawl-profile-d90de0e/cpu-2279650.cpuprofile`:
+  `ede3c262007c0dd232b229014686e054e2a974c07ccd4d5617cc60ccfb56093c`.
+
+The observer and runner are pinned respectively by
+`135aa07632ce0a2ddc3da31f6cf16ce2a86f8f0925441f8e29aba521d5e506c5`
+and `8216a0a0842ee95f528c039648080019b3934d4794ee9d48346e9adef9c459a8`.
+Both disposable control worktrees and their dependencies were removed after
+their runs. All started jobs finished; no live source/credential/production
+mutation or parser-image/issuance gate was performed.

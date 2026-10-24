@@ -302,10 +302,10 @@
       "version": "v24.22.1",
       "sha256": "e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb"
     },
-    "codeSha256": "0fc31594c3c81e8f0afa1d69967ef6e209ef92b5a3cb1c7e910a88db83aad4b1",
+    "codeSha256": "a0a9f1022b395b8754b825687c9131c7a338ef6195377a6f63f67264090d38b9",
     "registryConfigurationSha256": "72ab4357cf2dbb49df8f3a66070097d71444af1f8253f27aa28de5b31fa0c957",
     "contracts": {
-      "acquisition": "fdb3a0f6abcfc57e8b7aaf2f52cf9f0e10cf379609b5321d21eb73c6c20e0aaa",
+      "acquisition": "0a7bbfa29e22ec41bae105214b8ca85f9b8ea76272b0f5397607fed85a1e192d",
       "genesis": {
         "adapterContractSha256": "f63616d5041aa8f10f193b0262f956c747a410630bc687b5ee66870df23095cf",
         "parserContractSha256": "3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599",

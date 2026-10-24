@@ -134,7 +134,7 @@
     },
     "preparedPoliteFetch": {
       "path": "stadtstack-data/src/polite-fetch.ts",
-      "sha256": "f514622d4842f940e05b2c60536ccc63bd3b281164e08a8b8d81ddec14745060",
+      "sha256": "afb3add27e0975b06c280a581720eb6cc64d5529cd491ccb68d4956db905942b",
       "meaning": "prepared branch bytes, not integrated runtime approval"
     },
     "preparedParserWorker": {
@@ -142,12 +142,12 @@
       "sha256": "e3ababc527e464d6275f53fd5fb3d9cbeaccb3e0c5c4e53c601a58f6b6640fd8"
     },
     "preparedContractsEvidence": {
-      "path": "reports/r2-acquisition-contract-measurement.json",
-      "sha256": "282c21ea480cd8fda8db4a3cc41b9bc70e74f9b41eb6a2957b2bddf09befa3e9",
-      "acquisitionContractSha256": "016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607",
-      "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
-      "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
-      "meaning": "Acquisition contract freshly measured in a separate Node 24.22.1 process on r2-policy-reuse after job-bound policy snapshot reuse; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
+      "path": "reports/r2-genesis-integrated-contract-measurement.json",
+      "sha256": "64b19b06cc8940c28aa9eab856e185cd5a9774db585247a34771d6f1b13f3f5a",
+      "acquisitionContractSha256": "0a7bbfa29e22ec41bae105214b8ca85f9b8ea76272b0f5397607fed85a1e192d",
+      "parserIsolationContractSha256": "281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73",
+      "parserOutputContractSha256": "3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599",
+      "meaning": "Fresh-process integrated r2-genesis-release measurement against rebuild-r1 6ac22aa preserves all policy snapshots and ports only actual wire identity; only acquisition changes among14 native functions plus structured MaStR/GENESIS. No installed parser/image/runtime approval is created. Other prepared review/image evidence remains its original historical evidence and must match the final issuance checkout."
     },
     "preparedCheckSummary": {
       "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json",

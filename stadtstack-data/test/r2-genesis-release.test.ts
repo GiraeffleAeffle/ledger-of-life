@@ -112,6 +112,10 @@ test('all effectful commands refuse a genuinely committed DRAFT before credentia
  for(const action of [()=>genesisPreflight(pin,root),()=>genesisMetadataReviewDraft(pin,root),()=>genesisEnqueue(pin,root,pin),()=>genesisAcquire(pin,root,pin,randomUUID())])await assert.rejects(action());
  await assert.rejects(lstat(fixture.executionRoot),{code:'ENOENT'});
 });
+test('GENESIS controller has no credential reader or eager readiness probe',async()=>{
+ const source=await readFile(new URL('../src/r2-genesis-executor.ts',import.meta.url),'utf8');
+ assert.doesNotMatch(source,/\b(?:readGenesisOwnerCredentials|checkCredentials)\b|genesis-owner-credentials/u,'Only the existing PoliteFetcher owner-account branch may load credentials just in time');
+});
 test('trusted Core hooks preserve native admission and request cap while strengthening pacing/redirects',async t=>{
  const fixture=await createCivicPolicyTestContext(t),selector=genesisDataSelectors()[0],order:string[]=[],job={id:randomUUID(),jobKey:hash,spec:{step:'acquire_representation',lane:'acquisition',semanticContractSha256:hash,inputArtifactHashes:[],sourceScope:selector.scope,selector,policyProofSha256:null},attempt:1,fencingToken:'1',runId:randomUUID(),enqueuedAt:new Date().toISOString(),startedAt:new Date().toISOString(),leaseExpiresAt:new Date(Date.now()+60000).toISOString(),dependencyReceiptIds:[],category:'development' as const};
  const store={pool:{query:async(sql:string)=>{if(sql.startsWith('INSERT')){order.push('native-configuration');return {rows:[{normalized_host:'*',shared_service_group:'r1-public-acquisition',max_in_flight:1,min_start_interval_ms:2500}],rowCount:1};}order.push('native-timing');return {rows:[{paused_reason:null,wait_ms:'0'}],rowCount:1};}}} as unknown as DistrictJobStore;
