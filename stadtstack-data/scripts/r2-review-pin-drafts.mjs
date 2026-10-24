@@ -1,5 +1,6 @@
 import {lstat,readFile,writeFile} from 'node:fs/promises';
 import {isAbsolute,resolve} from 'node:path';
+import {homedir} from 'node:os';
 import {z} from 'zod';
 import {ParserReviewSchema,PARSER_ISOLATION_VERSION,parserIsolationContractSha256,parserOutputContractSha256} from '../src/district-parser-isolation.ts';
 import {OmpReviewSchema,OMP_RUNNER_VERSION,OMP_HOST_VERSION,ompRunnerContractSha256} from '../src/district-omp-b-runner.ts';
@@ -22,11 +23,14 @@ async function existingNonProductionPath(path,label,kind){
   if(metadata.isSymbolicLink()||current!==absolute&&!metadata.isDirectory())throw Error(label+' path contains a symlink or non-directory ancestor');
  }
  if(!metadata||kind==='file'&&!metadata.isFile()||kind==='directory'&&!metadata.isDirectory())throw Error(label+' must be an existing '+kind);
- return absolute;
+ return {path:absolute,metadata};
 }
 const [inputPath,outDir]=process.argv.slice(2);
-if(process.argv.length!==4||!inputPath||!outDir)throw Error('Use absolute input and non-production draft output paths');
-const inputFile=await existingNonProductionPath(inputPath,'Review input','file'),outputDirectory=await existingNonProductionPath(outDir,'Draft output','directory');
+if(process.argv.length!==4||!inputPath||!outDir)throw Error('Use absolute input and the dedicated private draft root');
+const inputFile=(await existingNonProductionPath(inputPath,'Review input','file')).path;
+const {path:outputDirectory,metadata:outputMetadata}=await existingNonProductionPath(outDir,'Draft output','directory');
+const dedicatedDraftRoot=resolve(homedir(),'.local/state/stadtstack-data/r2-review-pin-drafts'),uid=process.getuid?.();
+if(outputDirectory!==dedicatedDraftRoot||uid===0||uid!==undefined&&outputMetadata.uid!==uid||(outputMetadata.mode&0o077)!==0)throw Error('Draft output must be the non-root owner-private dedicated R2 review-pin draft root');
 const input=InputSchema.parse(JSON.parse(await readFile(inputFile,'utf8')));
 if(Date.parse(input.parser.reviewedAt)>Date.now()||Date.parse(input.omp.reviewedAt)>Date.now())throw Error('Review timestamp cannot be in the future');
 const [parserOutputSha256,parserRunnerSha256,ompRunnerContractSha256Value]=await Promise.all([parserOutputContractSha256(),parserIsolationContractSha256(),ompRunnerContractSha256()]);

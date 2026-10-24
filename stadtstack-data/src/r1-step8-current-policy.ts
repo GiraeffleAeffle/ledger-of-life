@@ -5,6 +5,7 @@ import {OMP_NATIVE_STREAM_VERSION} from './district-omp-b-runner.ts';
 import {HashSchema,canonicalJson,digest} from './district-adapter-contract.ts';
 import {authenticateStructuredExecutionEvidence} from './r1-step8-structured-execution.ts';
 import type {StructuredExecutionCustody} from './r1-step8-structured-execution.ts';
+import * as civic from './civic-opt-out.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {createCanonicalWitnessReadPool} from './r1-step8-provenance.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
@@ -141,29 +142,51 @@ export function assertStep8R2JobCurrent(currentRaw:unknown,jobRaw:unknown){
  if(job.processingGenerationSha256!==current.generationSha256||job.semanticContractSha256!==current.contracts[job.contractFamily])throw Error('R2 job is missing or differs from current processing pins');
  return current.generationSha256;
 }
+export const STEP8_R2_DRAIN_EVIDENCE_MAX_AGE_MS=60_000;
 const R2InventoryDrainSchema=z.object({
  schemaVersion:z.literal('civic-inventory-drain-v2'),authoritySha256:HashSchema,inventorySha256:HashSchema,
  observedAt:z.iso.datetime(),noReaders:z.literal(true),noWriters:z.literal(true),
  reference:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/),
  pendingScratch:z.array(z.object({id:z.uuid(),sha256:HashSchema}).strict()),
 }).strict();
+const R2CoreDryRunSchema=z.object({status:z.literal('dry_run'),oldManifestSha256:HashSchema}).passthrough();
+const R2NonProductionPath=z.string().min(1).refine(value=>isAbsolute(value)&&value!=='/etc'&&!value.startsWith('/etc/'));
 const R2CutoverObservationSchema=z.object({
- authoritySha256:HashSchema,inventorySha256:HashSchema,observedAt:z.iso.datetime(),
- activeLeases:z.array(z.string().min(1).max(256)),oldReaderMarkers:z.array(z.string().min(1).max(4096)),
+ schemaVersion:z.literal('stadtstack-r2-cutover-observation-v1'),stateDir:R2NonProductionPath,
+ authorityId:z.string().min(1).max(200),authoritySha256:HashSchema,observedAt:z.iso.datetime(),
+ drainProofPath:R2NonProductionPath,activeLeases:z.array(z.string().min(1).max(256)),
+ oldReaderMarkers:z.array(z.string().min(1).max(4096)),
 }).strict();
-/** Validate the codec's exact read-only drain evidence plus current lease/reader
- * observations immediately before the manifest swap. */
-export function assertStep8R2CutoverReady(input:{
- authoritySha256:string;inventorySha256:string;observedAt:string;drainProofBytes:Uint8Array;drainSha256:string;
- activeLeases:readonly string[];oldReaderMarkers:readonly string[];now?:number;
-}){
- const observation=R2CutoverObservationSchema.parse({authoritySha256:input.authoritySha256,inventorySha256:input.inventorySha256,observedAt:input.observedAt,activeLeases:input.activeLeases,oldReaderMarkers:input.oldReaderMarkers});
- const bytes=Buffer.from(input.drainProofBytes);
- if(digest(bytes)!==input.drainSha256)throw Error('R2 drain-proof digest mismatch');
- let raw:unknown;
- try{raw=JSON.parse(bytes.toString('utf8'));}catch{throw Error('R2 drain proof is not JSON');}
- const drain=R2InventoryDrainSchema.parse(raw),now=input.now??Date.now();
- if(drain.authoritySha256!==observation.authoritySha256||drain.inventorySha256!==observation.inventorySha256||drain.observedAt!==observation.observedAt
-  ||Date.parse(drain.observedAt)>now||observation.activeLeases.length||observation.oldReaderMarkers.length)throw Error('R2 cutover requires no active leases or old readers');
- return {authoritySha256:drain.authoritySha256,inventorySha256:drain.inventorySha256,drainSha256:input.drainSha256};
+type Step8R2CutoverEvidenceInput={observationBytes:Uint8Array;observationSha256:string;drainProofBytes:Uint8Array;drainSha256:string};
+type Step8R2DrainEvidenceInput=Step8R2CutoverEvidenceInput&{now?:number};
+/** Authenticate the exact external observation and drain bytes before any live
+ * Core probe. The expected hashes are independently supplied by the operator. */
+export function assertStep8R2DrainEvidence(input:Step8R2DrainEvidenceInput){
+ const observationBytes=Buffer.from(input.observationBytes);
+ if(digest(observationBytes)!==input.observationSha256)throw Error('R2 observation digest mismatch');
+ let observationRaw:unknown;
+ try{observationRaw=JSON.parse(observationBytes.toString('utf8'));}catch{throw Error('R2 observation is not JSON');}
+ const observation=R2CutoverObservationSchema.parse(observationRaw),drainBytes=Buffer.from(input.drainProofBytes);
+ if(digest(drainBytes)!==input.drainSha256)throw Error('R2 drain-proof digest mismatch');
+ let drainRaw:unknown;
+ try{drainRaw=JSON.parse(drainBytes.toString('utf8'));}catch{throw Error('R2 drain proof is not JSON');}
+ const drain=R2InventoryDrainSchema.parse(drainRaw),now=input.now??Date.now(),observedAt=Date.parse(drain.observedAt);
+ if(!Number.isFinite(now)||drain.authoritySha256!==observation.authoritySha256||drain.observedAt!==observation.observedAt
+  ||observedAt>now||now-observedAt>STEP8_R2_DRAIN_EVIDENCE_MAX_AGE_MS||observation.activeLeases.length||observation.oldReaderMarkers.length)throw Error('R2 cutover requires fresh locked evidence and no active leases or old readers');
+ return {observation,drain};
+}
+/** The only readiness gate invokes Core's live migration dry-run itself.
+ * Core checks the current authority and raw inventory epoch under its exclusive
+ * fence; callers cannot substitute a fabricated epoch result. */
+export async function assertStep8R2CutoverReady(input:Step8R2CutoverEvidenceInput){
+ const evidence=assertStep8R2DrainEvidence({...input,now:Date.now()}),coreV2=civic as unknown as {
+  migrateCivicPolicyInventoryV2:(options:CivicPolicyOptions&{drainPath:string;drainSha256:string;dryRun:true})=>Promise<unknown>;
+ };
+ if(typeof coreV2.migrateCivicPolicyInventoryV2!=='function')throw Error('R2 cutover requires the merged Core v2 migration validator');
+ const current=R2CoreDryRunSchema.parse(await coreV2.migrateCivicPolicyInventoryV2({
+  stateDir:evidence.observation.stateDir,authorityId:evidence.observation.authorityId,authoritySha256:evidence.observation.authoritySha256,
+  drainPath:evidence.observation.drainProofPath,drainSha256:input.drainSha256,dryRun:true,
+ }));
+ if(current.oldManifestSha256!==evidence.drain.inventorySha256)throw Error('R2 cutover requires fresh locked evidence and no active leases or old readers');
+ return {observationSha256:input.observationSha256,authoritySha256:evidence.drain.authoritySha256,inventorySha256:evidence.drain.inventorySha256,drainSha256:input.drainSha256,observedAt:evidence.drain.observedAt,lockedInventorySha256:current.oldManifestSha256};
 }

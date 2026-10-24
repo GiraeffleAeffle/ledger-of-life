@@ -369,7 +369,10 @@ used the explicit test-only localhost wire seam and isolated fixture authority;
 no civic source was fetched. All checks ran under
 `/home/max/.local/bin/stadtstack-cpu-slot` with `umask 022`, Node24.22.1 and
 worktree-local dependencies.
-
+The contract-cutover transition suite reports **6 tests: 5 passed, 0 failed,
+1 skipped**; the skip is the explicitly pending Core v2 migration/old-reader
+integration and is not a passing gate. `tsc --noEmit` also passed after these
+cutover changes.
 
 No live-source fetch, issuance, source-fetch-stop lift, parser build/SBOM,
 privileged review or production CLI/DB write was run. The executor
@@ -437,10 +440,13 @@ Follow this order:
    `omp:{imageId,ompBinarySha256,hostResolverBinarySha256,dockerDaemonId,securityReviewId,reviewedBy,reviewedAt,dockerSocket}`.
    The identities, image/binary/daemon hashes and review time come from the
    real independent review and host inspection; do not use synthetic/example
-   values for issuance. Choose an existing private non-`/etc/stadtstack`
-   output directory:
+   values for issuance. The generator accepts only the current user's dedicated
+   owner-private root, not arbitrary directories or managed policy/CAS/cache
+   state:
 
    ```sh
+   DRAFT_DIR="$HOME/.local/state/stadtstack-data/r2-review-pin-drafts"
+   install -d -m 0700 "$DRAFT_DIR"
    node --experimental-strip-types scripts/r2-review-pin-drafts.mjs "$REVIEW_INPUT" "$DRAFT_DIR"
    sha256sum "$DRAFT_DIR/parser-isolation-review.draft.json" "$DRAFT_DIR/omp-b-review.draft.json"
    ```
@@ -459,12 +465,14 @@ Follow this order:
    ```sh
    sudo install -o root -g root -m 0644 "$DRAFT_DIR/parser-isolation-review.draft.json" /etc/stadtstack/parser-isolation-review.json
    sudo install -o root -g root -m 0644 "$DRAFT_DIR/omp-b-review.draft.json" /etc/stadtstack/omp-b-review.json
+   cmp -- "$DRAFT_DIR/parser-isolation-review.draft.json" /etc/stadtstack/parser-isolation-review.json
+   cmp -- "$DRAFT_DIR/omp-b-review.draft.json" /etc/stadtstack/omp-b-review.json
    sudo stat -c '%U:%G %a %n' /etc/stadtstack/parser-isolation-review.json /etc/stadtstack/omp-b-review.json
    ```
 
-   Confirm the displayed ownership/mode is `root:root 644`; both review
-   readers also reject unsafe ancestry, symlinks, future review times, schema
-   drift and stale runner hashes.
+   Confirm both byte-for-byte comparisons succeed and the displayed
+   ownership/mode is `root:root 644`; both readers also reject unsafe ancestry,
+   symlinks, future review times, schema drift and stale runner hashes.
 6. **Sentinels and compatibility gates.** First read each installed review
    through the production reader, which checks the exact current contract
    without launching Docker, reading credentials or writing authority:
@@ -499,26 +507,42 @@ Follow this order:
      test/r2-contract-transition.test.ts
    ```
 
+   The v2-reader compatibility case is a conditional pending integration test:
+   it must run (not skip) after the Core codec/migration source is merged. It
+   provisions a fixture authority, commits a valid manifest through Core's
+   exported v2 migration, verifies the v2 reader accepts the same inventory ID,
+   then verifies the R1 reader rejects without rewriting it. Do not count its
+   current pre-merge skip as a passing compatibility gate.
+
    These are not model calls or a substitute for a real image review. The
    parser environment flag enables tests; it does not authorize the sandbox.
    For the inventory boundary, include the deployed 0.3.2 tools, old R1 tools,
    every Core consumer, active scratch/daemon callbacks, and any inventory
-   writer/reader in the real read-only lease/process/old-reader-marker
-   observations. Collect the exact Core drain-proof bytes at the same
-   timestamp, hash those bytes, and run:
+   writer/reader in a genuine, exhaustive process/old-reader-marker census.
+   The observation JSON pins `stateDir`, `authorityId`, `authoritySha256`,
+   `observedAt`, `drainProofPath`, `activeLeases` and `oldReaderMarkers`.
+   Independently hash-pin both the complete observation JSON and exact Core
+   drain-proof bytes; neither expected hash may be taken from the file it pins.
+   The drain and census `observedAt` values must match, and the evidence must be
+   no more than 60 seconds old at check time. Run:
 
    ```sh
-   node --experimental-strip-types scripts/r2-cutover-check.mjs "$DRAIN_OBSERVATION"
+   node --experimental-strip-types scripts/r2-cutover-check.mjs \
+     "$DRAIN_OBSERVATION" "$OBSERVATION_SHA256" "$DRAIN_SHA256"
    ```
 
-   This tool validates the strict v2 drain-proof schema/digest, exact
-   authority/inventory/time match, no future observation, and empty supplied
-   active-lease/old-reader-marker lists. It does not probe the authority or
-   prove that an operator's observations are genuine. Stop on any lease or
-   marker; do not retry the cutover with a fabricated empty observation. The
-   R1 old-reader fixture uses a local strict codec-schema adapter until the
-   v2 codec is merged; at integration, use the codec's exported schema rather
-   than weakening or duplicating its contract.
+   The checker invokes Core's merged `migrateCivicPolicyInventoryV2` with
+   `dryRun:true`. Core takes/releases its exclusive inventory lock, verifies
+   the current authority and raw inventory hash against the independently
+   pinned drain proof under that fence, and refuses live inventory leases or
+   writers; it does not migrate or replace the inventory. The checker also
+   refuses a stale/future/replayed drain timestamp or any non-empty
+   hash-pinned lease/old-reader census. A missing Core v2 validator fails
+   closed. Stop on every lease or marker; never retry using a fabricated empty
+   census.
+   This readiness result is a point-in-time preflight, not a lease or reusable
+   authorization. Any actual migration must repeat its checks under its own
+   lock.
 7. **Issue the R2 district v3 record separately.** Main/lead must resolve the
    source-fetch security review, exact final source/manifest and registry
    membership, genuine owner approval, final R1 digest inventory, real current
@@ -537,25 +561,27 @@ Follow this order:
 
 - The listed R2 slices must be merged, reviewed together and committed as one
   clean integrated source revision; this branch does not merge them.
-- The complete fourteen-contract report must be generated twice on that exact
-  tree, reconciled, retained externally and used to mint the current generation
-  pin. The report currently only defines the measurement procedure.
+- The fourteen-contract fingerprint tool is implemented, but the exact final
+  report still must be generated twice on the clean integrated tree, reconciled,
+  retained externally and used to mint the current generation pin.
 - The pure R1/R2 pin validators must be wired into the merged job/receipt
   boundary: authenticated historical R1 jobs use their exact recorded pin set,
   and every newly admitted R2 job must pass the current-generation check. The
-  focused fixtures prove validator behavior, not integration into a live queue.
+  focused fixtures prove validator behavior, not live queue integration.
+- Core's v2 codec/migration source is not merged in this branch. The checker
+  fails closed until Core exposes its locked migration dry-run, and the valid
+  committed-v2 compatibility test is explicitly pending/skipped until that
+  source exists; after merge it must run and pass without a skip.
 - The parser image must be rebuilt if its final image inputs/worker differ from
   the candidate, then independently reviewed with current real image/SBOM
   identity. The OMP runner/image/resolver/daemon review and both root-owned
   installed files remain a lead action.
 - Installed-review readback, parser image sentinels, OMP source-free
-  compatibility tests and genuine current lease/old-reader observations must
-  all pass on the freeze host.
+  compatibility tests, Core's live fenced dry-run and a genuine externally
+  hash-pinned lease/old-reader census must all pass on the freeze host.
 - R2 v3 and the separate structured GENESIS v3 each need genuine owner/source
   proofs and explicit Main/lead issuance. Neither current draft status nor
   these offline tests imply permission to fetch or use GENESIS credentials.
-- The final ordinary-phase run on this worktree is not green yet: 2,292 tests,
-  2,243 passed, 1 failed, 0 cancelled and 48 skipped. The remaining failure is
-  `test/r2-acquisition-executor.test.ts`'s retained-byte budget fixture
-  (`unhandledRejection: RETAINED_BYTE_BUDGET`); resolve it in the executor slice
-  before declaring the freeze gate clean.
+- This worktree's ordinary phase passed: **2,293 tests, 2,244 passed, 0 failed,
+  0 cancelled and 49 skipped**. One skip is the pending Core v2 integration
+  above; rerun ordinary on the clean integrated tree before freeze.

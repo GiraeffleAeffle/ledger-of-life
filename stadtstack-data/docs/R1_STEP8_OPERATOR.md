@@ -1631,15 +1631,20 @@ issue or use GENESIS credentials. Details, schemas and commands are in
    image inputs differ from the candidate; record the actual immutable image
    digest and refreshed image/SBOM evidence.
 4. **Review:** independently review the final parser image/isolation boundary
-   and OMP-B image, runner, host resolver and daemon; generate only schema-valid
-   review-pin drafts from real review metadata.
-5. **Authorization install:** the authorized lead installs the approved exact
-   draft bytes with `sudo install -o root -g root -m 0644`; verify both files
-   are root-owned mode `0644`. Generators never write `/etc/stadtstack`.
+   and OMP-B image, runner, host resolver and daemon; generate exact
+   `ParserReviewSchema` / `OmpReviewSchema` drafts only in the dedicated private
+   `$HOME/.local/state/stadtstack-data/r2-review-pin-drafts` root.
+5. **Authorization install:** the authorized lead installs only the approved
+   draft bytes with `sudo install -o root -g root -m 0644` to
+   `/etc/stadtstack/parser-isolation-review.json` and
+   `/etc/stadtstack/omp-b-review.json`; verify byte identity, `root:root`
+   ownership and mode `0644`. Generators never write `/etc/stadtstack`.
 6. **Sentinels:** read back both installed pins through their strict current
-   readers; run the reviewed-image parser sentinels, OMP-B contract fixtures,
-   and the current drain check. Cutover must refuse any active lease or
-   old-reader marker.
+   readers; run the reviewed-image parser sentinels and source-free OMP-B /
+   compatibility fixtures. Run the cutover checker using independently pinned
+   observation and drain hashes; its Core dry-run validates current authority
+   and inventory under the exclusive fence, and refuses any active lease,
+   reader marker, stale evidence or mismatch.
 7. **v3 issuance:** Main/lead separately resolves and issues the R2 district
    acquisition v3 record only after its genuine owner/source/runtime evidence
    is final. The prepared draft does not lift the stop.
