@@ -116,7 +116,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer)=>Promise<void>}
+export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -409,7 +409,7 @@ export class PoliteFetcher {
    try{response=await this.scheduled(url,state=>{started=true;return this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state));},(result,state)=>this.recordHostResponse(url,result,state));}
    catch(error){if(started)await this.onWireAttemptResult?.(url.href,error instanceof PoliteFetchError?error.status??null:null,error instanceof PoliteFetchError?error.failure:'network_error');throw error;}
    if(started)await this.onWireAttemptResult?.(url.href,response.status,response.status>=400?`http_${response.status}`:null);
-   if(started)await this.onWireResponse?.(url.href,response.status,response.body);
+   if(started)await this.onWireResponse?.(url.href,response.status,response.body,response.headers['content-type']??'');
    return response;
  }
  /** Current-proof validators must come from the actual immutable observation,

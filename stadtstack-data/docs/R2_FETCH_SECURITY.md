@@ -19,18 +19,29 @@ before Main creates any genuinely issued release.
 ### Executor record-binding contract
 
 The executor accepts no draft as authorization. Its release input is an
-authority-worktree record path plus the expected SHA-256 of the complete raw
-record file. The record must exactly match this v3 draft's schema and values,
-with only these issuance fields added/replaced: `status:"ISSUED"`,
+authority-worktree record path plus the expected SHA-256 of its complete raw
+bytes. The record must exactly match this v3 draft's schema and values, with
+only these issuance fields added/replaced: `status:"ISSUED"`,
 RFC3339 `issuedAt`, non-empty `approver`, RFC3339 `validFrom` and `expiresAt`,
 `sourceFetchStopLifted:true`, and
-`ownerApprovalReference:{sha256:<exact acquisition-manifest SHA-256>}`.
-The executor rejects schema drift, hash mismatch, a not-yet-valid/expired
-window, or a manifest hash other than the owner reference. Paths and expected
-hashes are explicit inputs, never inferred. The draft's `approvedBy:null`,
-empty issuance clock and `sourceFetchStopLifted:false` do not meet this
-contract. This describes the required later issuance record; it does not issue
-one, authorize a fetch, or lift the current stop.
+`ownerApprovalReference:{sha256:<exact acquisition-manifest SHA-256>,
+approvalRecordPath:<authority-worktree path>,
+approvalRecordSha256:<owner-approval raw-file SHA-256>}` plus
+`r1DigestInventoryReference:{sha256:<final R1 inventory raw-file SHA-256>}`.
+The owner-approval file must itself be a regular non-symlink v1 approval record
+whose `approved.acquisition.manifest.sha256` equals the pinned manifest digest.
+The separately supplied final R1 inventory is a raw-hash-pinned
+`r2-r1-digest-inventory-v1` JSON file with unique canonical `{url,sourceIds,
+sha256}` entries; every exact manifest URL/source binding must be covered and
+`sha256:null` means no sealed R1 original was recorded for that URL. Its path
+and expected SHA-256 are explicit executor arguments and the record's inventory
+digest must match. The executor binds to SHA-256 of the complete raw issued
+record file. It rejects schema drift, hash mismatch, a not-yet-valid/expired
+window, or a manifest/inventory hash other than the issued reference. Paths and
+expected hashes are explicit inputs, never inferred. The draft's
+`approvedBy:null`, empty issuance clock and `sourceFetchStopLifted:false` do not
+meet this contract. This describes the required later issuance record; it does
+not issue one, authorize a fetch, or lift the current stop.
 
 Changed bytes are durably recorded in the executor's append-only journal as
 `changed_since_r1` representations, with their source ID, R1/new digests, and
@@ -39,14 +50,19 @@ completed/admitted until a separately reviewed record with
 `schemaVersion:"r2-changed-source-release-v1"`, `id:"r2-changed-source-release"`,
 `reviewedBy`, RFC3339 `reviewedAt`, non-empty `reason`, and
 `representations:[{url,sourceId,sha256,r1Sha256}]` is supplied with its expected
-raw-file SHA-256. It releases only exact listed tuples. Preparation accepts the
-same guard through its policy options and carries it in the pinned preparation
-plan; preparation and extraction/inference recheck those exact tuples before
-admission. A missing guard/release keeps the representation held. Neither
-acquisition approval nor the ten-document batch review releases changed bytes.
-This mechanism covers already-known R1 original digests; it does not claim a
-semantic detector for anomalous MIME/template/mass-host changes or independent
-review of high-impact additions.
+raw-file SHA-256. It releases only exact listed tuples and never waives MIME,
+body/HTML, retained-byte, or document budgets; the held CAS bytes are rehashed
+and rechecked against those limits immediately before release. The `r2Integrity`
+provenance is included in authenticated source references and managed-source
+bindings; preparation, inference, cache reads/writes and worker re-entry derive
+the integrity gate from those source references rather than trusting a caller
+option. Mixed, absent or mismatched R2 provenance is refused. A missing release
+keeps the representation held. Neither acquisition approval nor the ten-document
+batch review releases changed bytes. The ten-document checkpoint binds journal
+sequence, record hash and the complete digest set; a raw-hash-pinned review
+issued after that checkpoint is single-use. This mechanism covers already-known
+R1 original digests; it does not claim a semantic detector for anomalous
+MIME/template/mass-host changes or independent review of high-impact additions.
 The executor journal is fsynced after each attempt-state transition and each
 response byte, binds its record/manifest hashes, and is protected by a
 cross-process exclusive lock. Budget usage is reconstructed from the journal
@@ -248,9 +264,9 @@ These are prepared branch fingerprints, not integrated-image approvals.
 
 ## Exercised verification
 
-Every Node check used
-`flock /home/max/.local/state/stadtstack-data/test-cpu.lock taskset -c 2-7 nice -n 10`,
-Node24.22.1 and umask022. `tsc --noEmit` completed exit0 with no output.
+Executor verification used `/home/max/.local/bin/stadtstack-cpu-slot bash -c
+'umask 022; <command>'`, Node24.22.1 and the worktree-local dependency tree.
+The focused executor run reports below; no production/live-source operation ran.
 The combined focused run used `--test-concurrency=1 --test-isolation=none` for
 polite-fetch, district-parser-worker and district-parser-isolation tests:
 **117 total,92 passed,0 failed/cancelled,25 skipped**,39.63s test duration.
@@ -271,13 +287,15 @@ pause, changed-byte quarantine and exact changed-source release matching,
 crash-resume without refetching completed URLs, journal status accounting and
 cross-instance exclusion. The redirect integration test used a deterministic
 localhost HTTP fixture; tests exercised only the explicit test seam. Preparation
-and inference use the shared `assertPreparedSourcesActive` integrity gate, with
-the guard pinned into the preparation plan and rechecked before model calls.
-A fresh Node process measured the current `acquisitionContract()` as
-`083b564ac78f8756e915733a658b9b49d43f34d05aeef3df5d219c2cbca41fc9`; this
-replaces the pre-follow-up measurement recorded above. The issued v3 record is
-bound by the raw-record SHA-256 argument, while the exact manifest bytes are
-independently SHA-256 checked and must equal
+and inference use the shared `assertPreparedSourcesActive` integrity gate.
+The R2 guard is persisted in managed source bindings and authenticated source
+references, required to match the pinned preparation plan and derived from
+those references in coordinator and worker paths. In a fresh Node24.22.1 process,
+`acquisitionContract()` measured `fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c`
+at base `f2876ef` and
+`330f45c5254c2fecb0999481a106b81f372782cbef839403a0ef67482f0773c1` after this
+change. The issued v3 record is bound by the raw-record SHA-256 argument, while
+the exact manifest bytes are independently SHA-256 checked and must equal
 `ownerApprovalReference.sha256`. No live-source fetch, issuance, stop lift,
 parser build/SBOM, privileged review, production CLI/DB write or full-suite
 check was run.

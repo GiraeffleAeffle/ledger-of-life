@@ -14,7 +14,7 @@ import {readBoundSourceObservation} from './source-observation.ts';
 export const PREPARATION_ARTIFACT_ROOT=join(dirname(PREPARED_VM_ROOT),'preparation-artifacts');
 export const preparedExpectationSchema=PreparedDocumentSchema.pick({receiptSha256:true,municipalityId:true,sourceSha256:true,extractorSha256:true,references:true,toolVersions:true}).strict();
 export const preparationGroupSchema=z.object({municipality:municipalityBindingSchema,documentIds:z.array(z.string()).min(1),expected:preparedExpectationSchema,referenceWarnings:z.array(z.object({documentId:z.string(),sourceId:z.string(),reason:z.string()}).strict())}).strict();
-export const preparationPlanSchema=z.object({schemaVersion:z.literal('stadtstack-preparation-plan-v1'),generatedAt:z.iso.datetime(),corpusSha256:authorizedPilotCorpusSchema,registrySha256:hashSchema,extractorSha256:hashSchema,maxDocumentsPerMunicipality:z.number().int().positive().nullable(),r2Integrity:z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:hashSchema.optional()}).strict().optional(),availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative(),municipalities:z.array(municipalityBindingSchema.extend({availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative()})),groups:z.array(preparationGroupSchema),quarantine:z.array(quarantineCaseSchema)}).strict();
+export const preparationPlanSchema=z.object({schemaVersion:z.literal('stadtstack-preparation-plan-v1'),generatedAt:z.iso.datetime(),corpusSha256:authorizedPilotCorpusSchema,registrySha256:hashSchema,extractorSha256:hashSchema,maxDocumentsPerMunicipality:z.number().int().positive().nullable(),r2Integrity:z.object({journalPath:z.string().min(1),recordSha256:hashSchema,manifestSha256:hashSchema,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:hashSchema.optional()}).strict().optional(),availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative(),municipalities:z.array(municipalityBindingSchema.extend({availableDocumentGroups:z.number().int().nonnegative(),selectedDocumentGroups:z.number().int().nonnegative(),selectedRepresentations:z.number().int().nonnegative()})),groups:z.array(preparationGroupSchema),quarantine:z.array(quarantineCaseSchema)}).strict().superRefine((plan,ctx)=>{for(const reference of plan.groups.flatMap(group=>group.expected.references)){if(JSON.stringify(reference.r2Integrity)!==JSON.stringify(plan.r2Integrity))ctx.addIssue({code:'custom',message:'Preparation plan R2 guard must exactly match every authenticated source reference'});}});
 export type PreparationPlan=z.infer<typeof preparationPlanSchema>;
 export type PreparationGroup=z.infer<typeof preparationGroupSchema>;
 
@@ -47,9 +47,13 @@ export async function prepareFrozenCorpus(options:{index:string;expectedIndexSha
     if(resolve(dirname(resolve(options.index)),document.localPath)!==resolve(options.rawRoot,'sha256',document.sha256))throw Error('Frozen source path differs from its original managed CAS location');
     const acquired=await readBoundSourceObservation({rawRoot:options.rawRoot,document,policy,registeredSource:source});
     if(mimeType&&mimeType!==document.mimeType)throw Error('Source MIME conflict within identical-byte group');
-    references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:acquired.policy});
-    sourceBindings.push(acquired.binding);
-    acquisitionBindings.push(acquired.binding);
+    const bindingGuard='r2Integrity' in acquired.binding?acquired.binding.r2Integrity:undefined;
+    if(bindingGuard&&policy.r2Integrity&&JSON.stringify(bindingGuard)!==JSON.stringify(policy.r2Integrity))throw Error('Caller R2 integrity option differs from authenticated acquisition binding');
+    const r2Integrity=bindingGuard??policy.r2Integrity;
+    references.push({id:source.id,url:document.url,sha256:document.sha256,retrievedAt:document.retrievedAt,locator:`document-sha256:${document.sha256}`,mimeType:document.mimeType,sourceType:source.kind,policy:acquired.policy,...(r2Integrity?{r2Integrity}:{})});
+    const bound= r2Integrity?{...acquired.binding,r2Integrity}:acquired.binding;
+    sourceBindings.push(bound);
+    acquisitionBindings.push(bound);
     bytes??=acquired.sourceBytes;mimeType??=document.mimeType;
    }catch(error){options.signal?.throwIfAborted();if(error instanceof HostOptedOutError||error instanceof CivicPolicyStateError)throw error;warnings.push({documentId:document.id,sourceId:document.sourceId,reason:safeFailure(error)});}
   }

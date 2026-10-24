@@ -46,19 +46,21 @@ const rootSchema=z.object({id:hex,path:z.string(),kind:kindSchema,identity:ident
 const publicationBindingSchema=z.object({manifestSha256:hex,releaseId:opaque,memberPath:z.string().min(1).max(2048).refine(value=>!isAbsolute(value)&&!value.includes('\\')&&value.split('/').every(part=>!!part&&part!=='.'&&part!=='..')),memberSha256:hex,memberBytes:z.number().int().nonnegative().max(MAX_CONTENT)}).strict();
 const gitSnapshotBindingSchema=z.object({gitCommit:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),path:z.string().min(1).max(2048).refine(value=>!isAbsolute(value)&&!value.includes('\\')&&value.split('/').every(part=>!!part&&part!=='.'&&part!=='..')),blobOid:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/),sha256:hex,bytes:z.number().int().nonnegative().max(MAX_CONTENT)}).strict();
 const registryApprovalSchema=z.object({role:z.literal('district_source_registry'),approver:z.literal('owner'),decisionId:z.literal(CIVIC_ACQUISITION_DECISION_ID),date:z.literal('2026-10-11'),configurationSha256:hex,gitCommit:z.string().regex(/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/)}).strict();
-function validProvenanceShape(value:{kind:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:z.infer<typeof gitSnapshotBindingSchema>;approval?:z.infer<typeof registryApprovalSchema>}):boolean{
- if(value.kind==='operator_registry_config')return value.sourceSha256===null&&!!value.configurationSha256&&!!value.schemaContractSha256&&!!value.code&&!!value.approval&&value.code.path==='stadtstack-data/sources/district-registry.json'&&value.code.sha256===value.configurationSha256&&value.approval.configurationSha256===value.configurationSha256&&value.approval.gitCommit===value.code.gitCommit&&!value.publication&&!value.snapshot&&!value.purpose&&!value.observationId&&!value.receiptSha256;
+const r2IntegritySchema=z.object({journalPath:z.string().min(1),recordSha256:hex,manifestSha256:hex,changedSourceReleasePath:z.string().min(1).optional(),changedSourceReleaseSha256:hex.optional()}).strict().superRefine((value,ctx)=>{if(!!value.changedSourceReleasePath!==!!value.changedSourceReleaseSha256)ctx.addIssue({code:'custom',message:'Changed-source release path and digest must be supplied together'});});
+function validProvenanceShape(value:{kind:string;sourceSha256:string|null;observationId?:string;receiptSha256?:string;publication?:unknown;snapshot?:unknown;purpose?:string;configurationSha256?:string;schemaContractSha256?:string;code?:z.infer<typeof gitSnapshotBindingSchema>;approval?:z.infer<typeof registryApprovalSchema>;r2Integrity?:z.infer<typeof r2IntegritySchema>}):boolean{
+ if(value.kind==='operator_registry_config')return !value.r2Integrity&&value.sourceSha256===null&&!!value.configurationSha256&&!!value.schemaContractSha256&&!!value.code&&!!value.approval&&value.code.path==='stadtstack-data/sources/district-registry.json'&&value.code.sha256===value.configurationSha256&&value.approval.configurationSha256===value.configurationSha256&&value.approval.gitCommit===value.code.gitCommit&&!value.publication&&!value.snapshot&&!value.purpose&&!value.observationId&&!value.receiptSha256;
  if(value.configurationSha256!==undefined||value.schemaContractSha256!==undefined||value.code!==undefined||value.approval!==undefined)return false;
+ if(value.r2Integrity&&value.kind!=='http_observation'&&value.kind!=='prepared_source')return false;
  if(value.kind==='authenticated_git_snapshot')return !!value.snapshot&&value.purpose==='historical_change_reconstruction_only'&&!value.publication&&!value.observationId&&!value.receiptSha256;
  if(value.snapshot!==undefined||value.purpose!==undefined)return false;
  if(value.kind==='retained_publication')return !!value.publication&&!value.observationId&&!value.receiptSha256;
  if(value.kind==='pre_admission'||value.kind==='preparation_input')return !!value.sourceSha256&&!value.publication&&!value.observationId&&!value.receiptSha256;
  return !!value.sourceSha256&&!!value.observationId&&!!value.receiptSha256&&!value.publication;
 }
-const entrySchema=z.object({id:hex,rootId:hex,relativePath:z.string(),contentSha256:hex,kind:z.enum(['http_observation','prepared_source','retained_publication','authenticated_git_snapshot','operator_registry_config']),sourceSha256:hex.nullable(),host:z.string(),urlSha256:hex,observationId:opaque.optional(),receiptSha256:hex.optional(),publication:publicationBindingSchema.optional(),snapshot:gitSnapshotBindingSchema.optional(),purpose:z.literal('historical_change_reconstruction_only').optional(),configurationSha256:hex.optional(),schemaContractSha256:hex.optional(),code:gitSnapshotBindingSchema.optional(),approval:registryApprovalSchema.optional(),independentAllowed:z.boolean(),state:z.enum(['active','revoked','deleted','missing'])}).strict().superRefine((value,ctx)=>{
+const entrySchema=z.object({id:hex,rootId:hex,relativePath:z.string(),contentSha256:hex,kind:z.enum(['http_observation','prepared_source','retained_publication','authenticated_git_snapshot','operator_registry_config']),sourceSha256:hex.nullable(),host:z.string(),urlSha256:hex,observationId:opaque.optional(),receiptSha256:hex.optional(),publication:publicationBindingSchema.optional(),snapshot:gitSnapshotBindingSchema.optional(),purpose:z.literal('historical_change_reconstruction_only').optional(),configurationSha256:hex.optional(),schemaContractSha256:hex.optional(),code:gitSnapshotBindingSchema.optional(),approval:registryApprovalSchema.optional(),r2Integrity:r2IntegritySchema.optional(),independentAllowed:z.boolean(),state:z.enum(['active','revoked','deleted','missing'])}).strict().superRefine((value,ctx)=>{
  if(!validProvenanceShape(value)||['retained_publication','authenticated_git_snapshot','operator_registry_config'].includes(value.kind)&&value.independentAllowed)ctx.addIssue({code:'custom',message:'Source provenance kind and proof differ'});
 });
-const scratchSourceSchema=z.object({host:z.string(),urlSha256:hex,kind:z.enum(['http_observation','prepared_source','retained_publication','authenticated_git_snapshot','operator_registry_config','pre_admission','preparation_input']),sourceSha256:hex.nullable(),observationId:opaque.optional(),receiptSha256:hex.optional(),publication:publicationBindingSchema.optional(),snapshot:gitSnapshotBindingSchema.optional(),purpose:z.literal('historical_change_reconstruction_only').optional(),configurationSha256:hex.optional(),schemaContractSha256:hex.optional(),code:gitSnapshotBindingSchema.optional(),approval:registryApprovalSchema.optional()}).strict().superRefine((value,ctx)=>{
+const scratchSourceSchema=z.object({host:z.string(),urlSha256:hex,kind:z.enum(['http_observation','prepared_source','retained_publication','authenticated_git_snapshot','operator_registry_config','pre_admission','preparation_input']),sourceSha256:hex.nullable(),observationId:opaque.optional(),receiptSha256:hex.optional(),publication:publicationBindingSchema.optional(),snapshot:gitSnapshotBindingSchema.optional(),purpose:z.literal('historical_change_reconstruction_only').optional(),configurationSha256:hex.optional(),schemaContractSha256:hex.optional(),code:gitSnapshotBindingSchema.optional(),approval:registryApprovalSchema.optional(),r2Integrity:r2IntegritySchema.optional()}).strict().superRefine((value,ctx)=>{
  if(!validProvenanceShape(value))ctx.addIssue({code:'custom',message:'Scratch provenance kind and proof differ'});
 });
 const scratchSchema=z.object({
@@ -241,8 +243,8 @@ export type OperatorRegistryApproval=z.infer<typeof registryApprovalSchema>;
 const sourceUrlSchema=z.string().refine(value=>{try{hostFromUrl(value);return true;}catch{return false;}},{message:'Public HTTP(S) source URL required'});
 /** Closed wire codec only: live authority and exact inventory checks remain mandatory. */
 export const ManagedSourceBindingSchema=z.discriminatedUnion('kind',[
- z.object({kind:z.literal('http_observation'),url:sourceUrlSchema,sourceSha256:hex,observationId:opaque,receiptSha256:hex}).strict(),
- z.object({kind:z.literal('prepared_source'),url:sourceUrlSchema,sourceSha256:hex,observationId:opaque,receiptSha256:hex}).strict(),
+ z.object({kind:z.literal('http_observation'),url:sourceUrlSchema,sourceSha256:hex,observationId:opaque,receiptSha256:hex,r2Integrity:r2IntegritySchema.optional()}).strict(),
+ z.object({kind:z.literal('prepared_source'),url:sourceUrlSchema,sourceSha256:hex,observationId:opaque,receiptSha256:hex,r2Integrity:r2IntegritySchema.optional()}).strict(),
  z.object({kind:z.literal('retained_publication'),url:sourceUrlSchema,sourceSha256:hex.nullable().optional(),publication:publicationBindingSchema}).strict(),
  z.object({kind:z.literal('authenticated_git_snapshot'),purpose:z.literal('historical_change_reconstruction_only'),url:sourceUrlSchema,sourceSha256:hex.nullable().optional(),snapshot:gitSnapshotBindingSchema}).strict(),
  z.object({kind:z.literal('operator_registry_config'),url:sourceUrlSchema,configurationSha256:hex,schemaContractSha256:hex,code:gitSnapshotBindingSchema,approval:registryApprovalSchema}).strict(),
@@ -772,7 +774,8 @@ function sourceProvenance(input:ManagedSourceBinding){
  if(input.kind==='authenticated_git_snapshot'){if(input.purpose!=='historical_change_reconstruction_only')throw new CivicPolicyStateError('HISTORICAL_SOURCE_PURPOSE_REQUIRED');return {kind:input.kind,purpose:input.purpose,sourceSha256:input.sourceSha256==null?null:hex.parse(input.sourceSha256),snapshot:gitSnapshotBindingSchema.parse(input.snapshot)};}
  if(input.kind==='retained_publication')return {kind:input.kind,sourceSha256:input.sourceSha256==null?null:hex.parse(input.sourceSha256),publication:publicationBindingSchema.parse(input.publication)};
  if(input.kind!=='http_observation'&&input.kind!=='prepared_source')throw new CivicPolicyStateError('SOURCE_PROVENANCE_KIND_REQUIRED');
- return {kind:input.kind,sourceSha256:hex.parse(input.sourceSha256),observationId:opaque.parse(input.observationId),receiptSha256:hex.parse(input.receiptSha256)};
+ const r2Integrity=input.r2Integrity?r2IntegritySchema.parse(input.r2Integrity):undefined;
+ return {kind:input.kind,sourceSha256:hex.parse(input.sourceSha256),observationId:opaque.parse(input.observationId),receiptSha256:hex.parse(input.receiptSha256),...(r2Integrity?{r2Integrity}:{})};
 }
 function makeEntry(root:Root,input:ManagedSourceContent):Entry{
  const provenance=sourceProvenance(input),contentSha256=hex.parse(input.contentSha256),receiptSha256='receiptSha256' in provenance?provenance.receiptSha256:undefined;
@@ -889,7 +892,7 @@ export async function parseContentFreePreparationPlan(value:unknown):Promise<imp
  const reference=preparedExpectationSchema.shape.references.element.extend({id:opaque,locator:z.string().regex(/^document-sha256:[a-f0-9]{64}$/),mimeType:z.string().regex(/^[a-zA-Z0-9.+-]+\/[a-zA-Z0-9.+-]+$/),policy:ContentFreeSourcePolicySchema}).strict();
  const group=preparationGroupSchema.extend({municipality,documentIds:z.array(opaque).min(1).max(MAX_FILES),expected:preparedExpectationSchema.extend({references:z.array(reference).min(1).max(MAX_FILES)}).strict(),referenceWarnings:z.array(z.object({documentId:opaque,sourceId:opaque,reason:failure}).strict()).max(MAX_FILES)}).strict();
  const quarantine=preparationPlanSchema.shape.quarantine.element.omit({candidate:true}).extend({documentId:opaque,municipalityId:opaque,sourceId:opaque,reason:failure}).strict();
- const metadataSchema=preparationPlanSchema.extend({municipalities:z.array(preparationPlanSchema.shape.municipalities.element.extend({name:municipality.shape.name,districtId:opaque}).strict()).max(MAX_FILES),groups:z.array(group).max(MAX_FILES),quarantine:z.array(quarantine).max(MAX_FILES)}).strict();
+ const metadataSchema=preparationPlanSchema.safeExtend({municipalities:z.array(preparationPlanSchema.shape.municipalities.element.extend({name:municipality.shape.name,districtId:opaque}).strict()).max(MAX_FILES),groups:z.array(group).max(MAX_FILES),quarantine:z.array(quarantine).max(MAX_FILES)}).strict();
  const metadata=metadataSchema.parse(value),original=canonical(value);
  // Parsing must not strip nested unknown fields or normalize away source text.
  if(Buffer.byteLength(original)>MAX_STATE||original!==canonical(metadata))throw new CivicPolicyStateError('INVALID_PREPARATION_METADATA');
@@ -1223,11 +1226,11 @@ async function assertManagedSourceBindingSet(input:string,bindings:Array<Managed
 /** Raw admission requires an actual HTTP observation, never a publication or
  * prepared receipt with a convenient byte hash.
  */
-export async function assertManagedRawSourceBinding(input:string,binding:Extract<ManagedSourceBinding,{kind:'http_observation'}>,options:CivicPolicyOptions={}):Promise<void>{
+export async function assertManagedRawSourceBinding(input:string,binding:Extract<ManagedSourceBinding,{kind:'http_observation'}>,options:CivicPolicyOptions={}):Promise<R2IntegrityGuard|undefined>{
  if(binding.kind!=='http_observation')throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
  const proof=sourceProvenance(binding),authority=await assertCivicPolicyAuthority(options),policy={...options,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256},state=statePath(policy),path=resolve(input);
  await assertHostNotOptedOut(binding.url,policy);
- await locked(policy,async()=>{
+ return locked(policy,async()=>{
   const inventory=await loadInventory(state,true),root=inventory.roots.find(item=>item.kind==='fetch'&&contained(item.path,path));if(!root?.complete)throw new CivicPolicyStateError('HTTP_SOURCE_PROVENANCE_REQUIRED');
   await verifyRoot(root);await readAcquisitionLaneMarker(root.path,root.kind,authority);
   const relativePath=relative(root.path,path).split(sep).join('/'),entry=entriesAt(inventory,root.id,relativePath).find(item=>item.kind==='http_observation'&&item.state==='active'&&item.independentAllowed&&item.urlSha256===urlHash(binding.url)&&item.sourceSha256===proof.sourceSha256&&item.contentSha256===proof.sourceSha256&&item.observationId===binding.observationId&&item.receiptSha256===binding.receiptSha256);
@@ -1238,6 +1241,7 @@ export async function assertManagedRawSourceBinding(input:string,binding:Extract
   try{observation=observationSchema.parse(JSON.parse(observationBytes.toString('utf8')));}catch{throw new CivicPolicyStateError('INVALID_MANAGED_OBSERVATION');}
   if(urlHash(observation.url)!==urlHash(binding.url)||observation.sha256!==binding.sourceSha256||!['fetched','not_modified'].includes(observation.state))throw new CivicPolicyStateError('HTTP_OBSERVATION_BINDING_MISMATCH');
   await assertHostNotOptedOut(binding.url,policy);if((await fileDigest(path)).sha256!==binding.sourceSha256)throw new CivicPolicyStateError('CONTENT_BINDING_MISMATCH');await assertHostNotOptedOut(binding.url,policy);
+  return entry.r2Integrity;
  });
 }
 

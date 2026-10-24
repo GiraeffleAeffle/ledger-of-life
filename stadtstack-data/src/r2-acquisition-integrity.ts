@@ -5,6 +5,7 @@ import {z} from 'zod';
 
 export interface R2IntegrityGuard{journalPath:string;recordSha256:string;manifestSha256:string;changedSourceReleasePath?:string;changedSourceReleaseSha256?:string}
 const sha=(bytes:Buffer|string)=>createHash('sha256').update(bytes).digest('hex');
+const canonical=(value:unknown):string=>Array.isArray(value)?`[${value.map(canonical).join(',')}]`:value&&typeof value==='object'?`{${Object.entries(value as Record<string,unknown>).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${JSON.stringify(k)}:${canonical(v)}`).join(',')}}`:JSON.stringify(value);
 const ReleaseSchema=z.object({schemaVersion:z.literal('r2-changed-source-release-v1'),id:z.literal('r2-changed-source-release'),reviewedBy:z.string().min(1),reviewedAt:z.iso.datetime(),reason:z.string().min(1),representations:z.array(z.object({url:z.url(),sourceId:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/),r1Sha256:z.string().regex(/^[a-f0-9]{64}$/)}).strict()).min(1)}).strict();
 async function privateFile(path:string,kind:string):Promise<Buffer>{
  const absolute=resolve(path),metadata=await lstat(absolute);
@@ -16,11 +17,11 @@ export async function assertR2ReferencesReleased(references:readonly {id:string;
  for(const value of [guard.recordSha256,guard.manifestSha256])if(!/^[a-f0-9]{64}$/.test(value))throw Error('R2 integrity guard identity is malformed');
  const bytes=await privateFile(guard.journalPath,'R2 acquisition journal'),text=bytes.toString('utf8');
  if(!text.endsWith('\n'))throw Error('R2 acquisition journal has an incomplete record');
- let latest:Record<string,unknown>|undefined;
+ let latest:Record<string,unknown>|undefined,sequence=0,previousRecordHash:string|null=null;
  for(const line of text.trimEnd().split('\n')){
-  const row=JSON.parse(line) as Record<string,unknown>;
-  if(row.schemaVersion!=='r2-acquisition-progress-v2'||row.recordSha256!==guard.recordSha256||row.manifestSha256!==guard.manifestSha256||!row.quarantined||typeof row.quarantined!=='object'||Array.isArray(row.quarantined))throw Error('R2 acquisition journal identity or shape mismatch');
-  latest=row;
+  const row=JSON.parse(line) as Record<string,unknown>,recordHash=row.recordHash,{recordHash:_omit,...payload}=row;
+  if(row.schemaVersion!=='r2-acquisition-progress-v3'||row.sequence!==++sequence||row.previousRecordHash!==previousRecordHash||typeof recordHash!=='string'||sha(canonical(payload))!==recordHash||row.recordSha256!==guard.recordSha256||row.manifestSha256!==guard.manifestSha256||!row.quarantined||typeof row.quarantined!=='object'||Array.isArray(row.quarantined))throw Error('R2 acquisition journal identity, sequence, hash chain, or shape mismatch');
+  previousRecordHash=recordHash;latest=row;
  }
  if(!latest)throw Error('R2 acquisition journal is empty');
  const held=Object.entries(latest.quarantined as Record<string,unknown>).map(([url,value])=>{

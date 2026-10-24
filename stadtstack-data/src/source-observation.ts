@@ -51,13 +51,14 @@ export async function readBoundSourceObservation(options:ReadBoundSourceObservat
  const bytes=await readFile(observationPath),observation=SourceObservationSchema.parse(JSON.parse(bytes.toString('utf8'))),sizeBytes=(await lstat(rawPath)).size;
  await assertManagedObservationReadable(observationPath,policy);
  if(!sourceObservationMatches(observation,{...document,checkedAt:document.checkedAt,status:document.status,sizeBytes,bodyState:'retained'}))throw Error('Source observation does not bind the requested representation');
- const binding:BoundSourceObservation['binding']={kind:'http_observation',url:document.url,sourceSha256:document.sha256,observationId:name,receiptSha256:sha256(bytes)};
- await assertManagedRawSourceBinding(rawPath,binding,policy);
+ const binding:BoundSourceObservation['binding']={kind:'http_observation',url:document.url,sourceSha256:document.sha256,observationId:name,receiptSha256:sha256(bytes)},r2Integrity=await assertManagedRawSourceBinding(rawPath,binding,policy);
+ if(policy.r2Integrity&&JSON.stringify(policy.r2Integrity)!==JSON.stringify(r2Integrity))throw Error('Pinned preparation R2 guard differs from authenticated managed source provenance');
+ const bound:BoundSourceObservation['binding']=r2Integrity?{...binding,r2Integrity}:binding;
  const sourcePolicy=ContentFreeSourcePolicySchema.parse(observation.policy);
  assertSubscriptionSourcePolicy(sourcePolicy,{url:document.url,sha256:document.sha256,mimeType:document.mimeType},options.registeredSource);
  const sourceBytes=await readFile(rawPath);
  if(sourceBytes.length!==observation.bytes||sha256(sourceBytes)!==document.sha256)throw Error('Source representation bytes changed after observation binding');
- await assertManagedRawSourceBinding(rawPath,binding,policy);
+ if(JSON.stringify(await assertManagedRawSourceBinding(rawPath,bound,policy))!==JSON.stringify(r2Integrity))throw Error('Managed R2 source provenance changed during source read');
  await assertHostNotOptedOut(document.url,policy);
- return {binding,policy:sourcePolicy,observation,sourceBytes};
+ return {binding:bound,policy:sourcePolicy,observation,sourceBytes};
 }
