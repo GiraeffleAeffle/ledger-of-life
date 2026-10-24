@@ -3,8 +3,9 @@
 ## Decision and scope
 
 Owner choice C (#103), as reported by Main: close R1 and prepare approximately
-100–140 new documents for R2. This branch starts at
-`33fa1d3df5daa485b609be9a2ab904add3cfb649`; it neither reopens R1 nor extends
+100–140 new documents for R2. The executor work branches from `rebuild-r1`
+at `f2876ef`; earlier v3 hardening evidence was measured against
+`33fa1d3df5daa485b609be9a2ab904add3cfb649`. It neither reopens R1 nor extends
 its processing/source pin. No source request, production DB/CLI write,
 container build/start, service change or authorization issuance is performed.
 The v2 security release was limited to the structured step8 continuation.

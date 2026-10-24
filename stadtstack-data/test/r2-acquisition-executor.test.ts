@@ -128,6 +128,8 @@ test('R2 fetch persists record-derived integrity through managed CAS and bound p
  assert.deepEqual(checked[0]?.r2Integrity,guard);
  const bound=await readBoundSourceObservation({rawRoot:input.fetcherOptions.cacheDir,document:{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,checkedAt:document.checkedAt,status:document.status,observationPath:document.observationPath},policy:input.fetcherOptions.ownerPolicyLane});
  assert.deepEqual(bound.binding.r2Integrity,guard);
+ await assertR2ReferencesReleased([{id:item.sourceId,url:document.url,sha256:document.sha256}],bound.binding.r2Integrity);
+ await assert.rejects(assertR2ReferencesReleased([{id:'caller-injected-source',url:document.url,sha256:document.sha256}],bound.binding.r2Integrity));
  await assert.rejects(readBoundSourceObservation({rawRoot:input.fetcherOptions.cacheDir,document:{url:document.url,sha256:document.sha256,mimeType:document.mimeType,retrievedAt:document.retrievedAt,checkedAt:document.checkedAt,status:document.status,observationPath:document.observationPath},policy:{...input.fetcherOptions.ownerPolicyLane,r2Integrity:{...guard,recordSha256:'0'.repeat(64)}}}));
  capture.mock.restore();
 });
