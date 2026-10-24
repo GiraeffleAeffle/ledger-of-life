@@ -54,5 +54,5 @@ test('terminal sealing preserves assessment identities across the measured R2 pa
  assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'d1c85950dc871747b691edf6f4be82cccfb54f160ee28441c6230f9b812a0e0e');
  assert.equal(await ompRunnerOutputContractSha256(),'0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361');
  assert.equal(await parserIsolationContractSha256(),'281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73');assert.equal(await parserOutputContractSha256(),'3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599');
- assert.equal(await acquisitionContract(),'fdb3a0f6abcfc57e8b7aaf2f52cf9f0e10cf379609b5321d21eb73c6c20e0aaa');
+ assert.equal(await acquisitionContract(),'016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607');
 });
