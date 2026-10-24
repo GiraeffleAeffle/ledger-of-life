@@ -46,11 +46,13 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
 // measured current identities (fresh Node 24.22.1 process), not a claim that
 // frozen R1 receipts changed. Assessment queue/B, policy refresh, OMP output and
 // parser output stay unchanged.
+// Integrated GENESIS exact-wire custody advances only acquisition from 6ac22aa;
+// fresh-process measurement leaves the other native/adapter identities unchanged.
 test('terminal sealing preserves assessment identities across the measured R2 parser and acquisition cutover',async()=>{
  assert.deepEqual(await residualPreparationContract(),{preparationSha256:'c9aff861a533be4cc09ae2d9f032b17ad31329bdb9f90e47c9e5183639595d21'});
  assert.deepEqual(await residualJobContract(),{preparationSha256:'c9aff861a533be4cc09ae2d9f032b17ad31329bdb9f90e47c9e5183639595d21',extraction:{promptSha256:'11fed38a252dee91e01afebf3b593faad1c18a50c77c1535a0e1ad50ef27ffbe',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'8bca64ba7930ab103495ba06ed2e54dac886e4729cf269a2b25622d1b56b8506'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
  assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'d1c85950dc871747b691edf6f4be82cccfb54f160ee28441c6230f9b812a0e0e');
  assert.equal(await ompRunnerOutputContractSha256(),'0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361');
  assert.equal(await parserIsolationContractSha256(),'281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73');assert.equal(await parserOutputContractSha256(),'3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599');
- assert.equal(await acquisitionContract(),'016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607');
+ assert.equal(await acquisitionContract(),'0a7bbfa29e22ec41bae105214b8ca85f9b8ea76272b0f5397607fed85a1e192d');
 });

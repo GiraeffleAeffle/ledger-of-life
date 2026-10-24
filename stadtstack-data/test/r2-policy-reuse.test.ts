@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {performance} from 'node:perf_hooks';
 import {test,type TestContext} from 'node:test';
-import {PoliteFetcher,PoliteFetchError,RequestAdmissionInterruption,type FetchObservation,type PoliteFetcherOptions} from '../src/polite-fetch.ts';
+import {PoliteFetcher,PoliteFetchError,RequestAdmissionInterruption,type FetchObservation,type PoliteFetcherOptions,type WireRequestIdentity} from '../src/polite-fetch.ts';
 import {recordHostOptOut} from '../src/civic-opt-out.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
 import {ownerRobotsOverrideFor} from '../src/source-policy.ts';
@@ -15,11 +15,11 @@ import {politeTestOptions} from './fixtures/polite-lane.ts';
 type WireResult={status:number;headers:Record<string,string|undefined>;body:Buffer;conditionalRequestSent?:boolean};
 type HostState={schemaVersion:1;host:string;lastStart:number;delayMs:number;nextAllowedAt:number;failures:number[];stop:null};
 interface FetchSeam{
- scheduled<T>(url:URL,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>;
+ scheduled<T>(url:URL,request:WireRequestIdentity,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>;
  wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},headers:Record<string,string>,onRefusedHeaders?:unknown,accountingUrl?:string):Promise<WireResult>;
  onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;
- beforeRequest?:(url:string)=>Promise<void>;
- wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:unknown,credentials?:unknown):Promise<WireResult>;
+ beforeRequest?:(url:string,request:WireRequestIdentity)=>Promise<void>;
+ wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:WireRequestIdentity['publicOperation'],credentials?:unknown):Promise<WireResult>;
 }
 interface Fixture{fetcher:PoliteFetcher;requests:string[];lane:NonNullable<PoliteFetcherOptions['ownerPolicyLane']>;root:string}
 async function fixture(t:TestContext,mode:'allow'|'failure'|'redirect'='allow',hooks:Pick<PoliteFetcherOptions,'beforeRequest'>={}):Promise<Fixture>{
@@ -39,10 +39,10 @@ async function fixture(t:TestContext,mode:'allow'|'failure'|'redirect'='allow',h
  const pendingOptions=await politeTestOptions({cacheDir:join(root,'cache'),fixtureInspection:fixturePolicyInspection,minDelayMs:0,policyTtlMs:60_000,...hooks});
  const lane={...pendingOptions.ownerPolicyLane!,r2Integrity:{journalPath:join(root,'progress.jsonl'),recordSha256:'a'.repeat(64),manifestSha256:'b'.repeat(64)}};
  const fetcher=new PoliteFetcher({...pendingOptions,ownerPolicyLane:lane});const seam=fetcher as unknown as FetchSeam;
- const scheduler=t.mock.method(seam,'scheduled',async function<T>(this:FetchSeam,_url:URL,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{const state:HostState={schemaVersion:1,host:_url.hostname,lastStart:Date.now(),delayMs:2000,nextAllowedAt:0,failures:[],stop:null};try{await this.beforeRequest?.(_url.href);}catch(error){throw new RequestAdmissionInterruption(error);}const result=await work(state);onResult?.(result,state);return result;});
- const wire=t.mock.method(seam,'wire',async function(this:FetchSeam,url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined):Promise<WireResult>{
+ const scheduler=t.mock.method(seam,'scheduled',async function<T>(this:FetchSeam,_url:URL,request:WireRequestIdentity,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{const state:HostState={schemaVersion:1,host:_url.hostname,lastStart:Date.now(),delayMs:2000,nextAllowedAt:0,failures:[],stop:null};try{await this.beforeRequest?.(_url.href,request);}catch(error){throw new RequestAdmissionInterruption(error);}const result=await work(state);onResult?.(result,state);return result;});
+ const wire=t.mock.method(seam,'wire',async function(this:FetchSeam,url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:WireRequestIdentity['publicOperation']):Promise<WireResult>{
   const fixtureUrl=new URL(`http://127.0.0.1:${address.port}${url.pathname}${url.search}`);
-  return this.scheduled(url,async()=>{const result=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,url.href);await this.onWireAttemptResult?.(url.href,result.status,result.status>=400?`http_${result.status}`:null);return result;});
+  return this.scheduled(url,{method,body:body??null,publicOperation:method==='POST'?operation??null:null},async()=>{const result=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,url.href);await this.onWireAttemptResult?.(url.href,result.status,result.status>=400?`http_${result.status}`:null);return result;});
  });
  t.after(()=>{wire.mock.restore();scheduler.mock.restore();});
  return {fetcher,requests,lane,root};

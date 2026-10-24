@@ -8,6 +8,12 @@ is a request inventory, not an instruction to execute MaStR first or require its
 bulk parser before GENESIS. MaStR national bulk remains preparation only and
 requires a later, separate reviewed issuance, cap and streaming ZIP/XML sandbox.
 
+The separately scoped executable path and unissued GENESIS-only v3 records are
+documented in [R2_GENESIS_RELEASE.md](R2_GENESIS_RELEASE.md). They exclude MaStR
+and the district allowance, require new Main issuance/current parser review
+before even preflight, and use native R1 acquisition with exact wire custody.
+The combined inventory below is not that narrower executable authority.
+
 ## Authority and source registration
 
 Owner record: `/home/max/.local/state/stadtstack-data/r2-authorities/stadtstack-data/reports/approvals/r2-owner-approval-2026-10-24.json`, SHA256 `fc7f7acd93a7ab1c6a3044e24367bec52891a0b96b9b3852276079b7f37ce8e4`, `approved.structuredSources`. It permits a narrow public nine-town solar/wind slice and GENESIS table31231-02-01 via the existing owner account, subject to exact plans, source rights and security coverage. It does not establish a particular export URL, payload schema or unlimited national-download budget.
@@ -87,7 +93,7 @@ One anonymous metadata POST (owner-account authorization currently covers data e
 
 ```text
 POST https://www.regionalstatistik.de/genesisws/rest/2020/metadata/table
-Content-Type: application/x-www-form-urlencoded
+Content-Type: application/x-www-form-urlencoded;charset=UTF-8
 name=31231-02-01&area=free&language=de
 ```
 
@@ -95,11 +101,11 @@ Then one existing-owner-account POST per exact AGS, with credentials injected on
 
 ```text
 POST https://www.regionalstatistik.de/genesisws/rest/2020/data/table
-Content-Type: application/x-www-form-urlencoded
+Content-Type: application/x-www-form-urlencoded;charset=UTF-8
 name=31231-02-01&area=free&language=de&regionalvariable=GEMEIN&regionalkey=<exact AGS from the nine frozen records>&startyear=2024&endyear=2024&compress=false&transpose=false&job=false&format=datencsv&quality=on
 ```
 
-The actual draft contains all9 literal bodies, not the notation above. Metadata is still subject to current robots/TDM/public access: account permission does not expand to it. Any block stops the plan. No password/token read occurs in this implementation, no GAST fallback, no `data/tablefile` retry and no background source jobs. Each data response cap is4MiB, metadata1MiB. Successful JSON parsing requires corrected `Parameter.regionalkey` equal to the requested town, GEMEIN `Structure.Rows` selected exactly once, datencsv format and exact reference year. District aggregates are held rather than assigned to a town.
+The actual draft contains all9 literal bodies, not the notation above. Metadata is still subject to current robots/TDM/public access: account permission does not expand to it. Any block stops the plan. Preparation and fixture checks read no real credentials. The GENESIS-only controller has no credential reader or readiness probe; only Core's existing owner-account branch loads the secured account just in time for the nine exact data POSTs, with no GAST fallback or `data/tablefile` retry. Each data response cap is4MiB, metadata1MiB. Successful JSON parsing requires corrected `Parameter.regionalkey` equal to the requested town, GEMEIN `Structure.Rows` selected exactly once, datencsv format and exact reference year. District aggregates are held rather than assigned to a town.
 
 Building/dwelling counts and explicit area units remain statistical context. The date is **31 December2024**, `statistical_reference_date`, never retrieval/publication, construction completion, occupancy, ownership or causal impact. Source signs/suppression, decimal/unit semantics and exact original cell provenance remain unchanged.
 

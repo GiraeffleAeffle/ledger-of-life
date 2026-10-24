@@ -121,7 +121,9 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>;onValidatedRepresentation?:(input:{url:string;body:Buffer;observation:FetchObservation;localPath:string})=>Promise<void>}
+/** Actual credential-free wire selector; headers/owner secrets never cross this hook. */
+export interface WireRequestIdentity {readonly method:'GET'|'POST';readonly body:string|null;readonly publicOperation:NativePublicOperation|null}
+export interface PoliteFetcherOptions{cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string,request:WireRequestIdentity)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer,contentType:string)=>Promise<void>;onValidatedRepresentation?:(input:{url:string;body:Buffer;observation:FetchObservation;localPath:string})=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -336,7 +338,7 @@ export class PoliteFetcher {
   return (await this.checkedSourceBindings(bindings)).map(proof=>({...proof,independentAllowed:true}));
  }
  private hostStateDirectory():string{return join(homedir(),'.cache','stadtstack-data','host-lanes');}
- private async scheduled<T>(url:URL,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{
+ private async scheduled<T>(url:URL,request:WireRequestIdentity,work:(state:HostState)=>Promise<T>,onResult?:(result:T,state:HostState)=>void):Promise<T>{
   const host=url.hostname,prior=sharedHostQueues.get(host)??Promise.resolve();
   const {promise:gate,resolve:unlock}=Promise.withResolvers<void>();sharedHostQueues.set(host,gate);await prior;
   let release:(()=>Promise<void>)|undefined;
@@ -373,7 +375,7 @@ export class PoliteFetcher {
    await this.assertHostAllowed(url.href);
    state.lastStart=Date.now();await writePrivateJson(path,state);
    await this.assertHostAllowed(url.href);
-   try{await this.beforeRequest?.(url.href);}catch(error){throw new RequestAdmissionInterruption(error);}
+   try{await this.beforeRequest?.(url.href,request);}catch(error){throw new RequestAdmissionInterruption(error);}
    await this.assertHostAllowed(url.href);
    // Persist before dispatch for crash safety, then retain the actual dispatch time.
    // An unsuccessful state commit leaves the owner lock in place, never a restart bypass.
@@ -416,7 +418,7 @@ export class PoliteFetcher {
    const pinned=addresses[0],nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
    let started=false;
    let response:WireResponse;
-   try{response=await this.scheduled(url,state=>{started=true;return this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state));},(result,state)=>this.recordHostResponse(url,result,state));}
+   try{response=await this.scheduled(url,{method,body:body??null,publicOperation:method==='POST'?operation??null:null},state=>{started=true;return this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state));},(result,state)=>this.recordHostResponse(url,result,state));}
    catch(error){if(started)await this.onWireAttemptResult?.(url.href,error instanceof PoliteFetchError?error.status??null:null,error instanceof PoliteFetchError?error.failure:'network_error');throw error;}
    if(started)await this.onWireAttemptResult?.(url.href,response.status,response.status>=400?`http_${response.status}`:null);
    if(started)await this.onWireResponse?.(url.href,response.status,response.body,response.headers['content-type']??'');
