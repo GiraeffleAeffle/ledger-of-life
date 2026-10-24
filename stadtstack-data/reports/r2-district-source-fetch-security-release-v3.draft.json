@@ -154,16 +154,41 @@
     "preparedParserImage": {
       "tag": "stadtstack-parser:r2-review",
       "imageId": "sha256:4feb00e1d9fa7802c523e9b6af16b8ab72014e0bf812d1b345b7a155eb608046",
+      "imageConfigId": "sha256:4feb00e1d9fa7802c523e9b6af16b8ab72014e0bf812d1b345b7a155eb608046",
       "base": "node:24.22.1-bookworm-slim@sha256:55fb5f5a527ea2c5c4a95f963e48ef90aa38c7b346054fdc8ee9957a2b55d205",
       "parserIsolationContractSha256": "04edb466058cbb79faa03432978640d96181d366b8dfddcffd251e1fab4326c3",
       "parserOutputContractSha256": "79999b46004d9471ff4c76f3267b5d5db707308077924ab27dcc3c6dc3504530",
       "contractsMeasuredInFreshProcess": true,
       "sbomPath": "stadtstack-data/reports/r2-parser-image.spdx.json",
+      "sbomSha256": "ec8326f1ed880dff470cf9c4a3e78774683373f682a091b4b58e58d96a5fb511",
+      "sbomSubjectManifestDigest": "sha256:ddadc59e00a1bf90cd77c50feb405207514186a6a2ddf33f36df47047961066e",
       "sbomFormat": "SPDX JSON",
-      "containmentSentinels": "NOT_RUN: installed root-owned review still binds historical image; do not alter active authorization; privileged reviewer must issue updated authorization before real-image sentinels",
-      "status": "PREPARED_NOT_REVIEWED_OR_AUTHORIZED"
+      "ociManifest": {
+        "digest": "sha256:ddadc59e00a1bf90cd77c50feb405207514186a6a2ddf33f36df47047961066e",
+        "configDigest": "sha256:bbabb6d71220ff4ebdb69321ed803c0eb3a588b9f8345a2639953d7421691fc8",
+        "layerDigests": [
+          "sha256:11422d7ca1a44390a32bd8d8d9dc5946b4d053b3bbd9507d682e35584ba84a26",
+          "sha256:47e82ed2c7200e6bb57827745085027ba425376a5ed4ba4a8e295a4e3b5d1b40",
+          "sha256:c0e48fd1aa256850e18f180365b8fa3e55ae2197e85461fd3392cfb5c4c8e5e7",
+          "sha256:f2b8e65232e105b573ea2f37c4a2ec56bcf0b63687ae2bbe329cf4252f30bc1d",
+          "sha256:6d793208473aa7d9ccc02b9de99aee40e4d6e73065d5307d076fad3ba554d580",
+          "sha256:15451eb532b2ffb1002ddc9cb46ead179236d8af5b39b5e1e0864c1c420b0d6e",
+          "sha256:0942f1147a372751d2a23d6073616e886251d82051898d31895fda97b2c4fada",
+          "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1",
+          "sha256:1d441e953d1201b6ff074373e2b60b5009ca7bef77e694e85f803f2d31abad5a",
+          "sha256:f8a75ca16a842f91fb6be5cf8f33cac428c8070d1022010bd262224e013002b9",
+          "sha256:c7ead44f9c1e29a1c2fc0a8714767b61ef08340c6d895bc1c6605da2c8ce5734",
+          "sha256:aed4d496fc1fbfa224a06b52289509e9978359a1c51124f3b36382ce9298abda",
+          "sha256:2a1c55f4d85075f3bbb3bf8d8e9fe1a601204127913a3e9b308aa243b5d2b559",
+          "sha256:b529bd2d05efebea54c5ed9194e4d9f3962e3cfe30772918f7eb455dcde723f3",
+          "sha256:4f4fb700ef54461cfa02571ae0db9a0dc1e0cdb5577484a6d75e68dc38e8acc1"
+        ]
+      },
+      "reviewEvidence": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/trivy-parser-image.json",
+      "containmentSentinels": "NOT_RUN: updated root authorization is outstanding; run at R2 code freeze against exactly this image",
+      "status": "IMAGE_AND_INVENTORY_PREPARED_AND_REVIEWED; ROOT_AUTHORIZATION_AND_REAL_IMAGE_SENTINELS_OUTSTANDING"
     },
-    "parserIssuanceRequirement": "Prepared candidate image is recorded above. Requires independent image/runner and SBOM review, containment sentinels against the candidate under genuine updated root-owned authorization, then privileged issuance. No authorization was changed or fabricated.",
+    "parserIssuanceRequirement": "Candidate image and inventory were reviewed; at R2 code freeze, prepare/issue the root authorization with the then-current runner hash, then run real-image containment sentinels before issuance.",
     "integratedCodeRequirement": "Main must bind actual integrated Git HEAD, all affected contracts, source hashes, reviewed test outputs and independent fix review before issue",
     "hostEnvironment": "fixed absolute Node path, clean NODE_OPTIONS/NODE_PATH/NODE_EXTRA_CA_CERTS/SSL_CERT_FILE/SSL_CERT_DIR/NODE_TLS_REJECT_UNAUTHORIZED; no inherited proxy/auth or provider credentials"
   },
@@ -2404,11 +2429,15 @@
   },
   "issuanceBlockers": [
     "Independent review/merge/gate of this branch and final integrated contracts; preparation alone is not approval",
-    "Patched parser base/image rebuild, SBOM/runtime inventory, containment sentinels and new root-owned review not available in this slice",
+    "The Node 24.22.1 parser image and inventory are prepared and reviewed; outstanding: root authorization at R2 code freeze with the then-current runner hash, and real-image containment sentinels",
     "Final R2 manifest/registry pin and42-versus43 source reconciliation",
     "Exact current source eligibility/provenance and R1final corpus/content dedup;112URLs are not120new documents",
     "Genuine owner103-derived acquisition scope/budget/policy-bootstrap/official-work approvals and Main security release signature/time",
     "Reviewed R2 executor enforcing the exact network allowlist, response MIME, all-wire request/byte/global-rate/time budgets and content-free stops; old R1 CLI cannot substitute",
     "Source-change quarantine and independent high-impact-fact review before any later inference/release; not waived by SS-01 repair"
+  ],
+  "knownParserImageDebt": [
+    "P2: apt package installation is not reproducible; a later rebuild requires a snapshot.debian.org pin and new review",
+    "P3-2: minimise setuid and apt methods in a later rebuild; not changed in this reviewed image"
   ]
 }
