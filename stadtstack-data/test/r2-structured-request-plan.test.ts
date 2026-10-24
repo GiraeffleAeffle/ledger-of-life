@@ -5,7 +5,7 @@ import {digest} from '../src/district-adapter-contract.ts';
 import type {AdmittedSnapshot,AdapterScope} from '../src/district-adapter-contract.ts';
 import {districtRegistrySchema} from '../src/district-registry.ts';
 import {admittedRegisteredRobotsScopes} from '../src/registered-source-policy.ts';
-import {MASTR_PILOT_AGS,mastrAdapter} from '../src/adapters/mastr.ts';
+import {MASTR_LIMITS,MASTR_PILOT_AGS,mastrAdapter} from '../src/adapters/mastr.ts';
 import {genesisAdapter,GENESIS_BASE} from '../src/adapters/genesis.ts';
 import {buildR2StructuredRequestPlan,planR2MastrBulkRequest,R2_STRUCTURED_CAPS,R2_MASTR_LANDING} from '../src/r2-structured-request-plan.ts';
 
@@ -71,4 +71,20 @@ test('bulk resolution requires complete exact native GET discovery and immutable
  assert.throws(()=>planR2MastrBulkRequest({...result,coverage:{...result.coverage,nextCursor:'synthetic-next'}},pins),/Complete bounded native discovery/);
  assert.throws(()=>planR2MastrBulkRequest(result,{...pins,stepReceiptSha256:'not-a-hash'}));
  for(const change of [{parentId:'https://example.org/'},{method:'POST' as const},{body:'session=synthetic'},{nativeId:'fabricated'}])assert.throws(()=>planR2MastrBulkRequest({...result,resources:[{...result.resources[0],...change}]},pins),/differs from exact native/);
+});
+
+test('a terminal discovery page cannot hide an earlier bulk candidate',()=>{
+ const fillers=Array.from({length:MASTR_LIMITS.resources-1},(_,index)=>`<a href="/MaStR/100-filler-${String(index).padStart(2,'0')}.csv">Synthetic CSV</a>`).join('');
+ const input=landing(`<a href="/MaStR/000-Gesamtdatenexport.zip">Synthetic first Gesamtdatenexport</a>${fillers}<a href="/MaStR/999-Gesamtdatenexport.zip">Synthetic last Gesamtdatenexport</a>`);
+ const first=mastrAdapter.discover(input,scope,null);
+ assert.equal(first.resources.length,MASTR_LIMITS.resources);assert.ok(first.coverage.nextCursor);
+ assert.equal(first.resources.filter(resource=>resource.format==='zip').length,1);
+ const last=mastrAdapter.discover(input,scope,first.coverage.nextCursor);
+ assert.equal(last.coverage.nextCursor,null);assert.equal(last.resources.length,1);
+ assert.equal(last.resources[0].url,'https://www.marktstammdatenregister.de/MaStR/999-Gesamtdatenexport.zip');
+ assert.equal(last.coverage.observedRows,MASTR_LIMITS.resources+1);
+ for(const [page,result] of [['first',first],['last',last]] as const){
+  const pins={sourceSha256:input.sourceSha256,policyReceiptSha256:input.policyReceiptSha256,stepReceiptSha256:digest('synthetic '+page+' discovery receipt'),resultSha256:digest(JSON.stringify(result))};
+  assert.throws(()=>planR2MastrBulkRequest(result,pins),/Complete bounded native discovery/);
+ }
 });

@@ -2,6 +2,12 @@
 
 This work sends **no requests**, reads no owner credentials, issues no authority, and makes no production DB/network/CLI mutation. The request draft has empty `issuedAt`. Source catalogue entries remain `not_checked`: registration, a parser and owner approval in principle are not policy admission or evidence of town coverage.
 
+**Execution priority:** GENESIS31231 comes first: its nine owner-account POSTs
+follow only its own reviewed policy/metadata prerequisites. The combined draft
+is a request inventory, not an instruction to execute MaStR first or require its
+bulk parser before GENESIS. MaStR national bulk remains preparation only and
+requires a later, separate reviewed issuance, cap and streaming ZIP/XML sandbox.
+
 ## Authority and source registration
 
 Owner record: `/home/max/.local/state/stadtstack-data/r2-authorities/stadtstack-data/reports/approvals/r2-owner-approval-2026-10-24.json`, SHA256 `fc7f7acd93a7ab1c6a3044e24367bec52891a0b96b9b3852276079b7f37ce8e4`, `approved.structuredSources`. It permits a narrow public nine-town solar/wind slice and GENESIS table31231-02-01 via the existing owner account, subject to exact plans, source rights and security coverage. It does not establish a particular export URL, payload schema or unlimited national-download budget.
@@ -38,6 +44,15 @@ Owner record: `/home/max/.local/state/stadtstack-data/r2-authorities/stadtstack-
 There is no admitted current download-page snapshot in this assignment. The exact ZIP href, advertised version/date/size, publisher hash availability, member layout and public-operator XML schema are therefore **unknown**, not invented. PhaseA is an exact bounded preflight; phaseB must be separately resolved and issued by Main from its genuine results.
 
 `discoverMastr` records a ZIP reference only when advertised as Gesamtdatenexport on the exact official landing (same-host scope remains conservative). It does not download, inspect or admit the archive. Discovery runs through the existing structured parser sandbox. `planR2MastrBulkRequest` consumes pinned native discovery references, **not host-parsed source HTML**, refuses missing/incomplete/ambiguous/session-signed references and returns only a review-required GET proposal. Main must authenticate the committed discovery receipt/output and replay those references. An external download/redirect host not covered by this conservative discovery needs a reviewed new explicit host/reference policy, never an inferred allow.
+
+Bulk selection additionally requires `resources.length === coverage.observedRows`
+from the authenticated native discovery result. `nextCursor === null` proves
+only that a page is terminal: MaStR discovery has at most32 references per page
+while `observedRows` counts the complete landing's reference set. A terminal
+page omitting earlier candidates therefore refuses, even when it contains just
+one ZIP. This planner does not combine or authenticate a cursor chain; accepting
+a multi-page aggregate would need its own complete authenticated reference-set
+contract. The existing successful single-page path and ambiguity refusal remain.
 
 Before issuing that one GET, retain byte-pinned landing/manifest and exact quotes/locators for the actual href, filename/version, advertised compressed bytes and any publisher checksum. If the publisher provides no checksum, record that evidenced absence explicitly after review; the locally calculated download SHA256 plus authentic HTTPS/HTTP custody is **not** an independent publisher digest. Do not use ETag as a cryptographic checksum or filename date as a publication/event date. Pin actual HTTP Content-Length/version/redirect metadata and refuse a changed manifest or an oversized response.
 
@@ -138,3 +153,15 @@ Review pins:
 - Same directory, permanent `measure-contracts.mjs`: `b509adb84f8c99eb80c6df4da3544a62b2915abc4e2b87a1d79be9574dbfa83b`.
 
 No actual housing/ZIP payload, credential use, source-coverage proof, live throughput/size/hash observation, streaming bulk parser image/sentinel gate, security release or production integration gate is asserted. The missing exact native artifact/schema/publicness and separate transport authority remain explicit prerequisites, not fabricated receipts or an unimplemented success path.
+
+### Bulk completeness review correction
+
+The review regression constructs33 advertised references: a ZIP on the first
+32-reference page,31 CSV links and a different ZIP on the terminal page. Both
+native pages refuse selection; a null successor never hides the earlier ZIP.
+The six-test request-plan fixture file passed **6/6**, zero failures, skips or
+cancellations (910.414821ms test duration), using the CPU-slot helper, umask022,
+Node24.22.1,3072MiB old-space cap, isolation `none`, concurrency1 and
+`--test-timeout=30000`. No source requests or production actions were performed.
+This focused correction did not rerun typecheck, the full gate or real discovery;
+GENESIS remains the first execution priority and MaStR bulk remains later/separate.

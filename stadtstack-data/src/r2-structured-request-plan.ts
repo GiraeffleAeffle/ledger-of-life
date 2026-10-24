@@ -44,7 +44,7 @@ export interface R2MastrDiscoveryPins {sourceSha256:string;policyReceiptSha256:s
  * and replay before issuing anything; this pure planner is not admission. */
 export function planR2MastrBulkRequest(discovery:DiscoveryResult,pins:R2MastrDiscoveryPins){
  for(const hash of Object.values(pins))HashSchema.parse(hash);
- if(discovery.coverage.state!=='partial'||discovery.coverage.nextCursor!==null)throw Error('Complete bounded native discovery references required before selecting the bulk request');
+ if(discovery.coverage.state!=='partial'||discovery.coverage.nextCursor!==null||discovery.resources.length!==discovery.coverage.observedRows)throw Error('Complete bounded native discovery references required before selecting the bulk request');
  const candidates=new Map<string,string>();
  for(const resource of discovery.resources){
   if(resource.format!=='zip')continue;
