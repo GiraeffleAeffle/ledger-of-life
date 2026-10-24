@@ -116,7 +116,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}
+export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -137,10 +137,11 @@ function retryAfterTime(value:string|undefined,now:number):number {
  return Number.isFinite(time)?Math.max(now,time):0;
 }
 export class PoliteFetcher {
- readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'>>;
+ readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'>>;
  private readonly fixtureInspection:FixturePolicyInspection|undefined;
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
+ private readonly onResponseChunk:PoliteFetcherOptions['onResponseChunk'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private readonly inventoryTimeoutMs:number;
  private readonly ownerGenesisTableTimeoutMs:number;
@@ -207,9 +208,10 @@ export class PoliteFetcher {
  }
  get requestCount():number{return this.fetchCount;}
  constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
-  if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
   this.fixtureInspection=options.fixtureInspection;
-  this.beforeRequest=options.beforeRequest;this.onRedirect=options.onRedirect;
+  this.beforeRequest=options.beforeRequest;
+  this.onRedirect=options.onRedirect;
+  this.onResponseChunk=options.onResponseChunk;
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
@@ -478,7 +480,7 @@ export class PoliteFetcher {
  }
  /** Transport seam used by disposable fixture servers; production reaches this
   * only through the authority, DNS pinning and exact-host scheduler above. */
- private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>,onRefusedHeaders?:(response:Pick<WireResponse,'status'|'headers'>)=>void):Promise<WireResponse>{
+ private wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},nativeHeaders:Record<string,string>,onRefusedHeaders?:(response:Pick<WireResponse,'status'|'headers'>)=>void,accountingUrl=url.href):Promise<WireResponse>{
   return new Promise<WireResponse>((done,reject)=>{
     const headers:Record<string,string>={'User-Agent':ua,Accept:'application/json,text/html,application/pdf,text/plain;q=0.8','Accept-Encoding':'identity'};
     if(body!==undefined){Object.assign(headers,nativeHeaders);headers['Content-Length']=String(Buffer.byteLength(body));}
@@ -498,7 +500,7 @@ export class PoliteFetcher {
      if(status>=300){response.destroy();clearTimeout(timer);done({status,headers:selected,body:Buffer.alloc(0),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});return;}
      const chunks:Buffer[]=[];let bytes=0;
      if(Number(selected['content-length'])>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Response exceeds byte bound'));return;}
-     response.on('data',(chunk:Buffer)=>{bytes+=chunk.length;if(bytes>this.options.maxBytes){clearTimeout(timer);reject(new PoliteFetchError('too_large','Response exceeds byte bound'));response.destroy();request.destroy();return;}chunks.push(chunk);});
+     response.on('data',(chunk:Buffer)=>{response.pause();void (async()=>{try{await this.onResponseChunk?.(accountingUrl,chunk.length);bytes+=chunk.length;if(bytes>this.options.maxBytes)throw new PoliteFetchError('too_large','Response exceeds byte bound');chunks.push(chunk);response.resume();}catch(error){clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Wire accounting failed'));response.destroy();request.destroy();}})();});
      response.on('end',()=>{clearTimeout(timer);done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});
      response.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
     });
@@ -622,7 +624,7 @@ export class PoliteFetcher {
   await this.initialize();this.fetchCount++;
   try{
    if(!this.publicPolicyFetcher&&options.method==='POST'&&options.publicOperation==='genesis_guest'&&ownerGenesisAccessFor(url)){
-    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,ownerAcquisitionProducer:this.ownerAcquisitionProducer,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect},this);
+    this.ownerAccountFetcher??=new PoliteFetcher({...this.options,cacheDir:genesisOwnerAccountRoot(this.cacheDir),ownerPolicyLane:this.activeLane,fixtureInspection:this.fixtureInspection,ownerAcquisitionProducer:this.ownerAcquisitionProducer,beforeRequest:this.beforeRequest,onRedirect:this.onRedirect,onResponseChunk:this.onResponseChunk},this);
     await this.ownerAccountFetcher.initialize();
     return await this.ownerAccountFetcher.fetchInternal(url,options,'document');
    }

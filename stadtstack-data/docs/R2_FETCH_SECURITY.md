@@ -16,6 +16,33 @@ DRAFT-only schema/status. **It cannot clear the SS-01 stop.** Its runtime/image,
 manifest, authority and executor prerequisites must be independently satisfied
 before Main creates any genuinely issued release.
 
+### Executor record-binding contract
+
+The executor accepts no draft as authorization. Its release input is an
+authority-worktree record path plus the expected SHA-256 of the complete raw
+record file. The record must exactly match this v3 draft's schema and values,
+with only these issuance fields added/replaced: `status:"ISSUED"`,
+RFC3339 `issuedAt`, non-empty `approver`, RFC3339 `validFrom` and `expiresAt`,
+`sourceFetchStopLifted:true`, and
+`ownerApprovalReference:{sha256:<exact acquisition-manifest SHA-256>}`.
+The executor rejects schema drift, hash mismatch, a not-yet-valid/expired
+window, or a manifest hash other than the owner reference. Paths and expected
+hashes are explicit inputs, never inferred. The draft's `approvedBy:null`,
+empty issuance clock and `sourceFetchStopLifted:false` do not meet this
+contract. This describes the required later issuance record; it does not issue
+one, authorize a fetch, or lift the current stop.
+
+Changed bytes are recorded in the executor's append-only journal as held
+`changed_since_r1` representations and copied into a quarantine area. A changed
+representation is never a completed/admitted document until a separately
+reviewed record with `schemaVersion:"r2-changed-source-release-v1"`,
+`id:"r2-changed-source-release"`, `reviewedBy`, RFC3339 `reviewedAt`,
+non-empty `reason`, and `representations:[{url,sourceId,sha256,r1Sha256}]`
+is supplied with its expected raw-file SHA-256. It releases only listed tuples.
+Neither acquisition approval nor the ten-document batch review releases changed
+bytes. Preparation/inference remain separate downstream gates; no changed
+representation is sent to them by this executor before the exact release record.
+
 ## Findings and dispositions
 
 Severity describes security impact if a reachable condition occurs, not proof
@@ -139,15 +166,14 @@ zero automatic retries, zero model calls, zero paid micro-USD. The byte measure
 is HTTP body bytes supplied by Node, not encrypted packet/TLS framing counts.
 Parsing keeps the fixed sandbox caps. Stop rather than reset a consumed budget.
 
-Monitoring proposal: private append-only per-attempt journal and30s aggregation
-of exact/canonical request identity, status/failure, times, body byte counts,
-Content-Encoding/MIME, Retry-After/cooldown, provenance/HTTP/policy hashes,
-parser image/contract/outcome and remaining budgets. Alerts are content-free;
-no source text, cookies, authorization/account material. Stop on unavailable
-accounting, authority/runtime/manifest drift, any unsupported encoding/MIME,
-network/security/access/policy failure, parser isolation/resource/protocol failure,
-changed prior digest, operator interrupt, or disk below a proposed10GiB floor.
-The journal/executor is a precondition, not something implemented or run here.
+The executor adds a private append-only, fsync-per-entry journal of attempted
+wire URLs, timestamps, response-body byte counts, completed and quarantined
+representation digests, and retained/wire byte counters. Budgets derive from
+this journal on resume; torn or inconsistent records fail closed. The journal
+does not yet persist response status/failure, implement the proposed30s
+aggregation, capture full headers/provenance/parser telemetry, or monitor the
+disk floor. Those remain blockers for issuance; journal accounting is not an
+operator-monitoring or production-readiness claim.
 
 ## Required approvals and receipts before acquisition
 
