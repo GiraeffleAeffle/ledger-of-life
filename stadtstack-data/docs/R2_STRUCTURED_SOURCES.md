@@ -118,6 +118,13 @@ A new **structured v3** review/issuance must machine-bind, rather than merely me
 5. Newly reviewed/installed streaming bulk path and parser image with genuine fixture and real-image sentinels, native XML schemas/publicness semantics, input/output/CPU/RAM/disk/time caps and cleanup receipts. Existing whole-buffer transport remains closed to bulk.
 6. Genuine issuance clocks/expiry and owner/source proofs covering the actual complete execution horizon; authenticate exact records from the separate authority worktree, never issue or edit old authority on main. Until Main issues this, **no preflight or data request is permitted**. Passing fixture tests is not a security release.
 
+For the final integrated code-freeze order (including all fourteen fingerprints,
+parser/OMP review-pin generation and installation, sentinels, district v3 and
+this separate GENESIS v3 issuance), follow
+[`R2_FETCH_SECURITY.md`'s freeze runbook](R2_FETCH_SECURITY.md#r2-code-freeze-operations).
+Passing the structured fixture suite is not a review pin, owner approval,
+preflight permission or GENESIS data-request authorization.
+
 ## Offline checks and remaining evidence
 
 Behavioral fixtures cover narrow field/privacy/fuel/geography semantics, typed ABR/SEE relations with unknown validity, native discovery refusal, exact25-request draft equality, unchanged old robots scope, and all9 municipal housing bodies/reference dates/selection failures. No test uses a production DB or requests sources. Main must remeasure the integrated tree and run the combined gates before issuing v3.
