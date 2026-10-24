@@ -125,13 +125,17 @@ Before even the first public licence GET, the controller requires:
    is grandfathered in; no sandbox is launched by `prepare`.
 5. A genuinely admitted registry descriptor for the draft's exact registry
    configuration SHA, all nine scopes and the current operator-registry contract.
-6. Existing secured owner credentials readable through
-   `readGenesisOwnerCredentials`; the check clears its in-memory result. Only
-   future execution calls it. Preparations/tests never read the real file.
-7. Current public robots/TDM/origin policy for all involved hosts. The real fetch
+6. Current public robots/TDM/origin policy for all involved hosts. The real fetch
    path observes it before primary requests. Regionalstatistik metadata/WADL may
    be blocked: the old owner API exemption does **not** authorize metadata, and
    no new exception is granted here. Stop, do not send a test data POST to bypass.
+
+Owner credentials are loaded **only just in time by PoliteFetcher's existing
+owner-account branch**, after selector/policy checks, for the nine exact data
+POSTs, and cleared by that branch. The controller has no credential reader or
+readiness probe. Anonymous preflight, metadata review, and rejected/non-attended
+acquisition invocations do not read them; a missing account holds the applicable
+data POST without a GAST fallback.
 
 Read-only inspection during preparation found `/etc/stadtstack/parser-isolation-review.json`
 still reviewed2026-10-17, image

@@ -18,7 +18,6 @@ import {authenticatedHttpBinding} from './district-http-observation.ts';
 import {withParserSandbox} from './district-parser-isolation.ts';
 import {StructuredWorkerRequestSchema} from './district-structured-parser-worker.ts';
 import {CIVIC_ACQUISITION_DECISION_ID,initializeManagedAcquisitionLane,withManagedSourceWrite,withCivicPolicyShutdown} from './civic-opt-out.ts';
-import {readGenesisOwnerCredentials} from './genesis-owner-credentials.ts';
 import {GENESIS_CAPS,GENESIS_PACKAGE_ROOT,GenesisWireCustody,checkedPin,committedPin,genesisDataSelectors,genesisRequestPlan,loadGenesisRelease,withGenesisOperation,checkGenesisMetadataReply,readGenesisDiscoveryReply,syncGenesisDirectory} from './r2-genesis-release.ts';
 import type {ControlPin,GenesisRelease,GenesisBudgetState} from './r2-genesis-release.ts';
 
@@ -26,7 +25,6 @@ const casRoot=join(GENESIS_PACKAGE_ROOT,'cache/districts/cas');
 async function newJson(path:string,value:unknown){const file=await open(path,'wx',0o600);try{await file.writeFile(JSON.stringify(value,null,2)+'\n');await file.sync();}finally{await file.close();}await syncGenesisDirectory(dirname(path));return {path,sha256:digest(await readFile(path))};}
 export function genesisAcquisitionSpecs(record:GenesisRelease):DistrictJobSpec[]{return genesisDataSelectors().map(selector=>({step:'acquire_representation',lane:'acquisition',semanticContractSha256:record.runtime.contracts.acquisition,inputArtifactHashes:[],sourceScope:selector.scope,selector,policyProofSha256:null}));}
 async function registry(record:GenesisRelease){const admitted=await readOperatorRegistryInputPin(record.registryDescriptor,record.runtime.policy);if(digest(admitted.bytes)!==record.runtime.registryConfigurationSha256)throw Error('GENESIS admitted registry bytes do not match issued configuration');return admitted;}
-async function checkCredentials(){const credentials=await readGenesisOwnerCredentials();credentials.clear();}
 async function managedJson(root:string,binding:ReturnType<typeof authenticatedHttpBinding>,value:unknown,kind:string,record:GenesisRelease){
  const bytes=Buffer.from(JSON.stringify(value,null,2)+'\n'),sha256=digest(bytes),part=kind+'/'+sha256+'.json',path=join(root,part);
  await withManagedSourceWrite(root,[{...binding,relativePath:part,contentSha256:sha256,independentAllowed:false}],async()=>{await mkdir(join(root,kind),{recursive:true,mode:0o700});await newJson(path,value);},record.runtime.policy);
@@ -61,7 +59,7 @@ async function wadlCapabilities(record:GenesisRelease,root:string,response:Fetch
  return {sourceSha256:response.sha256,policyPin,pages};
 }
 export async function genesisPreflight(pin:ControlPin,authorityRoot:string){
- const record=await loadGenesisRelease(pin,authorityRoot);await registry(record);await checkCredentials();
+ const record=await loadGenesisRelease(pin,authorityRoot);await registry(record);
  return withCivicPolicyShutdown(()=>withGenesisOperation(record,pin,async()=>{
   const custody=await GenesisWireCustody.open(record,pin,'preflight'),root=join(custody.root,'fetch');
   try{
@@ -108,7 +106,7 @@ export async function genesisEnqueue(pin:ControlPin,authorityRoot:string,reviewP
  })));
 }
 export async function genesisAcquire(pin:ControlPin,authorityRoot:string,reviewPin:ControlPin,authorizationId:string){
- const record=await loadGenesisRelease(pin,authorityRoot),review=await metadataReview(record,pin,reviewPin,authorityRoot),admitted=await registry(record);await checkCredentials();z.uuid().parse(authorizationId);
+ const record=await loadGenesisRelease(pin,authorityRoot),review=await metadataReview(record,pin,reviewPin,authorityRoot),admitted=await registry(record);z.uuid().parse(authorizationId);
  if(!process.stdin.isTTY)throw Error('GENESIS acquisition requires Main attended in a TTY');
  return withDistrictDatabaseScope(database=>withCivicPolicyShutdown(()=>withGenesisOperation(record,pin,async()=>{
   if(!process.env.DATABASE_URL)throw Error('DATABASE_URL required for native GENESIS execution');
