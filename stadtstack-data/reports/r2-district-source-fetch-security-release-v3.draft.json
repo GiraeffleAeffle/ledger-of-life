@@ -142,12 +142,12 @@
       "sha256": "e3ababc527e464d6275f53fd5fb3d9cbeaccb3e0c5c4e53c601a58f6b6640fd8"
     },
     "preparedContractsEvidence": {
-      "path": "reports/r2-acquisition-contract-measurement.json",
-      "sha256": "1744396cf6c85030a45cf092992f7c5e3d952413328a7860bfdd4036068fdf41",
-      "acquisitionContractSha256": "b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5",
-      "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
-      "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
-      "meaning": "Acquisition contract freshly measured in a separate Node24.22.1 process on r2-executor-regressions after restoring constructor-time fixture authority checks and serializing accounted response bytes; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
+      "path": "reports/r2-genesis-acquisition-contract-measurement.json",
+      "sha256": "fc1b09cc8b6e7dff828f9c76f24fd768517a832540be644cdb8e4f31c2b8e767",
+      "acquisitionContractSha256": "fdb3a0f6abcfc57e8b7aaf2f52cf9f0e10cf379609b5321d21eb73c6c20e0aaa",
+      "parserIsolationContractSha256": "281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73",
+      "parserOutputContractSha256": "3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599",
+      "meaning": "Fresh-process r2-genesis-release branch measurement against 0526d11: only acquisition changes among 14 native functions plus structured MaStR/GENESIS; no installed parser/image/runtime approval is created. This unissued prepared-contract dependency must be remeasured on the integrated checkout; other prepared runtime/review evidence remains historical."
     },
     "preparedCheckSummary": {
       "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json",

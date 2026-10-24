@@ -23,7 +23,7 @@ import {persistOperatorRegistry,persistR1Representation,enqueueStructuredSnapsho
 import {PolicyReceiptSchema,createPolicyReceipt,recheckPolicyReceipt} from './district-policy-receipt.ts';
 import {StepReceiptSchema} from './district-step-receipt.ts';
 import {PoliteFetcher,PoliteFetchError} from './polite-fetch.ts';
-import type {FetchedDocument,FetchFailure,FixturePolicyInspection} from './polite-fetch.ts';
+import type {FetchedDocument,FetchFailure,FixturePolicyInspection,WireRequestIdentity} from './polite-fetch.ts';
 import {nativePublicRequestHeaders} from './district-native-request.ts';
 import {readGenesisOwnerRepresentation} from './genesis-owner-acquisition.ts';
 import {OwnerAcquisitionReusePinSchema,readPriorGenesisOwnerAcquisition} from './genesis-owner-reuse.ts';
@@ -137,7 +137,7 @@ export async function readFetchedBytes(root:string,file:string,sha256:string,max
 }
 
 /** Read only the actual transport-returned immutable observation in the fixed fetch root. */
-async function readHttpObservation(response:FetchedDocument,root=R1_FETCH_ROOT,policy:CivicPolicyOptions={}){
+export async function readHttpObservation(response:FetchedDocument,root=R1_FETCH_ROOT,policy:CivicPolicyOptions={}){
  const observationId=basename(response.observationPath),path=join(root,'observations',observationId);
  if(resolve(response.observationPath)!==path||await realpath(root)!==root||await realpath(dirname(path))!==dirname(path))throw Error('HTTP observation escaped fixed fetch root');
  const file=await open(path,constants.O_RDONLY|constants.O_NOFOLLOW);
@@ -247,15 +247,24 @@ export function acquisitionFailureReason(error:unknown):ReasonCode|null {
 /** These dispositions follow a settled fetch rejection, unlike executor aborts. */
 export function isSettledAcquisitionFailure(reason:ReasonCode):boolean {for(const failure in acquisitionFailureReasons)if(Object.hasOwn(acquisitionFailureReasons,failure)&&acquisitionFailureReasons[failure as FetchFailure]===reason)return true;return false;}
 export interface AcquisitionFixture {fetchRoot:string;policy:CivicPolicyOptions;inspection?:FixturePolicyInspection}
+/** Trusted controller hooks add wire custody without replacing native policy,
+ * host-lane admission, representation checks or acquisition receipt handling. */
+export interface AcquisitionWireControl {
+ minDelayMs:number;
+ beforeRequest:(url:string,request:WireRequestIdentity)=>Promise<void>;
+ onResponseChunk:(url:string,bytes:number)=>Promise<void>;
+ onWireAttemptResult:(url:string,status:number|null,failure:string|null)=>Promise<void>;
+}
 /** Shared governed request admission for acquisition and current-policy jobs. */
-export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;registry?:DistrictRegistry;registrySha256?:string;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void}){
+export async function createR1PublicFetcher(store:DistrictJobStore,context:Parameters<JobHandler>[0],options:{maxRequests:number;maxBytes:number;fixture?:AcquisitionFixture;registry?:DistrictRegistry;registrySha256?:string;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;wire?:AcquisitionWireControl}){
  const fixture=options.fixture;
  if(fixture&&(await assertCivicPolicyAuthority(fixture.policy)).mode!=='isolated-fixture')throw Error('Acquisition fixture requires isolated authority');
  const fetchRoot=fixture?.fetchRoot??R1_FETCH_ROOT,policy=fixture?.policy??{};
  await privateRoot(fetchRoot);await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  let requests=0;
  const group=HostGroupsSchema.parse(JSON.parse(await readFile(join(REPO,'sources/district-host-groups.json'),'utf8'))).serviceGroups[0],laneKey=`service:${group.id}`;
- const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:group.minStartIntervalMs,maxBytes:options.maxBytes,ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,ownerAcquisitionProducer:context.job.spec.step==='acquire_representation'?{jobKey:context.job.jobKey,attempt:context.job.attempt,fencingToken:context.job.fencingToken}:undefined,beforeRequest:async url=>{
+ if(options.wire&&(!Number.isSafeInteger(options.wire.minDelayMs)||options.wire.minDelayMs<0))throw Error('Trusted acquisition wire spacing must be a nonnegative integer');
+ const fetcher=new PoliteFetcher({cacheDir:fetchRoot,minDelayMs:Math.max(group.minStartIntervalMs,options.wire?.minDelayMs??0),maxBytes:options.maxBytes,...(options.wire?{maxRedirects:0}:{}),ownerPolicyLane:{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID},fixtureInspection:fixture?.inspection,ownerAcquisitionProducer:context.job.spec.step==='acquire_representation'?{jobKey:context.job.jobKey,attempt:context.job.attempt,fencingToken:context.job.fencingToken}:undefined,beforeRequest:async(url,request)=>{
   context.signal.throwIfAborted();if(++requests>options.maxRequests)throw new DistrictExecutionHold('source_limit_exceeded');
   if(!['http:','https:'].includes(new URL(url).protocol))throw Error('Non-public acquisition transport');
   const lane=await store.pool.query<{normalized_host:string;shared_service_group:string;max_in_flight:number;min_start_interval_ms:number}>('INSERT INTO district_pipeline.host_lanes(lane_key,normalized_host,shared_service_group,max_in_flight,min_start_interval_ms) VALUES($1,$2,$3,$4,$5) ON CONFLICT(lane_key) DO UPDATE SET lane_key=EXCLUDED.lane_key RETURNING normalized_host,shared_service_group,max_in_flight,min_start_interval_ms',[laneKey,'*',group.id,group.maxInFlight,group.minStartIntervalMs]);
@@ -267,7 +276,8 @@ export async function createR1PublicFetcher(store:DistrictJobStore,context:Param
   if(!Number.isSafeInteger(waitMs)||waitMs<0||waitMs>60000)throw new DistrictExecutionHold('host_delay');
   if(waitMs)await waitBeforeDispatch(waitMs,undefined,{signal:context.signal}).catch(error=>{context.signal.throwIfAborted();throw error;});
   await context.acquireHostLane(laneKey);context.signal.throwIfAborted();
- },onRedirect:options.onRedirect});
+  await options.wire?.beforeRequest(url,request);context.signal.throwIfAborted();
+ },onRedirect:options.onRedirect,onResponseChunk:options.wire?.onResponseChunk,onWireAttemptResult:options.wire?.onWireAttemptResult});
  if(options.registry)fetcher.registerRegisteredSources(options.registry,options.registrySha256??semanticHash(options.registry));
  return fetcher;
 }
@@ -303,7 +313,7 @@ export async function enqueueAcquiredRepresentation(store:DistrictJobStore,cas:D
  return store.enqueue({step:'admit_acquired_representation',lane:'acquisition',semanticContractSha256:await acquisitionContract(),inputArtifactHashes:[registrySha256],sourceScope:selector.scope,selector:selected,policyProofSha256:null});
 }
 
-export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture,registrySha256=semanticHash(registry)):JobHandler{return async context=>{
+export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegistry,fixture?:AcquisitionFixture,registrySha256=semanticHash(registry),wire?:AcquisitionWireControl):JobHandler{return async context=>{
  const selector=await validateAcquisitionSelector(registry,store,context.cas,context.job.spec.selector),contract=await acquisitionContract();
  if(context.job.spec.semanticContractSha256!==contract||semanticHash(context.job.spec.sourceScope)!==semanticHash(selector.scope))throw Error('Acquisition job contract mismatch');
  // A custom root/inspection seam is fixture-only, never a production authority override.
@@ -312,7 +322,7 @@ export function acquisitionHandler(store:DistrictJobStore,registry:DistrictRegis
  const {city,source}=registeredScope(registry,selector.scope,selector.root);await privateRoot(fetchRoot);
  await initializeManagedAcquisitionLane(fetchRoot,{...policy,decisionId:CIVIC_ACQUISITION_DECISION_ID,kind:'fetch'});
  const redirectChain=[selector.request.url];
- const fetcher=await createR1PublicFetcher(store,context,{maxRequests:selector.maxRequests,maxBytes:selector.maxBytes,fixture,registry,registrySha256,onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
+ const fetcher=await createR1PublicFetcher(store,context,{maxRequests:selector.maxRequests,maxBytes:selector.maxBytes,fixture,registry,registrySha256,wire,onRedirect:event=>{if(event.requestUrl===selector.request.url)redirectChain.push(event.to);}});
  const fetchOptions={method:selector.request.method,body:selector.request.body??undefined,publicOperation:selector.request.publicOperation??undefined,ownerRobotsOverride:ownerRobotsOverrideFor(selector.root)??undefined,registeredSourceUrl:selector.root,registeredMunicipalityId:city.id,registeredSourceId:source.id,municipalityName:city.name,machinePolicyUrls:source.knownMachinePolicyUrls};
  if(selector.discovery){
   const {result}=await committedResult(store,context.cas,selector.discovery.stepReceiptSha256,selector.discovery.resultSha256);

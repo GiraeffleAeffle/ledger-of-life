@@ -5,7 +5,7 @@ import {join,basename} from 'node:path';
 import {tmpdir} from 'node:os';
 import {PoliteFetcher as BasePoliteFetcher,PoliteFetchError,parseRobots,robotsAllows,publicUrl,sourceContentBinding,assertSourceFetchNodeVersion} from '../src/polite-fetch.ts';
 import {isPublicAddress} from '../src/public-address.ts';
-import type {FetchObservation,ExcludedDocument,PoliteFetcherOptions,RobotsPolicy} from '../src/polite-fetch.ts';
+import type {FetchObservation,ExcludedDocument,PoliteFetcherOptions,RobotsPolicy,WireRequestIdentity} from '../src/polite-fetch.ts';
 import {metadataPdf,reservedXmp} from './fixtures/tdm-pdf.ts';
 import {ownerRobotsOverrideFor,APPROVED_OWNER_ROBOTS_OVERRIDE} from '../src/source-policy.ts';
 import {spawn} from 'node:child_process';
@@ -267,7 +267,7 @@ test('host scheduler serializes concurrent work and respects minimum spacing',as
  t.mock.method(scheduler,'hostStateDirectory',()=>join(cache,'lanes'));
  const starts:number[]=[];let active=0,maxActive=0;
  const work=async()=>{starts.push(Date.now());active++;maxActive=Math.max(maxActive,active);await Promise.resolve();active--;};
- let complete=false;const pending=Promise.all([scheduler.scheduled(new URL('https://stadt.de/a'),work),scheduler.scheduled(new URL('http://stadt.de/b'),work),scheduler.scheduled(new URL('https://stadt.de/c'),work)]).finally(()=>{complete=true;});
+ let complete=false;const pending=Promise.all([scheduler.scheduled(new URL('https://stadt.de/a'), {method:'GET',body:null,publicOperation:null}, work),scheduler.scheduled(new URL('http://stadt.de/b'), {method:'GET',body:null,publicOperation:null}, work),scheduler.scheduled(new URL('https://stadt.de/c'), {method:'GET',body:null,publicOperation:null}, work)]).finally(()=>{complete=true;});
  // Real filesystem I/O interleaves with the mocked clock; bound by wall time, not by a turn count,
  // so a loaded host cannot strand the remaining mocked timers and hang the runner.
  const deadline=performance.now()+60_000;
@@ -394,7 +394,7 @@ test('long-lived fetchers revalidate expired robots and machine policies before 
 interface LaneState {schemaVersion:1;host:string;lastStart:number;delayMs:number;nextAllowedAt:number;failures:number[];stop:null|{status:number;reason:string;checkedAt:string;until:number}}
 interface LaneSeam {
  hostStateDirectory():string;
- scheduled<T>(url:URL,work:(state:LaneState)=>Promise<T>,onResult?:(result:T,state:LaneState)=>void):Promise<T>;
+ scheduled<T>(url:URL,request:WireRequestIdentity,work:(state:LaneState)=>Promise<T>,onResult?:(result:T,state:LaneState)=>void):Promise<T>;
  recordHostResponse(url:URL,response:Pick<WireResult,'status'|'headers'>&{body?:Buffer},state:LaneState):void;
 }
 test('municipal lane serializes instances, policy requests and restart state without credits',async t=>{
@@ -407,7 +407,7 @@ test('municipal lane serializes instances, policy requests and restart state wit
  }));
  const work=async()=>{starts.push(Date.now());active++;maxActive=Math.max(active,maxActive);await immediate();active--;};
  let complete=false;
- const run=Promise.all(lanes.map((lane,index)=>lane.scheduled(new URL(['https://stadt.de/robots.txt','https://stadt.de/.well-known/tdmrep.json','http://stadt.de/document'][index]),work))).finally(()=>{complete=true;});
+ const run=Promise.all(lanes.map((lane,index)=>lane.scheduled(new URL(['https://stadt.de/robots.txt','https://stadt.de/.well-known/tdmrep.json','http://stadt.de/document'][index]), {method:'GET',body:null,publicOperation:null}, work))).finally(()=>{complete=true;});
  let deadline=performance.now()+60_000;
  while(!complete){assert.ok(performance.now()<deadline,'lanes did not finish within 60 s of real time');await immediate();t.mock.timers.tick(25);}
  await run;assert.equal(maxActive,1);assert.equal(starts.length,3);
@@ -416,7 +416,7 @@ test('municipal lane serializes instances, policy requests and restart state wit
  assert.equal(state.lastStart,starts[2]);assert.equal(state.delayMs,5000);
  // A fresh instance reads the committed timestamp even after the in-memory queue drains.
  const restart=await createPoliteFetcher({cacheDir:join(root,'restart')}) as unknown as LaneSeam;t.mock.method(restart,'hostStateDirectory',()=>join(root,'lanes'));
- complete=false;const resumed=restart.scheduled(new URL('https://stadt.de/restarted'),work).finally(()=>{complete=true;});
+ complete=false;const resumed=restart.scheduled(new URL('https://stadt.de/restarted'), {method:'GET',body:null,publicOperation:null}, work).finally(()=>{complete=true;});
  deadline=performance.now()+60_000;
  while(!complete){assert.ok(performance.now()<deadline,'restarted lane did not finish within 60 s of real time');await immediate();t.mock.timers.tick(25);}
  await resumed;assert.ok(starts[3]-starts[2]>=5000);
@@ -431,7 +431,7 @@ test('shared lane refuses a live other-process lock without stealing it',async t
  await Promise.race([ready,failure]);
  const lock=await readFile(join(lanes,'stadt.de.lock'),'utf8'),fetcher=await createPoliteFetcher({cacheDir:root}) as unknown as LaneSeam;
  t.mock.method(fetcher,'hostStateDirectory',()=>lanes);
- await assert.rejects(fetcher.scheduled(new URL('https://stadt.de/document'),async()=>{throw Error('Busy host must not dispatch');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_busy');
+ await assert.rejects(fetcher.scheduled(new URL('https://stadt.de/document'), {method:'GET',body:null,publicOperation:null}, async()=>{throw Error('Busy host must not dispatch');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_busy');
  assert.equal(await readFile(join(lanes,'stadt.de.lock'),'utf8'),lock);
  const exited=once(child,'exit');child.stdin.write('release');await exited;
 });
@@ -444,15 +444,15 @@ test('403/429 and three rolling 5xx persist cooldowns across restart with no ret
   let requests=0;
   const work=async()=>{requests++;return {status,headers:status===503?{}:{'retry-after':'7200'},body:Buffer.alloc(0)};};
   const record=(response:WireResult,state:LaneState)=>lane.recordHostResponse(url,response,state);
-  await lane.scheduled(url,work,record);
+  await lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,record);
   if(status===503){
    for(const delay of [5000,10000]){
-    await assert.rejects(lane.scheduled(url,work,record),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
-    t.mock.timers.tick(delay);await lane.scheduled(url,work,record);
+    await assert.rejects(lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,record),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
+    t.mock.timers.tick(delay);await lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,record);
    }
   }
   const restart=await createPoliteFetcher({cacheDir:join(root,'restart')}) as unknown as LaneSeam;t.mock.method(restart,'hostStateDirectory',()=>directory);
-  await assert.rejects(restart.scheduled(url,work),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown'&&!!error.retryAfter);
+  await assert.rejects(restart.scheduled(url, {method:'GET',body:null,publicOperation:null}, work),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown'&&!!error.retryAfter);
   assert.equal(requests,status===503?3:1);
   const state=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));assert.ok(state.stop.until-Date.now()>=(status===503?3600000:7200000));
  }
@@ -479,15 +479,15 @@ test('encoding refusal preserves header-only cooldown and 5xx accounting before 
   const work=(state:LaneState)=>lane.wireRequest(url,'GET',undefined,undefined,{address:'127.0.0.1',family:4},{},headers=>lane.recordHostResponse(url,headers,state));
   const onSuccess=t.mock.fn((response:WireResult,state:LaneState)=>lane.recordHostResponse(url,response,state));
   const before=requests,now=Date.now();
-  await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+  await assert.rejects(lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
   let state:LaneState=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));
   assert.equal(onSuccess.mock.callCount(),0);
   if(status===503){
    assert.deepEqual(state.failures,[now]);assert.equal(state.nextAllowedAt,now+7000);assert.equal(state.stop,null);
    for(const delay of [7000,10000]){
-    await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
+    await assert.rejects(lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
     t.mock.timers.tick(delay);
-    await assert.rejects(lane.scheduled(url,work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
+    await assert.rejects(lane.scheduled(url, {method:'GET',body:null,publicOperation:null}, work,onSuccess),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='unsupported_encoding');
    }
    state=JSON.parse(await readFile(join(directory,'stadt.de.json'),'utf8'));
    assert.equal(state.failures.length,3);assert.equal(state.stop?.status,503);assert.ok(state.nextAllowedAt>=Date.now()+3600000);
@@ -496,7 +496,7 @@ test('encoding refusal preserves header-only cooldown and 5xx accounting before 
   }
   const restart=await createPoliteFetcher({cacheDir:join(root,`restart-${status}`)}) as unknown as LaneSeam;
   t.mock.method(restart,'hostStateDirectory',()=>directory);
-  await assert.rejects(restart.scheduled(url,async()=>{throw Error('No dispatch during persisted cooldown');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
+  await assert.rejects(restart.scheduled(url, {method:'GET',body:null,publicOperation:null}, async()=>{throw Error('No dispatch during persisted cooldown');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_cooldown');
   assert.equal(requests-before,status===503?3:1);
   assert.deepEqual(await readdir(join(fetcher.cacheDir,'sha256')).catch(()=>[]),[]);
   assert.deepEqual(await readdir(join(fetcher.cacheDir,'observations')).catch(()=>[]),[]);
@@ -506,9 +506,9 @@ test('unsafe shared state fails closed before work',async t=>{
  const root=await realpath(await mkdtemp(join(tmpdir(),'polite-unsafe-lane-')));t.after(()=>rm(root,{recursive:true,force:true}));
  const lane=await createPoliteFetcher({cacheDir:root}) as unknown as LaneSeam;t.mock.method(lane,'hostStateDirectory',()=>root);
  const path=join(root,'stadt.de.json');await writeFile(path,'{}',{mode:0o600});
- await assert.rejects(lane.scheduled(new URL('https://stadt.de/'),async()=>{throw Error('Must not start');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+ await assert.rejects(lane.scheduled(new URL('https://stadt.de/'), {method:'GET',body:null,publicOperation:null}, async()=>{throw Error('Must not start');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
  await chmod(root,0o755);
- await assert.rejects(lane.scheduled(new URL('https://stadt.de/'),async()=>{throw Error('Must not start');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
+ await assert.rejects(lane.scheduled(new URL('https://stadt.de/'), {method:'GET',body:null,publicOperation:null}, async()=>{throw Error('Must not start');}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_state_unsafe');
 });
 test('global registered exception preserves real robots/TDM states and independently audits redirects',async t=>{
  const root=await mkdtemp(join(tmpdir(),'polite-owner-policy-'));t.after(()=>rm(root,{recursive:true,force:true}));
@@ -569,7 +569,7 @@ test('opt-out is checked before policy/cache reads and before paced dispatch',as
  await recordHostOptOut({host:'stadt.de',reason:'rights_holder_objection'},options.ownerPolicyLane!);
  let calls=0;t.mock.method(fetcher as unknown as WireSeam,'wire',async()=>{calls++;throw Error('Must not request opted-out host');});
  await assert.rejects(fetcher.fetch('https://stadt.de/document'),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
- await assert.rejects(seam.scheduled(new URL('https://stadt.de/robots.txt'),async()=>{calls++;}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
+ await assert.rejects(seam.scheduled(new URL('https://stadt.de/robots.txt'), {method:'GET',body:null,publicOperation:null}, async()=>{calls++;}),(error:unknown)=>error instanceof PoliteFetchError&&error.failure==='host_opted_out');
  assert.equal(calls,0);
 });
 

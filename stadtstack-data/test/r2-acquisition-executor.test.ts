@@ -12,7 +12,7 @@ import {PoliteFetcher,sourceContentBinding} from '../src/polite-fetch.ts';
 import {readBoundSourceObservation} from '../src/source-observation.ts';
 import {politeTestOptions} from './fixtures/polite-lane.ts';
 import {fixturePolicyInspection} from './fixtures/polite-inspection.ts';
-import type {FetchObservation,FetchedDocument,PoliteFetcherOptions} from '../src/polite-fetch.ts';
+import type {FetchObservation,FetchedDocument,PoliteFetcherOptions,WireRequestIdentity} from '../src/polite-fetch.ts';
 import {REVIEWED_REGISTERED_ROBOTS_SCOPES} from '../src/registered-source-policy.ts';
 import {assertR2ReferencesReleased} from '../src/r2-acquisition-integrity.ts';
 const sha=(bytes:Buffer|string)=>createHash('sha256').update(bytes).digest('hex');
@@ -88,7 +88,7 @@ test('R2 executor refuses an off-list redirect before dispatch to localhost fixt
  const input=await options(root,true);input.fetcherOptions=await politeTestOptions({cacheDir:join(root,'cache'),fixtureInspection:fixturePolicyInspection});
  interface FixtureWire {
   hostStateDirectory():string;
-  scheduled<T>(url:URL,work:(state:unknown)=>Promise<T>,onResult?:(result:T,state:unknown)=>void):Promise<T>;
+  scheduled<T>(url:URL,request:WireRequestIdentity,work:(state:unknown)=>Promise<T>,onResult?:(result:T,state:unknown)=>void):Promise<T>;
   wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},headers:Record<string,string>,onRefusedHeaders?:unknown,accountingUrl?:string):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>;
   onWireAttemptResult(url:string,status:number|null,failure:string|null):Promise<void>;
  }
@@ -96,7 +96,7 @@ test('R2 executor refuses an off-list redirect before dispatch to localhost fixt
  const hostLane=t.mock.method(PoliteFetcher.prototype as unknown as FixtureWire,'hostStateDirectory',()=>join(root,'host-lanes'));
  const patch=t.mock.method(PoliteFetcher.prototype as unknown as {wire:(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined)=>Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>},'wire',async function(this:FixtureWire,url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined){
   const fixtureUrl=new URL(`http://127.0.0.1:${address.port}${url.pathname}${url.search}`);
-  return this.scheduled(url,async()=>{requests.push(url.href);const response=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,url.href);await this.onWireAttemptResult(url.href,response.status,response.status>=400?`http_${response.status}`:null);return response;});
+  return this.scheduled(url,{method,body:body??null,publicOperation:null},async()=>{requests.push(url.href);const response=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,url.href);await this.onWireAttemptResult(url.href,response.status,response.status>=400?`http_${response.status}`:null);return response;});
  });
  t.after(()=>{patch.mock.restore();hostLane.mock.restore();});
  const executor=await R2AcquisitionExecutor.open(input);
@@ -122,13 +122,13 @@ test('R2 fetch persists record-derived integrity through managed CAS and bound p
  interface ExecutorInternals{documents:Map<string,R2ManifestItem>;fetcher:PoliteFetcher}
  const executor=await R2AcquisitionExecutor.open(input),internals=executor as unknown as ExecutorInternals,item=input.manifest[0]!,url=item.url;internals.documents.clear();internals.documents.set(url,item);
  interface FixtureWire {
-  scheduled<T>(url:URL,work:(state:unknown)=>Promise<T>,onResult?:(result:T,state:unknown)=>void):Promise<T>;
+  scheduled<T>(url:URL,request:WireRequestIdentity,work:(state:unknown)=>Promise<T>,onResult?:(result:T,state:unknown)=>void):Promise<T>;
   wireRequest(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,pinned:{address:string;family:number},headers:Record<string,string>,onRefusedHeaders?:unknown,accountingUrl?:string):Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>;
   onWireAttemptResult(url:string,status:number|null,failure:string|null):Promise<void>;
  }
  const patch=t.mock.method(PoliteFetcher.prototype as unknown as {wire:(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined)=>Promise<{status:number;headers:Record<string,string|undefined>;body:Buffer}>},'wire',async function(this:FixtureWire,requestUrl:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined){
   const fixtureUrl=new URL(`http://127.0.0.1:${address.port}${requestUrl.pathname}${requestUrl.search}`);
-  return this.scheduled(requestUrl,async()=>{const response=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,requestUrl.href);await this.onWireAttemptResult(requestUrl.href,response.status,response.status>=400?`http_${response.status}`:null);return response;});
+  return this.scheduled(requestUrl,{method,body:body??null,publicOperation:null},async()=>{const response=await this.wireRequest(fixtureUrl,method,body,validators,{address:'127.0.0.1',family:4},{},undefined,requestUrl.href);await this.onWireAttemptResult(requestUrl.href,response.status,response.status>=400?`http_${response.status}`:null);return response;});
  });
  t.after(()=>patch.mock.restore());
  const original=internals.fetcher.fetch.bind(internals.fetcher),fetched:FetchedDocument[]=[],capture=t.mock.method(internals.fetcher,'fetch',async(...args:Parameters<PoliteFetcher['fetch']>)=>{const document=await original(...args);fetched.push(document);return document;});
