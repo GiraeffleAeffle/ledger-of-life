@@ -251,6 +251,16 @@ real handshake. The Python worker test mocked the bounded source-free version
 probe and proved no readiness message on failure; it did not run the image.
 The all14 measurement completed exit0 under the same lock.
 
+
+This branch's reviewed-executor follow-up was typechecked with exit0 and its new
+focused suite completed **4/4 passed, 0 failed/skipped**. The suite covers draft
+rejection, stop-file handling, exact off-list redirect/path/query/host refusal,
+and request/policy/per-response body caps. A fresh-process
+`acquisitionContract()` measurement is
+`256cf5a95c52cd1ce73127b6d6256f9de4dc3cd49a10b9ae61d243b1ce3e4c6b`.
+It does not cover every campaign cap, ten-document pause, interrupted resume,
+changed-byte quarantine/release, or preparation/inference refusal. Those are
+unresolved executor issuance blockers; the suite makes no live-source claim.
 Exact commands/results and limitations are in
 `/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json`,
 SHA256 `fe82293f67922769ce28fd31fa3f3566645f8ad4a84990db5697d1ab87298e76`.
