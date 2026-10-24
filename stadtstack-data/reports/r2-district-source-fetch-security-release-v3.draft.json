@@ -28,7 +28,20 @@
       "sha256": "e471ba1fecc2be15f81e109dc8eb82360d85cebaa1a54ef1f3da3b1427399134",
       "observedSourceCount": 43,
       "ownerDescribedSourceCount": 42,
-      "sourceUniverseReconciliation": "REQUIRED_BEFORE_ISSUANCE; no silent expansion to43"
+      "sourceUniverseReconciliation": "RESOLVED:42was the registry count after GENESIS and before PEGELONLINE;43is the current registered inventory, not an R2 scope expansion or blanket fetch permission. The PEGEL route has its own historical bounded owner approval. R2 selects18district scopes and excludes both structured routes.",
+      "districtDocumentRegistrationCount": 41,
+      "structuredRouteCount": 2,
+      "historical43rdSource": {
+        "sourceId": "pegelonline",
+        "municipalityId": "hagenow",
+        "registrationCommit": "96e34c49891d9be3762b5ae181df7c0a32682cc1",
+        "registrationCommitAt": "2026-10-13T06:27:21Z",
+        "approvedMergeCommit": "7b9ab165398f8229c0cf0db4c85d3c6926695235",
+        "ownerApproval": "stadtstack-data/reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json",
+        "ownerApprovalSha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66",
+        "selectedForR2": false,
+        "historicalApprovalIsCurrentFetchAuthority": false
+      }
     },
     "candidateBindings": 120,
     "exactDocumentUrls": 112,
@@ -2393,7 +2406,7 @@
   "issuanceBlockers": [
     "Independent review/merge/gate of this branch and final integrated contracts; preparation alone is not approval",
     "Patched parser base/image rebuild, SBOM/runtime inventory, containment sentinels and new root-owned review not available in this slice",
-    "Final R2 manifest/registry pin and42-versus43 source reconciliation",
+    "Final exact R2 manifest/registry pin; historical42-versus43 count discrepancy is resolved without expanding the selected acquisition scope",
     "Exact current source eligibility/provenance and R1final corpus/content dedup;112URLs are not120new documents",
     "Genuine owner103-derived acquisition scope/budget/policy-bootstrap/official-work approvals and Main security release signature/time",
     "Reviewed R2 executor enforcing the exact network allowlist, response MIME, all-wire request/byte/global-rate/time budgets and content-free stops; old R1 CLI cannot substitute",
