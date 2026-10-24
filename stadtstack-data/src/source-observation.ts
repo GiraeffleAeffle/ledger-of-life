@@ -39,7 +39,7 @@ export async function readBoundSourceObservation(options:ReadBoundSourceObservat
  const document=options.document;
  if(document.exclusion!==undefined||!document.observationPath||!document.checkedAt||document.status===undefined)throw Error('Source observation index binding is incomplete or excluded');
  publicUrl.parse(document.url);hashSchema.parse(document.sha256);
- const selected=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selected),policy={...selected,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
+ const selected: CivicPolicyOptions=options.policy??CIVIC_POLICY_AUTHORITY,authority=await assertCivicPolicyAuthority(selected),policy:CivicPolicyOptions={...selected,authorityId:authority.authorityId,authoritySha256:authority.authoritySha256};
  await assertHostNotOptedOut(document.url,policy);
  const root=await realpath(options.rawRoot),observationPath=resolve(document.observationPath),name=basename(observationPath);
  if(dirname(observationPath)!==join(root,'observations')||!/^[a-zA-Z0-9][a-zA-Z0-9._-]*\.json$/.test(name))throw Error('Source observation is outside the explicitly managed raw root');
