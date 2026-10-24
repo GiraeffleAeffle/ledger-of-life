@@ -372,11 +372,181 @@ worktree-local dependencies.
 
 
 No live-source fetch, issuance, source-fetch-stop lift, parser build/SBOM,
-privileged review, production CLI/DB write or full-suite check was run. The
-executor implementation is an unissued gate only; the main integration review
-must still verify the full affected contract set and runtime/image boundary.
+privileged review or production CLI/DB write was run. The executor
+implementation is an unissued gate only; the main integration review must
+still verify the full affected contract set and runtime/image boundary.
 
 Root `docs/ontology.yaml` and `docs/ONTOLOGY.md` were read. No civic concept,
 assessment truth claim or DocumentDisposition semantics changes here; both
 ontology files are intentionally unchanged. A draft/authority remains distinct
 from a source observation, actual processing receipt or independent validation.
+
+## R2 code-freeze operations
+
+This is a lead-operated sequence for a future freeze, not an authorization,
+production cutover, source-fetch approval, or record issuance. The generators
+write only private drafts/reports. They never read or write `/etc/stadtstack`.
+Do not merge from this branch; the integration lead merges the independently
+reviewed R2 SDK, fetch-hardening, executor, structured-mapping, extraction,
+step-8 replay, and v2-codec slices before the freeze run.
+
+Follow this order:
+
+1. **Merge slices.** Merge the reviewed branches into the designated
+   `rebuild-r1` integration tree, including the v2 codec before measuring final
+   fingerprints. Keep each slice's review, tests and commit identity. Stop for
+   unresolved conflicts or a dirty/uncommitted integration tree.
+2. **Measure all fourteen contracts twice from fresh processes.** From the
+   clean integrated `stadtstack-data` root, keep output outside the checkout:
+
+   ```sh
+   umask 077
+   set -eu
+   STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/stadtstack-data"
+   mkdir -p -m 0700 "$STATE_ROOT"
+   RUN_DIR=$(mktemp -d "$STATE_ROOT/r2-contract-freeze.XXXXXX")
+   node --experimental-strip-types scripts/r2-contract-fingerprints.mjs "$PWD" >"$RUN_DIR/contracts-1.json"
+   node --experimental-strip-types scripts/r2-contract-fingerprints.mjs "$PWD" >"$RUN_DIR/contracts-2.json"
+   cmp -- "$RUN_DIR/contracts-1.json" "$RUN_DIR/contracts-2.json"
+   ```
+
+   Each invocation launches a new Node process per exported contract. The
+   versioned report contains every complete contract hash, exported value,
+   sorted source-file closure and closure-file SHA-256, the source revision,
+   clean-tree flag and full-set digest. Require exactly fourteen families,
+   `sourceTreeClean:true`, identical complete reports and no missing/empty
+   closure. Preserve both exact reports and their SHA-256 outside the source
+   tree; never copy one into an input tree before computing the clean-tree
+   identity.
+3. **Rebuild the parser image if needed.** The prepared candidate
+   `sha256:4feb00e1d9fa7802c523e9b6af16b8ab72014e0bf812d1b345b7a155eb608046`
+   is usable for review only if the final parser isolation and parser-output
+   contracts still match its recorded image evidence in the unissued v3 draft.
+   In particular, a changed `district-parser-worker.py` means the image must be
+   rebuilt. Rebuild from the final committed inputs using the approved offline
+   build procedure, then record the actual immutable image ID and refreshed
+   SBOM/image evidence. Do not relabel the old digest or pull an unreviewed
+   image. An unchanged image ID is not authorization.
+4. **Review.** Independently review the final parser image/runtime and
+   isolation boundary, and the final OMP-B image, binary, host resolver,
+   daemon/socket and runner. Review metadata must be real, final and
+   non-future-dated. Prepare one strict input document for
+   `scripts/r2-review-pin-drafts.mjs` using exactly
+   `schemaVersion:"stadtstack-r2-review-pin-draft-input-v1"`,
+   `parser:{imageId,securityReviewId,reviewedBy,reviewedAt,dockerSocket}` and
+   `omp:{imageId,ompBinarySha256,hostResolverBinarySha256,dockerDaemonId,securityReviewId,reviewedBy,reviewedAt,dockerSocket}`.
+   The identities, image/binary/daemon hashes and review time come from the
+   real independent review and host inspection; do not use synthetic/example
+   values for issuance. Choose an existing private non-`/etc/stadtstack`
+   output directory:
+
+   ```sh
+   node --experimental-strip-types scripts/r2-review-pin-drafts.mjs "$REVIEW_INPUT" "$DRAFT_DIR"
+   sha256sum "$DRAFT_DIR/parser-isolation-review.draft.json" "$DRAFT_DIR/omp-b-review.draft.json"
+   ```
+
+   The generator hashes the current exported runner contracts and validates
+   the exact exported `ParserReviewSchema` and `OmpReviewSchema`. A candidate
+   parser image is refused when its recorded parser isolation/output
+   fingerprints no longer match. The output files are drafts, not reviews or
+   authorizations; retain their exact bytes and hashes with the external review
+   record.
+5. **Lead authorization install.** Only the authorized lead, after review, may
+   install those exact approved bytes. The generator must never be pointed at
+   `/etc/stadtstack`; do not use this worktree or a script run as root to
+   create/modify authorization. After independent approval, install and verify:
+
+   ```sh
+   sudo install -o root -g root -m 0644 "$DRAFT_DIR/parser-isolation-review.draft.json" /etc/stadtstack/parser-isolation-review.json
+   sudo install -o root -g root -m 0644 "$DRAFT_DIR/omp-b-review.draft.json" /etc/stadtstack/omp-b-review.json
+   sudo stat -c '%U:%G %a %n' /etc/stadtstack/parser-isolation-review.json /etc/stadtstack/omp-b-review.json
+   ```
+
+   Confirm the displayed ownership/mode is `root:root 644`; both review
+   readers also reject unsafe ancestry, symlinks, future review times, schema
+   drift and stale runner hashes.
+6. **Sentinels and compatibility gates.** First read each installed review
+   through the production reader, which checks the exact current contract
+   without launching Docker, reading credentials or writing authority:
+
+   ```sh
+   node --experimental-strip-types --input-type=module -e '
+   import {readParserReview} from "./src/district-parser-isolation.ts";
+   const review=await readParserReview();
+   console.log(JSON.stringify({imageId:review.imageId,runnerSha256:review.runnerSha256}));
+   '
+   node --experimental-strip-types --input-type=module -e '
+   import {readOmpRunnerReview} from "./src/district-omp-b-runner.ts";
+   const review=await readOmpRunnerReview();
+   console.log(JSON.stringify({imageId:review.imageId,runnerContractSha256:review.runnerContractSha256}));
+   '
+   ```
+
+   Then run parser isolation sentinels on the reviewed Linux image, with the
+   existing authorized fixture authority and no downloaded document:
+
+   ```sh
+   STADTSTACK_PARSER_SECURITY_TESTS=1 node --experimental-strip-types --test --test-concurrency=1 \
+     test/district-parser-isolation.test.ts test/document-origin.test.ts test/pdf-tdm-policy.test.ts
+   ```
+
+   Run source-free OMP-B runner/output fixtures and the strict old-R1-reader
+   /new-R2-pin transition fixtures:
+
+   ```sh
+   node --experimental-strip-types --test --test-concurrency=1 \
+     test/district-omp-b-runner.test.ts test/district-omp-output-diagnostics.test.ts \
+     test/r2-contract-transition.test.ts
+   ```
+
+   These are not model calls or a substitute for a real image review. The
+   parser environment flag enables tests; it does not authorize the sandbox.
+   For the inventory boundary, include the deployed 0.3.2 tools, old R1 tools,
+   every Core consumer, active scratch/daemon callbacks, and any inventory
+   writer/reader in the real read-only lease/process/old-reader-marker
+   observations. Collect the exact Core drain-proof bytes at the same
+   timestamp, hash those bytes, and run:
+
+   ```sh
+   node --experimental-strip-types scripts/r2-cutover-check.mjs "$DRAIN_OBSERVATION"
+   ```
+
+   This tool validates the strict v2 drain-proof schema/digest, exact
+   authority/inventory/time match, no future observation, and empty supplied
+   active-lease/old-reader-marker lists. It does not probe the authority or
+   prove that an operator's observations are genuine. Stop on any lease or
+   marker; do not retry the cutover with a fabricated empty observation. The
+   R1 old-reader fixture uses a local strict codec-schema adapter until the
+   v2 codec is merged; at integration, use the codec's exported schema rather
+   than weakening or duplicating its contract.
+7. **Issue the R2 district v3 record separately.** Main/lead must resolve the
+   source-fetch security review, exact final source/manifest and registry
+   membership, genuine owner approval, final R1 digest inventory, real current
+   runtime/image evidence and current processing generation before the v3
+   record is issued. The current draft remains unissued and does not lift the
+   stop. The fingerprint and review-pin generators do not issue v3 or perform
+   a fetch.
+8. **Issue GENESIS authorization separately.** GENESIS is a distinct structured
+   source plan and owner/source authorization, not a side effect of district
+   v3 issuance or the old R1 approval. Main/lead must complete the structured
+   v3 review and exact nine-AGS/request-plan/owner-proof requirements in
+   [`R2_STRUCTURED_SOURCES.md`](R2_STRUCTURED_SOURCES.md) before any preflight
+   or data request. No GENESIS request or issuance is performed by these tools.
+
+### Still open until code freeze
+
+- The listed R2 slices must be merged, reviewed together and committed as one
+  clean integrated source revision; this branch does not merge them.
+- The complete fourteen-contract report must be generated twice on that exact
+  tree, reconciled, retained externally and used to mint the current generation
+  pin. The report currently only defines the measurement procedure.
+- The parser image must be rebuilt if its final image inputs/worker differ from
+  the candidate, then independently reviewed with current real image/SBOM
+  identity. The OMP runner/image/resolver/daemon review and both root-owned
+  installed files remain a lead action.
+- Installed-review readback, parser image sentinels, OMP source-free
+  compatibility tests and genuine current lease/old-reader observations must
+  all pass on the freeze host.
+- R2 v3 and the separate structured GENESIS v3 each need genuine owner/source
+  proofs and explicit Main/lead issuance. Neither current draft status nor
+  these offline tests imply permission to fetch or use GENESIS credentials.

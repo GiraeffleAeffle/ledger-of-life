@@ -1614,3 +1614,38 @@ These checks are step8 fixture/static evidence, not a production candidate,
 frozen value-test result, hosted approval or claim that Main's full integration
 gate has run. Every owned disposable PG cluster was stopped and removed; the
 post-run process search found no owned fixture/worker/PG actor.
+
+## R2 code-freeze runbook
+
+This is the future freeze order, not a completed cutover or permission to fetch,
+issue or use GENESIS credentials. Details, schemas and commands are in
+[`R2_FETCH_SECURITY.md`](R2_FETCH_SECURITY.md#r2-code-freeze-operations).
+
+1. **Merge slices:** integration lead merges the reviewed SDK, fetch-hardening,
+   executor, structured-mapping, extraction, step-8 replay and v2-codec work;
+   do not freeze an unmerged or dirty tree.
+2. **Fingerprints:** run `scripts/r2-contract-fingerprints.mjs` twice from fresh
+   processes on the clean integrated tree; preserve identical versioned reports
+   covering all fourteen contracts and their complete source-file closures.
+3. **Image rebuild (if needed):** rebuild the parser image if its worker or
+   image inputs differ from the candidate; record the actual immutable image
+   digest and refreshed image/SBOM evidence.
+4. **Review:** independently review the final parser image/isolation boundary
+   and OMP-B image, runner, host resolver and daemon; generate only schema-valid
+   review-pin drafts from real review metadata.
+5. **Authorization install:** the authorized lead installs the approved exact
+   draft bytes with `sudo install -o root -g root -m 0644`; verify both files
+   are root-owned mode `0644`. Generators never write `/etc/stadtstack`.
+6. **Sentinels:** read back both installed pins through their strict current
+   readers; run the reviewed-image parser sentinels, OMP-B contract fixtures,
+   and the current drain check. Cutover must refuse any active lease or
+   old-reader marker.
+7. **v3 issuance:** Main/lead separately resolves and issues the R2 district
+   acquisition v3 record only after its genuine owner/source/runtime evidence
+   is final. The prepared draft does not lift the stop.
+8. **GENESIS issuance:** separately complete and issue the structured GENESIS
+   v3 plan under its exact owner/source approval; district v3 does not authorize
+   a GENESIS request.
+
+Until those steps are complete, no R2 code freeze, production review
+installation, cutover, v3/GENESIS issuance or source fetch is claimed here.

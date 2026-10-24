@@ -7,6 +7,7 @@ import {authenticateStructuredExecutionEvidence} from './r1-step8-structured-exe
 import type {StructuredExecutionCustody} from './r1-step8-structured-execution.ts';
 import type {CivicPolicyOptions} from './civic-opt-out.ts';
 import {createCanonicalWitnessReadPool} from './r1-step8-provenance.ts';
+import {StepReceiptSchema} from './district-step-receipt.ts';
 import {createReadOnlyManagedSourceAudit} from './r1-step8-managed-read-view.ts';
 
 export const STEP8_STRUCTURED_SOURCE_SCOPES=[['strausberg','regionalstatistik-genesis'],['hagenow','pegelonline']] as const;
@@ -84,4 +85,85 @@ export function assertStep8NativeBStep(policy:Step8CurrentGeneration,spec:{seman
  if(!selected.success||spec.semanticContractSha256!==policy.B.jobContractSha256||selected.data.runnerOutputContractSha256!==policy.B.runnerOutputContractSha256
   ||versions.runnerContractSha256!==policy.B.runnerContractSha256||versions.ompNativeStreamVersion!==policy.B.nativeStreamVersion
   ||versions.ompThinking!==policy.B.thinking||versions.ompOutputNormalization!==undefined)throw Error('Admitting B job is outside approved native Sonnet profile/stream');
+}
+export const STEP8_PROCESSING_CONTRACT_NAMES=['preparationExtractor','residualPreparation','residualJob','jointExtraction','assessmentQueue','assessmentB','acquisition','policyRefresh','structuredStateGauges','operatorRegistry','parserOutput','parserIsolation','ompOutput','ompRunner'] as const;
+const ProcessingContractNameSchema=z.enum(STEP8_PROCESSING_CONTRACT_NAMES);
+const ProcessingContractSetSchema=z.object({
+ preparationExtractor:HashSchema,residualPreparation:HashSchema,residualJob:HashSchema,jointExtraction:HashSchema,
+ assessmentQueue:HashSchema,assessmentB:HashSchema,acquisition:HashSchema,policyRefresh:HashSchema,
+ structuredStateGauges:HashSchema,operatorRegistry:HashSchema,parserOutput:HashSchema,parserIsolation:HashSchema,
+ ompOutput:HashSchema,ompRunner:HashSchema,
+}).strict();
+const processingCommit=z.string().regex(/^[a-f0-9]{40}$/);
+const R1ProcessingPinPayloadSchema=z.object({
+ schemaVersion:z.literal('stadtstack-r1-processing-pin-set-v1'),processingCommit,contracts:ProcessingContractSetSchema,
+}).strict();
+export const Step8RecordedR1ProcessingPinsSchema=R1ProcessingPinPayloadSchema.extend({pinSetSha256:HashSchema}).strict().superRefine((value,ctx)=>{
+ const {pinSetSha256,...payload}=value;
+ if(digest(canonicalJson(payload))!==pinSetSha256)ctx.addIssue({code:'custom',message:'Recorded R1 processing pin-set digest mismatch'});
+});
+export type Step8RecordedR1ProcessingPins=z.infer<typeof Step8RecordedR1ProcessingPinsSchema>;
+export function createStep8RecordedR1ProcessingPins(input:{processingCommit:string;contracts:Record<(typeof STEP8_PROCESSING_CONTRACT_NAMES)[number],string>}):Step8RecordedR1ProcessingPins{
+ const payload=R1ProcessingPinPayloadSchema.parse({schemaVersion:'stadtstack-r1-processing-pin-set-v1',...input});
+ return Step8RecordedR1ProcessingPinsSchema.parse({...payload,pinSetSha256:digest(canonicalJson(payload))});
+}
+const R2CurrentGenerationPayloadSchema=z.object({
+ schemaVersion:z.literal('stadtstack-r2-processing-generation-v1'),processingCommit,fingerprintReportSha256:HashSchema,
+ contracts:ProcessingContractSetSchema,
+}).strict();
+export const Step8R2CurrentGenerationSchema=R2CurrentGenerationPayloadSchema.extend({generationSha256:HashSchema}).strict().superRefine((value,ctx)=>{
+ const {generationSha256,...payload}=value;
+ if(digest(canonicalJson(payload))!==generationSha256)ctx.addIssue({code:'custom',message:'R2 processing generation digest mismatch'});
+});
+export type Step8R2CurrentGeneration=z.infer<typeof Step8R2CurrentGenerationSchema>;
+export function createStep8R2CurrentGeneration(input:{processingCommit:string;fingerprintReportSha256:string;contracts:Record<(typeof STEP8_PROCESSING_CONTRACT_NAMES)[number],string>}):Step8R2CurrentGeneration{
+ const payload=R2CurrentGenerationPayloadSchema.parse({schemaVersion:'stadtstack-r2-processing-generation-v1',...input});
+ return Step8R2CurrentGenerationSchema.parse({...payload,generationSha256:digest(canonicalJson(payload))});
+}
+const R1ReceiptPinAssertionSchema=z.object({
+ contractFamily:ProcessingContractNameSchema,semanticContractSha256:HashSchema,jobKey:HashSchema,receipt:StepReceiptSchema,receiptSha256:HashSchema,
+}).strict();
+/** Check a historically authenticated R1 job against its immutable recorded pins.
+ * Receipt/CAS/job-row authentication remains the caller's existing responsibility. */
+export function assertStep8R1ReceiptRecordedPin(input:{contractFamily:(typeof STEP8_PROCESSING_CONTRACT_NAMES)[number];semanticContractSha256:string;jobKey:string;receipt:unknown;receiptSha256:string;recordedPins:unknown}){
+ const {recordedPins,...assertionInput}=input,pins=Step8RecordedR1ProcessingPinsSchema.parse(recordedPins),assertion=R1ReceiptPinAssertionSchema.parse(assertionInput);
+ if(assertion.receipt.jobKey!==assertion.jobKey||assertion.receiptSha256!==digest(canonicalJson(assertion.receipt))
+  ||assertion.semanticContractSha256!==pins.contracts[assertion.contractFamily])throw Error('R1 receipt differs from its recorded processing pin');
+ return {processingCommit:pins.processingCommit,pinSetSha256:pins.pinSetSha256,receiptSha256:assertion.receiptSha256};
+}
+const R2JobContractSchema=z.object({
+ processingGenerationSha256:HashSchema,contractFamily:ProcessingContractNameSchema,semanticContractSha256:HashSchema,
+}).strict();
+/** New R2 jobs must carry both the current full-generation identity and the
+ * exact semantic contract. A historical receipt cannot supply either pin. */
+export function assertStep8R2JobCurrent(currentRaw:unknown,jobRaw:unknown){
+ const current=Step8R2CurrentGenerationSchema.parse(currentRaw),job=R2JobContractSchema.parse(jobRaw);
+ if(job.processingGenerationSha256!==current.generationSha256||job.semanticContractSha256!==current.contracts[job.contractFamily])throw Error('R2 job is missing or differs from current processing pins');
+ return current.generationSha256;
+}
+const R2InventoryDrainSchema=z.object({
+ schemaVersion:z.literal('civic-inventory-drain-v2'),authoritySha256:HashSchema,inventorySha256:HashSchema,
+ observedAt:z.iso.datetime(),noReaders:z.literal(true),noWriters:z.literal(true),
+ reference:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$/),
+ pendingScratch:z.array(z.object({id:z.uuid(),sha256:HashSchema}).strict()),
+}).strict();
+const R2CutoverObservationSchema=z.object({
+ authoritySha256:HashSchema,inventorySha256:HashSchema,observedAt:z.iso.datetime(),
+ activeLeases:z.array(z.string().min(1).max(256)),oldReaderMarkers:z.array(z.string().min(1).max(4096)),
+}).strict();
+/** Validate the codec's exact read-only drain evidence plus current lease/reader
+ * observations immediately before the manifest swap. */
+export function assertStep8R2CutoverReady(input:{
+ authoritySha256:string;inventorySha256:string;observedAt:string;drainProofBytes:Uint8Array;drainSha256:string;
+ activeLeases:readonly string[];oldReaderMarkers:readonly string[];now?:number;
+}){
+ const observation=R2CutoverObservationSchema.parse({authoritySha256:input.authoritySha256,inventorySha256:input.inventorySha256,observedAt:input.observedAt,activeLeases:input.activeLeases,oldReaderMarkers:input.oldReaderMarkers});
+ const bytes=Buffer.from(input.drainProofBytes);
+ if(digest(bytes)!==input.drainSha256)throw Error('R2 drain-proof digest mismatch');
+ let raw:unknown;
+ try{raw=JSON.parse(bytes.toString('utf8'));}catch{throw Error('R2 drain proof is not JSON');}
+ const drain=R2InventoryDrainSchema.parse(raw),now=input.now??Date.now();
+ if(drain.authoritySha256!==observation.authoritySha256||drain.inventorySha256!==observation.inventorySha256||drain.observedAt!==observation.observedAt
+  ||Date.parse(drain.observedAt)>now||observation.activeLeases.length||observation.oldReaderMarkers.length)throw Error('R2 cutover requires no active leases or old readers');
+ return {authoritySha256:drain.authoritySha256,inventorySha256:drain.inventorySha256,drainSha256:input.drainSha256};
 }
