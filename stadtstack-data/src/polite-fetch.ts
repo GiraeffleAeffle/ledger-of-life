@@ -212,6 +212,7 @@ export class PoliteFetcher {
  }
  get requestCount():number{return this.fetchCount;}
  constructor(options:PoliteFetcherOptions,publicPolicyFetcher?:PoliteFetcher){
+  if(options.fixtureInspection&&(!options.ownerPolicyLane?.authorityId?.startsWith('fixture:')||!options.ownerPolicyLane.authoritySha256||!options.ownerPolicyLane.stateDir))throw new PoliteFetchError('host_state_unsafe','Injected inspection requires a fully pinned isolated fixture authority');
   this.fixtureInspection=options.fixtureInspection;
   this.beforeRequest=options.beforeRequest;
   this.onRedirect=options.onRedirect;
@@ -511,10 +512,21 @@ export class PoliteFetcher {
       clearTimeout(timer);reject(new PoliteFetchError('unsupported_encoding','Non-identity content encoding refused'));response.destroy();request.destroy();return;
      }
      if(status>=300){response.destroy();clearTimeout(timer);done({status,headers:selected,body:Buffer.alloc(0),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});return;}
-     const chunks:Buffer[]=[];let bytes=0;
+     const chunks:Buffer[]=[];let bytes=0,streamFailure:PoliteFetchError|undefined,chunkTail=Promise.resolve();
      if(Number(selected['content-length'])>this.options.maxBytes){request.destroy(new PoliteFetchError('too_large','Response exceeds byte bound'));return;}
-     response.on('data',(chunk:Buffer)=>{response.pause();void (async()=>{try{await this.onResponseChunk?.(accountingUrl,chunk.length);bytes+=chunk.length;if(bytes>this.options.maxBytes)throw new PoliteFetchError('too_large','Response exceeds byte bound');chunks.push(chunk);response.resume();}catch(error){clearTimeout(timer);reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Wire accounting failed'));response.destroy();request.destroy();}})();});
-     response.on('end',()=>{clearTimeout(timer);done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});
+     response.on('data',(chunk:Buffer)=>{
+      response.pause();
+      chunkTail=chunkTail.then(async()=>{
+       if(streamFailure)return;
+       await this.onResponseChunk?.(accountingUrl,chunk.length);bytes+=chunk.length;
+       if(bytes>this.options.maxBytes)throw new PoliteFetchError('too_large','Response exceeds byte bound');
+       chunks.push(chunk);
+      }).then(()=>{if(!streamFailure)response.resume();}).catch(error=>{
+       streamFailure=error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Wire accounting failed');
+       clearTimeout(timer);reject(streamFailure);response.destroy();request.destroy();
+      });
+     });
+     response.on('end',()=>{clearTimeout(timer);void chunkTail.then(()=>{if(!streamFailure)done({status,headers:selected,body:Buffer.concat(chunks,bytes),conditionalRequestSent:Object.hasOwn(headers,'If-None-Match')||Object.hasOwn(headers,'If-Modified-Since')});});});
      response.on('error',(error:Error)=>{clearTimeout(timer);request.destroy();reject(error instanceof PoliteFetchError?error:new PoliteFetchError('network_error','Response stream failed'));});
     });
     const timer=setTimeout(()=>request.destroy(new PoliteFetchError('timeout','Request deadline exceeded')),this.requestTimeoutMs(url,method));

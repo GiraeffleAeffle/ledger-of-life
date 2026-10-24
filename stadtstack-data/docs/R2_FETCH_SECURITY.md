@@ -344,27 +344,31 @@ The installed old parser review must fail against the new runner contract.
 No root review or historical fingerprint/receipt was edited. Main must measure
 all affected contracts in the actual integrated runtime before issuing v3.
 
-The historical all14-contract report below is not a fresh integrated-runtime
-measurement for this executor branch. The acquisition contract was freshly
+The prior all14-contract report is not a fresh integrated-runtime measurement
+for this regression-repair branch. The acquisition contract was freshly
 measured in a separate Node24.22.1 process using this worktree's
-`src/district-r1.ts`: SHA256
-`b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd`.
+`src/district-r1.ts` after the fetch-guard and response-accounting repairs:
+SHA256 `b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5`.
 Measurement record `reports/r2-acquisition-contract-measurement.json` SHA256
-`e5173c09a7fba90883dc7747091656bbc525567a8496823faa9b6f84706ec9b6`.
+`1744396cf6c85030a45cf092992f7c5e3d952413328a7860bfdd4036068fdf41`.
 Other preparation/parser contracts, installed image/runtime review and the
 integrated 14-contract set remain for the main integration review before
 issuance.
 
 ## Exercised verification
 
-`tsc --noEmit` passed. The focused executor suite reports **9 total, 9 passed,
-0 failed/cancelled/skipped**. It covered localhost fake HTTP, exact allowlist
-and redirect rejection, duplicate manifest URL refusal, budget stops, policy
-attempt accounting, ten-document review pause, changed-R1 quarantine, crash
-resume and stop-file handling. The fixture used explicit test-only localhost
-wire substitution and isolated fixture authority; no civic source was fetched.
-The suite ran under `/home/max/.local/bin/stadtstack-cpu-slot` with
-`umask 022`, Node24.22.1 and worktree-local dependencies.
+`tsc --noEmit` passed. The six required suites (`council`, `polite-fetch`,
+`registered-source-policy`, `genesis-owner-credentials`,
+`r2-acquisition-executor`, `district-terminal-exceptions`) report **142 total,
+142 passed, 0 failed/cancelled/skipped**. This includes all five previously
+reported regressions. The executor suite alone reports **9/9 passed**, covering
+localhost fake HTTP, exact allowlist and redirect rejection, duplicate manifest
+URL refusal, budget stops, policy attempt accounting, ten-document review
+pause, changed-R1 quarantine, crash resume and stop-file handling. The fixture
+used the explicit test-only localhost wire seam and isolated fixture authority;
+no civic source was fetched. All checks ran under
+`/home/max/.local/bin/stadtstack-cpu-slot` with `umask 022`, Node24.22.1 and
+worktree-local dependencies.
 
 
 No live-source fetch, issuance, source-fetch-stop lift, parser build/SBOM,

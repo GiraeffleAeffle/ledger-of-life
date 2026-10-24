@@ -143,11 +143,11 @@
     },
     "preparedContractsEvidence": {
       "path": "reports/r2-acquisition-contract-measurement.json",
-      "sha256": "e5173c09a7fba90883dc7747091656bbc525567a8496823faa9b6f84706ec9b6",
-      "acquisitionContractSha256": "b61fad1f140fed5a869038021eab3aea77c031a8d2cbdf4c196e3b79d148d2dd",
+      "sha256": "1744396cf6c85030a45cf092992f7c5e3d952413328a7860bfdd4036068fdf41",
+      "acquisitionContractSha256": "b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5",
       "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
       "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
-      "meaning": "Acquisition contract freshly measured in a separate Node24.22.1 process on r2-acquisition-executor; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
+      "meaning": "Acquisition contract freshly measured in a separate Node24.22.1 process on r2-executor-regressions after restoring constructor-time fixture authority checks and serializing accounted response bytes; parser contracts and independent runtime/image review remain historical and require fresh integrated evidence"
     },
     "preparedCheckSummary": {
       "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json",
