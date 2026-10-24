@@ -5,7 +5,7 @@ import {RetainedKnowledgeLineageSchema,type RetainedKnowledgeLineage} from './re
 
 export const publicationStagingPathSchema=z.string().regex(/^(?:catalogue\.json|cities\/[a-z0-9-]+\/(?:signals\.geojson|feed\.json)|regions\/brandenburg-mol\/topics\.json|core\/strausberg-facts\.json|knowledge\/(?:registry|records|coverage|assessment-admissions)\.json)$/);
 const memberSchema=z.object({path:publicationStagingPathSchema,sha256:HashSchema,bytes:z.number().int().nonnegative()}).strict();
-const priorMemberSchema=z.object({path:z.string().regex(/^(?:cities\/[a-z0-9-]+\/(?:signals\.geojson|changes\.json)|knowledge\/(?:records|changes)\.json|core\/(?:strausberg-facts|release-manifest|handover-draft)\.json)$/),sha256:HashSchema,bytes:z.number().int().nonnegative()}).strict();
+const priorMemberSchema=z.object({path:z.string().regex(/^(?:cities\/[a-z0-9-]+\/(?:signals\.geojson|changes\.json)|knowledge\/(?:records|changes)\.json|quality-report\.json|core\/(?:strausberg-facts|release-manifest|handover-draft)\.json)$/),sha256:HashSchema,bytes:z.number().int().nonnegative()}).strict();
 export const priorPublicationReleaseSchema=z.object({gitCommit:z.string().regex(/^[a-f0-9]{40}$/),manifestSha256:HashSchema,releaseId:HashSchema,directory:z.enum(['out','release']).optional(),members:z.array(priorMemberSchema).min(2)}).strict();
 const dependencySchema=z.object({role:z.enum(['registry','text_composition','candidate_records','candidate_quarantine','structured_run','structured_receipts','question_disposition','adapter_contract','policy_receipts','regional_policy_receipts','identity_assessments','critical_assessments','legacy_city_changes','publication_contract','graph_contract','schema_contract','parser_contract','regional_contract']),sha256:HashSchema}).strict();
 export type PublicationDependency=z.infer<typeof dependencySchema>;
@@ -42,7 +42,7 @@ export function verifyPublicationStaging(inputs:PublicationInputs,cities:readonl
  const required=requiredPublicationStaging(cities);
  if(JSON.stringify(inputs.staging.map(member=>member.path))!==JSON.stringify(required)||JSON.stringify([...staging.keys()].sort())!==JSON.stringify(required))throw Error('Publication requires the complete knowledge and non-knowledge staging inventory');
  for(const member of inputs.staging){const bytes=staging.get(member.path)!;if(bytes.byteLength!==member.bytes||digest(bytes)!==member.sha256)throw Error(`Publication input binding mismatch: ${member.path}`);}
- const prior=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'].sort();
+ const prior=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'].sort();
  if(inputs.priorRelease.members.some(member=>member.path==='knowledge/changes.json')){prior.push('knowledge/changes.json');prior.sort();}
  if(JSON.stringify(inputs.priorRelease.members.map(member=>member.path))!==JSON.stringify(prior))throw Error('Publication requires every authentic predecessor signal and change member');
 }
