@@ -2,8 +2,8 @@
   "schemaVersion": "r2-acquisition-contract-measurement-v1",
   "branch": "r2-policy-reuse",
   "runtimeNode": "24.22.1",
-  "measurement": "Fresh-process import of src/district-r1.ts and call to acquisitionContract() on r2-policy-reuse; measured 5b06545e6739f3340f66f69177fee381c825060a2853c76d2cc625a5b0655e11",
-  "priorDraftAcquisitionContractSha256": "7d1fa06127b73cad7fb5998f4543bbb13ff6066ba7a4d933f36e8e2fab0d4abe",
-  "acquisitionContractSha256": "5b06545e6739f3340f66f69177fee381c825060a2853c76d2cc625a5b0655e11",
-  "issues": "Policy snapshots in polite-fetch.ts bind immutable, integrity-checked policy values to one executor run, authority epoch, source permission context, canonical origin, exact policy URLs, receipts and expiry. This pin covers the running acquisition contract only; it is not a full integrated contract report, test evidence, or independent runtime/image approval."
+  "measurement": "Fresh-process import of src/district-r1.ts and call to acquisitionContract() on r2-policy-reuse; measured 016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607",
+  "priorDraftAcquisitionContractSha256": "5b06545e6739f3340f66f69177fee381c825060a2853c76d2cc625a5b0655e11",
+  "acquisitionContractSha256": "016f95f21af2a132b8098356b195def10557f5934cd931ba563aef80ae1ad607",
+  "issues": "Policy snapshots in polite-fetch.ts bind immutable, integrity-checked policy values to one executor run while nested policy GETs preserve only source permission context and never inherit operation method/body/public-operation. The executor awaits terminal stop rejection before asynchronous run-lock cleanup, with a deterministic lock-release race test. This pin covers the running acquisition contract only; it is not a full integrated contract report, test evidence, or independent runtime/image approval."
 }

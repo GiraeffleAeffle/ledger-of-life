@@ -74,7 +74,16 @@ test('R2 executor stops before request and wire-byte budget overflow',async t=>{
  const retainedPathJournal=join(root,'retained-progress.jsonl'),retainedExecutor=await R2AcquisitionExecutor.open({...input,journalPath:retainedPathJournal}),retainedPath=join(root,'retained.html'),retainedBody=Buffer.from('x');await writeFile(retainedPath,retainedBody);
  await writeJournal(retainedPathJournal,journalState(input,{completed:{'already-retained':{sha256:'0'.repeat(64),bytes:2_684_354_560,localPath:'fixture',sourceId:'fixture'}},retainedBytes:2_684_354_560}));
  const retainedFetcher=(retainedExecutor as unknown as {fetcher:PoliteFetcher}).fetcher,retainedMock=t.mock.method(retainedFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(retainedBody),localPath:retainedPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:retainedPath}));
- await assert.rejects(retainedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='RETAINED_BYTE_BUDGET');retainedMock.mock.restore();
+ type StopRaceSeam={stop(code:string):Promise<never>;beforeRunUnlockForTest?:()=>Promise<void>};
+ const stopRace=retainedExecutor as unknown as StopRaceSeam,originalStop=stopRace.stop.bind(retainedExecutor),unhandled:unknown[]=[];let releaseStopFailure!:()=>void,signalStopFailure!:()=>void,releaseUnlock!:()=>void,signalUnlock!:()=>void,unlockEntered=false;
+ const stopFailureGate=new Promise<void>(resolve=>{releaseStopFailure=resolve;}),stopFailureObserved=new Promise<void>(resolve=>{signalStopFailure=resolve;}),unlockGate=new Promise<void>(resolve=>{releaseUnlock=resolve;}),unlockObserved=new Promise<void>(resolve=>{signalUnlock=resolve;});
+ const onUnhandled=(reason:unknown)=>unhandled.push(reason);process.on('unhandledRejection',onUnhandled);
+ stopRace.stop=async(code:string)=>{try{return await originalStop(code);}catch(error){signalStopFailure();await stopFailureGate;throw error;}};
+ stopRace.beforeRunUnlockForTest=async()=>{unlockEntered=true;signalUnlock();await unlockGate;};
+ const stopped=assert.rejects(retainedExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='RETAINED_BYTE_BUDGET');
+ try{
+  await stopFailureObserved;const unlockedBeforeStopFailure=unlockEntered;releaseStopFailure();await unlockObserved;await new Promise<void>(resolve=>setImmediate(resolve));releaseUnlock();await stopped;await new Promise<void>(resolve=>setImmediate(resolve));assert.equal(unlockedBeforeStopFailure,false,'stop rejection must be observed before asynchronous run-lock cleanup');assert.deepEqual(unhandled,[]);
+ }finally{releaseStopFailure();releaseUnlock();process.off('unhandledRejection',onUnhandled);retainedMock.mock.restore();}
  const htmlExecutor=await R2AcquisitionExecutor.open({...input,journalPath:join(root,'html-progress.jsonl')}),htmlFetcher=(htmlExecutor as unknown as {fetcher:PoliteFetcher}).fetcher,htmlBody=Buffer.alloc(2_097_153),htmlPath=join(root,'oversized.html');await writeFile(htmlPath,htmlBody);
  const htmlMock=t.mock.method(htmlFetcher,'fetch',async(url:string):Promise<FetchedDocument>=>({url,sha256:sha(htmlBody),localPath:htmlPath,mimeType:'text/html',retrievedAt:new Date().toISOString(),checkedAt:new Date().toISOString(),status:200,observationPath:htmlPath}));
  await assert.rejects(htmlExecutor.run(),error=>error instanceof R2ExecutorError&&error.code==='HTML_BUDGET');htmlMock.mock.restore();

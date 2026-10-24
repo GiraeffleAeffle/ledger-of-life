@@ -557,6 +557,10 @@ export class PoliteFetcher {
   const lane=this.policyOptions(),sourceUrl=options.registeredSourceUrl??url.href,audit=this.registeredAudit(sourceUrl,options);
   return stablePolicyJson({authority:{id:lane.authorityId??null,sha256:lane.authoritySha256??null,stateDir:lane.stateDir?resolve(lane.stateDir):null,recordSha256:lane.r2Integrity?.recordSha256??null,manifestSha256:lane.r2Integrity?.manifestSha256??null},permission:{registeredMunicipalityId:options.registeredMunicipalityId??null,registeredSourceId:options.registeredSourceId??null,registeredRoot:audit?.root??new URL(sourceUrl).origin,audit:audit??null,registeredApproval:Boolean(audit)||ownerRobotsOverrideApplies(url.href,override),ownerOverride:override??options.ownerRobotsOverride??null,hostProfile:hostProfile??'default'},origin:url.origin,policyUrl,ttl});
  }
+ private policyFetchOptions(options:FetchOptions,hostProfile:FetchOptions['hostProfile'],ownerRobotsOverride?:OwnerRobotsOverride):FetchOptions{
+  const override=ownerRobotsOverride??options.ownerRobotsOverride;
+  return {...(options.registeredSourceUrl!==undefined?{registeredSourceUrl:options.registeredSourceUrl}:{}),...(options.registeredMunicipalityId!==undefined?{registeredMunicipalityId:options.registeredMunicipalityId}:{}),...(options.registeredSourceId!==undefined?{registeredSourceId:options.registeredSourceId}:{}),...(hostProfile?{hostProfile}:{}),...(override?{ownerRobotsOverride:override}:{})};
+ }
  private policySnapshot<T>(entry:PolicyCacheEntry<T>,value:T,responseSha256:string|null,receiptSha256:string|null):PolicySnapshot<T>{
   if(!receiptSha256||!/^[a-f0-9]{64}$/.test(receiptSha256)||responseSha256!==null&&!/^[a-f0-9]{64}$/.test(responseSha256))throw new PoliteFetchError('host_state_unsafe','Policy snapshot is missing a valid response receipt');
   const immutable=freezePolicyValue(value),rulesSha256=hash(stablePolicyJson(immutable)),payload={contextSha256:entry.contextSha256,origin:entry.origin,policyUrl:entry.policyUrl,expiresAt:entry.expiresAt,responseSha256,receiptSha256,rulesSha256};
@@ -580,7 +584,7 @@ export class PoliteFetcher {
    entry.response=(async()=>{
     const attemptedAt=new Date().toISOString();let result:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined,responseSha256:string|null=null,receiptSha256:string|null=null,value:RobotsPolicy;
     try{
-     result=await this.fetchInternal(policyUrl,{...requestOptions,hostProfile},'robots');
+     result=await this.fetchInternal(policyUrl,this.policyFetchOptions(requestOptions,hostProfile),'robots');
      if(result.validatedPolicy?.kind!=='robots')throw new PoliteFetchError('robots_unavailable','Validated robots policy missing');
      value=result.validatedPolicy.value;value.evidence={url:result.url,locator:'robots.txt applicable StadtstackData group',value:'checked',sha256:result.sha256,checkedAt:result.checkedAt};responseSha256=result.sha256;receiptSha256=hash(await readFile(result.observationPath));this.delays.set(url.hostname,Math.max(this.delays.get(url.hostname)??0,value.delayMs));
     }catch(error){
@@ -611,7 +615,7 @@ export class PoliteFetcher {
    entry.response=(async()=>{
     const redirectChain=knownUrl?undefined:[policyUrl];let response:(FetchedDocument&{validatedPolicy?:ValidatedPolicy})|undefined,responseSha256:string|null=null,receiptSha256:string|null=null,value:{rules:TdmRule[];evidence:PolicyEvidence};
     try{
-     response=await this.fetchInternal(policyUrl,{...requestOptions,ownerRobotsOverride,hostProfile},'tdm',redirectChain);
+     response=await this.fetchInternal(policyUrl,this.policyFetchOptions(requestOptions,hostProfile,ownerRobotsOverride),'tdm',redirectChain);
      if(response.validatedPolicy?.kind!=='tdm')throw new PoliteFetchError('tdm_unavailable','Validated TDM policy missing');
      value={rules:response.validatedPolicy.value,evidence:{url:response.url,locator:'W3C TDMRep origin rules',value:'checked',sha256:response.sha256,checkedAt:response.checkedAt}};responseSha256=response.sha256;receiptSha256=hash(await readFile(response.observationPath));
     }catch(error){
