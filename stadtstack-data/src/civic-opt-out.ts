@@ -17,6 +17,7 @@ import {SourceAccessPolicySchema,ContentFreeSourcePolicySchema} from './district
 import {effectiveSourcePermission} from './source-policy.ts';
 import {ManagedDockerResourceSchema,canonicalDockerSocket,dockerDaemonIdentity,dockerConfigSha256,createManagedDocker,attachManagedDocker,startManagedDocker,waitManagedDocker,removeManagedDocker} from './civic-docker.ts';
 import type {ManagedDockerResource,ManagedDockerOptions,DockerAttach} from './civic-docker.ts';
+import type {R2IntegrityGuard} from './r2-acquisition-integrity.ts';
 
 // Inventory remains bounded below V8's maximum string length; projected replay
 // includes hundreds of thousands of entries and large closed scratch leases.
@@ -229,7 +230,7 @@ export interface CivicPolicyAuthorityReceipt {schemaVersion:'civic-policy-author
 export type PurgeReceipt=z.infer<typeof purgeSchema>;
 export type RetireReceipt=z.infer<typeof RetireReceiptSchema>;
 export type OptOutReceipt=Objection&{purge:PurgeReceipt};
-export interface CivicPolicyOptions {stateDir?:string;authorityId?:string;authoritySha256?:string;lockWaitMs?:number}
+export interface CivicPolicyOptions {stateDir?:string;authorityId?:string;authoritySha256?:string;lockWaitMs?:number;r2Integrity?:R2IntegrityGuard}
 export interface CivicOptOutSnapshot {
  schemaVersion:'civic-opt-out-snapshot-v2';authorityId:string;authoritySha256:string;sha256:string;
  objections:Array<{hostSha256:string;receivedAt:string;purgeDueAt:string}>;

@@ -1,5 +1,6 @@
+import {spawn} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {copyFile,lstat,mkdir,open,readFile,realpath,stat} from 'node:fs/promises';
+import {chmod,copyFile,lstat,mkdir,open,readFile,realpath,rename,stat,writeFile} from 'node:fs/promises';
 import {dirname,join,resolve} from 'node:path';
 import {PoliteFetcher,publicUrl,type PoliteFetcherOptions} from './polite-fetch.ts';
 import {z} from 'zod';
@@ -9,9 +10,9 @@ const canonical=(value:unknown):string=>Array.isArray(value)?`[${value.map(canon
 const bounds={documents:140,reviewBatch:10,requests:600,policyRequests:22,body:25_165_824,html:2_097_152,policyBody:1_048_576,totalWire:1_073_741_824,retained:1_073_741_824,elapsed:28_800_000,spacing:5000,redirects:5} as const;
 export type R2ManifestItem={url:string;sourceId:string;scope:{municipalityId:string;sourceId:string;ags:string}};
 export type R2IssuedRecord=Record<string,unknown>;
-type Attempt={url:string;startedAt:string;bytes:number;status:number|null;failure:string|null};
-export interface R2ExecutorOptions{recordPath:string;recordSha256:string;manifestPath:string;manifest:readonly R2ManifestItem[];manifestSha256:string;fetcherOptions:Omit<PoliteFetcherOptions,'beforeRequest'|'onResponseChunk'>;journalPath:string;stopFile:string;priorR1?:Readonly<Record<string,string>>;reviewPath?:string;changedReleasePath?:string;changedReleaseSha256?:string}
-interface Journal{schemaVersion:'r2-acquisition-progress-v1';recordSha256:string;manifestSha256:string;startedAt:string;attempts:Attempt[];completed:Record<string,{sha256:string;bytes:number;localPath:string;sourceId:string}>;quarantined:Record<string,{sha256:string;r1Sha256:string;bytes:number;localPath:string;sourceId:string;reviewed:boolean}>;retainedBytes:number;wireBytes:number;documentsSinceReview:number;paused:boolean;stopped:boolean}
+type Attempt={url:string;startedAt:string;bytes:number;status:number|null;failure:string|null;state:'started'|'succeeded'|'failed'};
+export interface R2ExecutorOptions{recordPath:string;recordSha256:string;manifestPath:string;manifest:readonly R2ManifestItem[];manifestSha256:string;fetcherOptions:Omit<PoliteFetcherOptions,'beforeRequest'|'onResponseChunk'|'onWireAttemptResult'|'onWireResponse'>;journalPath:string;stopFile:string;priorR1?:Readonly<Record<string,string>>;reviewPath?:string;changedReleasePath?:string;changedReleaseSha256?:string}
+interface Journal{schemaVersion:'r2-acquisition-progress-v2';recordSha256:string;manifestSha256:string;startedAt:string;attempts:Attempt[];completed:Record<string,{sha256:string;bytes:number;localPath:string;sourceId:string}>;quarantined:Record<string,{sha256:string;r1Sha256:string;bytes:number;localPath:string;sourceId:string;reviewed:boolean}>;retainedBytes:number;wireBytes:number;documentsSinceReview:number;paused:boolean;stopped:boolean}
 function exactList(record:R2IssuedRecord,name:'exactDocumentRequestAllowlist'|'exactPolicyRequestAllowlist'):{url:string;method:string}[]{const value=record[name];if(!Array.isArray(value))throw Error('Issued release allowlist missing');return value.map(row=>{if(!row||typeof row!=='object'||!('url'in row)||typeof row.url!=='string'||!('method'in row)||row.method!=='GET')throw Error('Invalid issued allowlist entry');return {url:publicUrl(row.url).href,method:row.method};});}
 function boundsMatch(record:R2IssuedRecord){const got=record.proposedBounds as Record<string,unknown>|undefined;const expected={maxDocuments:bounds.documents,initialReviewBatchDocuments:bounds.reviewBatch,maxNetworkRequestsIncludingPoliciesRedirectsAndFailures:bounds.requests,maxPolicyBootstrapRequests:bounds.policyRequests,maxWireBytesPerResponse:bounds.body,maxHtmlBytesBeforeHostDiscovery:bounds.html,maxPolicyBodyBytes:bounds.policyBody,maxTotalWireBytes:bounds.totalWire,maxRetainedSourceBytes:bounds.retained,maxElapsedMs:bounds.elapsed,minGlobalStartIntervalMs:bounds.spacing,globalMaxInFlight:1,maxRedirects:bounds.redirects,maxAutomaticRetries:0,maxModelCalls:0,paidMicroUsd:0};return !!got&&Object.entries(expected).every(([key,value])=>got[key]===value);}
 function candidateAllows(record:R2IssuedRecord,url:string,item:R2ManifestItem):boolean{const rows=record.exactDocumentRequestAllowlist;if(!Array.isArray(rows))return false;return rows.some((raw:unknown)=>{if(!raw||typeof raw!=='object'||!('url'in raw)||typeof raw.url!=='string'||publicUrl(raw.url).href!==url||!('candidateBindings'in raw)||!Array.isArray(raw.candidateBindings))return false;return raw.candidateBindings.some((binding:unknown)=>!!binding&&typeof binding==='object'&&'municipalityId'in binding&&binding.municipalityId===item.scope.municipalityId&&'sourceId'in binding&&binding.sourceId===item.sourceId);});}
@@ -35,11 +36,32 @@ async function loadJournal(path:string,recordSha256:string,manifestSha256:string
   const text=await readFile(path,'utf8');if(!text.endsWith('\n'))throw Error('Progress journal has an incomplete final record');
   const rows=text.trimEnd().split('\n');if(!rows.length)throw Error('Empty progress journal');
   let previous:Journal|undefined;
-  for(const line of rows){const current=JSON.parse(line) as Journal;if(current.schemaVersion!=='r2-acquisition-progress-v1'||current.recordSha256!==recordSha256||current.manifestSha256!==manifestSha256||!Array.isArray(current.attempts)||!current.completed||!current.quarantined||!Number.isSafeInteger(current.wireBytes)||!Number.isSafeInteger(current.retainedBytes)||!Number.isSafeInteger(current.documentsSinceReview)||current.documentsSinceReview<0||current.documentsSinceReview>bounds.reviewBatch||current.wireBytes!==current.attempts.reduce((sum,row)=>sum+row.bytes,0)||current.retainedBytes!==Object.values(current.completed).reduce((sum,row)=>sum+row.bytes,0))throw Error('Progress journal identity, accounting, or shape mismatch');if(previous&&(current.attempts.length<previous.attempts.length||current.wireBytes<previous.wireBytes||current.retainedBytes<previous.retainedBytes||Object.keys(previous.completed).some(key=>!current.completed[key])||Object.keys(previous.quarantined).some(key=>!current.quarantined[key])))throw Error('Progress journal counters regressed');previous=current;}
+  for(const line of rows){const current=JSON.parse(line) as Journal;if(current.schemaVersion!=='r2-acquisition-progress-v2'||current.recordSha256!==recordSha256||current.manifestSha256!==manifestSha256||!Array.isArray(current.attempts)||!current.completed||!current.quarantined||!Number.isSafeInteger(current.wireBytes)||!Number.isSafeInteger(current.retainedBytes)||!Number.isSafeInteger(current.documentsSinceReview)||current.documentsSinceReview<0||current.documentsSinceReview>bounds.reviewBatch||current.wireBytes!==current.attempts.reduce((sum,row)=>sum+row.bytes,0)||current.retainedBytes!==Object.values(current.completed).reduce((sum,row)=>sum+row.bytes,0)||current.attempts.some(row=>!['started','succeeded','failed'].includes(row.state)||row.state==='started'&&row.status!==null||row.state==='succeeded'&&row.status===null||row.state==='failed'&&!row.failure))throw Error('Progress journal identity, accounting, or shape mismatch');if(previous&&(current.attempts.length<previous.attempts.length||current.wireBytes<previous.wireBytes||current.retainedBytes<previous.retainedBytes||Object.keys(previous.completed).some(key=>!current.completed[key])||Object.keys(previous.quarantined).some(key=>!current.quarantined[key])))throw Error('Progress journal counters regressed');previous=current;}
   return previous!;
- }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;const journal:Journal={schemaVersion:'r2-acquisition-progress-v1',recordSha256,manifestSha256,startedAt:new Date().toISOString(),attempts:[],completed:{},quarantined:{},retainedBytes:0,wireBytes:0,documentsSinceReview:0,paused:false,stopped:false};await persistJournal(path,journal);return journal;}
+ }catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;const journal:Journal={schemaVersion:'r2-acquisition-progress-v2',recordSha256,manifestSha256,startedAt:new Date().toISOString(),attempts:[],completed:{},quarantined:{},retainedBytes:0,wireBytes:0,documentsSinceReview:0,paused:false,stopped:false};await persistJournal(path,journal);return journal;}
 }
 async function persistJournal(path:string,journal:Journal){await mkdir(dirname(path),{recursive:true,mode:0o700});const handle=await open(path,'a',0o600);try{await handle.writeFile(JSON.stringify(journal)+'\n');await handle.sync();}finally{await handle.close();}}
+async function acquireRunLock(path:string,recordSha256:string,manifestSha256:string):Promise<()=>Promise<void>>{
+ const lockPath=path+'.run.lock',identityPath=lockPath+'.identity';await mkdir(dirname(lockPath),{recursive:true,mode:0o700});
+ try{const metadata=await lstat(lockPath);if(!metadata.isFile()||metadata.isSymbolicLink())throw new R2ExecutorError('RUN_LOCK_UNSAFE','Executor run lock must be a regular file');}catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+ const lockFile=await open(lockPath,'a',0o600);await lockFile.close();await chmod(lockPath,0o600);
+ const child=spawn('flock',['-n',lockPath,'sh','-c','printf "LOCKED\\n"; cat >/dev/null'],{stdio:['pipe','pipe','pipe']});
+ let stdout='';const ready=new Promise<void>((resolveReady,rejectReady)=>{
+  child.stdout.setEncoding('utf8');child.stdout.on('data',chunk=>{stdout+=chunk;if(stdout.includes('LOCKED\n'))resolveReady();});
+  child.once('error',rejectReady);child.once('exit',code=>rejectReady(new R2ExecutorError('RUN_LOCKED',`Could not acquire exclusive executor lock (${code??'signal'})`)));
+ });
+ try{await ready;}catch{child.stdin.end();throw new R2ExecutorError('RUN_LOCKED','Another executor holds the journal run lock');}
+ const identity={schemaVersion:'r2-acquisition-run-lock-v1',recordSha256,manifestSha256};
+ try{
+  try{const previous=JSON.parse(await readFile(identityPath,'utf8'));if(previous.schemaVersion!==identity.schemaVersion||previous.recordSha256!==recordSha256||previous.manifestSha256!==manifestSha256)throw new R2ExecutorError('RUN_LOCK_IDENTITY_MISMATCH','Existing run lock is bound to a different record or manifest');}
+  catch(error){if((error as NodeJS.ErrnoException).code!=='ENOENT')throw error;}
+  const temporary=`${identityPath}.${process.pid}.${Date.now()}.tmp`,handle=await open(temporary,'wx',0o600);
+  try{await handle.writeFile(JSON.stringify(identity)+'\n');await handle.sync();}finally{await handle.close();}
+  await rename(temporary,identityPath);const directory=await open(dirname(identityPath),'r');try{await directory.sync();}finally{await directory.close();}
+  if(child.exitCode!==null||child.signalCode!==null)throw new R2ExecutorError('RUN_LOCKED','Exclusive executor lock ended before identity commit');
+ }catch(error){child.stdin.end();throw error;}
+ return async()=>{if(child.exitCode!==null||child.signalCode!==null)return;child.stdin.end();await new Promise<void>(resolveExit=>child.once('exit',()=>resolveExit()));};
+}
 export class R2ExecutorError extends Error{readonly code:string;constructor(code:string,message:string){super(message);this.name='R2ExecutorError';this.code=code;}}
 export class R2AcquisitionExecutor{
  private readonly documents:Map<string,R2ManifestItem>;private readonly policies:Set<string>;private readonly journal:Promise<Journal>;private readonly fetcher:PoliteFetcher;private readonly options:R2ExecutorOptions;private current?:Journal;private nextStart=0;private running=false;private startedProcess=false;
@@ -51,11 +73,12 @@ export class R2AcquisitionExecutor{
   if(this.documents.size!==documentRows.length||options.manifest.some(item=>!this.documents.has(publicUrl(item.url).href)||item.sourceId!==item.scope.sourceId||!candidateAllows(record,publicUrl(item.url).href,item)))throw new R2ExecutorError('MANIFEST_SCOPE_MISMATCH','Manifest URL/source/scope is not an exact released candidate binding');
   this.policies=new Set(policyRows.map(row=>row.url));
   this.journal=loadJournal(resolve(options.journalPath),options.recordSha256,options.manifestSha256);
-  this.fetcher=new PoliteFetcher({...options.fetcherOptions,minDelayMs:Math.max(5000,options.fetcherOptions.minDelayMs??0),timeoutMs:25000,maxBytes:bounds.body,maxRedirects:bounds.redirects,beforeRequest:url=>this.beforeRequest(url),onResponseChunk:(url,bytes)=>this.onChunk(url,bytes)});
+  this.fetcher=new PoliteFetcher({...options.fetcherOptions,minDelayMs:Math.max(5000,options.fetcherOptions.minDelayMs??0),timeoutMs:25000,maxBytes:bounds.body,maxRedirects:bounds.redirects,beforeRequest:url=>this.beforeRequest(url),onResponseChunk:(url,bytes)=>this.onChunk(url,bytes),onWireAttemptResult:(url,status,failure)=>this.onWireAttemptResult(url,status,failure),onWireResponse:(url,status,body)=>this.onWireResponse(url,status,body)});
  }
  async run():Promise<{completed:number;paused:boolean;stopped:boolean}>{
-  if(this.running)throw new R2ExecutorError('GLOBAL_CONCURRENCY','Executor already has an active campaign');this.running=true;
+  if(this.running)throw new R2ExecutorError('GLOBAL_CONCURRENCY','Executor already has an active campaign');this.running=true;let releaseRunLock:(()=>Promise<void>)|undefined;
   try{
+  releaseRunLock=await acquireRunLock(resolve(this.options.journalPath),this.options.recordSha256,this.options.manifestSha256);
   const journal=await this.journal;this.current=journal;if(journal.stopped)throw new R2ExecutorError('JOURNAL_STOPPED','Journal records a terminal stop');if(!this.startedProcess&&journal.attempts.length>0&&!journal.paused){journal.paused=true;await this.save();}if(!this.startedProcess&&journal.attempts.length)this.nextStart=Date.parse(journal.attempts.at(-1)!.startedAt)+bounds.spacing;this.startedProcess=true;
   if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)return this.stop('TIME_BUDGET');
   await this.releaseQuarantined(journal);
@@ -68,6 +91,7 @@ export class R2AcquisitionExecutor{
    try{
     const document=await this.fetcher.fetch(url,{registeredSourceUrl:url,registeredMunicipalityId:item.scope.municipalityId,registeredSourceId:item.sourceId});
     if(document.url!==url)throw new R2ExecutorError('URL_MISMATCH','Fetcher returned a non-allowlisted final URL');
+    if(journal.quarantined[url])throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is quarantined for explicit independent review');
     if(!['text/html','application/xhtml+xml','application/pdf'].includes(document.mimeType))throw new R2ExecutorError('UNSUPPORTED_MIME','R2 permits only HTML, XHTML, and PDF');
     const bytes=await readFile(document.localPath);if(bytes.length>bounds.body)throw new R2ExecutorError('BODY_BUDGET','Per-document body cap reached');
     const prior=this.options.priorR1?.[url];if(prior&&prior!==document.sha256){const quarantinePath=join(dirname(this.options.journalPath),'quarantine',document.sha256);await mkdir(dirname(quarantinePath),{recursive:true,mode:0o700});await copyFile(document.localPath,quarantinePath);journal.quarantined[url]={sha256:document.sha256,r1Sha256:prior,bytes:bytes.length,localPath:quarantinePath,sourceId:item.sourceId,reviewed:false};journal.paused=true;await this.save();throw new R2ExecutorError('CHANGED_SINCE_R1','Changed R1 representation is quarantined for explicit independent review');}
@@ -78,13 +102,46 @@ export class R2AcquisitionExecutor{
    }catch(error){if(!(error instanceof R2ExecutorError&&error.code==='CHANGED_SINCE_R1'))journal.stopped=true;await this.save();throw error;}
   }
   return {completed:Object.keys(journal.completed).length,paused:false,stopped:false};
-  }finally{this.running=false;}
+  }finally{this.running=false;await releaseRunLock?.();}
  }
- async beforeRequest(url:string){const journal=this.current!,canonicalUrl=publicUrl(url).href;if(!this.documents.has(canonicalUrl)&&!this.policies.has(canonicalUrl))throw new R2ExecutorError('URL_NOT_ALLOWLISTED','Wire request is outside exact release allowlist');if(journal.attempts.length>=bounds.requests)await this.stop('REQUEST_BUDGET');const policy=this.policies.has(canonicalUrl);if(policy&&journal.attempts.filter(row=>this.policies.has(row.url)).length>=bounds.policyRequests)await this.stop('POLICY_REQUEST_BUDGET');if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)await this.stop('TIME_BUDGET');const delay=Math.max(0,this.nextStart-Date.now());if(delay)await new Promise(resolve=>setTimeout(resolve,delay));if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)await this.stop('TIME_BUDGET');this.nextStart=Date.now()+bounds.spacing;journal.attempts.push({url:canonicalUrl,startedAt:new Date().toISOString(),bytes:0,status:null,failure:null});await this.save();}
+ async beforeRequest(url:string){const journal=this.current!,canonicalUrl=publicUrl(url).href;if(!this.documents.has(canonicalUrl)&&!this.policies.has(canonicalUrl))throw new R2ExecutorError('URL_NOT_ALLOWLISTED','Wire request is outside exact release allowlist');if(journal.attempts.length>=bounds.requests)await this.stop('REQUEST_BUDGET');const policy=this.policies.has(canonicalUrl);if(policy&&journal.attempts.filter(row=>this.policies.has(row.url)).length>=bounds.policyRequests)await this.stop('POLICY_REQUEST_BUDGET');if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)await this.stop('TIME_BUDGET');const delay=Math.max(0,this.nextStart-Date.now());if(delay)await new Promise(resolve=>setTimeout(resolve,delay));if(await this.stopRequested())await this.stop('STOP_FILE');if(Date.now()-Date.parse(journal.startedAt)>=bounds.elapsed)await this.stop('TIME_BUDGET');this.nextStart=Date.now()+bounds.spacing;journal.attempts.push({url:canonicalUrl,startedAt:new Date().toISOString(),bytes:0,status:null,failure:null,state:'started'});await this.save();}
+ async onWireAttemptResult(url:string,status:number|null,failure:string|null){const attempt=this.current!.attempts.at(-1);if(!attempt||attempt.url!==publicUrl(url).href||attempt.state!=='started')throw new R2ExecutorError('JOURNAL_ACCOUNTING','Wire result has no matching started attempt');attempt.status=status;attempt.failure=failure;attempt.state=failure?'failed':'succeeded';await this.save();}
  async onChunk(url:string,bytes:number){const journal=this.current!,attempt=journal.attempts.at(-1);if(!attempt||attempt.url!==publicUrl(url).href)throw new R2ExecutorError('JOURNAL_ACCOUNTING','Wire body has no matching durable attempt');attempt.bytes+=bytes;journal.wireBytes+=bytes;await this.save();if(attempt.bytes>bounds.body)throw new R2ExecutorError('BODY_BUDGET','Per-response body budget reached');if(this.policies.has(attempt.url)&&attempt.bytes>bounds.policyBody)throw new R2ExecutorError('POLICY_BODY_BUDGET','Policy body budget reached');if(journal.wireBytes>bounds.totalWire)throw new R2ExecutorError('WIRE_BUDGET','Total wire body budget reached');}
+ async onWireResponse(url:string,status:number,body:Buffer){
+  const canonicalUrl=publicUrl(url).href;if(!this.documents.has(canonicalUrl)||status<200||status>=300)return;
+  const prior=this.options.priorR1?.[canonicalUrl],sha256=hash(body);if(!prior||prior===sha256)return;
+  const item=this.documents.get(canonicalUrl)!,journal=this.current!,quarantinePath=join(dirname(this.options.journalPath),'quarantine',sha256);
+  await mkdir(dirname(quarantinePath),{recursive:true,mode:0o700});
+  try{const handle=await open(quarantinePath,'wx',0o600);try{await handle.writeFile(body);await handle.sync();}finally{await handle.close();}}
+  catch(error){if((error as NodeJS.ErrnoException).code!=='EEXIST')throw error;const existing=await readFile(quarantinePath);if(hash(existing)!==sha256)throw new R2ExecutorError('QUARANTINE_CAS_MISMATCH','Existing quarantine object differs from changed representation');}
+  journal.quarantined[canonicalUrl]={sha256,r1Sha256:prior,bytes:body.length,localPath:quarantinePath,sourceId:item.sourceId,reviewed:false};journal.paused=true;await this.save();
+  return;
+ }
  private async stopRequested(){try{await stat(this.options.stopFile);return true;}catch(error){if((error as NodeJS.ErrnoException).code==='ENOENT')return false;throw error;}}
  private async validReview(){if(!this.options.reviewPath)return false;try{const review=JSON.parse(await readFile(this.options.reviewPath,'utf8'));return review.schemaVersion==='r2-acquisition-review-v1'&&review.releaseSha256===this.options.recordSha256&&review.manifestSha256===this.options.manifestSha256&&review.action==='resume'&&review.reviewedBy&&review.issuedAt&&Date.parse(review.issuedAt)<=Date.now();}catch{return false;}}
  private async save(){if(this.current)await persistJournal(this.options.journalPath,this.current);}
- private async releaseQuarantined(journal:Journal){if(!Object.values(journal.quarantined).some(row=>!row.reviewed))return;if(!this.options.changedReleasePath||!this.options.changedReleaseSha256)return;const path=resolve(this.options.changedReleasePath),metadata=await lstat(path);if(!metadata.isFile()||metadata.isSymbolicLink()||await realpath(path)!==path)throw new R2ExecutorError('CHANGED_RELEASE_PATH_UNSAFE','Changed-source release must be a regular file');const bytes=await readFile(path);if(hash(bytes)!==this.options.changedReleaseSha256)throw new R2ExecutorError('CHANGED_RELEASE_HASH_MISMATCH','Changed-source release digest mismatch');const release=ChangedSourceReleaseSchema.parse(JSON.parse(bytes.toString('utf8')));if(Date.parse(release.reviewedAt)>Date.now())throw new R2ExecutorError('CHANGED_RELEASE_TIME_INVALID','Changed-source review time is in the future');for(const [url,held] of Object.entries(journal.quarantined)){if(held.reviewed)continue;if(release.representations.some(row=>row.url===url&&row.sourceId===held.sourceId&&row.sha256===held.sha256&&row.r1Sha256===held.r1Sha256)){held.reviewed=true;journal.completed[url]={sha256:held.sha256,bytes:held.bytes,localPath:held.localPath,sourceId:held.sourceId};journal.retainedBytes+=held.bytes;}}if(Object.values(journal.quarantined).every(row=>row.reviewed)&&journal.documentsSinceReview<bounds.reviewBatch)journal.paused=false;await this.save();}
+ private async releaseQuarantined(journal:Journal){
+  const pending=Object.entries(journal.quarantined).filter(([,row])=>!row.reviewed);if(!pending.length)return;
+  if(!this.options.changedReleasePath||!this.options.changedReleaseSha256)return;
+  const path=resolve(this.options.changedReleasePath),metadata=await lstat(path);
+  if(!metadata.isFile()||metadata.isSymbolicLink()||await realpath(path)!==path)throw new R2ExecutorError('CHANGED_RELEASE_PATH_UNSAFE','Changed-source release must be a regular file');
+  const bytes=await readFile(path);if(hash(bytes)!==this.options.changedReleaseSha256)throw new R2ExecutorError('CHANGED_RELEASE_HASH_MISMATCH','Changed-source release digest mismatch');
+  const release=ChangedSourceReleaseSchema.parse(JSON.parse(bytes.toString('utf8')));
+  if(Date.parse(release.reviewedAt)>Date.now())throw new R2ExecutorError('CHANGED_RELEASE_TIME_INVALID','Changed-source review time is in the future');
+  const tuples=new Map<string,typeof release.representations[number]>();
+  for(const row of release.representations){
+   const url=publicUrl(row.url).href,held=journal.quarantined[url];
+   if(url!==row.url||tuples.has(url)||!held||held.sourceId!==row.sourceId||held.sha256!==row.sha256||held.r1Sha256!==row.r1Sha256)throw new R2ExecutorError('CHANGED_RELEASE_MISMATCH','Changed-source release contains a URL/source/digest tuple not held in this journal');
+   tuples.set(url,row);
+  }
+  for(const [url,held] of pending){
+   if(!tuples.has(url))continue;
+   const casPath=join(this.fetcher.cacheDir,'sha256',held.sha256),casMetadata=await lstat(casPath),casBytes=await readFile(casPath);
+   if(!casMetadata.isFile()||casMetadata.isSymbolicLink()||await realpath(casPath)!==casPath||hash(casBytes)!==held.sha256||casBytes.length!==held.bytes)throw new R2ExecutorError('CHANGED_RELEASE_CAS_MISSING','Exact changed-source approval has no matching retained CAS object');
+   held.reviewed=true;journal.completed[url]={sha256:held.sha256,bytes:held.bytes,localPath:casPath,sourceId:held.sourceId};journal.retainedBytes+=held.bytes;journal.documentsSinceReview++;
+  }
+  if(Object.values(journal.quarantined).every(row=>row.reviewed)&&journal.documentsSinceReview<bounds.reviewBatch)journal.paused=false;
+  await this.save();
+ }
  private async stop(code:string):Promise<{completed:number;paused:boolean;stopped:boolean}>{this.current!.stopped=true;await this.save();throw new R2ExecutorError(code,`R2 acquisition stopped: ${code}`);}
 }

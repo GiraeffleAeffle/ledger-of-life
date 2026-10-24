@@ -130,6 +130,7 @@ export async function runCodexExtraction(options:{preparationPath:string;prepara
  try{
   await assertManagedSourceReadable(options.preparationPath,policy);
   const preparation=preparationPlanSchema.parse(await readPinnedJson(options.preparationPath,options.preparationSha256)),contract=await jointExtractionContract();
+  if(preparation.r2Integrity)policy.r2Integrity=preparation.r2Integrity;
   await assertManagedSourceReadable(options.preparationPath,policy);
   const registryAdmission=await readOperatorRegistryInputPin(options.registry,policy);
   if(sha256(registryAdmission.bytes)!==preparation.registrySha256)throw Error('Admitted registry differs from trusted preparation');

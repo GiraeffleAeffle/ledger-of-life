@@ -36,7 +36,7 @@ import {admittedRegisteredRobotsScopes,registeredRobotsAuditApplies,registeredRo
 import {sourcePolicyValidityMs,registeredSourcePolicyContextUrls,isOriginTdmEvidence} from './source-policy.ts';
 
 export type FetchFailure='unsafe_url'|'robots_blocked'|'robots_unavailable'|'tdm_reserved'|'tdm_unavailable'|'access_barrier'|'credential_unavailable'|'dns_error'|'timeout'|'network_error'|'inspection_failed'|'http_error'|'too_large'|'redirect_limit'|'invalid_redirect'|'cross_host_redirect'|'cache_missing'|'unsupported_encoding'|'host_busy'|'host_state_unsafe'|'host_cooldown'|'host_opted_out'|'document_excluded'|'host_admission_deferred';
-class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
+export class RequestAdmissionInterruption extends Error {readonly admissionError:unknown;constructor(error:unknown){super('Public request admission held');this.admissionError=error;}}
 export interface FetchObservation {
  url:string;method:'GET'|'POST';checkedAt:string;retrievedAt:string|null;state:'fetched'|'not_modified'|'redirected'|'failed'|'excluded';
  status?:number;failure?:FetchFailure;retryAfter?:string;sha256?:string;bytes?:number;mimeType?:string;etag?:string;lastModified?:string;location?:string;policy?:SourceAccessPolicy;exclusion?:ExcludedDocument['exclusion'];
@@ -116,7 +116,7 @@ export interface FixturePolicyInspection {
  origin(input:DocumentOriginInput,options:DocumentOriginOptions):Promise<DocumentOriginClassification>;
  pdf(bytes:Buffer,sha256:string,cacheRoot:string,context:ParserSourceContext):Promise<PdfTdmPolicyResult>;
 }
-export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>}
+export interface PoliteFetcherOptions {cacheDir:string;minDelayMs?:number;timeoutMs?:number;maxBytes?:number;maxRedirects?:number;policyTtlMs?:number;ownerPolicyLane?:Omit<ManagedAcquisitionLaneOptions,'kind'>;fixtureInspection?:FixturePolicyInspection;ownerAcquisitionProducer?:OwnerAcquisitionProducer;beforeRequest?:(url:string)=>Promise<void>;onRedirect?:(event:{requestUrl:string;from:string;to:string;status:number})=>void;onResponseChunk?:(url:string,bytes:number)=>Promise<void>;onWireAttemptResult?:(url:string,status:number|null,failure:string|null)=>Promise<void>;onWireResponse?:(url:string,status:number,body:Buffer)=>Promise<void>}
 const sleep=(ms:number)=>new Promise<void>(done=>setTimeout(done,ms));
 const representationPolicyLocators={
  'tdm-reservation':'HTTP TDM-Reservation',
@@ -137,11 +137,13 @@ function retryAfterTime(value:string|undefined,now:number):number {
  return Number.isFinite(time)?Math.max(now,time):0;
 }
 export class PoliteFetcher {
- readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'>>;
+ readonly cacheDir:string;readonly options:Required<Omit<PoliteFetcherOptions,'ownerPolicyLane'|'fixtureInspection'|'ownerAcquisitionProducer'|'beforeRequest'|'onRedirect'|'onResponseChunk'|'onWireAttemptResult'|'onWireResponse'>>;
  private readonly fixtureInspection:FixturePolicyInspection|undefined;
  private readonly beforeRequest:PoliteFetcherOptions['beforeRequest'];
  private readonly onRedirect:PoliteFetcherOptions['onRedirect'];
  private readonly onResponseChunk:PoliteFetcherOptions['onResponseChunk'];
+ private readonly onWireAttemptResult:PoliteFetcherOptions['onWireAttemptResult'];
+ private readonly onWireResponse:PoliteFetcherOptions['onWireResponse'];
  private readonly ownerAcquisitionProducer:Readonly<OwnerAcquisitionProducer>|undefined;
  private readonly inventoryTimeoutMs:number;
  private readonly ownerGenesisTableTimeoutMs:number;
@@ -212,6 +214,8 @@ export class PoliteFetcher {
   this.beforeRequest=options.beforeRequest;
   this.onRedirect=options.onRedirect;
   this.onResponseChunk=options.onResponseChunk;
+  this.onWireAttemptResult=options.onWireAttemptResult;
+  this.onWireResponse=options.onWireResponse;
   this.ownerAcquisitionProducer=options.ownerAcquisitionProducer?Object.freeze(OwnerAcquisitionProducerSchema.parse(options.ownerAcquisitionProducer)):undefined;
   this.cacheDir=resolve(options.cacheDir);this.options={minDelayMs:2000,timeoutMs:25000,maxBytes:24*1024*1024,maxRedirects:5,policyTtlMs:PUBLIC_SOURCE_POLICY_VALIDITY_MS,...options};
   // 10.45 MB at 128 KiB/s takes about 80 seconds; retain connection margin.
@@ -399,9 +403,14 @@ export class PoliteFetcher {
    catch(error){if(error instanceof PoliteFetchError)throw error;throw new PoliteFetchError('dns_error','Public DNS lookup failed');}
    finally{clearTimeout(dnsTimer);}
    if(!addresses.length||addresses.some(item=>!isPublicAddress(item.address)))throw new PoliteFetchError('unsafe_url','DNS resolved a non-public address');
-   const pinned=addresses[0];
-   const nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
-   return this.scheduled(url,state=>this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state)),(response,state)=>this.recordHostResponse(url,response,state));
+   const pinned=addresses[0],nativeHeaders=credentials?credentials.requestHeaders(url,method,body,operation):nativePublicRequestHeaders(url,method,body,operation);
+   let started=false;
+   let response:WireResponse;
+   try{response=await this.scheduled(url,state=>{started=true;return this.wireRequest(url,method,body,validators,pinned,nativeHeaders,headers=>this.recordHostResponse(url,headers,state));},(result,state)=>this.recordHostResponse(url,result,state));}
+   catch(error){if(started)await this.onWireAttemptResult?.(url.href,error instanceof PoliteFetchError?error.status??null:null,error instanceof PoliteFetchError?error.failure:'network_error');throw error;}
+   if(started)await this.onWireAttemptResult?.(url.href,response.status,response.status>=400?`http_${response.status}`:null);
+   if(started)await this.onWireResponse?.(url.href,response.status,response.body);
+   return response;
  }
  /** Current-proof validators must come from the actual immutable observation,
   * not only the mutable request cache. Legacy observations remain usable. */

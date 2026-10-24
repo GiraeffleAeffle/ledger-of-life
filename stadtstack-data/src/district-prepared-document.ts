@@ -8,6 +8,7 @@ import { collectParserToolVersions, parserOutputContractSha256, readParserReview
 import {contractSourceManifest,type ContractSourceHash} from './district-contract-source.ts';
 import type { CivicPolicyOptions, ManagedSourceBinding, ManagedAcquisitionLaneOptions } from './civic-opt-out.ts';
 import type { ParserSourceContext } from './district-parser-isolation.ts';
+import {assertR2ReferencesReleased} from './r2-acquisition-integrity.ts';
 export const PREPARED_DOCUMENT_VERSION = 'district-prepared-v2';
 export const PREPARED_VM_ROOT = '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared';
 const MAX_PREPARED_BYTES = 6 * 1024 * 1024;
@@ -76,6 +77,7 @@ export async function assertPreparedSourcesActive(references: PreparedSourceRefe
   // Host-only authority modules are deliberately absent from the credential-free parser image.
   const { assertCivicPolicyAuthority, assertHostNotOptedOut } = await import('./civic-opt-out.ts');
   await assertCivicPolicyAuthority(options);
+  await assertR2ReferencesReleased(references,options.r2Integrity);
   const hosts = new Set<string>();
   for (const reference of references) {
     assertSubscriptionSourcePolicy(reference.policy, reference);

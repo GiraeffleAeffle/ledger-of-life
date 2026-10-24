@@ -32,16 +32,26 @@ empty issuance clock and `sourceFetchStopLifted:false` do not meet this
 contract. This describes the required later issuance record; it does not issue
 one, authorize a fetch, or lift the current stop.
 
-Changed bytes are recorded in the executor's append-only journal as held
-`changed_since_r1` representations and copied into a quarantine area. A changed
-representation is never a completed/admitted document until a separately
-reviewed record with `schemaVersion:"r2-changed-source-release-v1"`,
-`id:"r2-changed-source-release"`, `reviewedBy`, RFC3339 `reviewedAt`,
-non-empty `reason`, and `representations:[{url,sourceId,sha256,r1Sha256}]`
-is supplied with its expected raw-file SHA-256. It releases only listed tuples.
-Neither acquisition approval nor the ten-document batch review releases changed
-bytes. Preparation/inference remain separate downstream gates; no changed
-representation is sent to them by this executor before the exact release record.
+Changed bytes are durably recorded in the executor's append-only journal as
+`changed_since_r1` representations, with their source ID, R1/new digests, and
+quarantined CAS representation. A changed representation is never treated as
+completed/admitted until a separately reviewed record with
+`schemaVersion:"r2-changed-source-release-v1"`, `id:"r2-changed-source-release"`,
+`reviewedBy`, RFC3339 `reviewedAt`, non-empty `reason`, and
+`representations:[{url,sourceId,sha256,r1Sha256}]` is supplied with its expected
+raw-file SHA-256. It releases only exact listed tuples. Preparation accepts the
+same guard through its policy options and carries it in the pinned preparation
+plan; preparation and extraction/inference recheck those exact tuples before
+admission. A missing guard/release keeps the representation held. Neither
+acquisition approval nor the ten-document batch review releases changed bytes.
+This mechanism covers already-known R1 original digests; it does not claim a
+semantic detector for anomalous MIME/template/mass-host changes or independent
+review of high-impact additions.
+The executor journal is fsynced after each attempt-state transition and each
+response byte, binds its record/manifest hashes, and is protected by a
+cross-process exclusive lock. Budget usage is reconstructed from the journal
+on resume; completed URLs are not refetched. A torn or mismatched journal and a
+second concurrent executor fail closed.
 
 ## Findings and dispositions
 
@@ -54,9 +64,9 @@ that a source, host, parser or historical result was compromised.
 | R2-F02 | High, conditional transport integrity | HTTPS requests relied on Node's default certificate verification, which an inherited `NODE_TLS_REJECT_UNAUTHORIZED=0` can disable. | Fixed: HTTPS options explicitly set `rejectUnauthorized:true` and `minVersion:'TLSv1.2'`; DNS pinning, URL hostname/SNI and `agent:false` remain. Synthetic test intercepts the transport constructor under the insecure environment and verifies exact options; no handshake or public host probe is claimed. |
 | R2-F03 | Medium, source-integrity downgrade | A same-host HTTPS document redirect could change to HTTP; hostname equality alone did not preserve transport security. | Fixed before destination dispatch: HTTPS→HTTP is `invalid_redirect` for documents and standardized TDM policy redirects. HTTP→HTTPS and same-host HTTPS path changes remain; R2's exact allowlist itself contains HTTPS only. |
 | R2-F04 | Medium, stale launcher / runtime drift | Identity-only body handling removed Brotli exposure but did not stop a stale launcher from using a Node runtime with the advisory's other HTTP/TLS/DNS flaws. | Fixed: live `wire()` requires a fixed22/24 LTS version before initialization/DNS/transport. Tests reject24.21.0,24.22.0,22.23.3,unknown majors and malformed/prerelease versions. v3 must additionally pin the actual24.22.1 binary/hash; the version floor is not a signed runtime review. |
-| R2-F05 | High, authorization/budget prerequisite | Generic `crawlHtmlSource` can expand discovered links; its public `requestCount` and maxRequests count logical fetch calls, not every robots/TDM/redirect wire attempt. It has no run-wide byte ceiling and scheduling is exact-host, not a global42-source rate pool. | v3 stays unissued until the reviewed R2 executor enforces exact request membership and all-wire request/byte/global-rate/time limits. The draft supplies exact URLs and caps; the old R1 crawler CLI is **not** a substitute. No unexercised budget enforcement is claimed by this branch. |
-| R2-F06 | High, SS-02 integrity / inference prerequisite | Exact quotes, strict schemas and same-model faithfulness do not establish source truth. Crawler digest replacement lacks an independent defacement/high-impact-change hold. | Not waived. Draft requires quarantine of changed known prior digests, anomalous MIME/template/mass-host changes and independent review of high-impact additions before inference. Acquisition approval gives zero model calls and no publication permission. A separately reviewed integrity gate/clearance is still required; no unimplemented semantic detector is claimed. |
-| R2-F07 | Medium, representation-boundary prerequisite | Generic fetch supports several native/API/structured formats and may retain a representation before the HTML adapter later labels it unsupported. Generic MIME acceptance is broader than a district HTML/PDF campaign. Host-side HTML discovery still uses Cheerio. | v3 narrows document response types to HTML/XHTML/PDF, forbids archive/executable/unsupported outputs, and requires a reviewed executor's MIME/size admission before downstream use; policy JSON/directives remain separate. Unknown types must hold, never be treated as an empty successful crawl. PDFs/ZIP/XML still have their existing sandbox bounds. No JavaScript/browser execution path was found. |
+| R2-F05 | High, authorization/budget prerequisite | Generic `crawlHtmlSource` can expand discovered links; its public `requestCount` and maxRequests count logical fetch calls, not every robots/TDM/redirect wire attempt. It has no run-wide byte ceiling and scheduling is exact-host, not a global42-source rate pool. | Implemented by the separate `R2AcquisitionExecutor`, not the R1 CLI: exact HTTPS document/policy URL admission, every wire attempt counted, global request serialization/spacing, no retries/model calls, all-wire body and retained-byte/time/document limits, batch pause, durable resume journal and cross-process exclusion. Behavioral tests use only the explicit localhost test seam. The v3 record remains unissued; this executor does not lift the live-source stop. |
+| R2-F06 | High, SS-02 integrity / inference prerequisite | Exact quotes, strict schemas and same-model faithfulness do not establish source truth. Crawler digest replacement lacks an independent defacement/high-impact-change hold. | Implemented known-R1-digest quarantine: representation and `changed_since_r1` state are durably recorded before downstream admission, and preparation/extraction recheck the exact URL/source/new/R1 tuple against a separate reviewer/date/reason release. No semantic detector for anomalous MIME/template/mass-host changes or review mechanism for high-impact additions is claimed; those remain independent review requirements. Acquisition approval gives zero model calls and no publication permission. |
+| R2-F07 | Medium, representation-boundary prerequisite | Generic fetch supports several native/API/structured formats and may retain a representation before the HTML adapter later labels it unsupported. Generic MIME acceptance is broader than a district HTML/PDF campaign. Host-side HTML discovery still uses Cheerio. | The executor admits only the reviewed document representation types and body caps before downstream use; policy JSON/directives remain separate. Unknown types must hold, never be treated as an empty successful crawl. PDFs/ZIP/XML still have their existing sandbox bounds. No JavaScript/browser execution path was found. |
 | R2-F08 | Low / defense in depth | The image contract does not explicitly pin custom seccomp/AppArmor profiles; Debian package versions/SBOM are absent from the old review. Original HTTP encoding is not retained in historical observation/request records. | Preserve all current containment checks; require actual inventory/review and monitoring metadata in the new R2 run. No claim that Docker defaults equal an independently reviewed profile, or that historical unknown encodings were identity. |
 
 ## Current controls versus scrape-safety-20261022
