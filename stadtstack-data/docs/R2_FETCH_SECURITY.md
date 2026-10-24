@@ -554,3 +554,8 @@ Follow this order:
 - R2 v3 and the separate structured GENESIS v3 each need genuine owner/source
   proofs and explicit Main/lead issuance. Neither current draft status nor
   these offline tests imply permission to fetch or use GENESIS credentials.
+- The final ordinary-phase run on this worktree is not green yet: 2,292 tests,
+  2,243 passed, 1 failed, 0 cancelled and 48 skipped. The remaining failure is
+  `test/r2-acquisition-executor.test.ts`'s retained-byte budget fixture
+  (`unhandledRejection: RETAINED_BYTE_BUDGET`); resolve it in the executor slice
+  before declaring the freeze gate clean.
