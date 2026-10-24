@@ -14,7 +14,7 @@ import {CriticalAssessmentInventorySchema} from './district-critical-assessment-
 import {districtRegistrySchema} from './district-registry.ts';
 import {withPreparedKnowledge} from './prepare-knowledge.ts';
 import {publish} from './publish.ts';
-import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases} from './district-publication-predecessor.ts';
+import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases,publicationPredecessorPaths} from './district-publication-predecessor.ts';
 import {ReplayClocksSchema,ReplayReceiptSchema,readReplayPin,requiredReplayStaging,requiredReplayRuntimeSources,replayPipeline} from './replay-pipeline.ts';
 import {verifyDataRelease} from './data-release.ts';
 import {loadRelease} from './mcp-release.ts';
@@ -257,7 +257,7 @@ export async function runStep8(raw:unknown,pool:Pool){
  const cataloguePin=input.staging.find(pin=>pin.destination==='catalogue.json');if(!cataloguePin)throw Error('Staged catalogue required');
  const catalogue=JSON.parse((await external.read(cataloguePin.path)).toString('utf8')),cities=z.array(z.string()).parse(catalogue.cities.map((city:{id:string})=>city.id));
  if(canonicalJson(input.staging.map(pin=>pin.destination).sort())!==canonicalJson(requiredReplayStaging(cities)))throw Error('Complete unique non-knowledge staging inventory required');
- const priorPaths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
+ const priorPaths=publicationPredecessorPaths(cities);
  const baseline=await loadPriorPublicationRelease(input.priorRelease,priorPaths,input.clocks.manifestGeneratedAt);
  const predecessors=await preloadPriorPublicationReleases([{prior:input.priorRelease,paths:priorPaths,targetGeneratedAt:input.clocks.manifestGeneratedAt},...Object.entries(input.legacyPreviousReleases??{}).map(([cityId,prior])=>({prior,paths:[`cities/${cityId}/signals.geojson`],targetGeneratedAt:baseline.manifest.generatedAt,targetReleaseId:baseline.manifest.id}))]);
  const preparation={registry:registry.path,records:candidateRecords.path,quarantine:candidateQuarantine.path,textComposition:textComposition.path,structuredRun:structuredRun.path,policyReceipts:policyReceipts.path,criticalAssessments:criticalAssessments.path,identityAssessments:input.identityAssessments?.path,privateProvenance,outputRoot:output+'-preparation',casRoot:cas.root,policyStateDir:policy.stateDir,policyAuthorityId:policy.authorityId,policyAuthoritySha256:policy.authoritySha256,coverageGeneratedAt:input.clocks.coverageGeneratedAt};

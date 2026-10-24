@@ -123,7 +123,7 @@ test('actual catalogue reader gates compact and detail routes and fails closed a
   const directory = await mkdtemp(join(tmpdir(), 'ledger-core-publication-'));
   try {
     await mkdir(join(directory, 'cities', 'strausberg'), { recursive: true });
-    for (const path of ['catalogue.json', 'cities/strausberg/signals.geojson', 'cities/strausberg/signals.min.geojson', 'cities/strausberg/changes.json'])
+    for (const path of ['catalogue.json', 'quality-report.json', 'cities/strausberg/signals.geojson', 'cities/strausberg/signals.min.geojson', 'cities/strausberg/changes.json'])
       await copyFile(new URL(`../../stadtstack-data/out/${path}`, import.meta.url), join(directory, path));
     const script = `
       import assert from 'node:assert/strict';
@@ -151,7 +151,7 @@ test('same-path same-length replacements with restored mtimes cannot reuse a tru
   try {
     await mkdir(join(directory, 'cities', 'strausberg'), { recursive: true });
     await mkdir(join(directory, 'core'));
-    for (const path of ['catalogue.json', 'cities/strausberg/changes.json', ...paths])
+    for (const path of ['catalogue.json', 'quality-report.json', 'cities/strausberg/changes.json', ...paths])
       await copyFile(new URL(`../../stadtstack-data/out/${path}`, import.meta.url), join(directory, path));
     const script = `
       import assert from 'node:assert/strict';

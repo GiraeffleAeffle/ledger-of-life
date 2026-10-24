@@ -33,7 +33,7 @@ import type {WorkPlan} from './district-work-plan.ts';
 import type {PreparationPlan} from './district-preparation-run.ts';
 import {IdentityAssertionSchema,IdentityAdmissionSchema} from './district-entity-resolution.ts';
 import {publicationInputsSchema} from './district-publication-inputs.ts';
-import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases,type PriorReleaseCache} from './district-publication-predecessor.ts';
+import {priorReleaseSchema,loadPriorPublicationRelease,preloadPriorPublicationReleases,publicationPredecessorPaths,type PriorReleaseCache} from './district-publication-predecessor.ts';
 import {withManagedSourceScratch,withManagedSourceWrite,initializeManagedAcquisitionLane,CIVIC_ACQUISITION_DECISION_ID,type ManagedSourceScratch,type CivicPolicyOptions} from './civic-opt-out.ts';
 import {DistrictCas} from './district-cas.ts';
 import {canonicalJson,semanticHash} from './district-adapter-contract.ts';
@@ -389,7 +389,7 @@ async function replayAdmittedPublication(receipt:ReplayReceipt,base:string,works
  const cataloguePin=receipt.staging.find(pin=>pin.destination==='catalogue.json');if(!cataloguePin)throw Error('Replay staged catalogue missing');
  const catalogue=z.object({cities:z.array(z.object({id:z.string().regex(/^[a-z0-9-]+$/)})).min(1)}).parse(JSON.parse((await pinned(cataloguePin)).toString('utf8'))),cities=catalogue.cities.map(city=>city.id);
  requireEqual([...destinations].sort(),requiredReplayStaging(cities),'Replay requires the complete non-knowledge staging inventory');
- const priorPaths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
+ const priorPaths=publicationPredecessorPaths(cities);
  if(receipt.textComposition)await pinned(receipt.textComposition);
  return withPreparedKnowledge({registry:resolve(base,receipt.registry.path),records:resolve(base,receipt.candidateRecords.path),quarantine:resolve(base,receipt.candidateQuarantine.path),textComposition:receipt.textComposition?resolve(base,receipt.textComposition.path):undefined,structuredRun:receipt.structuredRun?resolve(base,receipt.structuredRun.path):undefined,policyReceipts:resolve(base,receipt.policyReceipts.path),identityAssessments:receipt.identityAssessments?resolve(base,receipt.identityAssessments.path):undefined,criticalAssessments:receipt.criticalAssessments?resolve(base,receipt.criticalAssessments.path):undefined,privateProvenance:{path:resolve(base,receipt.privateProvenance.path),sha256:receipt.privateProvenance.sha256},outputRoot:resolve(base,receipt.workspace),casRoot:resolve(base,receipt.casRoot),policyStateDir:receipt.policyStateDir?resolve(base,receipt.policyStateDir):undefined,policyAuthorityId:receipt.policyAuthorityId,policyAuthoritySha256:receipt.policyAuthoritySha256,coverageGeneratedAt:receipt.clocks.coverageGeneratedAt},async prepared=>{
   const nested:ReplaySourceContext={...context,scope:prepared.scope},output=join(prepared.scope.directory,'release'),prior=prepared.publication.priorDirectory;
@@ -416,7 +416,7 @@ export async function replayPipeline(receiptPath:string,receiptSha256:string){
  if(dataReleaseId(expected.files)!==expected.id||expected.generatedAt!==receipt.clocks.manifestGeneratedAt)throw Error('Replay expected release identity/clock mismatch');
  const stagedCatalogue=receipt.staging.find(pin=>pin.destination==='catalogue.json');if(!stagedCatalogue)throw Error('Replay staged catalogue missing');
  const cities=z.object({cities:z.array(z.object({id:z.string().regex(/^[a-z0-9-]+$/)}))}).parse(JSON.parse((await pinned(stagedCatalogue)).toString('utf8'))).cities.map(city=>city.id);
- const priorPaths=[...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'],baseline=await loadPriorPublicationRelease(receipt.priorRelease,priorPaths,expected.generatedAt,expected.id);
+ const priorPaths=publicationPredecessorPaths(cities),baseline=await loadPriorPublicationRelease(receipt.priorRelease,priorPaths,expected.generatedAt,expected.id);
  const predecessors=await preloadPriorPublicationReleases([{prior:receipt.priorRelease,paths:priorPaths,targetGeneratedAt:expected.generatedAt,targetReleaseId:expected.id},...Object.entries(receipt.legacyPreviousReleases??{}).map(([cityId,prior])=>({prior,paths:[`cities/${cityId}/signals.geojson`],targetGeneratedAt:baseline.manifest.generatedAt,targetReleaseId:baseline.manifest.id}))]);
  const priors=[baseline];for(const [cityId,prior] of Object.entries(receipt.legacyPreviousReleases??{}))priors.push(await loadPriorPublicationRelease(prior,[`cities/${cityId}/signals.geojson`],baseline.manifest.generatedAt,baseline.manifest.id,predecessors));
  const inputPins=await replayInputPins(receipt,receiptPin,receiptBytes,base,source,expected,expectedBytes,priors);
