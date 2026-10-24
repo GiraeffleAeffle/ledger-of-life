@@ -54,6 +54,14 @@ export class PoliteFetchError extends Error {
  policyPhase:'robots'|'tdm'|null=null;
  constructor(failure:FetchFailure,message:string,status?:number,policy?:SourceAccessPolicy,retryAfter?:string,cause?:unknown){super(message,cause===undefined?undefined:{cause});this.name='PoliteFetchError';this.failure=failure;this.status=status;this.policy=policy;this.retryAfter=retryAfter;}
 }
+/** The HTTP/TLS stack remains host-side even without representation decoders.
+ * Only the reviewed LTS lines with the 2026-10-21 security fixes may fetch. */
+export function assertSourceFetchNodeVersion(version=process.versions.node):void {
+ const match=/^(22|24)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version),minor=Number(match?.[2]),patch=Number(match?.[3]);
+ const supported=match&&(match[1]==='22'?minor>23||minor===23&&patch>=4:minor>22||minor===22&&patch>=1);
+ if(!supported||!Number.isSafeInteger(minor)||!Number.isSafeInteger(patch))throw new PoliteFetchError('host_state_unsafe','Source acquisition requires a patched reviewed Node 22 or 24 LTS runtime');
+}
+
 // Closed source-metadata findings from the existing PDF worker protocol.
 // Protocol/version/timeout/input/unknown failures are runtime failures, not source refusals.
 const pdfSourceMetadataFailures:Readonly<Record<string,true>>={size_limit:true,encrypted_pdf:true,parse_error:true,metadata_parse_error:true,metadata_unreadable:true,metadata_size_limit:true,invalid_xml_reference:true,invalid_tdm_reservation:true,metadata_structure_limit:true};
@@ -379,6 +387,7 @@ export class PoliteFetcher {
   }
  }
  private async wire(url:URL,method:'GET'|'POST',body:string|undefined,validators:FetchObservation|undefined,operation?:NativePublicOperation,credentials?:GenesisOwnerCredentials):Promise<WireResponse>{
+   assertSourceFetchNodeVersion();
    await this.initialize();
    if(this.authorityMode!=='codex-workstation-local')throw new PoliteFetchError('host_state_unsafe','Live HTTP acquisition requires the canonical production authority');
    await this.assertHostAllowed(url.href);
@@ -475,7 +484,7 @@ export class PoliteFetcher {
     if(body!==undefined){Object.assign(headers,nativeHeaders);headers['Content-Length']=String(Buffer.byteLength(body));}
     if(method==='GET'&&validators?.etag)headers['If-None-Match']=validators.etag;
     if(method==='GET'&&validators?.lastModified)headers['If-Modified-Since']=validators.lastModified;
-    const request=(url.protocol==='https:'?httpsRequest:httpRequest)(url,{method,headers,agent:false,family:pinned.family,lookup:(_name,_options,callback)=>callback(null,pinned.address,pinned.family)},response=>{
+    const request=(url.protocol==='https:'?httpsRequest:httpRequest)(url,{method,headers,agent:false,family:pinned.family,...(url.protocol==='https:'?{rejectUnauthorized:true,minVersion:'TLSv1.2' as const}:{}),lookup:(_name,_options,callback)=>callback(null,pinned.address,pinned.family)},response=>{
      const status=response.statusCode??0;
      const selected:Record<string,string|undefined>={};for(const key of ['content-type','content-length','content-encoding','etag','last-modified','location','tdm-reservation','tdm-policy','x-robots-tag','retry-after']){const value=response.headers[key];selected[key]=Array.isArray(value)?value[0]:value;}
      // Identity is the only requested representation. Refuse before reading any
@@ -693,6 +702,7 @@ export class PoliteFetcher {
     if([301,302,303,307,308].includes(response.status)){
      if(!response.headers.location)throw new PoliteFetchError('invalid_redirect','Missing redirect destination',response.status);
      const next=publicUrl(new URL(response.headers.location,url).href);observation.location=next.href;observation.state='redirected';
+     if(url.protocol==='https:'&&next.protocol!=='https:')throw new PoliteFetchError('invalid_redirect','HTTPS source redirect must not downgrade transport security',response.status);
      if(ownerCredentials)throw new PoliteFetchError(next.hostname!==url.hostname?'cross_host_redirect':'invalid_redirect','Authenticated source redirects are refused',response.status);
      if(/\/(?:login|signin|auth|anmelden)(?:\/|$)/i.test(next.pathname)){policy.access='authentication';throw new PoliteFetchError('access_barrier','Authentication redirect; ask municipality');}
      if(resource!=='document'&&!standardTdmChain)throw new PoliteFetchError('invalid_redirect','Policy-resource redirects are not authorized as policy representations',response.status);

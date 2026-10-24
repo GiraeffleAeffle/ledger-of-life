@@ -1,0 +1,2402 @@
+{
+  "schemaVersion": "stadtstack-district-acquisition-security-release-v3-draft",
+  "id": "r2-district-source-fetch-security-release-v3",
+  "status": "DRAFT_NOT_ISSUED_NOT_AUTHORIZATION",
+  "issuedAt": "",
+  "approvedBy": null,
+  "sourceFetchStopLifted": false,
+  "ownerDecisionContext": {
+    "reportedDecision": "C (#103)",
+    "meaning": "R1 closes; prepare R2 approximately100–140 new documents; this context is not a signed acquisition/job/security approval"
+  },
+  "preparedFromRuntimeCommit": "33fa1d3df5daa485b609be9a2ab904add3cfb649",
+  "supersession": {
+    "previousRecord": "r1-step8-source-fetch-security-release-2026-10-22-v2",
+    "previousScope": "structured step8 continuation only",
+    "meaning": "v2 is not extended or reused for district acquisition; this draft grants nothing"
+  },
+  "scope": {
+    "pipeline": "district HTML/PDF acquisition, policy-only bootstrap/refresh and networkless parser inspection",
+    "candidateManifest": {
+      "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/R2_ACQUISITION_MANIFEST.snapshot.json",
+      "sha256": "ea0478d57d7b68a105772fbe46b3bcc1e355c89bf5314aa96d6314388f2ffba5",
+      "originalPath": "/home/max/.local/state/stadtstack-data/r2-planning/R2_ACQUISITION_MANIFEST_DRAFT.json",
+      "originalMeaning": "offline unapproved candidate list; freeze snapshot is evidence only"
+    },
+    "registry": {
+      "path": "stadtstack-data/sources/district-registry.json",
+      "sha256": "e471ba1fecc2be15f81e109dc8eb82360d85cebaa1a54ef1f3da3b1427399134",
+      "observedSourceCount": 43,
+      "ownerDescribedSourceCount": 42,
+      "sourceUniverseReconciliation": "REQUIRED_BEFORE_ISSUANCE; no silent expansion to43"
+    },
+    "candidateBindings": 120,
+    "exactDocumentUrls": 112,
+    "selectedSourceScopes": [
+      {
+        "municipalityId": "hagenow",
+        "sourceId": "hagenow-gazette"
+      },
+      {
+        "municipalityId": "hagenow",
+        "sourceId": "hagenow-website"
+      },
+      {
+        "municipalityId": "hoppegarten",
+        "sourceId": "hoppegarten-participation"
+      },
+      {
+        "municipalityId": "ludwigslust",
+        "sourceId": "ludwigslust-gazette"
+      },
+      {
+        "municipalityId": "ludwigslust",
+        "sourceId": "ludwigslust-website"
+      },
+      {
+        "municipalityId": "moelln",
+        "sourceId": "moelln-gazette"
+      },
+      {
+        "municipalityId": "moelln",
+        "sourceId": "moelln-website"
+      },
+      {
+        "municipalityId": "parchim",
+        "sourceId": "parchim-council"
+      },
+      {
+        "municipalityId": "parchim",
+        "sourceId": "parchim-website"
+      },
+      {
+        "municipalityId": "ratzeburg",
+        "sourceId": "ratzeburg-gazette"
+      },
+      {
+        "municipalityId": "ratzeburg",
+        "sourceId": "ratzeburg-participation"
+      },
+      {
+        "municipalityId": "ratzeburg",
+        "sourceId": "ratzeburg-website"
+      },
+      {
+        "municipalityId": "ruedersdorf-bei-berlin",
+        "sourceId": "ruedersdorf-bei-berlin-participation"
+      },
+      {
+        "municipalityId": "schwarzenbek",
+        "sourceId": "schwarzenbek-council"
+      },
+      {
+        "municipalityId": "schwarzenbek",
+        "sourceId": "schwarzenbek-gazette"
+      },
+      {
+        "municipalityId": "schwarzenbek",
+        "sourceId": "schwarzenbek-participation"
+      },
+      {
+        "municipalityId": "strausberg",
+        "sourceId": "strausberg-participation"
+      },
+      {
+        "municipalityId": "strausberg",
+        "sourceId": "strausberg-planning"
+      }
+    ],
+    "forbidden": [
+      "R1 source drivers",
+      "R1 old renewals/reseals",
+      "unlisted sources/URLs/query variants",
+      "login/cookies/account authentication",
+      "GENESIS/PEGEL native data acquisitions",
+      "model calls/inference/value testing",
+      "publication/deployment",
+      "automatic retries or dynamic allowlist expansion"
+    ]
+  },
+  "runtimeRequirements": {
+    "node": {
+      "path": "/home/max/.local/share/mise/installs/node/24.22.1/bin/node",
+      "version": "v24.22.1",
+      "sha256": "e32e2d16081cf644f88392934288086e7662529d0d43277c34f7aad2207cfafb"
+    },
+    "preparedPoliteFetch": {
+      "path": "stadtstack-data/src/polite-fetch.ts",
+      "sha256": "67f4ea7f3d34be72859d818f49f8d14ba4c6968050fcbe37d188e5da5b7adce5",
+      "meaning": "prepared branch bytes, not integrated runtime approval"
+    },
+    "preparedParserWorker": {
+      "path": "stadtstack-data/src/district-parser-worker.py",
+      "sha256": "e3ababc527e464d6275f53fd5fb3d9cbeaccb3e0c5c4e53c601a58f6b6640fd8"
+    },
+    "preparedContractsEvidence": {
+      "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/contracts.json",
+      "sha256": "dd79a20c3f541d87abe3227fd1f55520194038a06ee338a99ba7e8a2971bc421",
+      "acquisitionContractSha256": "fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c",
+      "parserIsolationContractSha256": "0ea795fdf8b51ac6a40b889aa17181af0e65550a83eba561419af64e5f4e7268",
+      "parserOutputContractSha256": "576febd1db1b4982ded120c035b7912901d516967e6e519db35c58c7da7f1653",
+      "meaning": "actual14-function branch measurement against33fa1d3; seven functions changed, not integrated runtime authorization"
+    },
+    "preparedCheckSummary": {
+      "path": "/home/max/.local/state/stadtstack-data/r2-fetch-security-evidence/checks.json",
+      "sha256": "fe82293f67922769ce28fd31fa3f3566645f8ad4a84990db5697d1ab87298e76",
+      "meaning": "observed tsc and focused synthetic tests, not independent review or real-image sentinels"
+    },
+    "currentlyInstalledParserReview": {
+      "path": "/etc/stadtstack/parser-isolation-review.json",
+      "sha256": "b0afa635aab9c5c5a0723d3ce5c9b7adf66889f68f65d5110cf3bb88060cd9b3",
+      "imageId": "sha256:08cbb5205d0dd99f6518227b850f00c432f7dbe654cc10e59184dbf59bdfc2dc",
+      "status": "HISTORICAL_NOT_APPROVED_FOR_R2; new worker changes contract, so old review fails"
+    },
+    "parserIssuanceRequirement": "Rebuild from independently verified immutable patched Node22.23.4+ or24.22.1+ base; exact package/runtime SBOM; independently reviewed new image/runner; genuine root-owned authorization. No image ID or approval fabricated in this draft.",
+    "integratedCodeRequirement": "Main must bind actual integrated Git HEAD, all affected contracts, source hashes, reviewed test outputs and independent fix review before issue",
+    "hostEnvironment": "fixed absolute Node path, clean NODE_OPTIONS/NODE_PATH/NODE_EXTRA_CA_CERTS/SSL_CERT_FILE/SSL_CERT_DIR/NODE_TLS_REJECT_UNAUTHORIZED; no inherited proxy/auth or provider credentials"
+  },
+  "exactDocumentRequestAllowlist": [
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/altstadtquartier-srb/ca1618dd-d89a-4109-9139-cd834fa1e369",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-044",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/altstadtquartier-srb/dcb71b98-099c-431b-92ed-5753c11b6488",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-079",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan30feuerbachstrschillerstr/cf6e8157-0c3b-4248-a298-510a4f6bdbdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-100",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan30feuerbachstrschillerstr/d8044ba2-39a2-4775-acb4-1f485a3513c5",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-002",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan30feuerbachstrschillerstr/fe2faafb-d7ba-439f-b31d-991705ee3414",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-006",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/b6d0d1a1-8ff8-448a-aabd-f3158b296037",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-077",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/c4c57bf6-8472-4efd-b861-6fc0f4ec9f10",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-084",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/d41aa66c-519f-452f-80b5-43f7a49c0f92",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-009",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/d5a735a7-61b0-4529-9320-53316fac79c8",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-101",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/d86697c7-4f76-4ba6-bd72-cadd38fab9a7",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-090",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan33-verbrauchermarkt-strasse-der-jugend/f8566043-bda5-4eec-a7dd-d1de79017e4e",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-012",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan46lebensmittelmarktberlinerstr/acd497be-1d73-4c4b-90df-e45c0a08b3a8",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-015",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan46lebensmittelmarktberlinerstr/b3e72d4d-1561-4599-b048-349a9d6d251a",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-096",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan46lebensmittelmarktberlinerstr/d868ada6-345d-4752-97da-dfea2cbc18bc",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-018",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan46lebensmittelmarktberlinerstr/fc3bea0b-5e4a-4ae5-88ba-4c6e88ac12ab",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-021",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan53biomassezentrum/ab7f2d59-3f84-4110-ac53-2429d2828c16",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-023",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan53biomassezentrum/c164e65d-d794-4544-a645-3523cfc60bc6",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-025",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan53biomassezentrum/ede14f63-c6fb-4ae0-9117-64b7d125c9a3",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-027",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan53biomassezentrum/fab7021d-5486-4d53-8b9c-8463f765019f",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-029",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan56agripvlichtenow/d7b44372-24fd-4211-a3b1-a7d36c33eb30",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-031",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan56agripvlichtenow/dfa4a073-c349-432f-8874-40e31c385645",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-033",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/bplan57pvffahennickendorfnord/c3f3c604-8bf9-4fbc-9e9b-6536bd041bc6",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-035",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/eb568622-04ec-41e7-8069-fd8204fa88d8/c2d2951f-ccd4-4f87-a72e-b1f7027d57d3",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-104",
+          "municipalityId": "hoppegarten",
+          "sourceId": "hoppegarten-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-aenderung-lebensmittelmarkt-berliner-strasse/a250df01-8e70-46df-8fd2-06f7dce6bb4b",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-037",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-aenderung-lebensmittelmarkt-berliner-strasse/acdd768f-8ff7-42cf-b1c0-8860531d1999",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-102",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-aenderung-lebensmittelmarkt-berliner-strasse/e3f1c0a8-5d2f-4c2c-b884-aeb47cddade1",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-109",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-aenderung-verbrauchermarkt-strasse-der-jugend/f3768ed2-2ebb-4924-8ec0-1e3da47560ca",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-103",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/a02f59a7-1a87-458d-bcb8-eb03ff8449c3",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-086",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/a36f977e-f709-47d1-ab73-909fa1b15aec",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-092",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/a73f983b-27b9-46bc-8326-09b7b7e42999",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-098",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/bc9e8412-fd38-4142-9b1f-15e35c1f1f2b",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-004",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/solarpark-flugplatz/ca4f7aa2-d45c-4b60-b7a2-fbb5dab28abc",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-007",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/strausberg-hegermuehlenstrasse-ost/cca2b6b6-728b-47f2-8543-04cb4ecaa52b",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-108",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/file/wohnbebauung-thaelmannstrasse-nw/f8ab5df0-340a-4634-996a-65c34ab21ecc",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-110",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/verfahren/altstadtquartier-srb/public/detail",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-114",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation",
+          "knownPriorSha256": "f709a2273bfcf109686ab5ffdfb462c28489aeb6daebbf3c830de6ac5435da23",
+          "priorMeaning": "offline known bytes; not a current admission receipt"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/verfahren/solarpark-flugplatz/public/detail",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-115",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation",
+          "knownPriorSha256": "90fa9c41d4b3b921857b34ec623b4225eaea8fbd17ba2c25160fab53a0b7b17e",
+          "priorMeaning": "offline known bytes; not a current admission receipt"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/verfahren/wohnbebauung-thaelmannstrasse-nw/public/detail",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-116",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-participation",
+          "knownPriorSha256": "d1b90fa9af3763e4dac8c964357636d16c3e2ee188c9cf06f4be2b6a05d3a9e1",
+          "priorMeaning": "offline known bytes; not a current admission receipt"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--anlagenHeaderPanel-attachmentsList-9-attachment-link&SILFDNR=792&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-014",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--attachments-expandedPanel-content-body-rows-10-cells-2-cell-link&SILFDNR=792&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-017",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--attachments-expandedPanel-content-body-rows-11-cells-2-cell-link&SILFDNR=792&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-020",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--attachments-expandedPanel-content-body-rows-4-cells-2-cell-link&SILFDNR=793&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-022",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--attachments-expandedPanel-content-body-rows-8-cells-2-cell-link&SILFDNR=792&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-024",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/to010?0--attachments-expandedPanel-content-body-rows-9-cells-2-cell-link&SILFDNR=792&refresh=true",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-026",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc104285.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-028",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc108066.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-030",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc108069.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-032",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc108394.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-034",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc108848.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-036",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/public/wicket/resource/org.apache.wicket.Application/doc108984.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-038",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://sessionnet.owl-it.de/schwarzenbek/bi/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-003",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-council"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.hagenow.de/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-111",
+          "municipalityId": "hagenow",
+          "sourceId": "hagenow-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.hagenow.de/service-fuer-buerger/downloadcenter/bekanntmachungen-und-sonstiges.html",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-112",
+          "municipalityId": "hagenow",
+          "sourceId": "hagenow-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/Politik-Verwaltung/Verwaltung/%C3%96ffentliche-Bekanntmachungen/Allgemeine-Bekanntmachungen-/2023-01-06-Fernw%C3%A4rmesatzung.php?object=tx,3634.3.1&ModID=6&FID=3634.1576.1&NavID=3634.370",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-120",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.101.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-073",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.102.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-080",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.1079.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-107",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.116.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-093",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.119.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-039",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-065",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.133.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-099",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.286.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-117",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-119",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.3390.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-045",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-068",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.495.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-050",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-070",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.68.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-054",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-072",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.69.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-001",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-008",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.70.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-005",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        },
+        {
+          "candidateId": "R2-011",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.72.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-058",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/loadDocument.phtml?FID=3634.96.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-062",
+          "municipalityId": "ludwigslust",
+          "sourceId": "ludwigslust-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/buergerservice-politik/bekanntmachungen/amtliche-bekanntmachungen/4-aenderung-des-bebauungsplanes-nr-43-der-stadt-moelln-fuer-das-gebiet-heidberg-1",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-074",
+          "municipalityId": "moelln",
+          "sourceId": "moelln-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/buergerservice-politik/bekanntmachungen/amtliche-bekanntmachungen/bebauungsplanes-nr-135-der-stadt-moelln-fuer-das-gebiet-zwischen-posener-und-danziger-strasse-fuer-teilgebiet-1-grundstueck-oestlich-des-pappelwegs-und-teilgebiet-2-grundstueck-noerdlich-des-verbindungswegs-druesenbuchen",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-081",
+          "municipalityId": "moelln",
+          "sourceId": "moelln-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/fileadmin/Stadt_Moelln/Dateien/Amtliche_Bekanntmachungen/Gesamthaushalt_2026_Exemplar_Veroeffentlichung_neu.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-040",
+          "municipalityId": "moelln",
+          "sourceId": "moelln-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/nachrichten/artikel/bebauungsplanes-nr-135-der-stadt-moelln-fuer-das-gebiet-zwischen-posener-und-danziger-strasse-fuer-teilgebiet-1-grundstueck-oestlich-des-pappelwegs-und-teilgebiet-2-grundstueck-noerdlich-des-verbindungswegs-druesenbuchen",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-087",
+          "municipalityId": "moelln",
+          "sourceId": "moelln-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/bekanntmachungen/2026/20260203-foerderrichtlinie-der-stadt-parchim-kleinteilige-modernisierungsmassnahmen-nach-buchstabe-g-6.4-der-stbaufr-m-v.pdf?cid=12o7",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-051",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/bekanntmachungen/2026/20260609-ffrl-innenstadt-01.06.26-31.12.2027.pdf?cid=14cv",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-055",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/buergerservice-1/buergerservice/planen-bauen-und-wohnen/stadtplanung/bauleitplanung/flaechennutzungsplan/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-075",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/buergerservice-1/buergerservice/planen-bauen-und-wohnen/stadtplanung/bauleitplanung/verbindliche-bebauungsplaene/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-082",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/buergerservice-1/ortsrecht-bekanntmachungen/ortsrecht/wirtschaftsfoerderung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-059",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/ortsrecht/haushalt/spendenbericht-2025.pdf?cid=152g",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-041",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/ortsrecht/verwaltung/2022-11-08-richtlinie-ueber-die-gewaehrung-von-zuwendungen-an-die-fraktionen-der-stadtvertretung-i.-d.-f.-der-1.-aenderung-vom-16.12.2021.pdf?cid=nfp",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-046",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2021/20210205-pm-359-ipads-ksm-05-02-2021.pdf?cid=eys",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-088",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2021/20210315-pm-368-verwaltungsgebaeude-schliessung-15-03-2021.pdf?cid=fvj",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-094",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2021/20210413-pm-376-zuwendungsbescheid-gs-west-13-04-2021.pdf?cid=g0g",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-063",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2021/pm-465-foerderung-erneuerung-moederitz.pdf?cid=jvg",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-066",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2022/20220502-pm-buergerbeteiligung-zum-tag-der-staedtebaufoerderung-in-parchim.pdf?cid=li4",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-069",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/de/pressebereich/archiv-2022/20220712-pm-wirtschaftmeile.pdf?cid=m2s",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-071",
+          "municipalityId": "parchim",
+          "sourceId": "parchim-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Bauleitplanung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-076",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/B%C3%BCrgerservice/Bekanntmachungen-Ortsrecht/Haushaltssatzung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-042",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        },
+        {
+          "candidateId": "R2-067",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-website"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/Stadtentwicklung/Bauleitplanung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-089",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/Stadtentwicklung/Bauleitplanung/Bebauungspl%C3%A4ne-der-Stadt-Ratzeburg/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-095",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/Stadtentwicklung/Bauleitplanung/Fl%C3%A4chennutzungsplanung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-106",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/media/custom/2559_7947_1.PDF?1773995947",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-047",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/media/custom/2559_7986_1.PDF?1777277099",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-052",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/media/custom/2559_8073_1.PDF?1782383623",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-083",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/media/custom/2559_8118_1.PDF?1782986229",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-056",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/output/download.php?file=%2Fmedia%2Fcustom%2F2559_4096_1.PDF%3F1619083889&fn=B_Plan_82_Anlage_3_Wasserhaushaltsbilanz",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-060",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/output/download.php?file=%2Fmedia%2Fcustom%2F2559_7392_1.PDF%3F1745313851&fn=Wasserhaushaltsbilanz_1",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-064",
+          "municipalityId": "ratzeburg",
+          "sourceId": "ratzeburg-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ruedersdorf.de/meine-gemeinde/bauen-und-wohnen/bauleitplanung/",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-113",
+          "municipalityId": "ruedersdorf-bei-berlin",
+          "sourceId": "ruedersdorf-bei-berlin-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/Themen/Bauen-Umwelt/Bauleitplanung/index.php?object=tx,3787.1.1&ModID=9&FID=3787.49.1&NavID=3787.93",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-105",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1408.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-043",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1419.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-048",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1567.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-053",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1685.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-057",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1712.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-078",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/loadDocument.phtml?FID=3787.1713.1&Ext=PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-085",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-gazette"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/output/download.php?fid=3787.1783.1.PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-091",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/output/download.php?fid=3787.275.1.PDF",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-061",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/redirect.phtml?extlink=1&La=1&url_fid=3787.40.1",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-097",
+          "municipalityId": "schwarzenbek",
+          "sourceId": "schwarzenbek-participation"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2018/03/2017-12-04-Ringerschlie%C3%9Fung-mit-Fernw%C3%A4rmeleitung.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-118",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2021/02/BV-SVV-2020-0210_Aufstellungsbeschluss-B-Plan-65-20_Weinberg.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-010",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2023/12/BV-Aufstellungsbeschluss.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-013",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2024/08/Beschlussblatt.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-016",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2024/11/Beschlussblatt-B-Plan.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-019",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/wp-content/uploads/2026/08/20251124_BP67-22_Stellungnahme_LK-MOL_Nachtrag_uNB.pdf",
+      "role": "district_document",
+      "allowedMimeTypes": [
+        "text/html",
+        "application/xhtml+xml",
+        "application/pdf"
+      ],
+      "candidateBindings": [
+        {
+          "candidateId": "R2-049",
+          "municipalityId": "strausberg",
+          "sourceId": "strausberg-planning"
+        }
+      ]
+    }
+  ],
+  "exactPolicyRequestAllowlist": [
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://bb.beteiligung.diplanung.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://parchim.sitzung-mv.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://sessionnet.owl-it.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://sessionnet.owl-it.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.hagenow.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.hagenow.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ludwigslust.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.moelln.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.parchim.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ratzeburg.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ruedersdorf.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.ruedersdorf.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.schwarzenbek.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/.well-known/tdmrep.json",
+      "role": "machine_tdm_policy",
+      "allowedMimeTypes": [
+        "application/json",
+        "text/json",
+        "application/tdm+json"
+      ]
+    },
+    {
+      "method": "GET",
+      "url": "https://www.stadt-strausberg.de/robots.txt",
+      "role": "robots",
+      "allowedMimeTypes": [
+        "text/plain"
+      ]
+    }
+  ],
+  "allowlistRules": {
+    "canonicalization": "Use publicUrl() canonical URL; retain exact query, no wildcard/prefix/subdomain matching; all actual hops/control requests require exact membership before dispatch",
+    "redirects": "At most5, same host, no HTTPS downgrade; an unlisted target stops pending separately reviewed manifest amendment, never implicit permission",
+    "robotsMediaRule": "Existing fetcher validates actual UTF-8 directives despite misleading text labels; no blind MIME-only policy absence",
+    "extraPolicyReferences": "New TDM-Policy URLs or policy redirects outside the exact list require a reviewed amendment before requesting them",
+    "linkTraversal": "No automatic live discovery beyond listed document URLs; exact listed HTML may be parsed offline to propose a later amendment",
+    "deduplication": "120candidate bindings currently map to112URLs; final R1/current bytes must be deduplicated by content and bindings before claiming100–140 new documents"
+  },
+  "proposedBounds": {
+    "maxDocuments": 140,
+    "initialReviewBatchDocuments": 10,
+    "maxNetworkRequestsIncludingPoliciesRedirectsAndFailures": 600,
+    "maxPolicyBootstrapRequests": 22,
+    "maxWireBytesPerResponse": 25165824,
+    "maxHtmlBytesBeforeHostDiscovery": 2097152,
+    "maxPolicyBodyBytes": 1048576,
+    "controllerMemoryBytes": 1073741824,
+    "wireBytesDefinition": "HTTP response-body bytes delivered by Node before content decoding; this does not count encrypted TLS framing or network packets",
+    "maxTotalWireBytes": 1073741824,
+    "maxRetainedSourceBytes": 1073741824,
+    "maxElapsedMs": 28800000,
+    "maxDnsMs": 25000,
+    "maxWireMs": 25000,
+    "maxRedirects": 5,
+    "minGlobalStartIntervalMs": 5000,
+    "globalMaxInFlight": 1,
+    "maxInFlightPerHost": 1,
+    "respectLongerRobotsCrawlDelay": true,
+    "maxAutomaticRetries": 0,
+    "parserInputBytesForDistrictDocuments": 25165824,
+    "parserMemoryBytes": 536870912,
+    "parserPids": 32,
+    "parserCpus": 1,
+    "parserCpuSeconds": 120,
+    "parserWallMs": 180000,
+    "parserScratchBytes": 134217728,
+    "maxModelCalls": 0,
+    "paidMicroUsd": 0,
+    "boundsStatus": "PROPOSED_NOT_APPROVED; total caps include policy/redirect/error attempts, not only public fetch() count"
+  },
+  "policyRequirements": {
+    "beforeAnyNetwork": "genuine owner policy-bootstrap/job approval and issued security v3, new parser authorization and exact allowlist/runtime gate",
+    "beforeFirstDocument": "fresh authenticated robots/TDM proof or still-valid receipt rechecked for each exact target/current registered scope; policy-only approval cannot fetch documents",
+    "registeredValidityMs": 604800000,
+    "unregisteredValidityMs": 3600000,
+    "validityRule": "oldest real relevant evidence clock plus eligible validity, not issue time; no future/absent clocks; no seven-day grant from mere host-name membership",
+    "afterEachRepresentation": "fresh immutable HTTP observation, source digest, exact request/redirect evidence and per-representation TDM/XMP/origin/access finding; new PolicyReceipt bound to actual original bytes and scope",
+    "controls": "No stale disallowed/unavailable policy converted to absence; any existing official-work owner exception requires genuine R2 adoption and exact eligibility, not a general rights licence"
+  },
+  "stopConditions": [
+    "Any unlisted URL/method/query/host or source-universe mismatch",
+    "Any Content-Encoding other than absent/identity",
+    "Any HTTPS downgrade, certificate/hostname/TLS failure, DNS private/mixed answer or cross-host redirect",
+    "401/402/login/CAPTCHA/paywall/auth requirement",
+    "403/429: retain header-only Retry-After cooldown and stop;5xx: retain backoff/circuit and stop review, no automatic retry",
+    "Any rights reservation/unknown policy/origin failure without current exact valid owner exception",
+    "Any changed known prior source digest or new executable/archive/unsupported MIME: quarantine before inference; independent review required, never same-model clearance",
+    "Any byte/request/time/doc budget, disk guard or memory/process threshold reached",
+    "Parser review mismatch, unpatched/unmeasured image, missing isolation, parser timeout/resource/protocol failure",
+    "Authority/managed custody/receipt/binding or manifest/runtime hash drift",
+    "Pause after first10documents for genuine owner/Main source-quote/security/budget review; resume only within newly confirmed remaining bounds",
+    "Operator interrupt/service restart/crash: no blind retry/resume or budget reset"
+  ],
+  "monitoring": {
+    "cadenceSeconds": 30,
+    "receiptPerAttempt": [
+      "canonical URL or privacy-safe ID",
+      "method",
+      "source scope",
+      "dispatch/result time",
+      "status/failure",
+      "retry-after/cooldown",
+      "received bytes",
+      "selected content type/encoding",
+      "immutable original/body observation and request-evidence hashes",
+      "parser outcome/image/contract",
+      "remaining request/byte/time/doc budgets"
+    ],
+    "alerts": "content-free only, local private append-only run journal plus existing operator notification channel; no source text/cookies/secrets",
+    "minimumFreeDiskBytes": 10737418240,
+    "aggregation": "persist counters before dispatch and stream-account all received HTTP body bytes, including refused/error/control responses; stop without bypass if accounting is unavailable",
+    "currentImplementationGap": "The generic crawler public requestCount is not a wire-request counter and has no run-wide byte cap; the reviewed R2 executor must prove enforcement before this draft can be issued"
+  },
+  "issuanceBlockers": [
+    "Independent review/merge/gate of this branch and final integrated contracts; preparation alone is not approval",
+    "Patched parser base/image rebuild, SBOM/runtime inventory, containment sentinels and new root-owned review not available in this slice",
+    "Final R2 manifest/registry pin and42-versus43 source reconciliation",
+    "Exact current source eligibility/provenance and R1final corpus/content dedup;112URLs are not120new documents",
+    "Genuine owner103-derived acquisition scope/budget/policy-bootstrap/official-work approvals and Main security release signature/time",
+    "Reviewed R2 executor enforcing the exact network allowlist, response MIME, all-wire request/byte/global-rate/time budgets and content-free stops; old R1 CLI cannot substitute",
+    "Source-change quarantine and independent high-impact-fact review before any later inference/release; not waived by SS-01 repair"
+  ]
+}

@@ -3,6 +3,7 @@ import base64
 import json
 import os
 import resource
+import re
 import selectors
 import signal
 import subprocess
@@ -129,6 +130,22 @@ def run_tool(request):
                 pass
 
 
+def assert_node_security_version():
+    # Source-free probe before readiness: the image review alone must not let an
+    # old HTTP/TLS/Brotli-vulnerable Node binary consume an untrusted document.
+    result = run_tool({'tool': 'node', 'args': ['--version']})
+    if not result.get('ok'):
+        raise RuntimeError('security_review_required')
+    version = base64.b64decode(result['stdout'], validate=True).decode('ascii')
+    match = re.fullmatch(r'v(22|24)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\n?', version)
+    if not match:
+        raise RuntimeError('security_review_required')
+    major, minor, patch = map(int, match.groups())
+    if not (major == 22 and (minor, patch) >= (23, 4)
+            or major == 24 and (minor, patch) >= (22, 1)):
+        raise RuntimeError('security_review_required')
+
+
 def main():
     os.environ.clear()
     os.environ.update(ENV)
@@ -144,6 +161,7 @@ def main():
     assert_isolation()
     os.makedirs(ENV['HOME'], mode=0o700, exist_ok=True)
     os.makedirs(ENV['TMPDIR'], mode=0o700, exist_ok=True)
+    assert_node_security_version()
     reply({'ready': True})
     while True:
         line = sys.stdin.buffer.readline(MAX_REQUEST + 1)
