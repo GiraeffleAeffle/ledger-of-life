@@ -1,6 +1,6 @@
 {
   "schemaVersion": "stadtstack-source-registry-v1",
-  "generatedAt": "2026-10-13T06:26:42.624Z",
+  "generatedAt": "2026-10-24T10:19:33Z",
   "districts": [
     {
       "id": "maerkisch-oderland",
@@ -84,6 +84,37 @@
         }
       ],
       "sources": [
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "id": "strausberg-planning",
           "kind": "participation",
@@ -556,6 +587,68 @@
       ],
       "sources": [
         {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
           "contentCheck": {
             "checkState": "not_checked",
             "checkedAt": null,
@@ -887,6 +980,68 @@
         }
       ],
       "sources": [
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "contentCheck": {
             "checkState": "not_checked",
@@ -1250,6 +1405,68 @@
         }
       ],
       "sources": [
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "contentCheck": {
             "checkState": "not_checked",
@@ -1690,6 +1907,68 @@
       ],
       "sources": [
         {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
           "contentCheck": {
             "checkState": "not_checked",
             "checkedAt": null,
@@ -2083,6 +2362,68 @@
         }
       ],
       "sources": [
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "contentCheck": {
             "checkState": "not_checked",
@@ -2519,6 +2860,68 @@
       ],
       "sources": [
         {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
           "contentCheck": {
             "checkState": "not_checked",
             "checkedAt": null,
@@ -2853,6 +3256,68 @@
         }
       ],
       "sources": [
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "contentCheck": {
             "checkState": "not_checked",
@@ -5826,6 +6291,68 @@
         }
       ],
       "sources": [
+        {
+          "id": "regionalstatistik-genesis",
+          "kind": "structured",
+          "url": "https://www.regionalstatistik.de/genesisws/rest/2020/data/table",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.statistikportal.de/de/open-data",
+              "locator": "R2 approved table 31231-02-01; catalogue/terms discovery only, pending exact municipal response and current licence evidence"
+            },
+            {
+              "url": "https://www.regionalstatistik.de/genesisws/rest/2020/application.wadl",
+              "locator": "Documented GENESIS operations; existing owner-account policy, no credentials in catalogue or request bodies"
+            }
+          ],
+          "reason": "R2 housing-stock discovery registration only; no request executed. Reference date is 31 December, never project completion or retrieval date.",
+          "rights": {
+            "licence": "Documented Datenlizenz Deutschland – Namensnennung – Version 2.0; dataset-specific exceptions remain subject to byte-pinned review.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner-account approval is not distribution-specific policy admission or an expanded robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
+        {
+          "id": "mastr",
+          "kind": "structured",
+          "url": "https://www.marktstammdatenregister.de/MaStR/Datendownload",
+          "vendor": "other",
+          "checkState": "not_checked",
+          "checkedAt": null,
+          "evidence": [
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStR/Startseite/Impressum",
+              "locator": "R2 owner-approved solar/wind scope; documented dl-de/by-2-0, pending byte-pinned current distribution terms and structured security release v3"
+            },
+            {
+              "url": "https://www.marktstammdatenregister.de/MaStRHilfe/subpages/schutzFreigabe.html",
+              "locator": "Public organization disclosure only; no natural-person or contact enrichment"
+            }
+          ],
+          "reason": "R2 discovery registration only. No request executed; exact versioned bulk URL, integrity, XML schema, streaming sandbox and v3 issuance are prerequisites.",
+          "rights": {
+            "licence": "Documented dl-de/by-2-0; current byte-pinned legal notice, distribution markings and attribution remain required.",
+            "reuse": "facts_with_attribution",
+            "checkState": "not_checked",
+            "checkedAt": null,
+            "evidence": [],
+            "reason": "Owner approval and catalogue registration are not distribution-specific policy admission or a robots exception."
+          },
+          "crawlScope": {
+            "pageRoots": [],
+            "followLinkedDocuments": false
+          }
+        },
         {
           "id": "hagenow-publisher-gazette",
           "kind": "gazette",

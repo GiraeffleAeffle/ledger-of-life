@@ -129,6 +129,19 @@ IDs are requested. Browser data loss removes local follows and history.
 
 **One place, three lenses.** Places keeps one Project/CitySignal identity across Map, Outcomes and Connections. MapLibre draws only published geometry; a plan polygon is not a built footprint or affected area. An **Organization** may receive **Funding**, perform an **Activity** and produce an **Output**; an **Outcome** needs an **Indicator** with baseline, follow-up and attribution. Each project's `outputs[]` separately records basis, source URL, locator and date (`null` if unknown), so Kulturpark's reported phase-one facilities do not become its planned phase-two opening. Its own evidence record names the missing benefit indicator, not an inferred failure or zero. Adopting a plan, scheduling an opening, MWp capacity or planned annual outlays do not establish quality-of-life gains, energy generation or tax revenue. Source review and geometry precision remain inspectable.
 
+**Structured energy units are not financial Assets.** The R2 MaStR mapping is a
+prototype pending source admission, not a new live feed. A native SEE electricity
+unit fits an **Output** observation: the narrow solar/wind scope retains unit
+identity, status, commissioning and rated kWp/kW, never measured yield or municipal
+ownership. **Organization** and **RelationEvidence** already fit a publicly
+disclosed organization-only operator field plus explicit MaStR ABR registry
+identity. The resulting `operates` edge is source-attributed with unknown effective
+validity, not confirmed-current operation or independently verified legal-entity
+equivalence. Name-only, ID-only, redacted and natural-person rows create no edge
+and expose no private operator identifier/contact fields. GENESIS building/dwelling
+stock remains reference-day statistical context, not a project completion or
+measured impact. No additional ontology concept or financial role is introduced.
+
 **Measured observation is not a proven benefit.** The historical Münster 2021 bus-priority trial
 links sourced municipal steering, traffic-rule coordination, 500 m of reported bus-lane work,
 Stadtwerke GPS samples and LK Argus evaluation. Whole-route north/east-bound mean bus running

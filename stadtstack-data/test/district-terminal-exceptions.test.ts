@@ -40,18 +40,15 @@ test('seal permits all-terminal documents but rejects empty, duplicate and overl
  for(const value of [{jobKeys:[],reconciliationJobKeys:[]},{jobKeys:[],reconciliationJobKeys:[],terminalDocumentExceptions:[exception,exception]},{jobKeys:[jobKey],reconciliationJobKeys:[],terminalDocumentExceptions:[exception]}])assert.equal(QueueTextSealInputSchema.safeParse(value).success,false);
  assert.equal(TerminalAssessmentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,true);assert.equal(TerminalDocumentExceptionSchema.safeParse({...exception,step:'assessment_b'}).success,false);
 });
-// Preparation/extraction/residual, policy-refresh and parser-output identities
-// retain the authenticated campaign baseline. Acquisition advances only through
-// the window20 polite-fetch evidence-order fix and the 2026-10-22 identity-only
-// response-encoding security fix (SS-01, CVE-2026-111497).
-// Private proposition v2, compact provider encoding v3, item holds, native Sonnet
-// and renewable ownership advance assessment pins; inventory detachment advances
-// security-review pins only.
-test('terminal sealing preserves upstream identities while acquisition and assessment contracts advance',async()=>{
- assert.deepEqual(await residualPreparationContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa'});
- assert.deepEqual(await residualJobContract(),{preparationSha256:'be383e7da40ef2d686702d626bf060ab9cd88c80b159a1fb46582054e53d0eaa',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
+// R2 source mappings advance the shared parser/preparation closure. These are
+// the measured current identities, not a claim that frozen R1 receipts changed.
+// Extraction/assessment/refresh/OMP stay independent of the narrowed adapters;
+// acquisition already had this identity at the 46adf2e base.
+test('terminal sealing preserves extraction/assessment identities across the measured R2 parser cutover',async()=>{
+ assert.deepEqual(await residualPreparationContract(),{preparationSha256:'44f6a0be6f20759add538f1f7ee41a9a954d85340f8b256ca7cdbc09db7f1389'});
+ assert.deepEqual(await residualJobContract(),{preparationSha256:'44f6a0be6f20759add538f1f7ee41a9a954d85340f8b256ca7cdbc09db7f1389',extraction:{promptSha256:'2ee1b59defd3506bf861190724079aaa2ff8f77a5b137d33550195a9a6ed64f9',schemaSha256:'1b42c79eac636f4bb32522f7912a6fd254abf80090d22e853d859b26bd0f8a54',extractorSha256:'cb8bf07b9944205dc8e3eb5484a0a612a2b606665f56331d0273e786f9074ef9'},outputSha256:'6f8630a0caa782d84293fa4ff7ac4ab19b061e0dbf8384e053a87338199d11ae'});
  assert.equal(await assessmentQueueContract(),'0f8f88aaea6f4d1af62c0c4a3301f77d06ec584bc6e0b4ae24005aa964399ac9');assert.equal(await assessmentBJobContract(),'c69c8f53802e5441c9ec597f9ce7a3002986b252cafc8076e6db0a0db46b0fea');assert.equal(await policyRefreshContract(),'c8ac977c3e60522eb7bf53a5460177af3a91a8a9b8af65f788d38f12d8508884');assert.equal(await ompRunnerContractSha256(),'95265109e3d853c290b3e0f2720b9e278a89b2863cf52659d612487b049f43c2');
  assert.equal(await ompRunnerOutputContractSha256(),'0dc9eca7d86d2f7cfa9ddd25140216a676c1a2a687d468cf303b8cfb37abe361');
- assert.equal(await parserIsolationContractSha256(),'287e701cdbddef1c22b2d202b54983467651eccfe43ead8cb67365ead00a4942');assert.equal(await parserOutputContractSha256(),'8434afe355dd9345061ab10e53bb2ddc34949962451a6606d29b0be86f160eb6');
- assert.equal(await acquisitionContract(),'b29c293b4ff6ee6c31a7039b45f8cf1e0f73dc68774552e5aa29de2951fec0d1');
+ assert.equal(await parserIsolationContractSha256(),'fa81c5332b9ec0ebc7be7c252d9ac8fb9fbfd0eb609e69a1f376305fb0b86255');assert.equal(await parserOutputContractSha256(),'3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599');
+ assert.equal(await acquisitionContract(),'fe28346ef211d0cc025c8d65a9656f84ec2d4a5de2115b623f0a409b1599016c');
 });

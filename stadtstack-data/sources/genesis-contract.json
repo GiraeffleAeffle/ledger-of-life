@@ -1,5 +1,5 @@
 {
-  "contractVersion": "regionalstatistik-datencsv-v2",
+  "contractVersion": "regionalstatistik-datencsv-v3",
   "sourceId": "regionalstatistik-genesis",
   "family": 1,
   "wave": "A",
@@ -26,18 +26,18 @@
     ],
     "credentials": {"documentedHeaders": {"username": "GAST", "password": "GAST"}, "dataQueryExercised": false, "injectionOwner": "shared acquisition layer", "ownerAccount": {"decisionList": "src/source-policy.ts#APPROVED_OWNER_GENESIS_ACCESS", "default": "empty; no account use until explicit written owner approval is code-reviewed", "host": "www.regionalstatistik.de", "operations": ["data/table", "data/tablefile"], "permission": "facts_with_attribution", "credentialFile": "/home/max/.config/stadtstack/regionalstatistik/credentials.json", "tokenMode": "username header is the Regionalstatistik token; password header is empty", "passwordMode": "username and password headers are the owner's Regionalstatistik account", "audit": "authenticated_owner_account; decisionId; credentialKind token|password only", "redirects": "all authenticated redirects refused"}, "limitation": "ResourceReference never carries credentials or headers. Documented GAST/token header conventions are not assertions that live credentials, requests or quotas work."},
     "networkInsideDiscoverOrParse": false,
-    "requestBounds": "Single explicit year from scope.observationWindow; single GE AGS; native metadata-derived variable; compress=false, transpose=false, job=false; no asynchronous source jobs or hidden retries",
+    "requestBounds": "Single explicit year, single exact GE AGS; native metadata must first confirm GEMEIN. Housing 31231-02-01 data/table explicitly requests format=datencsv and quality=on, compress=false, transpose=false, job=false. R2 draft covers all nine registered AGS for 2024; no guessed municipal-depth suffix, fallback data request or asynchronous source job.",
     "cursor": "Adapter-owned request-reference pagination, not claimed publisher pagination. One reference per call, bound to admitted snapshot hash, full scope and request list."
   },
   "tables": [
     {"id": "12411-06-01", "catalogPage": 44, "title": "Bevölkerung nach Geschlecht", "catalogGeography": "GE", "referenceDay": "06-30", "periodicity": "annual", "semantics": "Population stock at sole/main residence; sex dimensions remain source-coded. Not the year-end population table.", "methodology": "From reporting year 2022 population progression is based on Census 15 May 2022; comparability before/after 2016 is limited by method changes."},
     {"id": "12411-02-03", "requestName": "12411-02-03-5", "requestNameBasis": "Explicit municipal-depth mapping admitted for owner-approved K1 retry4; live response remains unverified, no generic suffix inference.", "catalogPage": 46, "title": "Bevölkerung nach Geschlecht und Altersgruppen", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Source age-group and sex cells are distinct observations; no unobserved totals or denominator completion."},
-    {"id": "31231-02-01", "catalogPage": 190, "title": "Bestand an Wohngebäuden und Wohnungen in Wohn- und Nichtwohngebäuden", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Building/dwelling stock and housing-area measures are not project-specific completions, occupancy, public ownership or impact."}
+    {"id": "31231-02-01", "catalogPage": 190, "title": "Bestand an Wohngebäuden und Wohnungen in Wohn- und Nichtwohngebäuden", "catalogGeography": "GE", "referenceDay": "12-31", "periodicity": "annual", "semantics": "Building/dwelling stock and housing-area measures are municipal reference-day context, not construction completion, occupancy, public ownership or impact. JSON requires exact corrected municipal GEMEIN selection/format; district rows and dates outside the requested reference year are held. All nine AGS are fixture-exercisable, not claimed source coverage."}
   ],
   "mapping": {
     "nativeInputs": "Publisher WADL, native metadata/table JSON, native data/table JSON Object.Content, native tablefile datencsv; no normalized observations feed",
     "tableIdentity": "GENESIS-Tabelle preamble and/or corrected Parameter.name resolve to the catalog ID; only 12411-02-03-5 maps explicitly to 12411-02-03. Full names are checked, unknown suffixes and conflicting catalog IDs fail closed. Native observation IDs retain the catalog ID.",
-    "geography": "Explicit native 8-digit code stays GE; matching native 5-digit code stays KR with null town AGS and district subject. No padding or assignment of a district total to each town. Name-only geography requires native corrected Parameter.regionalkey and matching Structure.Rows variable with Selected=1. Uncoded multi-region rows remain held.",
+    "geography": "Explicit eight-digit native AGS including leading zeroes; no name/postcode inference. Housing 31231 requires GE only and exact source scope: JSON Parameter.regionalkey must equal the requested town and matching GEMEIN Structure.Rows must be Selected=1. A district aggregate is held, not assigned to towns. Other catalog tables retain their existing separate GE/KR semantics.",
     "referenceDate": "Exact source date must agree with catalog day. Year-only fields map via catalog table-specific reference day. RetrievedAt is never publication or reference date.",
     "publicationDate": "Unknown/null, never borrowed from retrieval or table Stand timestamp",
     "nativeDimensions": "Front columns and column headers stay in native observation identity, rowKey and exact source-cell evidence. TableLayout.FrontColumnsNumber is used where provided; bare datencsv requires explicit code+label front columns.",
@@ -51,15 +51,15 @@
   "rights": {
     "documentedInterfaceLicence": "Datenlizenz Deutschland – Namensnennung – Version 2.0",
     "evidence": "https://www.statistikportal.de/de/open-data",
-    "admission": "No fetched data distribution has been admitted by this implementation. Caller must supply an admitted byte-bound policy receipt; dataset exceptions and geobasis terms remain separate.",
+    "admission": "No R2 housing-stock distribution is admitted by this work. Caller must supply an admitted byte-bound current policy receipt; dataset exceptions and geobasis terms remain separate. Existing R1 population evidence does not establish housing coverage.",
     "publicOutput": "Attributed facts only; no implied republication grant for whole snapshots"
   },
   "capabilityReceipt": {
     "observed": ["Primary Open Data documentation read", "Regionalstatistik WADL methods/default GAST headers inspected", "Regio-Stat 2026 table geography and period definitions inspected", "Native GENESIS Object.Content/Structure/TableLayout examples inspected"],
-    "implementedNotExecuted": ["Snapshot-only metadata discovery", "Bounded POST request-reference pagination", "JSON/datencsv/ZIP parser", "Positive/empty/paginated/schema-change/withdrawn/blocked fixture definitions"],
-    "unverified": ["GAST login", "metadata query", "data/table POST", "data/tablefile POST", "municipality filter behavior", "real publisher payload layouts for these three tables", "full table extraction", "all fixture executions", "build/typecheck"],
+    "offlineImplemented": ["Snapshot-only metadata discovery", "Bounded POST request-reference pagination", "JSON/datencsv/ZIP parser", "Nine-town housing selection/year/format/date-role fixture definitions"],
+    "unverified": ["Current housing metadata query and table depth/layout", "Housing data/table POST", "Municipal filter behavior and real 31231 payloads", "All-town source completeness"],
     "collectionPerformed": false,
-    "checksRun": [],
+    "verificationRecord": "See docs/R2_STRUCTURED_SOURCES.md for actually exercised offline gates; no R2 source request or account use is implied.",
     "limitations": ["No operational-adapter or source-completeness credit until admitted publisher snapshots are actually exercised", "Other CSV/flatfile schema versions, XLSX, GENML, opaque name-only tablefile geography and unknown quality markers are held rather than guessed", "Shared acquisition must set real identification, host lanes, policy and GAST headers", "No causal or civic stage conclusions from statistics"]
   },
   "pilotCoverage": [
@@ -73,5 +73,5 @@
     {"municipality": "Parchim", "ags": "13076108", "state": "not_checked"},
     {"municipality": "Hagenow", "ags": "13076060", "state": "not_checked"}
   ],
-  "changelog": [{"date": "2026-10-11", "change": "Added deterministic native snapshot adapter and unexecuted fixture suite; documented GAST remains unexercised and all nine-town coverage remains not_checked."}, {"date": "2026-10-14", "change": "Separated catalog ID 12411-02-03 from explicit municipal-depth request name 12411-02-03-5 for owner-approved K1 retry4; parser resolves exact names without weakening region/selection or Status 104 holds. No other depth mappings added."}]
+  "changelog": [{"date": "2026-10-11", "change": "Added deterministic native snapshot adapter and fixtures; all source coverage remained not_checked."}, {"date": "2026-10-14", "change": "Explicit 12411-02-03-5 municipal request mapping only; no generic depth suffix inference."}, {"date": "2026-10-24", "change": "R2: explicit datencsv/quality request and strict municipal selection/reference-year checks for existing housing table 31231-02-01, nine-town fixture/request-plan coverage; no acquisition, credentials read or source-completeness claim."}]
 }

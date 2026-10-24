@@ -6,7 +6,8 @@ import {
 } from '../district-adapter-contract.ts';
 import {readCsv, readSpreadsheetXml, type NativeTable, type NativeCell} from './structured-tables.ts';
 
-export const MASTR_MAPPING_VERSION = 'mastr-public-export-v1';
+export const MASTR_MAPPING_VERSION = 'mastr-public-export-v2';
+export const MASTR_PILOT_AGS:Readonly<Record<string,string>> = Object.freeze({strausberg:'12064472',hoppegarten:'12064227','ruedersdorf-bei-berlin':'12064428',ratzeburg:'01053100',moelln:'01053090',schwarzenbek:'01053116',ludwigslust:'13076090',parchim:'13076108',hagenow:'13076060'});
 export const MASTR_LIMITS = {bytes: 16 * 1024 * 1024, rows: 25_001, columns: 128, resources: 32} as const;
 const HOST = 'www.marktstammdatenregister.de';
 const LIMITATIONS = [
@@ -14,18 +15,17 @@ const LIMITATIONS = [
   'Registration may lag commissioning by one month and records may be unchecked, erroneous or duplicated.',
   'Registration, operating status and rated capacity do not establish municipal ownership, measured generation or heat-network operation.',
   'Operator assignments are attributed as observed, not verified currently valid relationships; unknown temporal bounds remain unknown.',
-  'No SOAP, technical account, bulk XML/ZIP acquisition or private-person enrichment is implemented.',
+  'Only the approved nine-town solar/wind fields are mapped; no addresses, contacts, private persons, storage, registration or planning dates.',
+  'This bounded CSV/XLS adapter is not a national bulk ZIP/XML reader; bulk input requires a separately reviewed streaming parser sandbox.',
 ];
 const HEADERS = {
   id: 'MaStR-Nr. der Einheit', ags: 'Gemeindeschlüssel', status: 'Betriebs-Status',
   energy: 'Energieträger', gross: 'Bruttoleistung der Einheit', net: 'Nettonennleistung der Einheit',
-  commissioning: 'Inbetriebnahmedatum der Einheit', siteCommissioning: 'Inbetriebnahmedatum der Einheit am aktuellen Standort',
-  registered: 'Registrierungsdatum der Einheit', updated: 'Letzte Aktualisierung',
-  planned: 'Datum der geplanten Inbetriebnahme', ended: 'Datum der endgültigen Stilllegung',
+  commissioning: 'Inbetriebnahmedatum der Einheit',
   actor: 'MaStR-Nr. des Anlagenbetreibers', organization: 'Name des Anlagenbetreibers (nur Org.)',
-  storage: 'Nutzbare Speicherkapazität in kWh', system: 'System-Status',
+  system: 'System-Status',
 } as const;
-const emptyValue = (raw: string) => /^(?:|[-–—]|nicht (?:öffentlich|veröffentlicht|vorhanden)|vertraulich|datenschutz|geschwärzt|natürliche person)$/iu.test(raw.trim());
+const emptyValue = (raw: string) => /^(?:|[-–—]|nicht (?:öffentlich|veröffentlicht|vorhanden)|vertraulich|datenschutz|geschwärzt|natürliche(?:r|n)? person|privatperson|private person)$/iu.test(raw.trim());
 const normalizedHeader = (value: string) => value.normalize('NFC').replace(/\s+/gu, ' ').trim();
 
 function coverage(snapshot: AdmittedSnapshot, scope: AdapterScope, state: AdapterCoverage['state'], reason: string, rows = 0, nextCursor: string | null = null, extra: string[] = []): AdapterCoverage {
@@ -72,6 +72,7 @@ function capacity(cell: NativeCell, defaultUnit: string): {value: number; unit: 
 
 export function discoverMastr(snapshot: AdmittedSnapshot, scope: AdapterScope, cursor: string | null): DiscoveryResult {
   prepare(snapshot, scope);
+  if(scope.sourceId!=='mastr'||MASTR_PILOT_AGS[scope.municipalityId]!==scope.ags)return {resources:[],coverage:coverage(snapshot,scope,'not_applicable','Outside the approved nine-town MaStR source scope')};
   if (/\/MaStRApi(?:\/|$)|\/soap(?:\/|$)/iu.test(new URL(snapshot.url).pathname)) return {resources: [], coverage: coverage(snapshot, scope, 'blocked_access', 'Authenticated SOAP route is excluded')};
   if (!/html/iu.test(snapshot.mimeType)) return {resources: [], coverage: coverage(snapshot, scope, 'not_checked', 'A data export is not a discovery landing')};
   const html = new TextDecoder('utf-8', {fatal: true}).decode(snapshot.bytes);
@@ -83,11 +84,12 @@ export function discoverMastr(snapshot: AdmittedSnapshot, scope: AdapterScope, c
     const url = new URL(href, snapshot.url);
     if (url.protocol !== 'https:' || url.hostname !== HOST || url.username || url.password || /\/MaStRApi(?:\/|$)/iu.test(url.pathname)) return;
     const extension = /\.(csv|xls)$/iu.exec(url.pathname)?.[1].toLowerCase();
+    const bulk=snapshot.url==='https://www.marktstammdatenregister.de/MaStR/Datendownload'&&/\.zip$/iu.test(url.pathname)&&/gesamtdatenexport/iu.test($(element).text()+' '+url.pathname);
     const overview = /^\/MaStR\/Einheit\/Einheiten\/(?:ErweiterteOeffentlicheEinheitenuebersicht|OeffentlicheEinheitenuebersicht|GeloeschteUndDeaktivierteEinheitenuebersicht)$/u.test(url.pathname);
-    if (!extension && !overview) return;
+    if (!extension && !overview && !bulk) return;
     url.hash = '';
     if (url.href === snapshot.url) return;
-    links.set(url.href, {url: url.href, nativeId: url.pathname + url.search, parentId: snapshot.url, method: 'GET', body: null, format: extension || 'html'});
+    links.set(url.href, {url: url.href, nativeId: url.pathname + url.search, parentId: snapshot.url, method: 'GET', body: null, format: extension || (bulk?'zip':'html')});
   });
   const resources = [...links.values()].sort((left, right) => left.url < right.url ? -1 : left.url > right.url ? 1 : 0);
   const binding = semanticHash({sourceSha256: snapshot.sourceSha256, scope});
@@ -104,13 +106,14 @@ export function discoverMastr(snapshot: AdmittedSnapshot, scope: AdapterScope, c
 /** Parse admitted native export bytes only. No networking, subprocess or clock access. */
 export function parseMastr(snapshot: AdmittedSnapshot, scope: AdapterScope): ParseResult {
   prepare(snapshot, scope);
+  if(scope.sourceId!=='mastr'||MASTR_PILOT_AGS[scope.municipalityId]!==scope.ags)return {observations:[],coverage:coverage(snapshot,scope,'not_applicable','Outside the approved nine-town MaStR source scope')};
   if (/\/MaStRApi(?:\/|$)|\/soap(?:\/|$)/iu.test(new URL(snapshot.url).pathname)) return {observations: [], coverage: coverage(snapshot, scope, 'blocked_access', 'Authenticated SOAP route is excluded')};
   if (/html/iu.test(snapshot.mimeType)) {
     const html = new TextDecoder('utf-8', {fatal: true}).decode(snapshot.bytes);
     return {observations: [], coverage: coverage(snapshot, scope, accessBlocked(html) ? 'blocked_access' : 'not_checked', 'HTML is a discovery landing, not an admitted unit export')};
   }
   const xls = /\.xls$/iu.test(new URL(snapshot.url).pathname) || /ms-excel/iu.test(snapshot.mimeType);
-  if (!xls && (/zip|xml/iu.test(snapshot.mimeType) || /\.(?:zip|xml)$/iu.test(new URL(snapshot.url).pathname))) return {observations: [], coverage: coverage(snapshot, scope, 'held_origin', 'Bulk XML/ZIP distribution rights are unresolved; not a licensed CSV/XLS export')};
+  if (!xls && (/zip|xml/iu.test(snapshot.mimeType) || /\.(?:zip|xml)$/iu.test(new URL(snapshot.url).pathname))) return {observations: [], coverage: coverage(snapshot, scope, 'held_quality', 'National bulk ZIP/XML requires a separately reviewed streaming parser sandbox; it is not a bounded CSV/XLS export')};
   let tables: NativeTable[];
   try {
     tables = readMastrTables(snapshot);
@@ -131,7 +134,7 @@ export function parseMastr(snapshot: AdmittedSnapshot, scope: AdapterScope): Par
       if (new Set(headers.filter(Boolean)).size !== headers.filter(Boolean).length) throw Error('Duplicate MaStR header');
       const index = (key: keyof typeof HEADERS) => headers.indexOf(HEADERS[key]);
       const withdrawn = index('system') >= 0 && headers.includes('Letzter Betriebsstatus');
-      if (!withdrawn && (index('ags') < 0 || index('status') < 0 || index('commissioning') < 0)) throw Error('Changed MaStR schema: required geography/status/commissioning header missing');
+      if (!withdrawn && (index('ags') < 0 || index('status') < 0 || index('commissioning') < 0 || index('energy') < 0)) throw Error('Changed MaStR schema: required geography/status/commissioning/energy header missing');
       const schemaHash = semanticHash({headers, format: table.format, sheet: table.sheet});
       for (const row of table.rows.slice(headerIndex + 1).filter(Boolean)) {
         if (row.every(cell => emptyValue(cell.raw))) continue;
@@ -144,35 +147,28 @@ export function parseMastr(snapshot: AdmittedSnapshot, scope: AdapterScope): Par
         if (!ags || emptyValue(ags)) {unknownGeography++; continue;}
         if (!/^\d{8}$/u.test(ags) || get('ags')!.type === 'number') throw Error('MaStR AGS must remain an eight-digit native string');
         if (ags !== scope.ags) continue;
+        const energy = get('energy');
+        if(!energy||!/^(?:Solare Strahlungsenergie|Solar|Wind|Windenergie)$/iu.test(energy.raw.trim()))continue;
         if (seen.has(nativeId)) throw Error('Duplicate MaStR native unit in export');
         seen.add(nativeId);
         inScope++;
         const subject = `mastr:unit:${nativeId}`;
-        const updated = get('updated');
-        const sourceReferenceDate = updated && !emptyValue(updated.raw) ? cellDate(updated) : null;
-        const nativeVersion = updated && !emptyValue(updated.raw) ? updated.raw : snapshot.sourceVersion;
+        // Record-update, registration and contact cells are outside this approval.
+        // Retrieval/version metadata never establishes an operator validity interval.
+        const nativeVersion = snapshot.sourceVersion;
         const emit = (cell: NativeCell, predicate: string, value: string | number | null, options: {unit?: string; date?: string; dateRole?: string; subject?: string; kind?: string; extra?: string[]; evidenceCells?: NativeCell[]} = {}) => {
           const evidenceCells = [idCell!, get('ags')!, cell, ...(options.evidenceCells || [])];
-          if (updated && !emptyValue(updated.raw)) evidenceCells.push(updated);
-          observations.push(observation({publisherId: scope.publisherId, sourceId: scope.sourceId, nativeId, nativeVersion, kind: options.kind || 'EnergyUnitObservation', subject: options.subject || subject, predicate, value, unit: options.unit || null, date: options.date || null, dateRole: options.dateRole || null, financialRole: 'none', geography: {ags, basis: 'source_explicit', role: 'project_location'}, sourceReferenceDate, publishedAt: null, retrievedAt: snapshot.retrievedAt,
+          observations.push(observation({publisherId: scope.publisherId, sourceId: scope.sourceId, nativeId, nativeVersion, kind: options.kind || 'EnergyUnitObservation', subject: options.subject || subject, predicate, value, unit: options.unit || null, date: options.date || null, dateRole: options.dateRole || null, financialRole: 'none', geography: {ags, basis: 'source_explicit', role: 'project_location'}, sourceReferenceDate: options.date || null, publishedAt: null, retrievedAt: snapshot.retrievedAt,
             evidence: [...new Map(evidenceCells.map(item => [item.address, item])).values()].map(item => ({sourceSha256: snapshot.sourceSha256, format: table.format, nativeId, path: `${table.sheet || 'export'}/${item.address}`, sheet: table.sheet, rowKey: nativeId, cells: [item.address], rawValue: item.raw, schemaHash, mappingVersion: MASTR_MAPPING_VERSION})), limitations: [...LIMITATIONS, ...(options.extra || [])]}));
         };
         emit(idCell!, 'native_identifier', nativeId);
         emit(get('ags')!, 'located_in', `ags:${ags}`);
         const status = get('status');
         if (status && !emptyValue(status.raw)) emit(status, 'registered_operating_status', status.raw.trim());
-        const system = get('system');
-        if (system && !emptyValue(system.raw)) emit(system, 'registered_system_status', system.raw.trim());
-        const energy = get('energy');
         if (energy && !emptyValue(energy.raw)) emit(energy, 'registered_energy_carrier', energy.raw.trim());
-        for (const [key, predicate, dateRole] of [
-          ['commissioning', 'commissioning_date', 'commissioning'], ['siteCommissioning', 'site_commissioning_date', 'commissioning_at_current_location'],
-          ['planned', 'planned_commissioning_date', 'planned_commissioning'], ['registered', 'registration_date', 'registration'], ['ended', 'decommissioning_date', 'permanent_decommissioning'],
-        ] as const) {
-          const cell = get(key);
-          if (cell && !emptyValue(cell.raw)) {const date = cellDate(cell); emit(cell, predicate, date, {date, dateRole});}
-        }
-        for (const [key, predicate, defaultUnit] of [['gross', 'gross_rated_capacity', /^(?:Solare Strahlungsenergie|Solar)$/iu.test(energy?.raw.trim() || '') ? 'kWp' : 'kW'], ['net', 'net_rated_capacity', 'kW'], ['storage', 'usable_storage_capacity', 'kWh']] as const) {
+        const commissioning=get('commissioning');
+        if(commissioning&&!emptyValue(commissioning.raw)){const date=cellDate(commissioning);emit(commissioning,'commissioning_date',date,{date,dateRole:'commissioning'});}
+        for (const [key, predicate, defaultUnit] of [['gross', 'gross_rated_capacity', /^(?:Solare Strahlungsenergie|Solar)$/iu.test(energy.raw.trim()) ? 'kWp' : 'kW'], ['net', 'net_rated_capacity', 'kW']] as const) {
           const cell = get(key);
           if (cell && !emptyValue(cell.raw)) {const parsed = capacity(cell, defaultUnit); emit(cell, predicate, parsed.value, {unit: parsed.unit, evidenceCells: key === 'gross' && energy ? [energy] : []});}
         }
