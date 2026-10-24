@@ -1,5 +1,5 @@
 import {test} from 'node:test';
-import {carryForwardQuarantines,councilQualityNotice,assertPublicUrls,isPublicUrl,publicUrlIssues,parseSourceDate,normalizePublicationSignals} from '../src/publication-quality.ts';
+import {carryForwardQuarantines,councilQualityNotice,replaceCouncilQualityNotice,assertPublicUrls,isPublicUrl,publicUrlIssues,parseSourceDate,normalizePublicationSignals} from '../src/publication-quality.ts';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {collectionSchema,type Signal} from '../src/schema.ts';
@@ -73,6 +73,16 @@ test('prior quality holds retain their original reason and report reference unti
 test('catalogue quality notice supplements binding coverage with withheld counts and reasons',()=>{
  const old={id:'council:meeting-1',cityId:'castrop-rauxel',kind:'council_meeting' as const,reason:'end_before_start',originalReport:{releaseId:'a'.repeat(64),generatedAt:'2026-09-28T00:00:00.000Z',qualityReportSha256:'b'.repeat(64)}};
  assert.equal(councilQualityNotice([], [old]),'Publication quality also withholds 1 council record: end_before_start.');
+});
+test('catalogue quality notice is replaced when holds retire or change',()=>{
+ const source='Official OParl publication';
+ const one='Publication quality also withholds 2 council records: end_before_start, missing_sourced_start_date.';
+ const partial='Publication quality also withholds 1 council record: end_before_start.';
+ assert.equal(replaceCouncilQualityNotice(`${source} ${one}`,partial),`${source} ${partial}`);
+ assert.equal(replaceCouncilQualityNotice(`${source} ${one}`,null),source);
+ assert.equal(replaceCouncilQualityNotice(`${source} ${one} ${one}`,partial),`${source} ${partial}`);
+ assert.equal(replaceCouncilQualityNotice(source,partial),`${source} ${partial}`);
+ assert.equal(replaceCouncilQualityNotice(undefined,null),undefined);
 });
 
 test('unsafe source references fail publication rather than disappear silently',()=>{

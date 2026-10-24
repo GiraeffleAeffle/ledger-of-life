@@ -11,6 +11,9 @@ const execute=promisify(execFile);
 export interface PriorReleaseCache {readonly authenticated:true}
 const authenticatedCaches=new WeakMap<PriorReleaseCache,ReadonlyMap<string,string>>();
 /** The private map contains immutable byte encodings, never caller-owned mutable buffers. */
+export function publicationPredecessorPaths(cities:readonly string[]):string[]{
+ return [...cities.flatMap(city=>[`cities/${city}/signals.geojson`,`cities/${city}/changes.json`]),'knowledge/records.json','quality-report.json','core/strausberg-facts.json','core/release-manifest.json','core/handover-draft.json'];
+}
 export async function preloadPriorPublicationReleases(requests:readonly {prior:PriorRelease;paths:readonly string[];targetGeneratedAt:string;targetReleaseId?:string}[]):Promise<PriorReleaseCache>{
  const entries=new Map<string,string>();
  for(const request of requests){

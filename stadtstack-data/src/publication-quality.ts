@@ -84,6 +84,13 @@ export function councilQualityNotice(current:readonly QuarantinedSignal[],retain
  const allReasons=[...new Set([...reasons.values()].flatMap(reasons=>[...reasons]))].sort();
  return `Publication quality also withholds ${reasons.size} council record${reasons.size===1?'':'s'}: ${allReasons.join(', ')}.`;
 }
+/** Replace this publication's generated notice while keeping the source-owned explanation. */
+export function replaceCouncilQualityNotice(reason:string|undefined,notice:string|null):string|undefined{
+ const generated=/\s*Publication quality also withholds \d+ council record(?:s)?: [^.\n]*\.$/;
+ let base=reason??'';
+ while(generated.test(base))base=base.replace(generated,'').trimEnd();
+ return [base,notice].filter((part):part is string=>Boolean(part)).join(' ')||undefined;
+}
 /** Event/legal dates are mandatory for comparison signals; places retain observation/asOf semantics. */
 export function normalizePublicationSignals(input:Signal[]):{features:Signal[];quarantined:QuarantinedSignal[];counts:{input:number;deduplicated:number;published:number;quarantined:number}}{
  assertPublicUrls(input);

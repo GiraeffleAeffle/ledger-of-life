@@ -8,7 +8,7 @@ import type {Catalogue,FeatureCollection,CityFeed} from './schema.ts';
 import {hash} from './common.ts';
 import {validateCore} from './core.ts';
 import type {CoreBundle} from './core-schema.ts';
-import {normalizePublicationSignals,assertPublicUrls,carryForwardQuarantines,councilQualityNotice,type QuarantinedSignal,type RetainedQuarantine,type QualityReportReference} from './publication-quality.ts';
+import {normalizePublicationSignals,assertPublicUrls,carryForwardQuarantines,councilQualityNotice,replaceCouncilQualityNotice,type QuarantinedSignal,type RetainedQuarantine,type QualityReportReference} from './publication-quality.ts';
 import {normalizeRegionalPublication} from './regional-quality.ts';
 import {sourceHealth,cityTemporalCoverage,assertSourceHealth} from './source-health.ts';
 import {publishDataRelease} from './data-release.ts';
@@ -120,7 +120,7 @@ for(const city of catalogue.cities){
  collections[city.id]={type:'FeatureCollection',features:normalized.features};
  city.sources=city.sources.map(source=>sourceHealth(source,normalized.features));
  const qualityNotice=councilQualityNotice(normalized.quarantined,retainedQuarantines);
- if(qualityNotice)city.sources=city.sources.map(source=>source.kind!=='council'?source:{...source,coverage:{...source.coverage!,reason:`${source.coverage?.reason??''} ${qualityNotice}`}});
+ city.sources=city.sources.map(source=>{if(source.kind!=='council')return source;const reason=replaceCouncilQualityNotice(source.coverage?.reason,qualityNotice);return {...source,coverage:{...source.coverage!,reason}};});
  city.temporalCoverage=cityTemporalCoverage(normalized.features);
  cityQuality.push({cityId:city.id,...normalized.counts,quarantined:normalized.quarantined,retainedQuarantines,sources:city.sources.map(source=>({id:source.id,status:source.status,recordCount:source.recordCount,publishedRecordCount:source.publishedRecordCount,coverage:source.coverage,licence:source.licence,licenceEvidence:source.licenceEvidence}))});
  feeds[city.id]=await sourceInput(join('cities',city.id,'feed.json'));
