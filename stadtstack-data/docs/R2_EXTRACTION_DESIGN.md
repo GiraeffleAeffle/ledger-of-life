@@ -35,7 +35,7 @@ The cause-class figures below are ranges of records plausibly recovered after al
 | Full date already in excerpt | 4 | Separate document vs event date fields and prompt selection | 2–4 |
 | Month/year or year only | 10 | Explicit precision but publication still requires day | 0; retain hold absent genuine full-day evidence elsewhere in same case |
 | Ambiguous/navigation/wrong date role | 6 | Role-aware selection; no guessed transfer | 0–2 only if a safe same-case anchor is found; otherwise held |
-| Other event-only/no-match | 2 remaining of 5 (four already counted above; one event-only; one no full pattern) | no new date source; event date cannot become publication date without stage proof | 0–1 |
+| Event-only and no complete date match | 2 (1 event-only within “other”; 1 no full-pattern match) | no new date source; event date cannot become publication date without stage proof | 0–1 |
 | **Total plausible recovery** | **43** |  | **14–25** |
 
 Expected record recovery is intentionally below the 25 candidate opportunity count. The structural-context plan addresses at most 16+5 plus 4 already present; it does not repair the ten precision-only records, six role ambiguities, or missing date evidence by assertion. These category outcomes must be measured, not retroactively relabelled.
