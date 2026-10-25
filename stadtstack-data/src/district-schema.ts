@@ -1,10 +1,15 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { getTopic } from './topic-vocabulary.ts';
-import { PROVIDER_CONFIGS } from './district-model-contract.ts';
+import { ModelEvidenceSchema, SupportedModelRouteSchema } from './district-model-contract.ts';
 import { EntityMentionSchema, RelationClaimSchema, NormalizedEntitySchema, NormalizedRelationSchema, GRAPH_DETERMINISTIC_CHECKS, normalizeGraphClaims, normalizeRelationActions, RelationActionNormalizationSchema } from './district-graph-claims.ts';
+import {StructuredKnowledgeRecordSchema} from './district-structured-record.ts';
+import {IdentityAssertionSchema,IdentityAdmissionSchema} from './district-entity-resolution.ts';
+import { APPROVED_OWNER_ROBOTS_OVERRIDE, effectiveRobotsPermission, effectiveSourcePermission, ownerRobotsOverrideApplies, isContentFreePolicyEvidence, isPolicyMetadataUrl, MAX_POLICY_METADATA_EVIDENCE } from './source-policy.ts';
+import { DocumentOriginSchema } from './document-origin-contract.ts';
+import {ownerAccountAccessApplies,ownerGenesisRobotsExemptionApplies} from './source-policy.ts';
 
-export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v2';
+export const KNOWLEDGE_SCHEMA_VERSION = 'stadtstack-knowledge-v3';
 export const FAITHFULNESS_THRESHOLD = 0.8;
 export const sha256 = (value: string | Uint8Array) => createHash('sha256').update(value).digest('hex');
 export const hashSchema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -32,20 +37,65 @@ const geometry = z.discriminatedUnion('type', [
 ]);
 export const stageSchema = z.enum(['motion', 'draft', 'consultation', 'decision', 'adopted', 'in_force', 'implemented', 'rejected', 'withdrawn', 'unknown']);
 export const caseKeyTypeSchema = z.enum(['diplan', 'bobsh', 'paper_reference', 'plan_number', 'source_document']);
-export const sourceTypeSchema = z.enum(['council', 'participation', 'gazette', 'website']);
+export const sourceTypeSchema = z.enum(['council', 'participation', 'gazette', 'website','structured']);
+export const OwnerRobotsOverrideSchema = z.object({
+  host: z.string().min(1).max(253), reason: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.reason),
+  date: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.date), approver: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.approver), id: z.literal(APPROVED_OWNER_ROBOTS_OVERRIDE.id),
+}).strict().refine(value => ownerRobotsOverrideApplies(`https://${value.host}/`, value), 'Expected an exact public-host-bound owner decision');
+export const PolicyEvidenceSchema = z.object({
+  url: z.url().max(8192), locator: z.string().max(4096), value: z.string().max(64 * 1024),
+  sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional(),
+  valueSha256: hashSchema.optional(), valueBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  locatorSha256: hashSchema.optional(), locatorBytes: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+  itemCount: z.number().int().nonnegative().max(1_000_000).optional(),
+}).strict().superRefine((evidence, ctx) => {
+  if ((evidence.valueSha256 === undefined) !== (evidence.valueBytes === undefined) || (evidence.locatorSha256 === undefined) !== (evidence.locatorBytes === undefined)) ctx.addIssue({ code: 'custom', message: 'Policy evidence digest must retain its byte count' });
+});
 export const SourceAccessPolicySchema = z.object({
-  robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
-  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(z.object({ url: z.url(), locator: z.string(), value: z.string(), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict()) }).strict(),
-  access: z.enum(['public', 'authentication', 'captcha', 'paywall']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
-}).strict();
-export function assertSubscriptionSourcePolicy(input: unknown, document?: { mimeType: string; sha256: string; url: string }) {
+  robots: z.object({ state: z.enum(['allowed', 'blocked', 'unavailable']), url: z.url().max(8192), sha256: hashSchema.optional(), checkedAt: z.iso.datetime().optional() }).strict(),
+  tdm: z.object({ state: z.enum(['reserved', 'not_reserved', 'not_declared', 'unavailable']), evidence: z.array(PolicyEvidenceSchema).max(256), referenceStatus: z.literal('unavailable').optional(), declarationStatus: z.literal('unavailable').optional() }).strict(),
+  access: z.enum(['public', 'authentication', 'captcha', 'paywall','authenticated_owner_account']), legalClassification: z.literal('not_assessed'), publication: z.literal('facts_with_attribution_only'),
+  ownerAccountAccess: z.object({decisionId:z.string().regex(/^[a-z0-9][a-z0-9-]{0,159}$/),credentialKind:z.enum(['token','password']),robotsDecisionId:z.string().regex(/^[a-z0-9][a-z0-9-]{0,159}$/).optional()}).strict().optional(),
+  ownerRobotsOverride: OwnerRobotsOverrideSchema.optional(), robotsStatus: z.enum(['allowed', 'disallowed', 'unavailable']).optional(), override: z.literal('owner-approved 2026-10-11').optional(),
+  ownerTdmOverride: OwnerRobotsOverrideSchema.optional(), tdmOverride: z.literal('owner-approved 2026-10-11').optional(),
+  documentOrigin: DocumentOriginSchema.optional(),
+}).strict().superRefine((policy, ctx) => {
+  if (policy.access === 'authenticated_owner_account' || policy.ownerAccountAccess !== undefined) {
+    let approved=false;
+    try { approved=ownerAccountAccessApplies(new URL('/genesisws/rest/2020/data/table',policy.robots.url).href,policy.ownerAccountAccess); } catch {}
+    if (policy.access !== 'authenticated_owner_account' || !approved) ctx.addIssue({code:'custom',message:'Owner account audit requires the exact approved host decision'});
+    if (policy.ownerAccountAccess?.robotsDecisionId !== undefined) {
+      let exempt=false;
+      try { exempt=ownerGenesisRobotsExemptionApplies(policy,policy.documentOrigin?.url??new URL('/genesisws/rest/2020/data/table',policy.robots.url).href); } catch {}
+      if (!exempt) ctx.addIssue({code:'custom',message:'Owner-account robots exemption audit requires the exact blocked API decision'});
+    }
+  }
+  if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_reservation_declaration') && policy.tdm.declarationStatus !== 'unavailable') ctx.addIssue({ code: 'custom', message: 'Invalid reservation declaration must remain unavailable' });
+  if (policy.ownerRobotsOverride !== undefined || policy.robotsStatus !== undefined || policy.override !== undefined) {
+    if (!effectiveRobotsPermission(policy, policy.robots.url)) ctx.addIssue({ code: 'custom', message: 'Owner robots audit requires an exact approved decision and honest declared robots evidence' });
+  }
+  if (policy.ownerTdmOverride !== undefined || policy.tdmOverride !== undefined) {
+    if (policy.tdm.state !== 'reserved' || policy.tdmOverride !== 'owner-approved 2026-10-11' || !ownerRobotsOverrideApplies(policy.robots.url, policy.ownerTdmOverride)) ctx.addIssue({ code: 'custom', message: 'Owner TDM audit requires the exact approved host decision and retained reservation' });
+  }
+});
+/** Only this schema may exempt policy observations from source-content purging. */
+export const ContentFreeSourcePolicySchema = SourceAccessPolicySchema.superRefine((policy, ctx) => {
+  const fail = (message: string) => ctx.addIssue({ code: 'custom', message });
+  if (!isPolicyMetadataUrl(policy.robots.url) || policy.tdm.evidence.length > MAX_POLICY_METADATA_EVIDENCE || policy.tdm.evidence.some(evidence => !isContentFreePolicyEvidence(evidence))) fail('Policy metadata contains unprojected or excessive source evidence');
+  if (policy.tdm.evidence.some(evidence => evidence.value === 'invalid_policy_reference') && policy.tdm.referenceStatus !== 'unavailable') fail('Invalid policy reference must remain unavailable');
+  if (policy.documentOrigin && (!isPolicyMetadataUrl(policy.documentOrigin.url) || !/^document-origin-rules-v\d{1,3}$/.test(policy.documentOrigin.classifierVersion) || policy.documentOrigin.evidence.some(evidence => !/^origin-rule-(?:digest|inventory)$/.test(evidence.locator) || !/^sha256:[a-f0-9]{64}$/.test(evidence.value)))) fail('Origin metadata contains unprojected source evidence');
+});
+export function assertSubscriptionSourcePolicy(input: unknown, document?: { mimeType: string; sha256: string; url: string }, registeredSource?: { url: string | null; ownerRobotsOverride?: unknown }) {
   const parsed = SourceAccessPolicySchema.safeParse(input);
   if (!parsed.success) throw Error('Source policy evidence missing or invalid; recollect before subscription extraction');
-  if (parsed.data.robots.state !== 'allowed' || !['not_reserved', 'not_declared'].includes(parsed.data.tdm.state) || parsed.data.access !== 'public') throw Error('Source policy blocks extraction; ask_municipality');
+  // Never substitute the robots URL for a missing document URL on the exception path.
+  if (!effectiveSourcePermission(parsed.data, document ?? { url: '', sha256: '' })) throw Error('Source policy blocks extraction; ask_municipality');
+  if ((parsed.data.ownerRobotsOverride || parsed.data.ownerTdmOverride) && registeredSource && (!registeredSource.url || !ownerRobotsOverrideApplies(registeredSource.url, registeredSource.ownerRobotsOverride))) throw Error('Source policy exception is not bound to the registered source; ask_municipality');
   if (document && document.mimeType.split(';', 1)[0].trim().toLowerCase() === 'application/pdf') {
     const evidence = parsed.data.tdm.evidence.filter(item => /^PDF\.js \S+ XMP metadata \(pdf-tdm-v2\)$/.test(item.locator) && item.sha256 === document.sha256 && item.url === document.url && Boolean(item.checkedAt));
-    if (evidence.some(item => item.value === '1')) throw Error('Source PDF parsed metadata reserves TDM; ask_municipality');
-    if (!evidence.some(item => item.value === '0' || item.value === 'no_tdm_reservation_field')) throw Error('Source PDF parsed metadata evidence missing or not byte-bound; recollect before subscription extraction');
+    const reservedOverride = parsed.data.tdm.state === 'reserved' && parsed.data.documentOrigin?.classification === 'official_work' && parsed.data.tdmOverride === 'owner-approved 2026-10-11' && ownerRobotsOverrideApplies(document.url, parsed.data.ownerTdmOverride);
+    if (evidence.some(item => item.value === '1') && !reservedOverride) throw Error('Source PDF parsed metadata reserves TDM; ask_municipality');
+    if (!evidence.some(item => item.value === '0' || item.value === 'no_tdm_reservation_field' || item.value === '1' && reservedOverride)) throw Error('Source PDF parsed metadata evidence missing or not byte-bound; recollect before subscription extraction');
   }
   return parsed.data;
 }
@@ -73,14 +123,13 @@ export type DistrictExtractionClaims = z.infer<typeof DistrictExtractionClaimsSc
 export const deterministicCheckSchema = z.object({ id: z.string().min(1), passed: z.boolean(), reason: z.string().min(1) }).strict();
 export const REQUIRED_DETERMINISTIC_CHECKS = ['schema', 'exact_quotes', 'municipality', 'title', 'case_identity', 'document_date', 'stage_date', 'stage', 'stage_history', 'critical_stage_promotion', 'critical_budget_spending', 'topic_hierarchy', 'entity_labels', 'location_labels', 'geometry', 'summary_numbers', 'no_contacts'] as const;
 export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.extend({
+  kind: z.literal('text_model'),
   id: z.string().min(1), municipalityId: z.string().min(1), ags: z.string().regex(/^\d{8}$/), districtId: z.string().min(1),
   entities: z.array(NormalizedEntitySchema).max(30), relations: z.array(NormalizedRelationSchema).max(60),
   caseKey: z.string().min(1),
   sources: z.array(z.object({ id: z.string().min(1), url: z.url(), sha256: hashSchema, retrievedAt: z.iso.datetime(), locator: z.string().min(1), mimeType: z.string().min(1), sourceType: sourceTypeSchema, policy: SourceAccessPolicySchema }).strict()).min(1),
-  extraction: z.object({
-    extractorVersion: z.string().min(1), extractorSha256: hashSchema, model: z.string().min(1),
-    provider: z.enum(['openai-subscription', 'anthropic-subscription']), tool: z.enum(['codex-cli', 'claude-cli']), toolVersion: z.string().min(1),
-    modelIdentitySha256: hashSchema, modelIdentityBasis: z.enum(['configured-cli-model-and-tool-version', 'reported-cli-model-and-tool-version']), returnedModel: z.string().min(1).nullable(),
+  extraction: ModelEvidenceSchema.safeExtend({
+    extractorVersion: z.string().min(1), extractorSha256: hashSchema, returnedModel: z.string().min(1).nullable(),
     runtimeWarnings: z.array(z.string().min(1)).optional(),
     quoteNormalization: QuoteNormalizationSchema.optional(),
     relationNormalization: RelationActionNormalizationSchema.extend({ sourceSha256: hashSchema, textSha256: hashSchema, responseSha256: hashSchema }).strict().optional(),
@@ -89,8 +138,9 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
     cacheKey: hashSchema, extractedAt: z.iso.datetime(), chunk: z.object({ index: z.number().int().nonnegative(), count: z.number().int().positive(), start: z.number().int().nonnegative(), end: z.number().int().positive() }).strict(),
   }).strict(),
   verification: z.object({
+    kind: z.literal('text_model'),
     status: z.enum(['candidate', 'auto-verified']), deterministic: z.object({ passed: z.boolean(), checks: z.array(deterministicCheckSchema).min(1) }).strict(),
-    faithfulness: z.object({ score: z.number().min(0).max(1).nullable(), threshold: z.literal(0.8), model: z.string().min(1), provider: z.enum(['openai-subscription', 'anthropic-subscription']), tool: z.enum(['codex-cli', 'claude-cli']), toolVersion: z.string().min(1), modelIdentitySha256: hashSchema, returnedModel: z.string().min(1).nullable(), runtimeWarnings: z.array(z.string().min(1)).optional(), reason: z.string().min(1), evaluatedAt: z.iso.datetime().nullable(), responseSha256: hashSchema.nullable(), sameModel: z.literal(true), limitation: z.literal('Same-model judgment is not independent verification.') }).strict(),
+    faithfulness: SupportedModelRouteSchema.safeExtend({ score: z.number().min(0).max(1).nullable(), threshold: z.literal(0.8), toolVersion: z.string().min(1), modelIdentitySha256: hashSchema, returnedModel: z.string().min(1).nullable(), runtimeWarnings: z.array(z.string().min(1)).optional(), reason: z.string().min(1), evaluatedAt: z.iso.datetime().nullable(), responseSha256: hashSchema.nullable(), sameModel: z.literal(true), limitation: z.literal('Same-model judgment is not independent verification.') }).strict(),
     evidenceHash: hashSchema, reason: z.string().optional(),
   }).strict(),
 }).strict().superRefine((record, ctx) => {
@@ -107,15 +157,14 @@ export const DistrictKnowledgeRecordSchema = DistrictExtractionClaimsSchema.exte
   if (record.verification.deterministic.passed !== record.verification.deterministic.checks.every(check => check.passed)) fail('Deterministic gate mismatch');
   if (!REQUIRED_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required deterministic evidence missing');
   if (!GRAPH_DETERMINISTIC_CHECKS.every(id => record.verification.deterministic.checks.some(check => check.id === id))) fail('Required graph grounding evidence missing');
-  const provider = PROVIDER_CONFIGS[record.extraction.provider];
-  if (record.extraction.model !== provider.model || record.extraction.tool !== provider.tool || record.extraction.modelIdentityBasis !== provider.modelIdentityBasis || record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
+  if (record.verification.faithfulness.provider !== record.extraction.provider) fail('Provider/model evidence mismatch');
   try {
-    const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, sourceSha256: record.extraction.inputSha256 });
+    const normalized = normalizeGraphClaims(record, { municipalityId: record.municipalityId, ags:record.ags, sourceSha256: record.extraction.inputSha256 });
     if (normalized.entities.some((entity, i) => entity.entityId !== record.entities[i].entityId || JSON.stringify(entity.identityBasis) !== JSON.stringify(record.entities[i].identityBasis)) || normalized.relations.some((relation, i) => relation.fromId !== record.relations[i].fromId || relation.toId !== record.relations[i].toId)) fail('Pipeline graph identity mismatch');
   } catch { fail('Invalid graph mention references'); }
   const actionNormalization = record.extraction.relationNormalization;
   // Frozen original contracts stay readable for reassessment; never relabel their generation.
-  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
+  if ((actionNormalization || record.extraction.promptVersion === 'district-claims-v8-action-relations' || record.extraction.promptVersion === 'district-claims-v9-civic-policy-facts') && normalizeRelationActions(record).normalization !== null) fail('Graph actions must be canonical before gating and judging');
   if (actionNormalization) {
     if (actionNormalization.sourceSha256 !== record.extraction.inputSha256 || actionNormalization.textSha256 !== record.extraction.textSha256 || actionNormalization.responseSha256 !== record.extraction.responseSha256) fail('Relation normalization source/response binding mismatch');
     const indexes = new Set<number>();
@@ -160,7 +209,9 @@ export function knowledgeEvidenceHash(record: { verification: { evidenceHash: st
   };
   return sha256(JSON.stringify(canonical({ ...claims, verification: gates })));
 }
-export const KnowledgeRecordsSchema = z.object({ schemaVersion: z.literal(KNOWLEDGE_SCHEMA_VERSION), generatedAt: z.iso.datetime(), records: z.array(DistrictKnowledgeRecordSchema) }).strict();
+export const PublicKnowledgeRecordSchema=z.discriminatedUnion('kind',[DistrictKnowledgeRecordSchema,StructuredKnowledgeRecordSchema]);
+export type PublicKnowledgeRecord=z.infer<typeof PublicKnowledgeRecordSchema>;
+export const KnowledgeRecordsSchema = z.object({ schemaVersion: z.literal(KNOWLEDGE_SCHEMA_VERSION), generatedAt: z.iso.datetime(), records: z.array(PublicKnowledgeRecordSchema),identityAssertions:z.array(IdentityAssertionSchema),identityAdmissions:z.array(IdentityAdmissionSchema) }).strict();
 export type KnowledgeRegistryBinding = { municipalities: Array<{ id: string; name: string; ags: string; districtId: string; sources: Array<{ id: string; kind: string; url: string | null; checkState: string }> }> };
 export function validateKnowledgeRelease(input: unknown, registry: KnowledgeRegistryBinding): z.infer<typeof KnowledgeRecordsSchema> {
   const parsed = KnowledgeRecordsSchema.parse(input);
@@ -171,7 +222,9 @@ export function validateKnowledgeRelease(input: unknown, registry: KnowledgeRegi
     const municipality = registry.municipalities.find(item => item.id === record.municipalityId);
     if (!municipality || municipality.ags !== record.ags || municipality.districtId !== record.districtId) throw Error(`Unbound municipality: ${record.id}`);
     if (record.verification.status !== 'auto-verified') throw Error(`Candidate cannot be published: ${record.id}`);
-    for (const source of record.sources) if (!municipality.sources.some(item => item.id === source.id && item.kind === source.sourceType && item.url !== null && item.checkState === 'checked')) throw Error(`Unbound source: ${record.id}`);
+    if(record.kind==='structured'){
+      for(const source of [record.source,...record.supportingSources])if(!municipality.sources.some(item=>item.id===source.id&&item.url!==null&&item.checkState==='checked'))throw Error(`Unbound structured source: ${record.id}`);
+    }else for (const source of record.sources) if (!municipality.sources.some(item => item.id === source.id && item.kind === source.sourceType && item.url !== null && item.checkState === 'checked')) throw Error(`Unbound source: ${record.id}`);
   }
   return parsed;
 }

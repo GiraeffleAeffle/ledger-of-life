@@ -1,0 +1,59 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-omp-b-review-2026-10-15-addendum-3",
+ "amends": {"id": "r1-omp-b-review-2026-10-15", "path": "stadtstack-data/reports/approvals/r1-omp-b-review-2026-10-15.json"},
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval and not a human review",
+ "issuedAt": "2026-10-16T10:46:27Z",
+ "updatedAt": "2026-10-16T12:36:04Z",
+ "reissues": [
+  {
+   "codeCommit": "68d08055fb26f26723060096c15c8159ce9438bd",
+   "installedReviewSha256Prefix": "8ada24fd",
+   "runnerContractSha256Prefix": "11d1236b",
+   "change": "B decoder settlement (79f8556..68d0805)",
+   "note": "Only prefixes were retained in the lead's notes for this reissue; full values are not restated here."
+  },
+  {
+   "codeCommit": "2ba51a873915fc9a09db748464f214d27d317e8b",
+   "installedReviewSha256": "8ae5bf8ddd0d2ca3eb28198a28995a49df0ef13e499c854030495d81099094d4",
+   "runnerContractSha256": "a827423cb81f23be7d5d3821dcf48802cb3756fbe1f271692694366e1cb8147b",
+   "change": "B-only enumerated output instruction, exact whole-text json fence normalization, omp-output-rejection-v2 diagnostics with version-dispatched immutable v1 reading",
+   "reviews": "BrokerReview: correct, no P0-P3 findings"
+  },
+  {
+   "codeCommit": "1649b6ef8cad66b27f49714ff85b44900cd9fbfe",
+   "installedReviewSha256": "0c258d308cb5b1cd48888eed278fa9d21252bf5c0a090c02b794060eac49a787",
+   "runnerContractSha256": "b40e92f848cd0524d3f89c189b3ebcaf60c1d700667a5f62c9c5dfea1016e51f",
+   "change": "Bounded content-free output structure diagnostics (omp-output-structure-v3, omp-output-rejection-v3) for accepted and rejected outputs; token line and request sent as one contiguous stdin frame",
+   "reviews": "BrokerReview: correct, no P0-P3 findings; noted that diagnostics intentionally reveal output lengths/offsets and that frame minus request bytes reveals credential length (not contents or a credential-derived hash)"
+  },
+  {
+   "codeCommit": "1a918030e948007d29ca8fc02cbc6b2e294b8739",
+   "installedReviewSha256": "f874d5528986c459acd6f8b6f2861c271e97242ce9eacf6049eb999de7c57a7f",
+   "reviewedAt": "2026-10-16T10:39:39Z",
+   "runnerContractSha256": "60d8313a3015271b973ff7c31b1d2ddd76374d79bb84d52be2b5f7b8bae0f571",
+   "change": "Control file system-prompt.md forced to exact mode 0444 (fchmod, fsync, fstat, authenticated no-follow read; identity/mode/hash recheck immediately before stdin); omp prompt-resolution warnings classified as execution holds, never quality settlements",
+   "reviews": "BrokerReview: correct, no P0-P3 findings; residual host-side TOCTOU and private-file-only upstream warning logging documented as limits"
+  },
+  {
+   "codeCommit": "05d82c33d92c498ee5726337b208197e4a12d169",
+   "installedReviewSha256": "35ddf7b90967e53a1019fa2b014d18a2c279b201cec1129794902491c55fb8af",
+   "reviewedAt": "2026-10-16T12:35:35Z",
+   "runnerContractSha256": "5a525867c0b2d025358fdeaf4b50fea84c871246848737f0bbb0a7f52c912475",
+   "change": "Native accepted B path binds an authenticated post-cleanup acknowledgement (omp-native-cleanup-v1 / assessment-vm-omp-purge-ack-v1) so the submitted lease satisfies the unchanged assessment_bridge_leases_check4; original exception class/code/first repository frame preserved in R1_EXCEPTION; B-only control states the deterministic checker's encoding rules (PROMPTS.B, schema and checker unchanged)",
+   "reviews": "BrokerReview: correct, no P0-P3 findings"
+  }
+ ],
+ "installedReview": {
+  "path": "/etc/stadtstack/omp-b-review.json",
+  "owner": "root:root 0644",
+  "installMethod": "sudo -n install -o root -g root -m 0644",
+  "changedFields": "runnerContractSha256, securityReviewId, reviewedAt only",
+  "unchangedFields": "imageId sha256:e61fc2520bcfe87dd37586ab19b2d2b054abfc41335b3af2437a7b7175c6c169, ompBinarySha256 647237… (container omp/18.9.2), hostResolverBinarySha256/hostResolverVersion (omp/18.10.4 root copy), dockerDaemonId, dockerSocket",
+  "validation": "Each reissue parsed with OmpReviewSchema of the respective main checkout and compared with its ompRunnerContractSha256(): schema valid, contract match."
+ },
+ "rootCauseNote": "Until 1a91803 no production lane-B call received its instructions: the runner created control/system-prompt.md with open(..., 'wx', 0o444), the executors run with umask 0077, so the file was 0400 owned by uid 1000; the container runs as uid 65534 and could not read it, and upstream omp v18.9.2 (bd4dffd5 packages/coding-agent/src/system-prompt.ts:291-306) logs a warning and uses the path itself as the system prompt. Consequently all 64 production assessment_b held_quality settlements observed up to 2026-10-16T10:13:03Z (and any later ones before 1a91803) are infrastructure-caused, not genuine quality outcomes. Their receipts and proofs remain immutable history; the changed B contract re-runs lane B for every selected source under the new pin.",
+ "confirmation": "Lead-authorized private diagnostic calls with 1a91803 under umask 0077 through the production managed Docker path (no production lease or database effects): control at handoff 0444, no prompt-resolution warning; one call returned valid JSON rejected by the strict schema (issues not retained), two calls (same item 5784438b0a2f and item 5b5606a86762) passed the unchanged strict schema.",
+ "secondRootCauseNote": "On 1a91803 the first three production B answers (jobs 71dfff9b1dbf, 8f459ae61e14, e6eb958e879f) were schema-valid but the native accepted path set the lease to submitted without purge_ack_sha256; assessment_bridge_leases_check4 (SQLSTATE 23514, PostgreSQL server log) rolled back each final transaction and the jobs were held as execution_exception. Fixed in 05d82c3 without changing the constraint.",
+ "confirmation05d82c3": "Three lead-authorized private diagnostic calls with 05d82c3 on those three items (umask 0077, production managed Docker path, no production effects): control 0444, strict decoder accepted all three; output outcome unresolved for all three with model-declared evidence holds, two still with abstention_usefulness. These are honest quality holds, not admissions."
+}

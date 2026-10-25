@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "stadtstack-r1-step8-production-plan-v1",
+  "readOnly": true,
+  "writes": [],
+  "network": false,
+  "providers": false,
+  "repository": "/home/max/civic-rebuild-r1/stadtstack-data",
+  "driverRoot": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full",
+  "structuredRuns": [
+    {"run_id": "329d949b-e87f-4942-98d2-767188cf1947", "receipts": "1"},
+    {"run_id": "3fe33cb6-fb63-4151-b56d-e94271c0d0af", "receipts": "1"},
+    {"run_id": "5f582f17-d494-4fd5-8aea-a6c7a2a22dcc", "receipts": "1"},
+    {"run_id": "6a60345b-850c-4130-9105-aa6b89e99cf3", "receipts": "1"},
+    {"run_id": "f311d068-1f14-47f2-856f-d3213098821a", "receipts": "1"}
+  ],
+  "sealedSources": [],
+  "authenticPriorRelease": {
+    "gitCommit": "57bddbbd8b84b0634229ad9cd45b689bda7271ea",
+    "directory": "release",
+    "manifestSha256": "85b9236328402364ee1211ffe274933d3eaf0ff52c976a39720920337cc866b8",
+    "releaseId": "4ceebf75374df54c51bcf4a212c73770186a1a6db502423be7f108b665096691"
+  },
+  "wouldRead": [
+    "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/catalogue.json",
+    "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/cas",
+    "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-operator",
+    "/home/max/civic-rebuild-r1/stadtstack-data/release",
+    "/home/max/stadtstack-ops/STATUS_0.3.2.md",
+    "explicit staged catalogue/city feeds/signals/regional topics",
+    "independently pinned source provenance and current policy/identity/critical controls",
+    "Git predecessor members and authentic legacy predecessor change state",
+    "same-host canonical jobs, step receipts, call accounting and authorizations"
+  ],
+  "missing": [
+    "Complete 27-source seal set is not available in the inspected driver tree; no publication or replay was attempted."
+  ],
+  "requires": "Complete pinned Step8InputSchema manifest, including one graph asOf, clocks and full non-knowledge staging/provenance. This discovery is not execution approval or a passing release gate."
+}

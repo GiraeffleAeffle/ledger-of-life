@@ -45,22 +45,29 @@ const stockMint = address('So11111111111111111111111111111111111111112');
 const testUsdc = address('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 const classic = address('TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA');
 
-async function solanaFixture(stockAmount: bigint, missingCash = false, failCash = false) {
+async function solanaFixture(stockAmount: bigint, missingCash = false, failCash = false, corrupt?: 'owner' | 'mint' | 'layout') {
   const [cashAta] = await findAssociatedTokenPda({ owner: solOwner, mint: testUsdc, tokenProgram: classic });
   const [stockAta] = await findAssociatedTokenPda({ owner: solOwner, mint: stockMint, tokenProgram: TOKEN_2022_PROGRAM_ADDRESS });
   const token = (mint: SolanaAddress, amount: bigint) => getTokenEncoder().encode({
-    mint, owner: solOwner, amount, delegate: null, state: AccountState.Initialized,
+    mint: corrupt === 'mint' ? solOwner : mint, owner: solOwner, amount, delegate: null, state: AccountState.Initialized,
     isNative: null, delegatedAmount: 0n, closeAuthority: null, extensions: null,
   });
   const mint = getMintEncoder().encode({ mintAuthority: null, supply: stockAmount, decimals: 8,
     isInitialized: true, freezeAuthority: null, extensions: null });
-  const rpc = { getAccountInfo: (account: typeof cashAta) => ({ send: async () => {
-    if (account === cashAta && failCash) throw new Error('Devnet RPC quota exceeded');
-    if (account === cashAta && missingCash) return { value: null };
-    const data = account === cashAta ? token(testUsdc, 750_000_000n)
-      : account === stockAta ? token(stockMint, stockAmount) : mint;
-    return { value: { data: [Buffer.from(data).toString('base64'), 'base64'], executable: false,
-      lamports: 1n, owner: account === cashAta ? classic : TOKEN_2022_PROGRAM_ADDRESS, space: data.length } };
+  let reads = 0;
+  const rpc = { getMultipleAccounts: (accounts: SolanaAddress[], options: { commitment: string }) => ({ send: async () => {
+    reads++;
+    assert.equal(reads, 1);
+    assert.equal(options.commitment, 'confirmed');
+    assert.deepEqual(accounts, [cashAta, stockAta, stockMint]);
+    if (failCash) throw new Error('Devnet RPC quota exceeded');
+    return { context: { slot: 50n }, value: accounts.map(account => {
+      if (account === cashAta && missingCash) return null;
+      const data = corrupt === 'layout' ? new Uint8Array(1) : account === cashAta ? token(testUsdc, 750_000_000n)
+        : account === stockAta ? token(stockMint, stockAmount) : mint;
+      return { data: [Buffer.from(data).toString('base64'), 'base64'], executable: false,
+        lamports: 1n, owner: corrupt === 'owner' ? solOwner : account === cashAta ? classic : TOKEN_2022_PROGRAM_ADDRESS, space: data.length };
+    }) };
   } }) } as unknown as Rpc<SolanaRpcApi>;
   return rpc;
 }
@@ -82,4 +89,11 @@ test('a cold Jupiter outage retains actual Solana cash and share amounts without
     assert.equal(noShares.valueUsd, null);
     await assert.rejects(readPortfolioPosition(await solanaFixture(0n, false, true), solOwner, stockMint), /Devnet RPC quota exceeded/);
   } finally { globalThis.fetch = original; }
+});
+
+test('a batched portfolio rejects wrong account program, token mint and malformed layout', async t => {
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, { status: 429 }));
+  for (const corrupt of ['owner', 'mint', 'layout'] as const) {
+    await assert.rejects(readPortfolioPosition(await solanaFixture(250_000_000n, false, false, corrupt), solOwner, stockMint));
+  }
 });

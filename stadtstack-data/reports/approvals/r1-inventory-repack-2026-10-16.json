@@ -1,0 +1,28 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-inventory-repack-2026-10-16",
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81, approved.authorityToolingCutover) and r1-autonomy-and-release-2026-10-14; not a new owner approval",
+ "issuedAt": "2026-10-16T02:35:00Z",
+ "authority": {"id": "owner-2026-10-11-codex-workstation", "sha256": "e35c90d1b705a52d739f438ae80b0ab1217db86386826fd9feac2f32329e926f", "inventoryId": "bec03dec-7ad1-4522-8da1-2da049142eb6"},
+ "action": "Physical-only repack of the sealed R1 inventory layout with the reviewed command `civic-opt-out.ts repack-inventory` (code f066c34; implementation f99d813/feb5bfd, reviewed by LockWaitReview with no remaining findings). No logical record, root, watermark, lease or objection state was changed; all old segment files and the original manifest are retained.",
+ "reason": "Custody checks verify every segment pin; the layout had grown from 19 segments after the 2026-10-14 cutover to 1,641 pins, making authority CLI commands take minutes and stalling the processing campaign.",
+ "preconditions": [
+  "Processing campaign stopped; no driver, executor or authority CLI process running",
+  "recover-scratch run with Docker group access at about 02:25Z: one more lease recovered; four partial leases remain with only daemon_resource_pending (10f567ce-3086-47da-9c62-3f693450dbd1 since 2026-10-14, b8417816-0283-4fb3-9f17-151e88294b64, 618cb437-ee52-4944-997e-42be9ad49611, cfd8c31d-3b7e-42a5-8036-67381d7bc565), preserved unchanged via --pending-scratch tokens",
+  "Dry run: 1,641 -> 23 pins, logical equality true"
+ ],
+ "result": {
+  "status": "repacked",
+  "logicalEquality": true,
+  "authoritativeCandidateReread": true,
+  "logicalSha256": "b651c94a3f61ab78d5c9582e0518c52a7e8b3f4e2f7794af247949581e3ded84",
+  "before": {"pins": 1641, "manifestSha256": "64382486348af324177dd91337fda9fde08c6ff9f8a633ec64aef293301eb052"},
+  "after": {"pins": 23, "manifestSha256": "218657ed5979f9a0b986ae4df63f18839f36d3de6936d057d52addb6f19735ac"},
+  "backup": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/repack-2026-10-16/inventory-manifest-backup.json (original manifest); old segments retained in civic-policy/inventory-segments",
+  "receipt": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/repack-2026-10-16/repack.json",
+  "receiptSha256": "0a7813c708198f705a0ef5d254b5ec7fd2718d873f1e1919136095c53c0cb60c",
+  "totalMs": 38985,
+  "postCheck": "readCivicPolicyInventory: 267 roots, 0 incomplete, 4 unfinished (the preserved pending leases)"
+ },
+ "followUp": "The daemon_resource_pending leases persist although no Docker containers exist; investigation of why recovery cannot confirm their removal is pending."
+}

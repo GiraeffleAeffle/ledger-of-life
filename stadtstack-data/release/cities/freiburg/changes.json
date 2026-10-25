@@ -1,0 +1,1131 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "previous": "d4f56a8b3e01ef4e5c485a7717ccd2a1330c6363016c88a69a87b2c70dcd082b",
+      "current": "c2bef37ef514220a5aba9c44630c06837389211b84c3603d3b8c0952feb3be18",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2022-BehB-26",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d5f4dd80ea539e762a930e78195704710bf1094789062bd4b14edebefc44b342",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-ASW-151",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "dc7e34ecfda0886f85b0d93522a9145a23aefaaaad35df34eec4c3aafa66e970",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-17",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e604a68eb81f7bb7273779e1123982b1217bf37dea5416067c8439f6049812b3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-AWW-18",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8f2bdcec9936b221987957b9600184abd1b1be33ada23065225fdf7a7e995e9b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-73",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "98ba3aea507014336b6603d579811b29a16329362ed825c833603b4248ae8105",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-74",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "49c6af0054e12c4057292904305ab5f274c2223dac0736bfcab37f032c32b023",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-75",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e8509fa67656510a6e7383bc82205adcc84850a9fe4ddc63c3588aab9b4a31b2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BaUStA-76",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7f1e795a91b26c7abd4d748ba13fdc89cf113253920d603f2d448a3844dea515",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-BehB-25",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c543d39d873d1b4510f42a203e77094ea95689ff40ddbd307af4dbe431c032d8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-300",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d555df12c7d6204ac549b76e62873df07f61c04668b1f36a5ff0a8957e7e9ace",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-301",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3e5b603e54e7dc0f3090ffe4e721a7f28221101fe3cf1f21c8a6ee0536384687",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-302",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9e895f90abcc7e849d4a978a8bd42fc5b761722e2b33a5266117c604c0056b74",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-303",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5c960ced58fd0d2bd73bc28dfa820087551e97caea31891a6a3b54df6c7b401d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-304",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0c744878e104d032743f3c20df38e337e5d3b2179b76e8560209ec448cb5302f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-GR-305",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "246f429802c68cbe5f9d78e06eba17752cbb5c907525b0cdb175c03647baff79",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-120",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "67acd93bef6be8135430836dd2cf8d7baa9c4db618f6a94801847f9cef2908af",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-121",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6450c90b9a534ddde38ea96c1884151724ce2a3e60215d54ada13a5d5fa8566e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-122",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fc6b7feaaa191090b78c7802f94e3fab3d744eff487fd73cfbe51c057d30e0d2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-HFA-123",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "17810b5cf027852dfb95794ecffa24b5b806000c321ebed6ba60bf628f404c37",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KA-168",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ae334c6d27713e4909debe33c9a5b816bd0a8e90be727b56047cde2a769107ae",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-155",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0d4784c75d84d7888e49a22b6c6ba4a89e9e692b0332bb8ed14184c2a760bfed",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-KJHA-156",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7b339f1db71ab1b5bcb10fe0ec620aea89207ee30f154ee1f10d9ecc94be2ac8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-26",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f67cd936c9abeb8c72f8b59b6d0125d4d26daa1bbadb0d9b633e3f28071a7403",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-MIA-27",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "96c23579ee2e214a2b1abf8451a772d59f90f80020c33da829bff5e7a41cdf59",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-26",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8f54cfd72760cefacf19fbc38c7dfd373c281ebbb35ffc67d5447d570e194257",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Mobi-27",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c360f126b74b44c59e07c4ed8363ce2af3c8b2f9f43618ed7ef1db681d32b92f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-116",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bc3beaaed524cdeed6264aebb58ed3054823ffa9e82d1ed9665f12554901ca45",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-117",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aabab00e8503e62442f9cd120bb545180dd0d0a702790354348edb8dcaceb8cd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-118",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1f2a15be71ec27cb3702d3bd305f847ad60fbfea723cb491e34edac62ada345a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_EB-119",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1215f7dcb45e0518933d7b5bd8ca6bf611f1a7d0120f426cc051a1e5742ec498",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-251",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "15b763fc00c436a53c561c935b7ab20e998a787febbb76152d50cbc54347ac64",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-252",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a2809a4ac44cd88be946388d8eda9ffbcc823b9ae467737b63eab66f71bb5b7d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_HD-253",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bc92a181c62f511a653fa1c3344c89bf9ebc4e4de43129c475609174e16a19eb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-112",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "44d04a64eb31ae511b4c1cecb0af59cbae4927242996393ec018c5dcb3a57e2a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-113",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "330d541d119f092fb17135038ac6ce225db52c6159ad87deda3d3eeb0c763728",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-114",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fe8bca29725da2a75c711b88b873fc58fd47a58e42db7e689a0a9a99925d6cb1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_KA-115",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a9c4cb280a48d64bdd64ac9f7731f2590972fac3e6bf7071d6bfdb00330609f7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-138",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fe5e130e08db77156bd93d39fcabfac74a6d3f0644bdb7dbf8509409d60c49da",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-139",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1a4a729b2bf015bffa8c4cf830a6bf21131ce6050fb65a1b6c01882be10e964b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_LE-140",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7507e0a9bc1e8826bca9a1216098f673047ac5e1164b07b47a1e30b5c09d6b57",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-121",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b76b4adc7e7a2e28b5cee69cfb992fd2033692c3c0bc39a6bfd522c4972d849d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-122",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cdeb912bc69a687c63c4869eca351e1a92ccc02f8616081afe75eba617462f85",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_MU-123",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "851018dfd919ebc124dd456c0b4c754b0a6f73b0a40acef8b08345b96536bcc1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-127",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6c8690ad46bb07f01d6bcdc4879e2d89cd86a985212a4434d643078fc6b80d35",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-128",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5fb03f5d3ed44ecbd182cbc45aab91d0e834879f768af77741e698c070c22737",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_OPF-129",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bd99fe32bedda7284dc2be4a30eb574be011db50af9ce392329ee3315ed86dc3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-144",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3f1908d6e35e5a4d1776974e30c755b21d2a95697a768cabdb5299fa212b84b8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-145",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "deccb54750f2f0a5a5061da4d4eaeefe6f85c756695f8e0b02bf55fcac2ec588",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-146",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "06598d0af7684b21d66a32fb31a48bf306ac057d3efce38f36c7ddc40a544aaf",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_TI-147",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a4f04f87e3e91f354e02b39abfcffb960a99e872fe1f6e035c2fbff755300ea1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-123",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "287e694a0b47d6bb4874a00b341d76f214d283854692f7224a65f66ea6651e98",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-124",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ef3e22e7bcfa002733e9e05aaefc296c08ed1ae5b0813a2c4bf38f403102360c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-125",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "97dbc28467c309525f4aa1c8db5457abe06eee5f06c441bf6606d1c331b6a6bb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-OR_WA-126",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5b7c56110971bd809e329689565f056676f313222e8e1ba0ebc94eb475f9d55d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-211",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "17f645836c16b663ff5c0cdb402b536209f8a82d5379f2e94bb08da809264ef6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SO-212",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e0790ef88dd5253528724835b6083c15d944488b06c64686bd9cb6be4c1231f6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-SP-105",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4f5088bc08b82979129ff7726ae6c41e362f8ffabf62eb3ea3b90f2b85068951",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-36",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a0495c0f0034466b2d860dc4a1d97e82ff12a9c64503b57a0ba24c3e1dbe7a9d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-Strat-37",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a36f8cce03822cee4c4192e9c308d4d2c647dd3a0cbfd83781f8d2457a2d5bde",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-The-90",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "96376ab199fe0d043ab775afca984973cf8f03bd631015f28e11e47bceb6686d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-42",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6f8b52819b274be8e943aed9e52f07ac7894e7b6eb226d751f322e2eacdd1fae",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fris.freiburg.de%2Foparl%2Fmeeting%2F2026-UKA-43",
+      "cityId": "freiburg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2860cf3384bb9b63d696ff3e48667940548dbbfde3b5f1561945aa8335ec70b2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "ab2174d224bbecbfa4349ee7e8c991b67d7c362dc75fcb4d69c142b0e32e82a9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

@@ -1,8 +1,12 @@
 import {XMLParser,XMLValidator} from 'fast-xml-parser';
+import {readFile,lstat} from 'node:fs/promises';
+import {createRequire} from 'node:module';
 
 // Isolated process: input and diagnostics never leave this worker. Only TDM findings are emitted.
 const MAX_INPUT=32*1024*1024,MAX_METADATA=1024*1024,MAX_NODES=50000;
 const WORKER_POLICY_VERSION='pdf-tdm-v2';
+const pdfjsVersion=JSON.parse(await readFile(createRequire(import.meta.url).resolve('pdfjs-dist/package.json'),'utf8')).version as unknown;
+if(typeof pdfjsVersion!=='string'||!/^[A-Za-z0-9.+-]+$/.test(pdfjsVersion))throw Error('PDF metadata parser version unavailable');
 let metadataProblem=false;
 const observeDiagnostic=(...values:unknown[])=>{
  if(values.some(value=>typeof value==='string'&&/metadata|xmp/i.test(value)&&/invalid|skipp|fail|error/i.test(value)))metadataProblem=true;
@@ -26,10 +30,12 @@ function decodeXmlReferences(value:unknown):string {
 }
 
 async function main():Promise<Findings>{
- const chunks:Buffer[]=[];let length=0;
- for await(const chunk of process.stdin){const bytes=Buffer.isBuffer(chunk)?chunk:Buffer.from(chunk);length+=bytes.length;if(length>MAX_INPUT)throw new MetadataFailure('size_limit');chunks.push(bytes);}
- if(!length)throw new MetadataFailure('parse_error');
- const bytes=Buffer.concat(chunks,length);
+ const artifact=process.argv[2];
+ if(artifact!=='/input/document'||process.argv.length!==3)throw new MetadataFailure('parser_input_failed');
+ const metadata=await lstat(artifact);
+ if(!metadata.isFile()||metadata.size<1||metadata.size>MAX_INPUT)throw new MetadataFailure('size_limit');
+ const bytes=await readFile(artifact);
+ if(bytes.length!==metadata.size)throw new MetadataFailure('parser_input_failed');
  // Stream dictionaries cannot themselves be Flate-compressed PDF object streams. Decode PDF Name escapes
  // so an unreadable /Metadata stream cannot silently turn into "no metadata" in PDF.js's forgiving API.
  let metadataObjectPresent=false;
@@ -99,6 +105,8 @@ async function main():Promise<Findings>{
   throw new MetadataFailure(error instanceof Error&&error.name==='PasswordException'?'encrypted_pdf':'parse_error');
  }finally{await task.destroy();}
 }
-main().then(result=>process.stdout.write(JSON.stringify({policyVersion:WORKER_POLICY_VERSION,...result})+'\n')).catch(error=>{
- process.stdout.write(JSON.stringify({policyVersion:WORKER_POLICY_VERSION,state:'unavailable',reason:error instanceof MetadataFailure?error.reason:'worker_error'})+'\n');
+if(process.argv[2]==='--version'&&process.argv.length===3){
+ process.stdout.write(JSON.stringify({policyVersion:WORKER_POLICY_VERSION,pdfjsVersion})+'\n');
+}else main().then(result=>process.stdout.write(JSON.stringify({policyVersion:WORKER_POLICY_VERSION,pdfjsVersion,...result})+'\n')).catch(error=>{
+ process.stdout.write(JSON.stringify({policyVersion:WORKER_POLICY_VERSION,pdfjsVersion,state:'unavailable',reason:error instanceof MetadataFailure?error.reason:'worker_error'})+'\n');
 });

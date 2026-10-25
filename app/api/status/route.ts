@@ -15,7 +15,7 @@ export async function GET() {
     storeAvailable = true;
     priceJob = shapePriceJob(await readPriceJob(store), Math.floor(Date.now() / 1000));
     const manifest = await loadBuildingManifest();
-    building = { configured: Boolean(manifest), distributor: manifest?.distributor ?? null, status: manifest ? 'configured' : 'unconfigured' };
+    building = { network: 'robinhood-testnet', configured: Boolean(manifest), distributor: manifest?.distributor ?? null, status: manifest ? 'configured' : 'unconfigured' };
     buildingIncome = await buildingIncomeStatus(store);
   } catch {
     /* Configuration state is returned without secrets. */
@@ -24,6 +24,7 @@ export async function GET() {
   // carry it in its runtime environment, so passing process.env alone would report sign-in as unconfigured.
   const environment = { ...process.env, NEXT_PUBLIC_PRIVY_APP_ID: process.env.NEXT_PUBLIC_PRIVY_APP_ID };
   // `market.priceJob` is null only when the store cannot be read; a job that never ran reports health "attention".
+  // RPC booleans describe configuration presence, not health; building above is the legacy EVM deployment.
   return Response.json(
     { ...connectionStatus(environment), storeAvailable, market: { priceJob }, building, buildingIncome },
     { headers: { 'Cache-Control': 'no-store' } },

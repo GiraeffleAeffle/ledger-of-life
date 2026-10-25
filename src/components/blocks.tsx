@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight } from 'lucide-react';
 import './blocks.css';
 
@@ -57,6 +57,10 @@ export function MoreList({ title, children }: { title?: ReactNode; children: Rea
   return <div className="more-list">{title && <h3 className="more-list-title">{title}</h3>}{children}</div>;
 }
 
+const DisclosureActive = createContext(true);
+/** Nested closed rows keep signed workflow state, but must not keep reading the network. */
+export function useDisclosureActive() { return useContext(DisclosureActive); }
+
 /**
  * A closed row whose content mounts on first open. Put deep-link ids here: `goToSection` opens it.
  * `defaultOpen` only ever opens: a row never snaps shut when its state changes (or after the person opened it),
@@ -68,15 +72,17 @@ export function MoreRow({ id, title, meta, defaultOpen = false, children }: {
   const row = useRef<HTMLDetailsElement>(null);
   const [initiallyOpen] = useState(defaultOpen);
   const [opened, setOpened] = useState(defaultOpen);
+  const parentActive = useDisclosureActive();
+  const [visible, setVisible] = useState(defaultOpen);
   useEffect(() => { if (defaultOpen && row.current && !row.current.open) row.current.open = true; }, [defaultOpen]);
   return <details ref={row} className="more-row" id={id} tabIndex={id ? -1 : undefined} open={initiallyOpen || undefined}
-    onToggle={(event) => { if (event.currentTarget.open) setOpened(true); }}>
+    onToggle={(event) => { setVisible(event.currentTarget.open); if (event.currentTarget.open) setOpened(true); }}>
     <summary>
       <span className="more-row-title">{title}</span>
       {meta && <span className="more-row-meta">{meta}</span>}
       <ChevronRight className="more-row-chevron" size={16} aria-hidden="true" />
     </summary>
-    <div className="more-row-body">{opened ? children : null}</div>
+    <div className="more-row-body"><DisclosureActive.Provider value={parentActive && visible}>{opened ? children : null}</DisclosureActive.Provider></div>
   </details>;
 }
 

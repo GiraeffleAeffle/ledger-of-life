@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "r2-acquisition-contract-measurement-v1",
+  "branch": "r2-genesis-release",
+  "base": "0526d11216592b23465f89cd7d780c956edcddff",
+  "runtimeNode": "24.22.1",
+  "measurement": "Fresh Node process invokes 14 native exported contract functions plus structured MaStR/GENESIS with historical base Git blob hashes and current file hashes. Only acquisition changes.",
+  "priorDraftAcquisitionContractSha256": "b356e7e86d24504b8460c0f055c0e6aa20b23750182755d281b82ece48aa72f5",
+  "acquisitionContractSha256": "fdb3a0f6abcfc57e8b7aaf2f52cf9f0e10cf379609b5321d21eb73c6c20e0aaa",
+  "parserIsolationContractSha256": "281f2cabfe5fa16cc00553f92a053a822f7c65050ed1e3716d21cb8f283fbb73",
+  "parserOutputContractSha256": "3024a2b87f136379bf05fcb6d899707567f158f26c2cea0deef25dd0ae247599",
+  "fullMeasurement": {
+    "path": "/home/max/.local/state/stadtstack-data/r2-genesis-release/contracts-0526d11.json",
+    "sha256": "653c3bafe98d8ab7fcce49f047819f0cf965558999e36966242d3cef78009550"
+  },
+  "measurementScript": {
+    "path": "/home/max/.local/state/stadtstack-data/r2-genesis-release/measure-contracts.mjs",
+    "sha256": "75d957a4940d5466053a4bf29dc447b74c10f144b035b465b5de026228bb45e1"
+  },
+  "issues": "The GENESIS-only exact wire identity/custody extension advances acquisition. This is measured branch evidence, not an issued district/structured release, independent security approval, installed parser review or real-image gate. Historical measurement remains unchanged; Main must remeasure the integrated checkout after merging other slices."
+}

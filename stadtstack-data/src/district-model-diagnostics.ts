@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { sha256 } from './district-schema.ts';
 import { PROVIDER_CONFIGS, RUNTIME_TOOL_KINDS, type ExtractorProvider, type RuntimeFailureDiagnostic, type RuntimeFailureReason, type RuntimeToolEvidence, type SubscriptionFailureCategory } from './district-model-contract.ts';
+import {SubscriptionLimitSchema,codexSubscriptionLimit,codexSubscriptionNoOutput,type SubscriptionLimit} from './district-subscription-limit.ts';
 
 const Hash = z.string().regex(/^[a-f0-9]{64}$/);
 const Activity = z.enum(['declaration', 'attempt', 'unknown']);
@@ -10,18 +11,20 @@ const ToolEvidenceSchema = z.union([
 ]);
 export const RuntimeFailureDiagnosticSchema = z.object({
   version: z.literal(1), callId: z.uuid(), groupId: Hash.nullable(), groupIdSha256: Hash.nullable(),
-  provider: z.enum(['openai-subscription', 'anthropic-subscription']), requestedModel: z.enum(['gpt-6-luna', 'claude-haiku-5-5']),
+  provider: z.enum(['openai-subscription', 'anthropic-subscription']), requestedModel: z.enum(['gpt-6.1-sol', 'gpt-6-luna', 'claude-haiku-5-5']),
   startedAt: z.iso.datetime(), failedAt: z.iso.datetime(), attempted: z.boolean(), exitCode: z.number().int().min(0).max(255).nullable(),
   failureCategory: z.enum(['subscription_authentication', 'model_identity_mismatch', 'model_identity_missing', 'rate_limit', 'generation_error', 'invalid_structured_output', 'tool_attempt', 'operator_pause', 'process_failure']),
   reason: z.enum(['timeout', 'output_bound', 'operator_pause', 'model', 'schema', 'context', 'tool', 'generation', 'authentication', 'rate_limit', 'configuration', 'event_stream', 'input_channel', 'process']),
-  parserFailureCategory: z.enum(['model_metadata_unavailable', 'structured_schema_rejected', 'configured_model_unavailable', 'context_limit', 'subscription_authentication', 'cli_configuration', 'rate_limit', 'generation_error', 'model_identity_mismatch', 'model_identity_missing', 'invalid_structured_output']).nullable(),
+  parserFailureCategory: z.enum(['model_metadata_unavailable', 'structured_schema_rejected', 'request_schema_rejected', 'output_schema_validation_failed', 'schema_failure_unclassified', 'configured_model_unavailable', 'context_limit', 'subscription_authentication', 'cli_configuration', 'rate_limit', 'generation_error', 'model_identity_mismatch', 'model_identity_missing', 'invalid_structured_output']).nullable(),
   toolEvidence: z.array(ToolEvidenceSchema).max(64), toolEvidenceTruncated: z.boolean(),
-}).strict().refine(value => value.requestedModel === PROVIDER_CONFIGS[value.provider].model && !(value.groupId && value.groupIdSha256));
+  subscriptionLimit: SubscriptionLimitSchema.optional(),
+  subscriptionNoOutput:z.boolean().optional(),
+}).strict().refine(value => (value.requestedModel === PROVIDER_CONFIGS[value.provider].model || (PROVIDER_CONFIGS[value.provider].historicalModels as readonly string[]).includes(value.requestedModel)) && !(value.groupId && value.groupIdSha256));
 
 export function runtimeFailureReason(category: string | null): RuntimeFailureReason {
   switch (category) {
     case 'model_metadata_unavailable': case 'configured_model_unavailable': case 'model_identity_mismatch': case 'model_identity_missing': return 'model';
-    case 'structured_schema_rejected': case 'invalid_structured_output': return 'schema';
+    case 'structured_schema_rejected': case 'request_schema_rejected': case 'output_schema_validation_failed': case 'schema_failure_unclassified': case 'invalid_structured_output': return 'schema';
     case 'context_limit': return 'context';
     case 'subscription_authentication': return 'authentication';
     case 'cli_configuration': return 'configuration';
@@ -52,7 +55,7 @@ export function classifyRuntimeFailure(processFailure: RuntimeFailureReason | nu
 const object = (value: unknown): Record<string, unknown> => value !== null && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
 // Diagnostic projection only: never grants tool permission or replaces the authoritative provider parser.
 // Malformed/truncated lines are omitted here, but still rejected by the runtime parser.
-export function runtimeToolEvidence(provider: ExtractorProvider, stdout: string): Pick<RuntimeFailureDiagnostic, 'toolEvidence' | 'toolEvidenceTruncated'> {
+export function runtimeToolEvidence(provider: ExtractorProvider, stdout: string): Pick<RuntimeFailureDiagnostic, 'toolEvidence' | 'toolEvidenceTruncated'> & {subscriptionLimit?:SubscriptionLimit;subscriptionNoOutput?:boolean} {
   const evidence = new Map<string, RuntimeToolEvidence>();
   let toolEvidenceTruncated = false;
   const add = (kind: string, activity: RuntimeToolEvidence['activity']) => {
@@ -100,12 +103,15 @@ export function runtimeToolEvidence(provider: ExtractorProvider, stdout: string)
       if (!formatterProgress && !formatterSummary) add(type, event.tool_name !== 'StructuredOutput' && ['tool_use', 'tool_progress', 'permission_request'].includes(type) ? 'attempt' : 'unknown');
     }
   }
-  return { toolEvidence: [...evidence.values()], toolEvidenceTruncated };
+  const subscriptionLimit=provider==='openai-subscription'?codexSubscriptionLimit(stdout):null;
+  return { toolEvidence: [...evidence.values()], toolEvidenceTruncated,...(subscriptionLimit?{subscriptionLimit,subscriptionNoOutput:codexSubscriptionNoOutput(stdout)}:{}) };
 }
 export function failureDiagnostic(input: {
   callId: string; groupId?: string; provider: ExtractorProvider; startedAt: string; attempted: boolean;
   exitCode: number | null; failureCategory: SubscriptionFailureCategory; reason: RuntimeFailureReason;
   parserFailureCategory: string | null; toolEvidence: RuntimeToolEvidence[]; toolEvidenceTruncated: boolean;
+  subscriptionLimit?:SubscriptionLimit;
+  subscriptionNoOutput?:boolean;
 }): RuntimeFailureDiagnostic {
   const groupId = input.groupId && /^[a-f0-9]{64}$/.test(input.groupId) ? input.groupId : null;
   return RuntimeFailureDiagnosticSchema.parse({
@@ -114,5 +120,6 @@ export function failureDiagnostic(input: {
     attempted: input.attempted, exitCode: Number.isInteger(input.exitCode) && input.exitCode! >= 0 && input.exitCode! <= 255 ? input.exitCode : null,
     failureCategory: input.failureCategory, reason: input.reason, parserFailureCategory: input.parserFailureCategory,
     toolEvidence: input.toolEvidence, toolEvidenceTruncated: input.toolEvidenceTruncated,
+    ...(input.failureCategory==='rate_limit'&&input.subscriptionLimit?{subscriptionLimit:input.subscriptionLimit,subscriptionNoOutput:input.subscriptionNoOutput??false}:{}),
   });
 }

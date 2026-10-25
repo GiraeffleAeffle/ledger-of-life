@@ -1,22 +1,54 @@
-import test from 'node:test';
+import test, { after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile, realpath, stat, mkdir, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { provisionCivicPolicyAuthority, initializeManagedAcquisitionLane, withManagedSourceWrite, CIVIC_ACQUISITION_DECISION_ID } from '../src/civic-opt-out.ts';
 import { sha256 } from '../src/district-schema.ts';
-import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readAuthorizedSourceBytes, type PreparedSourceReference } from '../src/district-prepared-document.ts';
+import { prepareDocument, verifyPreparedDocument, cachePreparedDocument, readPreparedDocument, assertPreparedSourcesActive, assertPreparedReferenceMembership, readAuthorizedSourceBytes, PREPARED_VM_ROOT, type PreparedSourceReference, type ManagedPreparationInput } from '../src/district-prepared-document.ts';
 import { createWorkPlan, restoreWorkPlan, resumeWorkPlan, runWorkPlan, modelCacheKey, classifyWorkFailure, RemoteWorkFailure, type WorkGroup, type WorkPlan } from '../src/district-work-plan.ts';
-import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus } from '../src/district-corpus.ts';
+import { PILOT_BASE_CORPUS_SHA256, PILOT_COMPLETION_CORPUS_SHA256, R1_NINE_TOWN_2026_10_13_CORPUS_SHA256, authorizedPilotCorpusSchema, loadFrozenCorpus, crawlDocumentSchema } from '../src/district-corpus.ts';
 import { preparationPlanSchema } from '../src/district-preparation-run.ts';
 import { readPinnedJson } from '../src/district-private-io.ts';
+import { ownerRobotsOverrideFor, APPROVED_OWNER_ROBOTS_OVERRIDE } from '../src/source-policy.ts';
+import { DOCUMENT_ORIGIN_CLASSIFIER_VERSION } from '../src/document-origin-contract.ts'
+import { recordHostOptOut, assertCivicPolicyAuthority } from '../src/civic-opt-out.ts';
+import { createCivicPolicyTestContext } from './fixtures/civic-policy.ts';
+import { readBoundSourceObservation } from '../src/source-observation.ts';
+const ordinaryFixture = await createCivicPolicyTestContext();
+after(ordinaryFixture.dispose);
 const sourceText = 'Die Stadt beschließt ein neues Wärmenetz. Quelle und Beschluss bleiben überprüfbar. 😀';
 const bytes = Buffer.from(sourceText);
 function reference(): PreparedSourceReference {
   return { id: 'public-source', url: 'https://example.org/document', sha256: sha256(bytes), retrievedAt: '2026-10-01T00:00:00.000Z', locator: 'document-sha256:' + sha256(bytes), mimeType: 'text/plain', sourceType: 'website', policy: { robots: { state: 'allowed', url: 'https://example.org/robots.txt' }, tdm: { state: 'not_declared', evidence: [] }, access: 'public', legalClassification: 'not_assessed', publication: 'facts_with_attribution_only' } };
 }
-const preparation = () => ({ bytes, municipalityId: 'strausberg', references: [reference()], mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: { node: process.versions.node } });
+// Explicitly synthetic parser identity for fixture receipts, never evidence of a reviewed worker run.
+const fixtureToolVersions = { node: process.versions.node, parser_isolation: 'district-parser-isolation-v1', parser_image: 'sha256:' + sha256('synthetic fixture parser image; not reviewed'), parser_contract: sha256('synthetic fixture parser contract; no actual execution') };
+const preparation = () => ({ bytes, municipalityId: 'strausberg', references: [reference()], mimeType: 'text/plain', extractorSha256: sha256('extractor'), toolVersions: fixtureToolVersions });
+const fixtureCommand = async () => { throw Error('Pure synthetic text fixture must not execute parser commands'); };
+const fixtureSourceBindings = [{ kind: 'http_observation' as const, url: reference().url, sourceSha256: sha256(bytes), observationId: 'synthetic-preparation-fixture', receiptSha256: sha256('synthetic preparation fixture receipt') }];
+test('result references may change span locators but cannot replace prepared identity or policy', () => {
+  const source = reference();
+  assert.doesNotThrow(() => assertPreparedReferenceMembership([{ ...source, locator: 'text-sha256:' + sha256(sourceText) + ';chars:0-40' }], [source]));
+  const changes: Partial<PreparedSourceReference>[] = [
+    { id: 'another-source' }, { url: 'https://example.net/copy' }, { sha256: sha256('other source') },
+    { retrievedAt: '2026-10-02T00:00:00.000Z' }, { mimeType: 'text/html' }, { sourceType: 'gazette' },
+    { policy: { ...source.policy, tdm: { state: 'not_reserved', evidence: [] } } },
+  ];
+  for (const change of changes) assert.throws(() => assertPreparedReferenceMembership([{ ...source, ...change }], [source]), /authenticated prepared context/);
+});
+test('frozen index decoding preserves real observation fields and never invents legacy acquisition proof', async () => {
+  const source = reference(), document = { id: 'synthetic-document', municipalityId: 'strausberg', ags: '12064472', districtId: 'maerkisch-oderland', sourceId: source.id, url: source.url, sha256: source.sha256, mimeType: source.mimeType, retrievedAt: source.retrievedAt, checkedAt: '2026-10-02T00:00:00.000Z', status: 200, observationPath: '/synthetic/raw/observations/fixture.json', documentDate: null, localPath: '/synthetic/raw/sha256/' + source.sha256, adapter: 'synthetic-fixture', metadata: {}, policy: source.policy };
+  const parsed = crawlDocumentSchema.parse(document);
+  assert.equal(parsed.observationPath, document.observationPath); assert.equal(parsed.checkedAt, document.checkedAt); assert.equal(parsed.status, document.status);
+  const { observationPath: _observation, checkedAt: _checked, status: _status, ...legacy } = document;
+  const original = crawlDocumentSchema.parse(legacy);
+  assert.equal(original.observationPath, undefined); assert.equal(original.checkedAt, undefined); assert.equal(original.status, undefined);
+  await assert.rejects(readBoundSourceObservation({ rawRoot: ordinaryFixture.managedRoot, document: original, policy: ordinaryFixture.policy }), /index binding is incomplete/);
+});
 test('prepared receipts bind bytes, policy, source references, tools, exact text and UTF16 offsets', async () => {
-  const receipt = await prepareDocument(preparation());
+  const receipt = await prepareDocument(preparation(), fixtureCommand);
   const checked = verifyPreparedDocument(receipt, receipt, bytes);
   assert.equal(checked.text, sourceText);
   assert.equal(checked.textLength, sourceText.length);
@@ -26,11 +58,40 @@ test('prepared receipts bind bytes, policy, source references, tools, exact text
   assert.throws(() => verifyPreparedDocument(receipt, receipt, Buffer.from('tampered source')), /source bytes/);
   assert.throws(() => verifyPreparedDocument(receipt, { ...receipt, toolVersions: { node: 'different' } }), /tool versions/);
   assert.throws(() => verifyPreparedDocument(receipt, { ...receipt, references: [{ ...reference(), retrievedAt: '2026-10-02T00:00:00.000Z' }] }), /references/);
-  const rehashed = await prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed'), references: [{ ...reference(), sha256: sha256(sourceText + 'changed') }] });
+  const rehashed = await prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed'), references: [{ ...reference(), sha256: sha256(sourceText + 'changed') }] }, fixtureCommand);
   assert.throws(() => verifyPreparedDocument(rehashed, receipt), /receipt hash/);
-  await assert.rejects(prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed') }), /source reference/);
-  await assert.rejects(prepareDocument({ ...preparation(), references: [{ ...reference(), policy: { ...reference().policy, access: 'captcha' } }] }), /blocks extraction/);
-  await assert.rejects(prepareDocument({ ...preparation(), toolVersions: {} }), /tool version evidence/);
+  await assert.rejects(prepareDocument({ ...preparation(), bytes: Buffer.from(sourceText + 'changed') }, fixtureCommand), /source reference/);
+  await assert.rejects(prepareDocument({ ...preparation(), references: [{ ...reference(), policy: { ...reference().policy, access: 'captcha' } }] }, fixtureCommand), /blocks extraction/);
+  await assert.rejects(prepareDocument({ ...preparation(), toolVersions: {} }, fixtureCommand), /tool version evidence/);
+});
+test('ordinary preparation requires authentic original source bindings before parser execution', async () => {
+  const input: ManagedPreparationInput = { ...preparation(), managedRoot: '/unused-before-admission', policy: {}, sourceBindings: [] };
+  await assert.rejects(prepareDocument(input), /authenticated managed source bindings/);
+  const mismatch: ManagedPreparationInput = { ...input, sourceBindings: [{ kind: 'http_observation', url: 'https://example.org/unrelated-source', sourceSha256: sha256(bytes), observationId: 'synthetic-unrelated-source', receiptSha256: sha256('synthetic unrelated source receipt') }] };
+  await assert.rejects(prepareDocument(mismatch, fixtureCommand), /bindings differ/);
+});
+
+test('prepared text keeps source-bound blocked robots exception and rejects transferred approval', async () => {
+  const url = 'https://strausberg.allris.cloud/public/si010';
+  const source: PreparedSourceReference = {
+    ...reference(), id: 'strausberg-council', sourceType: 'council', url,
+    policy: { ...reference().policy, robots: { state: 'blocked', url: new URL('/robots.txt', url).href, sha256: sha256('synthetic denied robots'), checkedAt: '2026-10-11T12:00:00.000Z' }, ownerRobotsOverride: ownerRobotsOverrideFor(url)!, robotsStatus: 'disallowed', override: 'owner-approved 2026-10-11', documentOrigin: { classification: 'official_work', method: 'rules', classifierVersion: DOCUMENT_ORIGIN_CLASSIFIER_VERSION, url, sha256: sha256(bytes), classifiedAt: '2026-10-11T12:00:00.000Z', evidence: [{ locator: 'synthetic fixture', value: 'administrative authorship and formal work fixture' }] } },
+  };
+  const receipt = await prepareDocument({ ...preparation(), references: [source] }, fixtureCommand);
+  const checked = verifyPreparedDocument(receipt, receipt, bytes);
+  assert.deepEqual(checked.references[0].policy, source.policy);
+  assert.equal(checked.references[0].policy.robots.state, 'blocked');
+  assert.equal(checked.text, sourceText);
+  for (const changed of [
+    { ...source, url: 'https://other.allris.cloud/public/si010' },
+    { ...source, policy: { ...source.policy, robots: { ...source.policy.robots, state: 'unavailable' as const } } },
+    { ...source, policy: { ...source.policy, access: 'authentication' as const } },
+    { ...source, policy: { ...source.policy, tdm: { state: 'reserved' as const, evidence: [] } } },
+  ]) await assert.rejects(prepareDocument({ ...preparation(), references: [changed] }, fixtureCommand));
+  const pdf = { ...source, mimeType: 'application/pdf' };
+  let calls = 0;
+  await assert.rejects(prepareDocument({ ...preparation(), references: [pdf], mimeType: pdf.mimeType }, async () => { calls++; throw Error('must not run'); }), /parsed metadata evidence/);
+  assert.equal(calls, 0);
 });
 test('PDF preparation policy requires byte-bound parsed metadata before invoking tools', async () => {
   let calls = 0;
@@ -39,18 +100,38 @@ test('PDF preparation policy requires byte-bound parsed metadata before invoking
   assert.equal(calls, 0);
 });
 test('private prepared cache rejects tampering and raw reads enforce containment and hashes', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'district-prepared-test-'));
+  const base = await realpath(await mkdtemp(join(tmpdir(), 'district-prepared-test-'))), root = join(base, 'prepared');
   try {
-    const receipt = await prepareDocument(preparation());
-    const path = await cachePreparedDocument(root, receipt);
-    assert.equal(await cachePreparedDocument(root, receipt), path);
+    const stateDir = join(base, 'policy-state');
+    const authority = await provisionCivicPolicyAuthority({ stateDir, authorityId: 'fixture:' + randomUUID() });
+    const options = { stateDir, authorityId: authority.authorityId, authoritySha256: authority.authoritySha256, decisionId: CIVIC_ACQUISITION_DECISION_ID, kind: 'prepared' as const };
+    const receipt = await prepareDocument(preparation(), fixtureCommand);
+    const path = await cachePreparedDocument(root, receipt, options);
+    assert.equal(await cachePreparedDocument(root, receipt, options), path);
     await writeFile(path, JSON.stringify({ ...receipt, textSha256: sha256('tamper') }));
-    await assert.rejects(cachePreparedDocument(root, receipt), /hash/);
-    const raw = join(root, 'source.txt');
-    await writeFile(raw, bytes);
-    assert.deepEqual(await readAuthorizedSourceBytes(root, raw, sha256(bytes)), bytes);
-    await assert.rejects(readAuthorizedSourceBytes(root, raw, sha256('wrong')), /frozen index/);
-    await assert.rejects(readAuthorizedSourceBytes(join(root, 'source.txt'), raw, sha256(bytes)), /escapes/);
+    await assert.rejects(cachePreparedDocument(root, receipt, options), /hash|policy state requires operator review/i);
+    const rawRoot = join(base, 'raw-artifacts'), raw = join(rawRoot, 'source.txt');
+    await initializeManagedAcquisitionLane(rawRoot, { ...options, kind: 'artifacts' });
+    await withManagedSourceWrite(rawRoot, [{ kind: 'http_observation', relativePath: 'source.txt', contentSha256: sha256(bytes), sourceSha256: sha256(bytes), url: reference().url, observationId: 'synthetic-raw-fixture', receiptSha256: sha256('synthetic raw fixture receipt'), independentAllowed: true }], () => writeFile(raw, bytes, { mode: 0o600 }), options);
+    assert.deepEqual(await readAuthorizedSourceBytes(rawRoot, raw, sha256(bytes), options), bytes);
+    await assert.rejects(readAuthorizedSourceBytes(rawRoot, raw, sha256('wrong'), options), /frozen index/);
+    await assert.rejects(readAuthorizedSourceBytes(raw, raw, sha256(bytes), options), /escapes/);
+  } finally { await rm(base, { recursive: true, force: true }); }
+});
+test('recorded host objection stops prepared cache, extraction and transfer before native commands', async () => {
+  const fixture = await createCivicPolicyTestContext(), { root, policy } = fixture, cacheRoot = join(root, 'prepared');
+  try {
+    const receipt = await prepareDocument({ ...preparation(), managedRoot: cacheRoot, policy, sourceBindings: fixtureSourceBindings }, fixtureCommand);
+    const path = await cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, ...policy });
+    const objection = await recordHostOptOut({ host: 'example.org', reason: 'municipality_objection', reference: 'synthetic-preparation-test' }, policy);
+    assert.equal(objection.purge.status, 'purged');
+    await assert.rejects(stat(path), { code: 'ENOENT' });
+    await assert.rejects(assertPreparedSourcesActive(receipt.references, policy), /objection/);
+    await assert.rejects(cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, ...policy }), /objection/);
+    await assert.rejects(readPreparedDocument(receipt, policy), /objection/);
+    let commands = 0;
+    await assert.rejects(prepareDocument({ ...preparation(), managedRoot: cacheRoot, policy, sourceBindings: fixtureSourceBindings }, async () => { commands++; throw Error('must not run'); }), /objection/);
+    assert.equal(commands, 0);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 function groups(count: number): WorkGroup[] {
@@ -148,6 +229,27 @@ test('interrupted plans require explicit provider resume; operator pause starts 
   assert.equal(calls, 0);
 });
 
+test('final nine-town admission retains exactly 27 distinct approved source snapshots', () => {
+  const admitted = new Set<string>(R1_NINE_TOWN_2026_10_13_CORPUS_SHA256);
+  assert.equal(R1_NINE_TOWN_2026_10_13_CORPUS_SHA256.length, 27);
+  assert.equal(admitted.size, 27);
+  for (const hash of admitted) assert.equal(authorizedPilotCorpusSchema.parse(hash), hash);
+  for (const hash of [
+    '6e2bfe0bc3a784ce641d9197a9f0a26fb58ea1875f5d5962112ad6ca5ad0314b',
+    'd7b1ba546e570df7bf1835a0d563125560f6c53f18dbb2bbebefd838db9af273',
+    '093fc83a284c8478052ecad4325b19ed2275cbcfdea667a3a66a7032d1074499',
+    'df53bcbab8e36a8277c0a88392f8721286db4040cd4069648aee819134a59188',
+    '4f850a75d1c1ce6220a5ae25bb49ffb73b23944a9d8c7f1c6b460ee8643e4df8',
+    '0e55bcd4d04315d73a92852ccd40e8d1f14cce396c2dd678efe0bb04b1cd0ef2',
+    'b122e033c8475486af40a980decd5e29bf44dadd7029b2d7fcdfd556cd99ba12',
+    'fd86e3f07dff97a43535bbe6501eedbc45701fe3bdf37dbf8718f4ae126247d1',
+    '4f1b3622982dd8bd39cce87380743988bfc22e8a00654cda78e6de30c327d268',
+  ]) {
+    assert.equal(admitted.has(hash), true);
+    assert.equal(authorizedPilotCorpusSchema.safeParse((hash[0] === '0' ? '1' : '0') + hash.slice(1)).success, false);
+  }
+});
+
 test('pilot authorization rejects an internally correct substituted index and pinned preparation plan', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'district-corpus-authorization-'));
   try {
@@ -156,7 +258,7 @@ test('pilot authorization rejects an internally correct substituted index and pi
     const index = JSON.stringify({ schemaVersion: 'stadtstack-crawl-index-v1', documents: [], laterCrawlDocuments: 7623 });
     const path = join(directory, 'index.json');
     await writeFile(path, index);
-    await assert.rejects(loadFrozenCorpus(path, sha256(index)), /Invalid option/);
+    await assert.rejects(loadFrozenCorpus(path, sha256(index)), /owner-authorized/);
     await assert.rejects(loadFrozenCorpus(path, PILOT_BASE_CORPUS_SHA256), /hash mismatch/);
     const plan = { schemaVersion: 'stadtstack-preparation-plan-v1', generatedAt: '2026-10-01T00:00:00.000Z', corpusSha256: PILOT_BASE_CORPUS_SHA256, registrySha256: sha256('registry'), extractorSha256: sha256('extractor'), maxDocumentsPerMunicipality: null, availableDocumentGroups: 0, selectedDocumentGroups: 0, selectedRepresentations: 0, municipalities: [], groups: [], quarantine: [] };
     assert.equal(preparationPlanSchema.parse(plan).corpusSha256, PILOT_BASE_CORPUS_SHA256);
@@ -164,7 +266,7 @@ test('pilot authorization rejects an internally correct substituted index and pi
     await writeFile(planPath, substituted);
     // Mac coordinator and VM worker both apply this schema after transport pinning.
     const correctlyPinned = await readPinnedJson(planPath, sha256(substituted));
-    assert.throws(() => preparationPlanSchema.parse(correctlyPinned), /Invalid option/);
+    assert.throws(() => preparationPlanSchema.parse(correctlyPinned), /owner-authorized/);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 
@@ -195,4 +297,38 @@ test('provider failures persist only allowlisted categories and message digests 
     assert.equal(task.failureCategory, 'tool'); assert.equal(task.errorMessageSha256, sha256('private-source-payload'));
   }
   assert.ok(plan.tasks.some(task => task.state === 'pending'));
+});
+
+test('global owner-policy preparation and model defaults do not enroll historical frozen roots', () => {
+  assert.equal(PREPARED_VM_ROOT, '/home/max/civic-knowledge-slice/stadtstack-data/cache/districts/owner-policy-2026-10-11/prepared');
+});
+
+test('a dated directory name cannot authorize a populated unmarked prepared cache', async () => {
+  const fixture = await createCivicPolicyTestContext(), { root, policy } = fixture, cacheRoot = join(root, 'owner-policy-2026-10-11', 'prepared');
+  try {
+    const receipt = await prepareDocument({ ...preparation(), managedRoot: join(root, 'preparation'), policy, sourceBindings: fixtureSourceBindings }, fixtureCommand), body = JSON.stringify(receipt) + '\n';
+    await mkdir(cacheRoot, { recursive: true, mode: 0o700 });
+    const path = join(cacheRoot, receipt.receiptSha256 + '.json');
+    await writeFile(path, body, { mode: 0o600 });
+    const authorityPath = join(policy.stateDir!, 'authority.json'), inventoryPath = join(policy.stateDir!, 'inventory.json');
+    const authorityBefore = await readFile(authorityPath), inventoryBefore = await readFile(inventoryPath);
+    await assert.rejects(cachePreparedDocument(cacheRoot, receipt, { decisionId: APPROVED_OWNER_ROBOTS_OVERRIDE.id, ...policy }), /policy state/);
+    assert.equal(await readFile(path, 'utf8'), body);
+    await assert.rejects(stat(join(cacheRoot, '.civic-acquisition-lane.json')), { code: 'ENOENT' });
+    assert.deepEqual(await readFile(authorityPath), authorityBefore);
+    assert.deepEqual(await readFile(inventoryPath), inventoryBefore);
+    assert.equal((await assertCivicPolicyAuthority(policy)).authoritySha256, policy.authoritySha256);
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
+
+test('missing or divergent authority cannot authorize prepared source processing', async () => {
+  const fixture = await createCivicPolicyTestContext();
+  try {
+    for (const policy of [
+      { ...fixture.policy, stateDir: join(fixture.root, 'missing-authority') },
+      { ...fixture.policy, authoritySha256: sha256('different authority') },
+      { stateDir: fixture.policy.stateDir },
+    ]) await assert.rejects(prepareDocument({ ...preparation(), managedRoot: fixture.managedRoot, policy, sourceBindings: fixtureSourceBindings }, fixtureCommand), /policy state/);
+    await assert.rejects(stat(fixture.managedRoot), { code: 'ENOENT' });
+  } finally { await fixture.dispose(); }
 });

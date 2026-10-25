@@ -1,0 +1,4954 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "koeln",
+      "recordType": "signal",
+      "previous": "95a3d109e9e242018081baacaa04158440c39748542a2a5695dc9e3d8b860bb3",
+      "current": "17f664878340b44201ecbdc224590572870a396c9f74a8f1ed2b605c021c389e",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35774",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "02e4e4bd0057a76264f9e43e2f6519edae3b0a6114971f7b41b04c3b62b281ab",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "a5c82edcad378736f1b774bf63d4724e1b215a99eb3c10494a60a6233725f4d6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35775",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bbb0acd634ec6482c34b07a6d79d0cbc56bdf3e36183911c8972313895bc0887",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "20e26a8e93e9df97c7dffc52893c6ca783cb6b098c98c47996893c443b17fab3",
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35776",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b71c4c3322d6c19e134354aaa3bf722c888c3faf28e9c51cb639a77badf6b4fc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "5de380d275cf56ec016940a9c3cdad556a81f5904e274434240e64b0b7d4e26c"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35777",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "675ef6e0c1fd1efed392596bdff3a4155161fb701cd95d457c55331bee8b836d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1fafb74f2238c2ae6a698ae3701dd32b03b0402a5e47626abc93e3d4ef431f36",
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35778",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5679ed5d546c52f8f19c7ba3ede3043a98d5f935a0c4da42d4587fe6079b4bde",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "a926ad65e7e570cf973eabbe1d7e562f6227f0661007f16e7aa4728d8c64cf5f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35779",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a5e207975caed841fc8e7acf38ffcb781f57eee23c1e7fc056df96c6b2af5d15",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "ba0deba7cec5b299dd39c3533f40317076711bfb7ac054d0a468bcadc7729cd6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35781",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1a098d285dedba2216be7cea6e53773e079b12f0c1d70f37090d114eb39a2e21",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "21924899f0b814102442a66a9e3d812c7603efeb648c01efd0747aaa97cb77ba",
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35782",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c3202bebde7480ccc05085f95f813042f1826caa4a5474ac5e17103ec21c3506",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "2553dcec1688e2f2b9384d907b1b600b6b54200c41c98859c8a75ce36dcd8119",
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35783",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c89bd8444be6dafa289556dd26760bfa0f83afd3420220e4a36662e0f33fc196",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "bf06f2488d0559e79de7929578300644859bda5b601ea0cc04fac6ad86625d2f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35784",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "511f1d7bb252ec208b2cbc63406f441baf958bc6e99f5aefaa79ea7ce9989c54",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "b907e75443f5fc4d478fd5f7d24d3a5e17a6b45d8518701e98e183d9d374ad4c"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35785",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3ea4ffe90ef5db807b6e6c974511edac23bf2563f45e40f4f6ba89fb9eb92d48",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "8ea321bfb3a2d092523a17cee9bdb4fac80ab2ad312b18c638bea341387502b4"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35786",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fd3566396b337f3eef52026e23566af453ca5da1596c4c598bab80b8d9422153",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "43ed299e681fa6670a442478862f027c3f0f06be910c8e91beebc11e5375f6f9"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35787",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9eb867eac6a410febd171d87a4dc0edb33a181ee6d48af715dfbb7c4d4ade679",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "c7d115cdd097dd1e0976b3d0edf74321727b5067fd459dfb2cb785b99c5dc125"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35788",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b9d99d26f25344bc32a9bb0b609f8cf511d0b674def1418950bb95b288ad759f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "5660cbaacdb764d8648349ff686efce3513bbe54ba55a9f1e54af031538bb2b3"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35789",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "28931b6f7fec64666cbb151f0a9f606e649278db4a13c422e6d6bd455319897f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "a710d4224df1d1e52a97ebc5182dc06cf76f38847f2edd629c85a97d80014aa2"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35790",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "691c073d394d55891c60c82cf2afd37f4fd3bcd6bbf0ed569ffd6e6a350fdd45",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "3f8a745188c62e89ab753a7afa5af8382cf8143b005c53a756073583352372d2"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35791",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ee064ec97ad2f84acad494820a2296f05c4ac9febf16c81b48cec451f6f1b7ad",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "8f76dbbeafae757f3dad5c37c1b0fb18ce93c80b098acfa2ac26cc8a7214ce5f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35792",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c780a927717a8ddff7bc8cac25b6f1412f55b0e4485eac17e2a1d42cf1845861",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "75f6b05fc31eca651efad7a79a8392deed4695f7c5fa054c0f75d35f3b9b49b0"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35793",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b6c85b3846ce9376ce469bece17fb086060c9df9abbd38833f93165fe4d9f3a2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "932e3931f63fd523f2fc17cfb61d11f95738d1bf35d11e34ad5b2bcaf152c059"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35794",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "10ecc0e5430142b8611e4c3d9ee2be8f928eb22f36a34dec6abd617b74e3c84c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "a5629b947d89b0270db750530f814f0d3f010486aa32059031ab61fcbd0bcffa"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35795",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e072178708d379abe0d89a708d877c2ea5b39b601adf91881f372d1016dd55ad",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1439e4587706702e2866e077d8f50857b7841031c5adea5fdd0d5cf9a9efad2f",
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35796",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "507f055ce9506287f597f803c0343f19328745823113062383bb3eb5d0398bfd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "a570352fb20b634cf83d06e39cda908c8390747f238314158a660ab9d9bf44a1"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35797",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "dcae13b69d27e1bdd533d1cb4a0535c7aa417218ec0d36ba90386a52933646e3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "e934d2d479983031afdd1d9cebbf09a397a73daa4b3e320e534e3b431b5324d5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35798",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fe37a5e203370525fef19848aee25a2ec47769184eabc93bdb7417af83654a54",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "d931b8d5d2345dbd781cedda8ff725a7020fc182f3fadf987d1baa6ba9fc8489"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35799",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6d5d3d149bf8004e9d42fc6d5d1a9015baca39c6f4fe58def884787f06cbc576",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "39ba7126ce510f5ca432e8764f1fdd2ed607f8fbb209efae1699215107f45f32",
+          "7420728e59f4deaed4ac089baf8e177951890699d75f7407014bd27497019a12"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35800",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8cf58b001ebf45218d484281f9b7c77fbcf608cad54e474829834341686db4b1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1f13a4c871ddeae3f165050f5ad0de079abcd4176aabe70531527a11711ee857",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35801",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7545c6a687329423fcfe1f30d151d13ec053aa12f8a6b1f8ceadb2c74d59e47e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "b20feee61607ff5eb190df4c918a300ac3163fe23981b392f110146a7df26ec6"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35802",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d5cca7a4bed248b67106e16d0a949f9d8ac5092842beef53cac9f1cec35c5d99",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "89e85abcfe88d0b0b6178452d984fd06bd884cc49a33f4157d95bbc6a049d0f8",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35803",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "47b7157ef543f522bd34e409aabf79c6bc8cfde74ad5c5b8fdbac72a3406aff5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9f2c5935fd4fbb8ec7a38d0e15b1c9a78f17a7237be60437f08e6db5bd325588",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35804",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "65cde535cadfea792f4a017845ba673eb15c789928a30f48cfea3bf4f1513bce",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "389267955d361eb0d775ce3cbf1cdb6734ceb5a98a7bf467697b133a24eef2d9",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35805",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "93a04a0b794f95878fa5650cd762c682310501f095995154d0c8d1ea420fbbbb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9144f1d46fc0b28795a8f9f52692284b82d01e1722b5c21de658939bbe32128f",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35806",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6b835976a47950d0fbcf5b045c28b1000aedfc21b7a93b34418181c150544099",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "fdca9760bfe0e5f26d9dce0a176afa8b32287a3f5af6c7172db98b5ee1d7aa58"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35807",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e0a8eb88e81bceefec76286bcc4a1b600a70e23c651f046ef83e9b04a23d1e77",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "d3cb1e02aee2c200bfb27b4e692301a217d4a2d54500d55c6555acc0c2f9e1bd"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35808",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6e3c9d7230fca07d45db2aa101632289b22431d74124f8c2b65579f84a830438",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "7a71e2502ff546bc4e2277a53273d1dc33f4212565f1ba95901304928e26e990",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35809",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "64e22bc82ec5820b2e1aaf97d79b191621e7627aa8588924a0002f4afb24e875",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "d970dd76973088917308beb9eb59ca1cd3d8421233b503e110a07963648425ec"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35810",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a8352a5ccc4b29f6efbe3ee63286cbf33c5ce8fb7ac004e8deb49e7d793ca870",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "e0929f2d5cb8a1e011b40c10db219b6ece9cdffee54da29ac305700ffb18a494"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35811",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "077cb3078f0318e38b3441b81f7411cbd31b6fcf4b9a9e13c76ef744efbb76b7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9dc216169f65c07bb3862ab47847500b5cb21f5911f6b9caf7bc9ed41023cc89",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35812",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8c1c6220ed9cba0af16a243875e40c00a26409c089dd1b4262f2eb7305257c63",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "a97cf105f66ea9bfa853948beec1d7598794bfd873f0a9c4dc8d07c01e9d945d"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35814",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "61360be9f15dda506eeec3f5e9ea312df159eb32bf0c8c741877402c1220b7e5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "9e986dbd342edcb47531b37aafbd60e8399407834ed60abfdb7a49b3c6d30356",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35815",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5f8759a0b5885274eb94c0a67f7c90d8e59d1cfa4b8d6cfa95fb6fb29e8aff4c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "aa0a1b0b7a111ff7873888fbd52dd2533e7a0ac991003d5947fa8f48bf0e1012"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35816",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "83cff48abac4cb2a12b371138a2793ab333e032fcef53176c8a94ba4ef7f03a7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "4f276f14f86ec6621571c1613e9ce125de51609d72a66b3edca69959847cb8af",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35817",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "91af6687772eed7bb7c04ca7817046efe2ca58247f5be093290da62d2f9f2f3d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "cd4f252b72313f2c49f9cc6460e623e2337f7ac742cf2d8889d765e41a392ab0"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35818",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0da1dbdeebc477c96d321758c9b056a3008b09f1c14fc9097d49ca5b92ab8143",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "3eb033a1c1faaf317f8a545bc44410422dc4834ee199368030ce7c46f5ae9a8f",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35819",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2a3956460f5170c078e6ea72fbae5dca9092ce7f0c4d4905de5b86a3b2382ff3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "bcaf220c5b43fa5c4bbd8ae9f34656666b44fa74eca0dceefced6f4d5cf7228e"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35820",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8783bb3954f4f7d97dc050a3b1233fe3e161c1f78b1d84c5b72c55dcce7a4851",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "6958f19125a878e9b43972165b42cafe123f7104ffbec14446bf96ee8e981693",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35821",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aaf5767564e76944eee84ad1258487d88ff75eef7f4c30a008136b19658cb654",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "1c82467da3f7aa45daefba42dae1e3a99844860c4bb5d86c16db09bc73392c9c",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35822",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "933990e2c5ae32b01e2754217371e5784154d6e526ae09a56348d92a2ec621a3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "67a25428be03303bce285c2ba0c817bf0fdf11cffed69661132c30d191b9afd1",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35823",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4d9d0596b5f8646eb0a9a7e91044e93b7b733a030ace0b91cefe67302078c160",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "f871d4095d629090cd208a6611408a71cdd2a9f06b3f51143c5fbc3d1d3ebd9a"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35824",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7dea5c49ba743ef9f55698b11696fb1cd7832847350d1c09e1cd7c69f49ead9b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435",
+          "f13a410518d352ea73cd768e2a391fcba54db094dbedbabe70344f31a3504377"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fmeetings%2F35825",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5bbc38990d4e7e661e6389a2b1fb53d27192f94fc7a886a6af8eddc8960f0871",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "64f32f689976b1d830ac1930926d6ab6e7930a66dd16458bc7c75980270d5424",
+          "a41f11d9921349b862f2767a93782a9bfb8c62ddcbcb5ebba693c57be36bb435"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "council:https%3A%2F%2Fbuergerinfo.stadt-koeln.de%2Foparl%2Fbodies%2Fstadtverwaltung_koeln%2Fpapers%2Fvo%2F134834",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "efb36ffb0babf0f3d1f6d31f6d7cae81bbe033a60326c3cb1950b23f566ab6e4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c890a9028b101b9b5877b61ceb49057a6e6cf77e43685e760ee4946c3646af4b",
+          "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+          "d82bbfa66f67422160a1f62a12b4e700212d3b1e08e319ccccaa9ba872514865"
+        ],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "8568071426930673cedc18d26f06238d5c15cf59df9f3b4c3a5dfcc523c8a8e3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "c890a9028b101b9b5877b61ceb49057a6e6cf77e43685e760ee4946c3646af4b",
+          "d4db5796baad577e81f6aca02177009da7dcd37aedff95e5237d32a816540edf",
+          "d82bbfa66f67422160a1f62a12b4e700212d3b1e08e319ccccaa9ba872514865"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1428",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "70163f7dac576a4e813d3856e596202376d19fc76000226479cc65661dd3810e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1429",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5db744588a6c818803a0cf6ae9b0873090e3f9bfc2bb91a0d2f052f9836de3ab",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1430",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6fd96a1fe90ae73e0312bc582364494d4c8dece2ff4377cdb26b7b2460d9ad3e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1431",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f3dbedfe99e598d03e54c08fa83be6b64236cee96cbdf3f88e5b65f2b8758a4c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1432",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "771fbb8c76eeff766c3092a91bbbc4ff4ad38a4814b592236dba645e11f4e0e6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1433",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "308d783724b966d7e263f6b562504207a06495a56a3fee8c6f873143ef778dea",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1434",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "94dc54cf400e89b87ea3cacee6c859b40028e90c44dcbbd3b6d429eb4b47337e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1435",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6018219e442185c217f96284000c2d3f0b0d55175efab45b3ff7a70b2d0b71d8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1436",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "677d968b5da32f112f915a3394cd80047453f042134285b63ab0838d929f2637",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1437",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cde1d1f8a86b941eaf93181190206df1ea5cf0f7cb9b802f1ebf6be598ecbab7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1438",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b8809419b8253f866673927ec8fea40eb21e08721469b30b7f84d73dd879cbfb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1439",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "010016ff253643e26211eaefc10059906261351c5c2b87332b0708a63e57ac8e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1440",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0e725621eb0f5ac5df97e5427da393d8dacef1c1902eafb31eac44f8572fe533",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1441",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3eb9899e90e0abc7732d4ae0853e6f9b17d428628af759e77132370c8c473bbc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1442",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c1f9f8019618a463667786403650d68588decfa838ad220d916370ed81541df3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1443",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ef9183e5d9935eee08717f7c98944dc4a04370b8f3b7b11eb54b13b13f8abba9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1444",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f90a406f2b12adfd8890a5efd8b64142002cb44758f954a6256766e2ed4da5b1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1445",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "26c8f76828f099c4b5d97fff2d3f3fd9bc111c8027bd73eff183d7bfa0b0b46e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1446",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "02930963fecc5205e616b63def70d0037644245d04186434335a70467897c4d5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1447",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1f8edf982065473976fdc97582360495b9a5b486ee7cb913db42fa2d5c7bf4c7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1448",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "66c7789582d2bea239f698d264238a274975f2af541511d8d2c0046b7ca58be1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1449",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c3ae7f80215d5de07d9312fda0295686b914cd4f01252a43c01e5a38405a5e02",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1450",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fc073ec753fc835968d48af55a368d1f25d870f4d1194929d0749fceb5def69d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1451",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a32efc679a270b7c6e021d83caf0c915c6b9be418a0627ff5116e9fa6881d2cc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1452",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cee87154f4d2d6a925f20da3a6bec416a3d0ccf0388e023076185f272a3281b2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1453",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "26a4f251effcdf04b7a09e39f9564406dc546dd71370ec8bfb566f12f3339e66",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1454",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ccc53dd06d0b7c77cd45b1a5f17f8a0bda5f6718f778fe2e3686102fe5a50ce5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1455",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f3252d52908b93553053f981fc10bc290d1f8bd533a9375a7bab05f7f71e8e3a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1456",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6aefe4d947adecfb9537aacbf0c3a7d1701905412069b7cf185ea89ce5e6e951",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1457",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5916f2ca26e09f8076a832dd373b185527b4b7347406d77ffb6f199ed8a4c1b5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1458",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "98c4927ab4295ef36fb6399d6648073d5b82937ea00085d720a0fe8b6e8d7f2d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1459",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cce2f5d05e3e05bf9004ed86dfe9e7339f9e12e40bb1300ef8b111810eb05303",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1460",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ed63ad9401124a18d8cde67d5e9432b0a11cf9dcc3f742f8cf82f5756efbdd04",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1461",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a236142f2ca45dd18645804810e3714a64aad6f33d5f77f8ea2b6d9b512a0e05",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1462",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "23c4de8d48e8c7fd73bf05d3f2dc265c6890e78ff423a3e504886b5c872504c4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1463",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e5160dd497c5c9a2e6881be0803e58602fd69d2b68e5ccde5aa04c0b92caf7fd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1464",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5f542cfd70e1c5c02c16b43f1c4522ad24e070121f9f541ae6361130e7acaa21",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1465",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "32c45d4c5417c8cc411399c13fe085c18734479cca5be6cbf385bc1cfbb8de5b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1466",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cd1e90fc412e625e6bdb72bfcf5467f0e9201c7474b6c53ebabdcbebdf35ef27",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1467",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a8b0f9c3b86827bf7bb05d11f749378aacf5184fad412105b8f25ebf8d3b65b0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1468",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "154e3d9adcb19e085692d94f61ca75070bb264b1f8266d5f2404111b9d561c5c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1469",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "faa6f0b0999f8af4b7c23acd116fb146a732a84a3721c2f839cf0b05ed035873",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1470",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e8fea6d1d574d92d6c63d499909729b5616e2f08f9615991ad030986adf369c1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1471",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "de78128e20d84033994cfd4bdb7d3628a2f7f040e75b34bfdbbfdff7672b4ca8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1472",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9ca5404de501305a0e55655faefc7a857c002d8043b48cdd2a7724d3b9a38206",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1473",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3a8c2a801a524b1b503b03f66709df7a8f6ccbbe652c10904e46c22c8176678d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1474",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "425b92fedffd335f23fba25883c85d36955637b4ecc1351e79dbde214aa9227d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1475",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4dd880de2e1c37f15906d579102f4eee7d65181a7c3dbd3a1aca4ed5c897b505",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1476",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7e5a8cc111d05010df500335bdaea6ea0dfeec96054157fca3efa2e342491ffb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1477",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c98bcc73183770a11e42ab5d31e186006ff63e2491aab9d8c5f230d116962dc7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1478",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2ddab6d920a933553e7cc8538cece5ee15a14242a140df0cc665044fbf2e1502",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1479",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "75416bec517e00bbb471242a7af91b8df9b9f304ad08311b3339e05cd7c2a4e9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1480",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7cf59c61c8631d380371772f512f7c3f650e6b77b9ac125523da889f7676a9ef",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1481",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b1a717306e34a29e6f7e9a7dca080347ccd3d51283f7104a4d2d35b40b580089",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1482",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e363a1a70526aefdd5dff5362a0dcccc71a469834dec29b8c0138ec0ccd0f8ce",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1483",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e0bda96858c06ba3fec1e86737939778e428d20015fecedad8c8f2246ec07da3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1484",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4aef8b766d05bcedfa26854d87d9a5b1ce9e3d6772437aee2af5f5ec4c4abb96",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1485",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0f566a2c83c3d6fde7f4cf4794947428013f45fbc61980e401c28c592ec660f0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1486",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9f155bca7fef1f74d46709795283603dc5a4932f4a3716b43ce7b3fabd0385e8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1487",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "973dd17b1125af61aab4adbd23c5c9a41881bde323464cef3967744b0e16100d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1488",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2e728721420d177c8f004b56e5c4604745b3f415190635248d6c5794af348557",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1489",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "34eaab4ba8c8cad7532b1f0e296039849cd56e030f9b0b525d3f75ce38621d0f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1490",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d972bab17c6a6a4c4986a4e659fe7c9171704fd6d29a531eab28f4e0301fb465",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1491",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1e983b69c69dbce33d220862f7f02dac2d95b41b131189f08bf3656e20945f91",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1492",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3f1942c05b99b729c8a79c7dc94e3def4bb882b19e9dfa49bcc1d3dab006800d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1493",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f545f5e7ccaf3d5b516a364324fd6b8f1f137b79880b6ab6942219e51ec2e221",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1494",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "264a497c00847593e5d684decbaa2fc7b1760406cfad8d2b0a72bff3cdae409d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1495",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fa18c358aea45e8831f62e752f3d6bf8a4c68d041ceb701610b7b03621441919",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1496",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5ebb61787efbf97d50164a536ff63d0aff83c87634575c8c860868e6bf0faf44",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1497",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b0fb519ffb23cdc5a2d232c5d343f9682ad03f80725af6172c82db0f71c2a0c4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1498",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6492e3d5d9ef7bc0a1351d019a04a7bedf521c0e922ebe6d9e8cfd7a3933c336",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1499",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bee0da0904b1415e55381f7067c434cd90c657925b226bb4d420fc77f74abfd6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1500",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a9acc767f19a4f52f925e692f4e43eea745b7dde61688e0987893e06d9f0a9f2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1501",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ae6900b1b23641fa05c7cc7ea0403b85d23780c3b22f504335a1a02222490ee9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1502",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "331410508c9d7276359b2472acd04635d68ebfd79afeb10b17606e3f708c0af3",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1503",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "30accdf85f2cfa18d61caf47fd94958686b60179c8b695b9ff0018378b0c82c1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1504",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0475bce1e47bcf4aa72823ce7a4b53c9e4648852c32342ee1b446c9da0d43103",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1505",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e5af872956ce35dae409269dc7b6566ba77afc00230e02a8cc1c3ac27a3c8f2d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1506",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "04c3272df36b9f526484a8cd5111d365e40d8d02822e8d7ff1686c3860904c41",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1507",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a9e1c9720006f3eeddc00b685ff28ec33f7b6bfe512e388663812847e191edff",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1508",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "443bf7fbb7f8521627763bc92d59dcde013356886873962df343cb42a2b26cc9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1509",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d14c516628852153e48c1ff9d2f4ea1128b9f08cc8c8db224d4283c6054bf8b0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1510",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "62c5871d95588f83d02ecc0885b4fcc5429b8867edd9337e8e10210d384ba32a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1511",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0aa6b9a9e7fea861eec0187dea00abcda4dd4c219accf03ddf2053e3f493fb3b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1512",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cd647f3cfa762b7743c58cbb0c97bbe648f9714fb72fac883083d809e62a13c4",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1513",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "eff288037306cc39c9de861e7b07623fb49b49bef9b534cf523ba87c3d3bd0d2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1514",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3ba3304f733e12c59f55579975b92510db30b0e7dc7bfb1734d8781e97df3dc6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1515",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "770803f9f4216bf1f4d0b1149d722d4f996b5d279b3be8b9388311e56ab586f5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1516",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4d481fd8abd4e946f69fa9906240d7b99dd16905f8b3e6b24bf9b97ef421a7ce",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1517",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c1e72f9a0db58dae47c74a8a079d2a0eb468bb73fda0c424490a170c39b7b4f1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1518",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "44c916c8acc7ce6caee5ab14fcbd1bf7b35a0eeffbb30b5cb39b9da3f8b79fca",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1519",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "81650cc794327bda3e0a2dd604ebffb04b9aed9dee1b8248da2a40f0dc03d52c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1520",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a57c32edf2faa91183fc72b1eff54840831ffec9b72782f8b07a2ac11577c3fb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1521",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "118b43b22d46841c5b580c43ccecd73f2c1e3c3c772086850f25db5e302c18b5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1522",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b4ee535748255043663acd51de424ae4a56421668bb7abf0077de4980b9ee2dd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1523",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "386f74b5bf5cd813b0200df0f3e990df03e9c0747f3c659ba192f03ff96a44e5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1524",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6c9a53c7a647163cec25c9fe7c213c40a536805ad3ad919834647e9f9fdab568",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1525",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "76b2e93c0043ddc8dfb58ec5f5132698bff360a83f9fed88a283501c5146b3df",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1526",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8a5093d7881ccccb237d325a1bc5f7b8076be4718e9f7318fd58c85f0648ef6b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1527",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3c29896da40b3aabcaf2dd694ba202dc1bb1b90cd8b33b37669cf10f731ddd9c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1528",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3948e742bead31147ab3a70d6a2cfd1ffb02a3a8d05e2f00a939cdcebbd5ac0a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1529",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e5ddd281fb9a51f26a1e1c4e54dd1bbc4e939312c41d488335c4a6597ff203d9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1530",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3f40fa030d9a6b0c99b43c9be758e34657feaf3fecdad135bfe00f4353355168",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1531",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fca647c9553449caaa54fa8f946524ea0d9f300374cd4f7a885a7f8ead514d58",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1532",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "495d377f9cf4586227fd4f8bf81cd2e6297ff90176b08d6d86fd65d1a7f9fbba",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1533",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2199ccdeaaf547a13da48c0d321e82f62b0928a8f001353ecab90b1384cc3738",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1534",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "632671907dc08ebd3e02152e2cea8f77f5c543df75b1ad9357d434e2c8a7c00f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1535",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "427f2afa502c784154701f0fa67b826ef36746146491b40375a480a6fe0e6053",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1536",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0d8d8a93bd5d69069b56c3b6e8446948812121fd78d78501bbe3911f8bfa0df0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1537",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2b62103c3a005915a8099f2ad2387e020e4bfeb5433e552b985651bc8ffeb902",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1538",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "15db983d25b044748dd31075f9685f8c840780bcb5e3508a0e8cf8418cb2948f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1539",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "80c9edcee77c7487ac5aa74a02bdcb7385a91515e6791bb629aac6f9136d3930",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1540",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c58ffab3a846c71e3a54865fe3153b13b849478d0fd5efe29000f016bfe6d945",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1541",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "379af8dc49e73db1b0e138e77229a8630385b9012fe12f87975e1ec87a3e9d03",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1542",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c9452c7832aa84d8a49e202b38649cdb27868c97126baf2618fe9ab24a4e1139",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1543",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4151b0cd34ead16d6da06eab99574990bb928b25d59a0d9e4e7cc1a024b8f6a6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1544",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0887c61332781861193912808f77c0ecb203fed96557971e57a4090b9cf7b078",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1545",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ccf63eaaeb4a09c7a7409cceea33ab18096a9df63c31ff3ae71b56fa46fef317",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1546",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "afcc3e60b6fe62ee0836d1e8f083ab73246d3fe98a6e352d410727599f678cf2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1547",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3c40a542ab85311d939cf688f503ba6e08a32a79b88641b3f801c485d318aa74",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1548",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "950e84c9cabd03a90f05501cf568c84da9b0037b282709b4872322826a22eda1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1549",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3955017443988efbbc2a23a52fe34ff18ac0becd62bc29ba09648d047d5255c0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1550",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "77354c46a367688d92c0a6d3155fcf7e5e95e8ed3dc4a470e7cf6e7558cf7b1b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1551",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "283d1dab16dd019990287faae4cf58244ef6b8af379dee72d4a7fd66a9c92ca2",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1552",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2228f69c6acd90f05f497e6929e978f8fb298c1105f1a817cc66c664e0d8bbd7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1553",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "383e7ceab7c72666e20e684667780a4e10e5c3a3204395853231f5a55c9ac1bf",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1554",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "162a78d664c20aeab642840171687ffc9838315340f68544c5c862a60d0ea530",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1555",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d7a12c586dc0c7510c10b2f88fc87be9d91ae4b1041a7950043e9ca8bdfe1c80",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1556",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "27ce4307857b2dd5a0ce362de658158d07caa8e1d09e8d8d608e8aa4702ff17f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1557",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "403067e928eb1057f7e43bb8363ee08fd2952002404536206dc30e38ed52c5e6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1558",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9537740079c94695453156fa15f74e5347b4a08f358f6a32406fe9aa152d4c0b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1559",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9ce661005b4967b559c391f449cb4923736e0b0f6972fc0307c2aec02c3a696b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1560",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "22cf5486bc2dad1825993a717db35cb1a4d431f7680bc0b74a70aa7c366f77d8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1561",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5395743c6af590eff74b42bdf1f456c62c084bf88a3cf75c0c1523dbc129edc0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1562",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f8c8be6d5665c97bff3a7ed5f16638a3ba0d8aafd976079d9a05dd8f32d2f6be",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1563",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5e63858d34202a755b79e406aa0f69a68a210d61622f9d5dcb81ed5078e9c9b9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1564",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cda5695fdfd8ce29069eee313ed1bc9c348c025b359b8e6dbce3f740c03ef996",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1565",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f38d5514726996a0122799a2902102570b73b4d2891ede56cbf46664c0e87122",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1566",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f9606378ceef0f5084dafbf587d1e83aba2eae15c385ab4daf37762f93eba62e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1567",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9d06f6dd3260e4da1e45c96ace45d678915031defe636ab3c5490bedb7738a6c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1568",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3cd8df0cd1f86a01a40a43bdbbd39a0f51f930f44faa652af8d7877f0b307171",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1569",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "36220af65a6b16d241e8c693a813a24100a82cf65ce7b6c628741fc449194deb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1570",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "94589cc0d33c88a9c68322da3180e9871578c2ff62be5afe64116d9034856bda",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1571",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3b85af1543f17f5bae75822a51b7adc9b6f97a91e40a687d498751bb09859f9e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1572",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aca27a54f2fc5173e714ab400c9e6a785c4b4dd71a6789bc04e3ef99e59a324d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1573",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "920cd03c569533125cf9f7ebf76afb24c8b5beb3603d10aa3ee0ae04f2045fe8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1574",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cc310957573a41199eaf2ccf9c860d118d35df856470c830d8a1af8ac937b052",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1575",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d3a0ac9587e03094ca7aa6a0643bf7cc46a8085e3c979fd64e25a0c09868f633",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1576",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "50a82f70c7629f24a456f04ef3285db611502c17177f17686887568322df0d3f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1577",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "db7200c8a08314f4dad846ce7b7b5ac8de3c6dbf9cb76a47a26e9a6499ac933a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1578",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "31e28e7485793d78514ab170727d10715a247557175e07bd2d96585bc0ad08e9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1579",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4c5d9b4b76195af84c6821967d5723052517a2a6e8bd7b283a359c0079bc6bb7",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1580",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2d898bdf2e44d5271123dfa1ed55bced1dae70218c1a58baf04b54d7ae60925b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1581",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "5bb53f5b284e5f8f03d051bd44e34e7b3875f22c4fb0688f50b1c2f8c98dad8a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1582",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "528133240ca1e4c5412a4969424e36a16a86d9fce18b642a68136b7a369e7eef",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1583",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cbcd6296a058d3a81607347a4b286a595b1e18bbd4e8b5dcfce708e4e7b4491e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1584",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "28e41553eb3006823d714a9f1fc0be194122474903860ea7c5f4acfe21a5a13a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1585",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f525c8002e6a961a3f6d438c743d257cbe1986ce23728b2bdc86f2b0c56b587f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1586",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a326c5c3c6c9d8240c1bd3ce60a080665981cfe87280ea6db9430d2b94ad469d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1587",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "129106bf420890679f05873d63412bd154b8ccf992162e167bb1aeabe30b1956",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1588",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6ace7a68be93ac9b99b93943fa28d617a88cd0f51a99e392a54548f113d9380b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "92f682734f30d63cbc21216d620c1728e939b48e609c7bb17cc0c7a120b0ffa5"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1589",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "3bb03a6fd963f798dbcc34dd59a97295c0c237259ae99a53abfd7621cee3ab19",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1590",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "16d71eaae05ff308abf7ef11812f3c87bfa9daefef3f4e54fdb01c627dcac290",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1591",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "0f66599865d5dfc359da0b4d76ace053e0f56bb8ced63cf2d13e8bb9962630eb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1592",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "2aa671b0548a121c25a723544398428255345d804c43972a00947bcec0fc5ca5",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1593",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6c84a2d99a6dd7e2fae989803efaa63a786d86cb898b27d34c8d3c872494d0b1",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1594",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4bbef496baea3a00e9f8cd8d95f303cc62e16a68253b66e5e593253a00dbad22",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1595",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "d2700a69b4c419009f6155289759d3e04d074d97f076a88c2c67199d087a81da",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1596",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8c8d9cb8b77eff8e466a2e04f968c4ccc3eaec53d9aef8c7681704282b611dbb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1597",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "54381f02b5805bfae0af137a0cf10136c9ea59288d311e966586c84b88259cbd",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1598",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1a5563cd9222b7ed185323e644bdc838bd88372883424dcea69ad8393eef92f8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1599",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bd4bd942c6196d9d4a557bd6b10d902af54babc8c518f381cd6c1618657a293e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1600",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fdc73283d96270f435b1d72b67b328a015c11250a2900a653a7ad373f177c8b0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1601",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "70e189a439c82ca3ee85b8492a1fd830b5c475762c2d8ddf93441eb8fd663f6d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1602",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "14e3c846c90690cf2810c7c3ff90da02c475888287b0200631b9340a1c7e7cdf",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1603",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "676bd92ccf09e48ca4f4a01038a55be285176d104d456e49e5df38720d839e9c",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1604",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cb36052c10b77aa7e14537015f08f3678b3e071920f43c25527af75a6fd84f43",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1605",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8e827dc826fafd43b4247747e9ca414576b911422d596ad7ddc50596bfe5efe0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1606",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a0f727f391a2c6dcf67ae21f7e15088420534b7e5964643e780d58d1c9540b48",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1607",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "812d5235d6420ea13e6f2fc98f06b294fad7727bc74e58b21c1d03d93cefd618",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1608",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9e3cc2e7d9ac2200e75205341addd3faaf8d1e7472067d6b38b270ce94d900e9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1609",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "df446c5d61b98ace9f7fefa9404d2f7188de5a657589b6182958f9288fc7f6ba",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1610",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "87a5e1da51f32b54c3f2999924cbba28be07832f455cd005def11867f724aa35",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1611",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f73a80ed0c8dc95d88a8274fd4a2e0a1ea0eba9355d11a3e40cb1ce450d7b1b0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1612",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "4849073d521069490c3d236e08348126dd61a15badb26964e1aec777c1f52a46",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1613",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "089ec0206ecd6a4128d4464d89f4d0764dd69157915e5fb64f77532c07ceb502",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1614",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "484505136bed2abf90dd1d637b4b3672a829d5c53a5eed10538d10af4f6a5a0a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1615",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cc30f9b7fbe4c85dc563350d524086874654e4e5315c1f2a7da9e0c37713b64b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1616",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "fe408723998dac2c04c56727122103b35081f913055c25f8bf4a752bfeb78276",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1617",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7e96b465df9c090b9fd634967b9f7ea0f7b5f99e15da2db0d6dc00fddc80b988",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1618",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a39f957a8568cc4d8f194322fb93d055263944c8ed8a3535f367fb2f2c49a7fc",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1619",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "27b25f6eb9efcf34dd86436352e16968d1831c3d8f6ab86f541d6545ac289f18",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1620",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b03287c852b91b67f0d4d16ed766cb4191e7c2d84268a9235dc15f66e4553f7a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1621",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "05a0b24b5d291bcb7b818404e851b561c42bb85bd81b7de1df70f132d3e5f0de",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1622",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ad7b1a641a5dd2de1d4d24f4701678f91a838d8695f18de75522c3dc977519cb",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1623",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ac21a7ec903045d4f3467f235a82ebd20e8ad8fe3af4480dbe94952227fecca6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1624",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "1472695435ceda3e1744524539cdfceb1421d6e9c33865174b445cb2157ff072",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1625",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c80e09556a796c07cc01682fdf272426e15e1a8b59b412659e5a10f350e451ee",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1626",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "307d9f6e491a0cd07fda3260028b8950bb7cd64deeb7f15236a950938c35d28a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1627",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6a62e6cfb37f3a5ccfc92c1678e0e419647f59694c4d270a53a5f3dbc688802d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1628",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7706330b8c74b04c2245f51f5735eae3be74ff1052b0f39f296b015751853c9a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1629",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8e5899f68dea986230febdc0f84eb13da4098cd67f80f30cf5100ecd736ac109",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1630",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "aa951f5095de75a09b722e1a12680c7cda0cc2fb4890118f7ee77a3453425a95",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1631",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "9a3b0500279ff943025cad2c657286edf7bcd3e324603bc21e0845104b56d421",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1632",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "7bed872befca4393dc2e91478aaeab9f2cbcfbd251dfb09f10542f66c21b227d",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1633",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "77a5f079167ef7d3683b90d0696c19fc25cb13a074223da43f5fb223726c1940",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1634",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b098b8bbcc5c41bb6ad00aa5bbe275a8df417c4554af49609f185ad52831fcda",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1635",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "624282724738de91775c70c9608bba13d9ee4e1f1c4183de95f60f14cca94767",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1636",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "428e95b5e89d014da8337626c54e7f7903d0542dd7f5bc98e58190c05b9129a0",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1637",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b93e14490073745cada8e03a8cf4a5f6a699a3c374112b4f02d686eacfc332b9",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1638",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c32f2ba96e0de291dd1320831c8fa354dda240f7522183f733bf6398d2f3091a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1639",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b3411cc40baf874e2c270584c9347ee79858ac13721d3eec048631a35d375397",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1640",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "a9f33ce584adbf3cc1470e2fecc10cb6070359a44d5c6ed51f5c318d791ca27e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1641",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c51fadfb750af493bd3801b43ffd64a9147ea2aa692f1a23627b62794cc0a23f",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1642",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e17c2aed99269379c871ce50f0e142c8cb2f6640c899182bc6b5011257361707",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1643",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "376e21e6ce93b08f5e92b423beafe8bc887c02893fe7847c648aa29ad38764ac",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1644",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c514d5b5c0d368e30628aa00e777a8ea5440be30953307ff40fe12d8887cb82e",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1645",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c6a9a9e4d14f32e79f6d009e90729409678fc464c0be88d56c2a23d46e227c21",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1646",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "98d6162b7601d125096df4a922d994dd1452f66493c6207a55d8e57aa20fbc85",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "koeln-bplan:1647",
+      "cityId": "koeln",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8bfdad47fc966f160a5ec6f24dfdcf84204a2ae2405783368f4eabcc47588ec8",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "61bfbf4b09f6800e996daea0d78c60ab40c4062c681afd53cae0fc4d66a4a24f"
+        ],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

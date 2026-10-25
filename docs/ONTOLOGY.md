@@ -34,7 +34,7 @@ Operation includes a durable sponsor reservation ledger: account rolling/global 
 | 3. Custody | Who may move a deposit? | Escrow, Operation, Claim, Settlement, Payout, CollateralDeposit |
 | 4. Earnings | What does it earn? | YieldSource, Earnings, Release |
 | 5. Ownership | What do I own, owe and earn? | Asset, Position, TestFunds, BorrowAgainstShares, Venue, Distribution, Adapter |
-| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence |
+| 6. Civic system | What was proposed, done or measured in this same place? | Organization, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment, DocumentDisposition |
 | 7. Vision | What could follow, subject to verification? | ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline |
 
 Financial custody still depends on identity, home and signed operations. The civic lens reuses the city Context and CitySignal rather than introducing a separate atlas or portfolio.
@@ -45,7 +45,15 @@ Financial custody still depends on identity, home and signed operations. The civ
 
 Grounding uses full published source records with their original unknowns, status and locators. Only valid recorded dates qualify as dated evidence. Relevance ignores engine-generated field labels; source type preference follows substantive matching. The bounded prompt retains complete included facts/caveats and the actual question, or declines explicitly; it does not turn a context-size failure into a false claim of missing evidence.
 
+**Auto-verified core sources.** The Straussee record is a `measurement`, not a place: **14 September 2026, 1.61 m below Normalstau**, from a document dated **5 October 2026**, with no claim about today's level. The **2025 / 2026 planned investment outlays** are **17,941,270 / 12,609,320 EUR**, from the budget ordinance dated **7 November 2024**, not actual expenditure. `reviewState` stays `auto_checked`. **Auto-verified** is a separate status for named deterministic checks and actual DeepEval faithfulness evidence (threshold0.8, configured model), not human review or independent truth certification; each claim has one primary source.
+
+The hosted reader binds the core bundle, full/compact corpus and source/assertion/evaluation hashes to their committed release manifest before projecting public verification metadata. Missing/mismatched evidence stays explicitly unverified and cannot ground City AI. The immutable image is the manifest trust boundary, not a signed municipal certificate. Relevant admitted core records outrank candidates; source DTOs and UI preserve document date, measurement date/budget year and automated-evidence caveats.
+
+If a question names admitted budget years, every such year must remain in its grounding packet. Redundant metadata can be compacted, but not the facts/caveats; an oversized complete year set is declined rather than presenting omitted data as unavailable.
+
 **Public loyalty places.** Enabling the optional map layer reads the separate Stadtstack loyalty service's public merchant feed in the browser. Only validated, city-matching published records create **Sepolia test** pins with their evidence links. A successful empty feed invites shop owners to the service; failed/invalid reads create no pins and remain failures. No Ledger identity, wallet, city choice or personal balance is sent, and the separate service's membership/rewards never become a Ledger Position.
+
+An optional literal `test: true` marks an owner-published operator test entry, not a real business. Its muted dashed **T** pin, accessible name, list row and selected detail say **Test entry · not a real business**, alongside **Sepolia test**. Test entries remain explorable but contribute zero to the real-shop count; a test-only city still offers the no-real-shops owner handoff. `false`, `null`, strings and unknown fields fail validation rather than silently becoming ordinary participation.
 
 ## Concept map
 
@@ -121,6 +129,19 @@ IDs are requested. Browser data loss removes local follows and history.
 
 **One place, three lenses.** Places keeps one Project/CitySignal identity across Map, Outcomes and Connections. MapLibre draws only published geometry; a plan polygon is not a built footprint or affected area. An **Organization** may receive **Funding**, perform an **Activity** and produce an **Output**; an **Outcome** needs an **Indicator** with baseline, follow-up and attribution. Each project's `outputs[]` separately records basis, source URL, locator and date (`null` if unknown), so Kulturpark's reported phase-one facilities do not become its planned phase-two opening. Its own evidence record names the missing benefit indicator, not an inferred failure or zero. Adopting a plan, scheduling an opening, MWp capacity or planned annual outlays do not establish quality-of-life gains, energy generation or tax revenue. Source review and geometry precision remain inspectable.
 
+**Structured energy units are not financial Assets.** The R2 MaStR mapping is a
+prototype pending source admission, not a new live feed. A native SEE electricity
+unit fits an **Output** observation: the narrow solar/wind scope retains unit
+identity, status, commissioning and rated kWp/kW, never measured yield or municipal
+ownership. **Organization** and **RelationEvidence** already fit a publicly
+disclosed organization-only operator field plus explicit MaStR ABR registry
+identity. The resulting `operates` edge is source-attributed with unknown effective
+validity, not confirmed-current operation or independently verified legal-entity
+equivalence. Name-only, ID-only, redacted and natural-person rows create no edge
+and expose no private operator identifier/contact fields. GENESIS building/dwelling
+stock remains reference-day statistical context, not a project completion or
+measured impact. No additional ontology concept or financial role is introduced.
+
 **Measured observation is not a proven benefit.** The historical Münster 2021 bus-priority trial
 links sourced municipal steering, traffic-rule coordination, 500 m of reported bus-lane work,
 Stadtwerke GPS samples and LK Argus evaluation. Whole-route north/east-bound mean bus running
@@ -135,6 +156,104 @@ benefit indicators. Places opens the exact Münster case without altering chosen
 everyone can find the clearly dated historical example there.
 
 **Relation evidence.** Solid means evidence-backed observation/report with its original status; proposed links identify a plan and do not inherit delivered status. Dashed means a modeled causal assumption in a fictional **Scenario**. Its allocation conserves capital as wages + local suppliers + external purchases + reserve; wages divided by assumed cost per job-year yields job-years, not permanent hires. Municipal receipts, transfers and service costs are editable *independent* assumptions; no investment→tax conversion, permanent employment, municipal retention of all tax, housing growth or causal improvement is inferred. Switching to observed hides this loop. Neither simulation nor public signals enter the personal Position/net-worth model.
+
+**Civic assessment (source projection v2).** A governed private item separates actual
+source propositions from deterministically authenticated bookkeeping and explicit
+unset qualifications. A generated `source_document:<hash>`, scoped entity ID or
+record hash is not a municipal statement requiring a quotation. The complete
+private record and its hash remain lossless, but earlier model judgments stay
+outside blind A/B requests. Null dates, empty statuses, `unknown` stages and
+`precision:none` on unlocated geometry remain explicitly unset, not false source
+assertions, observations of zero, or grounds for inventing dates. Printed identifiers, positive case/type classifications,
+actual dates/statuses, entities and relations still require source evidence;
+unresolved classifications remain held. `caseQuote` grounds printed case
+identifiers/classifications, `stageQuote` grounds original status and stage, and
+date-role quotations remain distinct.
+Relation subject/object direction and modality remain source-assessed roles, with
+explicit endpoint labels. Local mention labels are context, not literal source
+quotations; only mechanical global IDs/identity derivations are graph bindings.
+The checker requires the matching typed subject/object/modality assertion even
+for noncritical relations, never just the names' co-occurrence.
+The frozen assessment wire uses a coarser modality vocabulary, explicitly encoded
+per relation: asserted/decided/implemented → `confirmed`, planned/proposed →
+`planned`; conditional, negated and historical retain their names. These are
+serialization categories: the original source modality remains unchanged and
+assessed, `confirmed` is not independent verification, and encoding cannot
+promote a proposed relation's graph/comparison eligibility.
+
+Blind A/B choose their shared provider representation **before inference** by
+canonical UTF-8 byte count: full source-proposition provider v2 at or below
+22,000 bytes; otherwise lossless compact provider v3 if it fits; otherwise an
+explicit pre-call context hold. This changes serialization, not the proposition
+set, quotation windows, source roles or eligibility. C inherits the recorded
+encoding and exact blind request hash, adding genuine reviews under its separate
+36,000-byte cap. New receipts bind `providerEncodingVersion` and request SHA-256;
+immutable older receipts without that field dispatch by their recorded request
+hash, never by today's default. Historical bytes are not rewritten or reusable
+as approval of a changed item/contract.
+
+**Known output-form limitation:** the authorized six-arm Sonnet comparison on
+17 October 2026 observed leading prose/non-JSON material before the object in all
+three compact-v3 outputs; the three full-v2 outputs decoded, including two
+supported judgments and one insufficient-evidence abstention. This small
+diagnostic is not a universal failure-rate estimate. Compact-only items remain
+at risk of an honest output-quality hold. No embedded-object salvage, decoder
+relaxation, output-dependent encoding switch, provider retry or model fallback
+is authorized by the hybrid selector.
+
+The B control explicitly requires silent compact-reference resolution and a
+single JSON object with no surrounding analysis, prose or fence. This is an
+output-encoding instruction, not a guarantee of model compliance or permission
+to salvage embedded JSON. A/C likewise encode the unchanged checker rules:
+full-day dates only (partial precision remains quoted with a null date), paired
+value/unit nullability without invented units, explicit null for absent review
+targets, zero usefulness for non-supported outcomes, and the exact frozen
+top-level keys. Neither these instructions nor historical role-specific prompt
+hash dispatch changes a source-bound verdict, rubric or deterministic check.
+
+Non-quantitative text propositions use assertion `value:null` and `unit:null`;
+their proposed wording is the claim payload, not a measurement. Typed critical
+quantities retain genuine source-attested value/unit and financial-role checks.
+Supported admission covers every real proposition, including those on a critical
+record, plus its critical claims. Changed items require fresh A/B/C receipts,
+without resetting lifetime call caps; historical v1 items/receipts remain history,
+not transferable approval of v2. Value-test answers assess their actual answers
+and cited evidence, never every metadata/null field in an MCP response.
+Read-only seal/export reconstruction rebuilds the exact persisted v1 or v2
+target and requires canonical equality plus committed preparation ancestry.
+New preparation cannot request the historical encoding.
+
+**Source document disposition (R1 step 8).** Within one municipality/sourceId/sourceSha256
+scope, byte-identical campaign documents use the smallest `documentId` as the canonical
+record carrier. Each other member receives a terminal `duplicate_source_content`
+disposition pinned to that canonical document and its own extraction receipt/output.
+These members remain accounted for but are never admitted or merged; the disposition
+does not claim that they are the same legal instrument or case. In the recorded
+coverage snapshot, 208 documents formed 207 byte-identity groups. This is
+implementation/prototype tooling, not a published release assertion.
+
+Pre-processing **import rejections** are a separate `DocumentDisposition` variant,
+not native terminal exceptions or residual `StepReceipt`s. A pinned, issued owner
+decision binds the selected seal and frozen corpus/document/original byte identity
+to the exact registry, historical import manifest and import result. Both step-8
+execute and audit recompute the importer rule from authenticated inputs. The
+permanent-only decision permits `unsupported_mime` and `scope_mismatch`; the
+alternative additionally permits `source_policy_stale` only on the owner's explicit
+decision to dispose without processing, where registered discovery cannot be
+authenticated and the ordinary policy proof has expired. Drafts have empty
+`issuedAt` and authorize nothing. Processing the 22 policy-held originals instead
+remains possible: they then require native results/terminal exceptions, not import
+dispositions. Results, native terminal exceptions and import rejections must cover
+all 208 frozen documents exactly once. Import rejections admit no records and make
+no processing claim.
+
+This implements the frozen rebuild plan's original-evidence and typed-role intent
+([§4.1](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#41-freeze-an-honest-evaluation-set)
+and [§6](../stadtstack-data/docs/CIVIC_PIPELINE_REBUILD.md#6-phases-effort-and-acceptance-gates)), not a relaxed output schema, score target or majority override.
+AI reconciliation remains provisional; owner exceptions/rights and sampled audit
+are separate. The v2 artifacts are implementation/prototype work, not evidence of
+a deployed or independently validated release.
+
 
 ## Money flow of one tenancy
 

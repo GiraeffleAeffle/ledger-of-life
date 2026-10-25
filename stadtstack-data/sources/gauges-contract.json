@@ -1,0 +1,63 @@
+{
+  "contractVersion": "gauges-native-v1",
+  "family": 11,
+  "module": "src/adapters/gauges.ts",
+  "exports": ["gaugesAdapter", "createGaugesAdapter", "stateGaugesAdapter", "stateGaugeSources", "GAUGES_MAPPING_VERSION"],
+  "scopeAgs": ["12064472", "12064227", "12064428", "01053100", "01053090", "01053116", "13076090", "13076108", "13076060"],
+  "collectionAuthorized": false,
+  "networkInsideAdapter": false,
+  "capabilities": [
+    {
+      "sourceId": "pegelonline",
+      "entrypoint": "https://m.pegelonline.wsv.de/webservices/rest-api/v2/stations.json",
+      "documentation": "https://m.pegelonline.wsv.de/webservice/dokuRestapi",
+      "rightsEvidence": "https://m.pegelonline.wsv.de/gast/nutzungsbedingungen",
+      "catalogLicence": "dl-de/zero-2-0",
+      "observed": ["Catalog reports explicit licence and inspected API documentation", "API documentation inspected during implementation: native station UUID/number/water and timeseries unit/equidistance/gaugeZero/currentMeasurement", "API documentation distinguishes timestamp offsets, raw measurements, forecasts and terminology values"],
+      "implemented": ["Original JSON station object or inventory array", "Bounded local inventory cursor, not undocumented remote API pagination", "Embedded W/Q/WT current measurements", "Standalone measurements with another admitted original station JSON snapshot passed as stationSnapshot", "Original source hash, JSON paths and scalar raw values", "Gauge zero value/unit/validFrom, source comments and raw classification states"],
+      "unverified": ["No station or measurement endpoint exercised", "No pilot station inventory or spatial municipality join", "No full-history retention or historical completeness", "No live processing rights receipt", "Fixtures not executed in this worker"],
+      "coverageDisposition": "not_checked",
+      "publicationBoundary": "Input must have an exact byte-bound upstream policy receipt; this adapter is not an acquisition or rights engine",
+      "supportingEvidence": "Locators from a distinct original station metadata snapshot use supportingEvidence role source_metadata; primary evidence binds only measurement bytes. Publication must supply separate policy/CAS bindings for supplemental originals.",
+      "nativeIdentity": "Station UUID; station number preserved as string including leading zeros; series name and source timestamp identify measurement",
+      "time": "Original fully qualified JSON timestamp retained with offset; retrievedAt never becomes measurement time",
+      "datum": "Original gaugeZero value, unit and validFrom retained; no conversion to absolute elevation or guessed datum validity",
+      "retention": {"apiAvailableDays": 31, "apiDefaultDays": 10, "privateCopyPolicy": "Unresolved owner retention/opt-out controls; API availability is not private retention permission"},
+      "granularity": "Individual gauge/time/series, not project, parcel or municipality",
+      "bounds": {"snapshotBytes": 4194304, "stations": 10000, "timeseriesPerStation": 100, "measurementRows": 100000, "discoveryPageMax": 500},
+      "schemaDriftDisposition": "held_quality; never empty or withdrawal"
+    },
+    {
+      "sourceId": "state-gauges-bb",
+      "entrypoint": "https://pegelportal.brandenburg.de/flussgebiet.php?fgid=5&thema=karte",
+      "format": "html",
+      "catalogObserved": "Kienitz/Oder station pkz=603050; Güstebieser Loose and Wriezen OP; mixed state and WSV data",
+      "implemented": "Bounded same-host pkz station-link candidate discovery only",
+      "coverageDisposition": "held_origin",
+      "unverified": ["Distribution-specific rights", "Numeric table schema and datum mapping", "Pilot station spatial join", "Live endpoint behavior"],
+      "licence": "unknown; federal licence must not be inherited"
+    },
+    {
+      "sourceId": "state-gauges-sh",
+      "entrypoint": "https://hsi-sh.de/pegelliste.html",
+      "format": "html",
+      "catalogObserved": "Geesthacht and local catchment gauges; page refresh 15 minutes, measurement cadence differs",
+      "implemented": "Bounded same-host numeric HTML-link candidates only; candidate grammar unverified",
+      "coverageDisposition": "held_origin",
+      "unverified": ["Distribution-specific rights", "Station-link grammar and numeric table schema", "Pilot station spatial join", "Live endpoint behavior"],
+      "licence": "unknown; federal licence must not be inherited"
+    },
+    {
+      "sourceId": "state-gauges-mv",
+      "entrypoint": "https://pegelportal-mv.de/59870.1.html",
+      "format": "html",
+      "catalogObserved": "Hagenow/Schmaar 59870.1; PNP 22.5m NHN; unverified raw values; no complete Ludwigslust/Parchim inventory",
+      "implemented": "Bounded same-host numeric HTML-link candidate discovery preserving decimal station ID",
+      "coverageDisposition": "held_origin",
+      "unverified": ["Distribution-specific rights", "Numeric table schema and original datum evidence for processing", "Complete pilot station inventory", "Live endpoint behavior"],
+      "licence": "unknown; federal licence must not be inherited"
+    }
+  ],
+  "fixtures": {"path": "test/gauges-adapter.test.ts", "basis": "Hand-authored source-native JSON and HTML shapes; not collected snapshots or claims about pilot gauges", "cases": ["positive", "empty", "local paginated discovery", "schema change", "disappearance is not withdrawal", "blocked access body", "state rights hold", "missing original unit/datum metadata", "scope exclusion", "byte binding mismatch"], "execution": "not run"},
+  "limitations": ["All nine pilots remain not_checked for actual gauge coverage", "No AGS inferred from adapter scope, name or proximity", "State HTML emits no numeric observations while rights are unresolved", "Raw water-level classifications are not certified measurement quality", "No project flood-risk claim or measured project impact", "No fabricated normalized inputs, paid APIs or network requests"]
+}

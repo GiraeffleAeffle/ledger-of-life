@@ -1,0 +1,256 @@
+{
+  "schemaVersion": "stadtstack-r1-import-disposition-decision-v1",
+  "id": "r1-import-dispositions-owner-stale-2026-10-19",
+  "issuedBy": "owner",
+  "issuedAt": "",
+  "expiresAt": "2026-10-25T21:59:59Z",
+  "nativeSealSelection": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-window17/selection/native-seal-selection-23b6c2502593b3a8e1fd2c783dabcf79705645abf862572ecbd2712cd8ea9a1d.json",
+    "sha256": "23b6c2502593b3a8e1fd2c783dabcf79705645abf862572ecbd2712cd8ea9a1d"
+  },
+  "catalogue": {
+    "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/catalogue.json",
+    "sha256": "63e180b1601ffc9f23e1e52614b1b14e9167ac1ead7614b8fbe9c01089182ed3"
+  },
+  "policy": {
+    "kind": "include_expired_unregistered_discovery",
+    "enabledReasons": [
+      "unsupported_mime",
+      "scope_mismatch",
+      "source_policy_stale"
+    ],
+    "ownerDecision": "dispose_without_processing"
+  },
+  "sources": [
+    {
+      "municipalityId": "hoppegarten",
+      "sourceId": "hoppegarten-participation",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-hoppegarten-participation-index/index.json",
+        "sha256": "4b761bd2e751024c9391842b6d17d13272ee6f364ea817c5926cbd22e01e199c"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/hoppegarten-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-3537fdef15b2da714741f5205d7da1b5badb626a9013704e6b6e1b68ed383e4e/seal-result.json",
+        "sha256": "426941fe914edd22efb72eda8c172f9d48c882fcd45644764c82c5bc7f3e8cf9"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/hoppegarten-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-3537fdef15b2da714741f5205d7da1b5badb626a9013704e6b6e1b68ed383e4e/import-crawl-corpus.json",
+        "sha256": "4205d18ccac824867b3f81b5db4c905a97acaad95cc779e5691d471fb37ae234"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/hoppegarten-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-3537fdef15b2da714741f5205d7da1b5badb626a9013704e6b6e1b68ed383e4e/import-result.json",
+        "sha256": "b271907b640e985d66e2a17581241d8ee891fd17d0fbee4ab86e082f4c17c2b9"
+      },
+      "documents": [
+        {
+          "documentId": "document-61b200ad7041df49a46e8627",
+          "sourceSha256": "60fb4fbe682120da9fe0cab362df5d8435dd8a5970dad17b8932ca66043131b1",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-68dbe6840a563acc5e38bd1b",
+          "sourceSha256": "9c083d018f6d9534023d75847bda40974d3b61e4cc7b921ef79c771da71b7c9a",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-fb12cf3d764d2cbd3d93e878",
+          "sourceSha256": "beebf4c76bc3ac837a70818749e979a4049fcd11f00a5b1e3e92e6cab5937d2f",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-33138617a001ae65a340c84b",
+          "sourceSha256": "badbec7cc5e2cca04885bce7d36cbc40ea57895691f07ed4c861b0fb768eda4a",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-fad61a55d81afaec21efd117",
+          "sourceSha256": "379789ae83bfdf1e8367caf4de4ac835af53839538a3eb81714d479693f9dfd2",
+          "reasonCode": "source_policy_stale"
+        }
+      ]
+    },
+    {
+      "municipalityId": "ruedersdorf-bei-berlin",
+      "sourceId": "ruedersdorf-bei-berlin-participation",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-ruedersdorf-bei-berlin-participation-index/index.json",
+        "sha256": "7623108b5742f819f44eff891e3a68be2098fccea581fb668a82e8e20e612b0b"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/seal-result.json",
+        "sha256": "7e8a78a26180cefe42c8506e0d77fe38aa9d106a164ba45ef676eb74f3aae8a5"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-crawl-corpus.json",
+        "sha256": "22f8668ec813b8812fd260a78e933d251ad98ddf5784194431236334e693e7eb"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-participation/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-result.json",
+        "sha256": "e8e0a312e26d029e823083f6858068e1ebc104d933830e229f89e3bddef6e827"
+      },
+      "documents": [
+        {
+          "documentId": "document-2f1c29006c467033dea62553",
+          "sourceSha256": "51ce690a4c5bb0638cffbc5cccda17b3cf44e2650290c4b6d9d9d3566cc87fbe",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-146bb2b4515c2c8dd8cba309",
+          "sourceSha256": "4b7147d7cdb9819aef165bd17f1f15b7c67f5f5a9895c2a0d67fac334c79f112",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-204f7776193b1b905332d461",
+          "sourceSha256": "530de2b364471eb094af3aad386148a2e902bff684eca49535c1c8c7b483db89",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-ac842ddeb4854cb8db61512b",
+          "sourceSha256": "068dc9c768201a69a49197993afb47bddd472e0e3bdb5e2a534825076d628067",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-07be16612d8cad1e9d7002a6",
+          "sourceSha256": "209be4c5e9ec847ac9d71b92a694026f457368c707f72b40d0a68d679ba77e3a",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-718b2d6073569dc21ba3b4e7",
+          "sourceSha256": "fad9c5f1125b7bf9bcf177de04827f59cdd5036620fdcb7c9044caa9c5833c4f",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-668a6689ba62c65a214862f2",
+          "sourceSha256": "f78d377d2512466f9da4fbfb6b0695be132a4ba44095baa8500afd2b0b43cb1c",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-9a71fcc1adcc72d7cd741ce4",
+          "sourceSha256": "883f7309af5471b767b5c657547e0f71f93f6ac849a406750f479febfe4d0f7e",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-f5ff89cfbc299f19a696437e",
+          "sourceSha256": "2bb3c59ce764c6d3f985e216902034818abb855f5711b8f5a831905ad37f23fe",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-1f11b1324f6f9188203fe63a",
+          "sourceSha256": "968be4d6213642412aeb207a00936abc5fad1d775446bf7f29116348978bbb67",
+          "reasonCode": "source_policy_stale"
+        }
+      ]
+    },
+    {
+      "municipalityId": "ruedersdorf-bei-berlin",
+      "sourceId": "ruedersdorf-bei-berlin-website",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-ruedersdorf-bei-berlin-website-index/index.json",
+        "sha256": "0a583778e40528aefe105ff545697f7d8d90e84d8c5911cab72755eb61383173"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/seal-result.json",
+        "sha256": "007874b3fc20a1d9ea41c4b59aa45ebdc9a6556cc113b9c8b121bf6700250fbc"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-crawl-corpus.json",
+        "sha256": "88a56fe4f019b0c292f39e345b820af7ffbd3867ed6d44c8c9d534abd0cac4c9"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/ruedersdorf-bei-berlin-website/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/import-result.json",
+        "sha256": "2d93961be3701542a1cfce320e4a61ef7f4a522bc6cf5bd136b9c7e944d96b42"
+      },
+      "documents": [
+        {
+          "documentId": "document-2dec1b7b4e81cb2502e1f2cf",
+          "sourceSha256": "42ab932642c25e2cdd491a88cf7fe3907437c06f2ae94cca45a085221075f0bd",
+          "reasonCode": "scope_mismatch"
+        }
+      ]
+    },
+    {
+      "municipalityId": "schwarzenbek",
+      "sourceId": "schwarzenbek-gazette",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-schwarzenbek-gazette-index/index.json",
+        "sha256": "5217c2ce7d79e660bff39e1651d140846aa6846cb61eb76397de68f24e07c475"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/schwarzenbek-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/seal-result.json",
+        "sha256": "463534ea0e611132d285ceb20968cc272be122714204849c5951e5d0558fd7d6"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/schwarzenbek-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/import-crawl-corpus.json",
+        "sha256": "cffa8edd21b84f40e8ed5790647a3d7e481b70ca59d001d0b2f1d37fa407f6b1"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/schwarzenbek-gazette/generations/478b3e39004cf0bb45219595aafef65f7bddadd7/import-result.json",
+        "sha256": "ace25abc6fe0fe58d15819777d7130b7419a3a1427bf3e202e0e08f3180aaf62"
+      },
+      "documents": [
+        {
+          "documentId": "document-0f43ad63143d21a2ecd5c419",
+          "sourceSha256": "90008f32c685c21b2c6caa03897d513a8cad23f9d59b87e32779aaab3014f5e9",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-3006421d325bd3d6ba1709fb",
+          "sourceSha256": "f02b0c4354be70ef716157aa495e850785a6bd2bafe0a80b96d806f2051e7ccb",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-5e599c9104fad3b78b6f99f5",
+          "sourceSha256": "c83baff187b6d377f8082c1ffba9e31961d1c2dac11aee8849073620b7542847",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-1866d3e936d7cbe61e3eec63",
+          "sourceSha256": "de35d89563a9806aca2c423b77092fb1dc6a77833b840c3d4e813ee286f774e7",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-29d7c6e4b912c726c0e7b825",
+          "sourceSha256": "75656726f334d013d19a4d2cd4c2308cfb33b5218ac48a168d0c9996cb1733e4",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-0dd58dcf17c96422e22360c2",
+          "sourceSha256": "d65083c1de6e978fe34b9cd85f1528014d576573aefc41fbb98a423895fd2bb6",
+          "reasonCode": "source_policy_stale"
+        },
+        {
+          "documentId": "document-07211c56946a6c31a4a5ef3e",
+          "sourceSha256": "95acaf93400e88c78b870482ae7693cdf0b4cc081b212e3925d77c5b3c24ef89",
+          "reasonCode": "source_policy_stale"
+        }
+      ]
+    },
+    {
+      "municipalityId": "strausberg",
+      "sourceId": "strausberg-planning",
+      "corpus": {
+        "path": "/home/max/civic-rebuild-r1/stadtstack-data/cache/districts/r1-nine-town-2026-10-13-strausberg-planning-index/index.json",
+        "sha256": "59dd581ab2fc27bada2c039d505e3763b7fa9125af65100f3464c272dde377c4"
+      },
+      "sealResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/seal-result.json",
+        "sha256": "0abb7d7113cb1d86159789fed1247f33aad3f2f744914113e833c50b1c1eccc3"
+      },
+      "manifest": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/import-crawl-corpus.json",
+        "sha256": "70b849529a0658b3c0d7f886d3f2fc9abab5d51e8a123486295f22f262916209"
+      },
+      "importResult": {
+        "path": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/nine-town-2026-10-13/full/runs/strausberg-planning/generations/aceb0a658c48f2e683e79316f4ddd2d13689b36e/continuations/reconcile-17fdcaa3ea859129812c5e346afce601a8e905d0d355cbb4c9ef7b278eca332e/import-result.json",
+        "sha256": "15ccaa82620558a5401158bae2a104e028d7c3a2ba5c65810223ebe3a3f94ce2"
+      },
+      "documents": [
+        {
+          "documentId": "document-f5f3c6cdc1afb34cef583a92",
+          "sourceSha256": "b8ba1f9cf8aff593c20f28838e71549ae5de75a65aac23da30677d5358699fc1",
+          "reasonCode": "unsupported_mime"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "schemaVersion": "district-source-family-contract-v1",
+  "family": 13,
+  "adapter": "permit-notices",
+  "mappingVersion": "permit-notices-html-v1",
+  "exports": ["permitNoticesAdapter", "permitNoticesCapabilityReceipt", "PERMIT_NOTICE_SOURCES", "PERMIT_NOTICES_VERSION"],
+  "catalogEvidence": {
+    "csv": "/Users/max/Code/ledger-of-life-review/platform/civic-source-catalog.csv",
+    "csvSha256": "c19460dddf97c1e4ac2ef85d5bb34a9feff9482af2e8399d06c5b20001d05e40",
+    "catalogSha256": "03e497514c2f6903e41e70147f6bce699c7ad6c8f20088a10f59239c1601fe05",
+    "sourceIds": ["uvp-bb", "uvp-sh", "uvp-mv", "bimschg-bb", "bimschg-sh", "bimschg-mv"],
+    "planningContract": "/Users/max/Code/ledger-of-life-review/platform/CIVIC_PIPELINE_REBUILD.md#31-common-adapter-contract"
+  },
+  "sources": [
+    {
+      "sourceId": "uvp-bb",
+      "state": "BB",
+      "url": "https://www.uvp-verbund.de/freitextsuche?provider=bb",
+      "nativeFormat": "HTML search/detail, linked PDF",
+      "identity": "docuuid query parameter scoped by publisher/source; exact value retained",
+      "collectionDisposition": "held_origin",
+      "reason": "No distribution licence or exact-document official-work admission resolved; no live collection authorized."
+    },
+    {
+      "sourceId": "uvp-sh",
+      "state": "SH",
+      "url": "https://www.uvp-verbund.de/freitextsuche?provider=sh",
+      "nativeFormat": "HTML search/detail, linked PDF",
+      "identity": "docuuid query parameter scoped by publisher/source; exact value retained",
+      "collectionDisposition": "held_origin",
+      "reason": "No distribution licence or exact-document official-work admission resolved; no live collection authorized."
+    },
+    {
+      "sourceId": "uvp-mv",
+      "state": "MV",
+      "url": "https://www.uvp-verbund.de/freitextsuche?provider=mv",
+      "nativeFormat": "HTML search/detail, linked PDF",
+      "identity": "docuuid query parameter scoped by publisher/source; exact value retained",
+      "collectionDisposition": "held_origin",
+      "reason": "No distribution licence or exact-document official-work admission resolved; no live collection authorized."
+    },
+    {
+      "sourceId": "bimschg-bb",
+      "state": "BB",
+      "url": "https://lfu.brandenburg.de/lfu/de/aktuelles/oeffentliche-bekanntmachungen/immissionsschutzrecht-genehmigungsverfahren/genehmigungsverfahrensstelle-ost/",
+      "nativeFormat": "HTML authority index/notice, linked PDF/application attachments",
+      "identity": "Explicit authority plus Aktenzeichen/Geschäftszeichen, issuer-scoped compound hash; raw reference and authority remain in separately evidenced observations. Notice URL alone is source_document, not procedure identity.",
+      "collectionDisposition": "held_origin",
+      "reason": "Distribution/document rights unresolved; LfU index is not every district-issued permit."
+    },
+    {
+      "sourceId": "bimschg-sh",
+      "state": "SH",
+      "url": "https://bimschg.bob-sh.de/",
+      "nativeFormat": "HTML index/detail, linked PDF/application attachments",
+      "identity": "UUID in observed /verfahren/{UUID}/public/detail route; explicit issuer-scoped file reference fallback",
+      "observedRouteEvidence": "https://bimschg.bob-sh.de/verfahren/a6cda373-679c-4b54-9944-4135500d7c12/public/detail",
+      "collectionDisposition": "held_origin",
+      "reason": "Distribution/document rights unresolved; BOB metadata is not substantive approval evidence."
+    },
+    {
+      "sourceId": "bimschg-mv",
+      "state": "MV",
+      "url": "https://www.stalu-mv.de/wm/Service/Presse_Bekanntmachungen/",
+      "nativeFormat": "HTML authority index/notice, linked PDF/application ZIP",
+      "identity": "Explicit authority plus Aktenzeichen/Geschäftszeichen, issuer-scoped compound hash; CMS notice id alone is source_document, not procedure identity.",
+      "observedRouteEvidence": "https://www.stalu-mv.de/wm/Service/Presse_Bekanntmachungen?id=221478&processor=processor.sa.pressemitteilung",
+      "collectionDisposition": "held_origin",
+      "reason": "Distribution/document rights unresolved; catalogued Drenkow notice is an application, not a granted permit. ZIP studies have separate third-party rights."
+    }
+  ],
+  "discovery": {
+    "input": "Only a caller-admitted, hash-bound original HTML snapshot; no networking, hidden requests, API generation or JavaScript execution.",
+    "resources": "Observed hrefs only: native detail routes, authority notice links, document/download/PDF/ZIP links and same-host next-page links. Preserve meaningful query parameters, remove fragment only. Exclude login/navigation/contact/private-address targets.",
+    "cursor": "Exact absolute next URL observed in current page. Caller must acquire/admit it and supply that same URL as the cursor with the next snapshot. Conflicting next links hold quality.",
+    "attachmentParents": "Detail-page attachments point to the explicit detail native identity or document identity. Unbound index documents remain source-document resources, not invented project relations.",
+    "redirectsAndPolicy": "Shared acquisition owner must revalidate each resource and every redirect, apply host lane/opt-out policy, and admit exact bytes independently; this adapter does not create policy proofs."
+  },
+  "parsing": {
+    "nativeHtmlPatterns": ["h1 detail title", "dt/dd explicit German field labels", "two-column labelled detail tables", "thead column-labelled index rows", "native detail anchor text/href", "document anchor text/href"],
+    "selectorEvidence": "Semantic HTML patterns are implemented; complete publisher DOM snapshots were not supplied. Tests are synthetic original-format HTML, not captured real-source responses. A JS-only or changed page with no recognizable fields/links returns held_quality, not empty.",
+    "observationKinds": ["PermitProcedureMetadata", "PermitNoticeDocumentMetadata"],
+    "rawEvidence": "Each field preserves original DOM text or href, immutable CSS nth-of-type path (/@href for attributes), native record identity, source SHA-256, schema hash and mapping version. Cleaned observation text never replaces raw evidence.",
+    "schemaHash": "Mapping version plus source ID plus sorted recognized field key/label pairs; values do not define schema identity.",
+    "nativeVersion": "Admitted snapshot sourceVersion only; no date-derived revision numbers.",
+    "identity": "docuuid/BOB UUID wins. Otherwise exactly one nonempty explicit authority and file-reference value produces an issuer-scoped authority-file identity. Conflicting or missing authority/file evidence remains a source-document fallback.",
+    "dateRoles": "Publication, source reference, inspection start/end and objection deadline are separate. Only valid exact DD.MM.YYYY or YYYY-MM-DD is normalized. Relative/range/invalid dates remain raw with null normalized date. Retrieval time is never substituted. Conflicting contextual publication/reference dates remain null.",
+    "geography": "Only a single unambiguous explicit eight-digit AGS is source_explicit project-location geography. Preserve leading zeroes; scope municipality AGS and place names never establish geographic membership. External verified joins are an integration step.",
+    "financialRole": "none for every observation",
+    "legalBoundary": "Published status/type and decision-document labels are attributed metadata only. No permit-issued/authorizes/project-completion/payout claim is emitted. Actual decisions, objections, conditions and fulfillment require original residual text evidence and substantive admission gates."
+  },
+  "coverage": {
+    "nonempty": "partial: page-local metadata is not complete statewide or municipal coverage",
+    "empty": "Explicit empty-result text on a recognized admitted page only; no global absence or deletion",
+    "schemaChangeOrMissingPage": "held_quality; absence never synthesizes withdrawn status",
+    "withdrawn": "Explicit source status is preserved as a new versioned attributed observation; no historical deletion or inferred legal effect",
+    "accessChallenge": "blocked_access; no resources or observations",
+    "livePilotCoverage": "not_checked for all nine pilot towns; six source distributions remain held_origin until separate rights admission"
+  },
+  "limits": {"maxBytes": 8388608, "maxLinks": 2000, "maxLabelledRows": 1000, "encoding": "UTF-8 only; invalid input holds quality", "onExcess": "held_quality with zero rows/resources; no truncation"},
+  "fixtures": {
+    "file": "test/permit-notices-adapter.test.ts",
+    "provenance": "Synthetic bounded HTML fixtures in native markup, not publisher captures; no normalized JSON inputs or live calls.",
+    "perSource": ["positive detail", "labelled index", "explicit empty", "observed pagination", "schema change", "explicit withdrawn status", "blocked access"],
+    "crossSource": ["raw-locator roundtrip", "deterministic observations", "no finalization/payout from application/screening/decision labels", "AGS leading zero/conflict", "separate legal date roles", "invalid calendar date", "issuer-scoped file reference", "document identity fallback", "attachment rights/parent", "wrong state slice", "hash mismatch", "MIME mismatch", "byte/link/field limits", "conflicting cursors"]
+  },
+  "integration": [
+    "Register permitNoticesAdapter for exactly the six catalog source IDs; do not invent a public API.",
+    "Only dispatch policy/origin-admitted snapshots; source-level held_origin is not lifted by tests or by host officialness.",
+    "Acquire document references through the shared acquisition lane and credential-free document parser sandbox; ZIP extraction is not implemented here.",
+    "Bind authority/file-reference metadata to residual decision evidence before adding issues/authorizes/disposition/condition relations.",
+    "Verify publisher DOM distributions against admitted original snapshots before reporting operational/live coverage. No source access or rights was verified in this implementation.",
+    "Main agent should run the adapter test file, TypeScript build and repository integration checks; no tests/build/lint/formatters were run by this worker."
+  ]
+}

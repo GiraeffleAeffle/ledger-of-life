@@ -1,0 +1,483 @@
+{
+  "schemaVersion": "stadtstack-changes-v2",
+  "generatedAt": "2026-10-10T21:56:45.237Z",
+  "snapshots": [
+    {
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "previous": "95855e7f7fe69ec41d4f219e8110e17206dd15f0f097661c480936819e463bd5",
+      "current": "a8dc7f96f00acd72902c62a15f400c12a2074a92e7fbaf8e1ebec4e2ab0cd968",
+      "generatedAt": "2026-10-10T21:56:45.237Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "atlas:altstadt-plan69",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "83aac7ef1b1045314d5d902c1a0414ad2c4b9a8300351e196a71eec506462787",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "b1cfdfe18343905f4144679ef22b5e94ac9fc762df0fdd55b9d9148153677d0a",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:altstadt-quartier",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "90992497a8cfc101ba705336bc05931ea579c3c31fe3f55335f0f4d74b9a85bb",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "8cf71ba4106f96634f7230a6db3aabe981d186b240d455eda63941fc9c8f63fe",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:biotop",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8d62998d93ed03a95b05562659af98529161ed04cf7bc44171576759424fcccb",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:fischerkietz",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b963296b8da8f4e62fbbc93747836ab4b507b89633df2572a96797ea48ccfeac",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:fliessstrasse",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "8c45e46c8b5cb5549d417e304f92262ca87778863160f57f98e01a18ee21ce34",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "8d7c28eec3adef10d2f6c3278a45d0ce2808d8d28f38c7e9661de404dc6ee3db",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:garzauer-bruecke",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "8acc17f963f250babcbd5f6a7d7464e9e885e14bb14f81eda84fa6a967a97f79",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:gleise",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "cb0736d2d3a461b6fe01bfabb792a56b371c777f2d2ac9e6fd9cce9fa27f07d9",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:grosse-strasse",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "c21b494cfa10509c8283c2629ab947d4cf5c9ee4decc25ff65789e7b67309c0a",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:heger-walk",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "b0080f74f66d9f2525851d00c8785631dfcdb981b0c7310a927b609bdd6afc36",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "1a4b3579b516a0ce5a17156ed71e5db55a3f2cc6b0291de1bc9feb3c5344131b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:hubertusallee",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "f74b6b13a1d3d23c08775737e5cc752a94937fd58e93756a5c948d0335a58cc7",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:kieferngrund",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "394f773597446670dccba0d626f53ef7ad16e45dfec1961e8b8dcc3c576f50c1",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "23b4f0ca487e280680c17cfada826444d3fd21e27ba526f44f57ac703f22da4b",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:kinderland",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "de1b6528adccb732e38fe9159d9ecc81736c7d92d2e17a6f2f5aef9810e41fb5",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "95121c4dd165a4404f66547d4ac20544ae6e3dac6243eee2a62c626545531200",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:klosterdorfer",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "ad1c61646d33a623dde580af7694d9db081024b8c53a3f043c8e5d11c1c3704a",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:krankenhaus",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "8af6ea1f5cc8ef9a91cd7e935ce4c59d03314a2c1b17922979620d71e0a228f0",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "154221343281069d51914540ede2f08a5f88f9b0042b47194422f95ff7af4f01",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:kulturpark",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "855d6bf216b87856ecb0e2202c17e9493a421e8cbf6c54e54d20dd652286f4be",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "3cc99ea8322d08336879982a01fc9ff2715b0aa64903d6cb7cb7ac8143476431",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:lustgarten",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "254f1ad308e665ef988cf33df29847ee93cf0441f27daf30ffe5b8e3ee4ae583",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:muehlenweg",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "a1ce74c711da2ae66a31e0a6ab7c980c71e1bd179e4fc8f7216c97017b086e0a",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "c11b2730a8787b140d8671c32847c499c3cb0d303c65595edbd5e957b0e1b842",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:ringstrasse",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "bf7826e5cdc3d7d9398452400e028ed71b74fa9bd951b83bf5582a587d319aae",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:schulcampus",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "e12e0fda5141be6927183a34971b5b068ddc4c3a65dd106d4371e1ba13973ea2",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:solarpark-flugplatz",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "4c34158fe3f65f1d49119f34dc31ef68fc7436d1931b2602e520eb4d1f516146",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "01926a3b11cf971a00b0ecf1c563fc569a60082941034ee5ca8b128e88a68163",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:stadtmauer",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "b5d3436c1608842815c4cacdc274676e13a9159c2f8eaf1097aa6d9b74e891f0",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:tausendfuessler",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "removed",
+      "reason": "Record is absent from this publication; absence alone does not establish source withdrawal or supersession.",
+      "previous": {
+        "version": "6da24128b33e990e70b386072a04d5dc5c961fa13b43d38fd74e443eb578e9ba",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": null,
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:thaelmann-nw",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "f26505762e2bb2a08adf1a95a4ca3c3667256d5c2be53f633bc1f6c9dc6acfb8",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "9c4cff9d636c3e25f0b22ff014832ec3721c2fa7853458172748b6ca4dffa751",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    },
+    {
+      "id": "atlas:weinberg",
+      "cityId": "strausberg",
+      "recordType": "signal",
+      "kind": "changed",
+      "reason": "Published revision changed.",
+      "previous": {
+        "version": "9ee1d267e4ed81792d2ce8e7cbe7cc700152d0498c845ff996bbc7097a1c00d6",
+        "evidenceHash": null,
+        "sourceHashes": [],
+        "metricClaims": []
+      },
+      "current": {
+        "version": "ecf7d6c51dfa365708b4eacde7adc6af473afa7bcec196522dd315e6baaff5d6",
+        "evidenceHash": null,
+        "sourceHashes": [
+          "5e29f25382f7d94b903a4ec21358c7e16d645ac5725a9eed8bf62074e5a9f53f"
+        ],
+        "metricClaims": []
+      },
+      "evidence": null,
+      "targetRevision": null
+    }
+  ]
+}

@@ -1,9 +1,12 @@
 import 'server-only';
 import { readFile, readdir, stat } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join, resolve } from 'node:path';
+import type { SourceAssertion, SourceVerification } from '../data/city-source-evidence.ts';
+import { isCoreFact, projectCorePublication, validateCorePublication, type CoreAdmission, type PublishedSnapshot } from './core-publication.ts';
 
 export type Coordinate = [number, number];
-export type SignalKind = 'planning' | 'construction' | 'roadworks' | 'council_paper' | 'council_meeting' | 'budget' | 'consultation' | 'place';
+export type SignalKind = 'planning' | 'construction' | 'roadworks' | 'council_paper' | 'council_meeting' | 'budget' | 'consultation' | 'measurement' | 'place';
 export type SignalGeometry =
   | { type: 'Point'; coordinates: Coordinate }
   | { type: 'LineString'; coordinates: Coordinate[] }
@@ -24,6 +27,7 @@ export interface Signal {
     sources: SignalSource[];
     extraction: { method: 'structured' | 'llm'; model?: string; faithfulness?: { score: number; reason: string; evaluator: string; threshold: number } };
     reviewState: 'candidate' | 'auto_checked' | 'reviewed' | 'rejected'; asOf: string;
+    assertion?: SourceAssertion; verification?: SourceVerification;
   };
 }
 export interface SignalCollection { type: 'FeatureCollection'; features: Signal[] }
@@ -43,7 +47,8 @@ export interface SignalCity {
   sources: { id: string; kind: string; publisher: string; url: string; licence: string; reuse: string; retrievedAt: string }[];
 }
 export interface SignalCatalogue { schemaVersion: 'stadtstack-signals-v1'; generatedAt: string; cities: SignalCity[] }
-export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] } }
+export interface CouncilQualityHold { id: string; reason: string; kind?: 'council_meeting' | 'council_paper' }
+export interface CitySignals { catalogue: SignalCity; coveredCities: SignalCity[]; generatedAt: string; signals: CityCollection; changes: { added: string[]; changed: string[]; removed: string[] }; councilQualityHolds: CouncilQualityHold[] }
 export type SignalResult = { state: 'covered'; data: CitySignals } | { state: 'not_covered'; city: string; coveredCities: SignalCity[]; generatedAt: string };
 export interface CityFeedItem {
   id: string; kind: 'news' | 'event'; title: string; url: string; publisher: string;
@@ -86,14 +91,45 @@ export type RegionalTopicResult =
   | { state: 'not_available'; cityId: string };
 
 // mtime and file path are both part of the key: switching STADTSTACK_DATA_DIR never serves an old city.
-const files = new Map<string, { mtimeMs: number; size: number; value: unknown }>();
-async function jsonFile<T>(path: string): Promise<T> {
+const files = new Map<string, PublishedSnapshot & { mtimeMs: number; size: number }>();
+async function jsonSnapshot(path: string, freshBytes = false): Promise<PublishedSnapshot> {
   const info = await stat(/* turbopackIgnore: true */ path);
   const cached = files.get(path);
-  if (cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) return cached.value as T;
-  const value = JSON.parse(await readFile(/* turbopackIgnore: true */ path, 'utf8')) as T;
-  files.set(path, { mtimeMs: info.mtimeMs, size: info.size, value });
-  return value;
+  if (!freshBytes && cached && cached.mtimeMs === info.mtimeMs && cached.size === info.size) return cached;
+  const bytes = await readFile(/* turbopackIgnore: true */ path, 'utf8');
+  const sha256 = createHash('sha256').update(bytes).digest('hex');
+  const snapshot = { mtimeMs: info.mtimeMs, size: info.size, value: cached?.sha256 === sha256 ? cached.value : JSON.parse(bytes) as unknown, sha256 };
+  files.set(path, snapshot);
+  return snapshot;
+}
+async function jsonFile<T>(path: string): Promise<T> {
+  return (await jsonSnapshot(path)).value as T;
+}
+let coreCache: { key: string; admission: CoreAdmission } | undefined;
+async function publishedCoreSignals(root: string, cityId: string, signals: CityCollection, selectedSha256: string): Promise<CityCollection> {
+  if (!signals.features.some((feature) => isCoreFact(feature.properties.id) || feature.properties.verification || feature.properties.assertion)) return signals;
+  let admission: CoreAdmission = new Map();
+  if (cityId === 'strausberg') {
+    try {
+      // Trust inputs always get fresh byte hashes, even after metadata-preserving replacement.
+      // Fixed publication paths only; never follow paths supplied by a manifest.
+      const [bundle, manifest, full, compact] = await Promise.all([
+        jsonSnapshot(join(root, 'core', 'strausberg-facts.json'), true), jsonSnapshot(join(root, 'core', 'release-manifest.json'), true),
+        jsonSnapshot(join(root, 'cities', 'strausberg', 'signals.geojson'), true), jsonSnapshot(join(root, 'cities', 'strausberg', 'signals.min.geojson'), true),
+      ]);
+      if (selectedSha256 !== full.sha256 && selectedSha256 !== compact.sha256) throw new Error('Selected core snapshot changed');
+      const key = `${bundle.sha256}:${manifest.sha256}:${full.sha256}:${compact.sha256}`;
+      if (coreCache?.key === key) admission = coreCache.admission;
+      else {
+        admission = validateCorePublication(bundle, manifest, full, compact);
+        coreCache = { key, admission };
+      }
+    } catch {
+      // No badge or AI admission from a missing, malformed or stale publication.
+      admission = new Map();
+    }
+  }
+  return projectCorePublication(signals, admission);
 }
 const dataDirectory = () => resolve(/* turbopackIgnore: true */ process.env.STADTSTACK_DATA_DIR ?? join(process.cwd(), 'stadtstack-data/out'));
 export async function readSignalsCatalogue(): Promise<SignalCatalogue> {
@@ -101,18 +137,37 @@ export async function readSignalsCatalogue(): Promise<SignalCatalogue> {
   if (catalogue.schemaVersion !== 'stadtstack-signals-v1' || !Array.isArray(catalogue.cities)) throw new Error('Unsupported city signals catalogue.');
   return catalogue;
 }
+function councilQualityHolds(report: unknown, cityId: string): CouncilQualityHold[] {
+  if (!report || typeof report !== 'object' || !('cities' in report) || !Array.isArray(report.cities)) throw new Error('Invalid publication quality report.');
+  const city = report.cities.find((item) => item && typeof item === 'object' && 'cityId' in item && item.cityId === cityId);
+  if (!city || typeof city !== 'object') return [];
+  const rows = [...('quarantined' in city && Array.isArray(city.quarantined) ? city.quarantined : []),
+    ...('retainedQuarantines' in city && Array.isArray(city.retainedQuarantines) ? city.retainedQuarantines : [])];
+  const holds = new Map<string, CouncilQualityHold>();
+  for (const row of rows) {
+    if (!row || typeof row !== 'object' || !('id' in row) || typeof row.id !== 'string' || !('reason' in row) || typeof row.reason !== 'string') continue;
+    const kind = 'kind' in row && (row.kind === 'council_meeting' || row.kind === 'council_paper') ? row.kind : undefined;
+    if (!kind && !row.id.startsWith('council:')) continue;
+    holds.set(row.id, { id: row.id, reason: row.reason, ...(kind ? { kind } : {}) });
+  }
+  return [...holds.values()].sort((a, b) => a.id.localeCompare(b.id));
+}
 export async function readCitySignals(cityId: string, detail: 'compact' | 'full' = 'compact'): Promise<SignalResult> {
   const catalogue = await readSignalsCatalogue();
   // Never use raw input as a filesystem path: only catalogue IDs select directories.
   const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
   if (!city) return { state: 'not_covered', city: cityId, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt };
-  const directory = join(dataDirectory(), 'cities', city.id);
-  const [signals, changes] = await Promise.all([
-    jsonFile<CityCollection>(join(directory, detail === 'compact' && city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
+  const root = dataDirectory();
+  const directory = join(root, 'cities', city.id);
+  const [snapshot, changes, quality] = await Promise.all([
+    jsonSnapshot(join(directory, detail === 'compact' && city.minUrl ? 'signals.min.geojson' : 'signals.geojson')),
     jsonFile<CitySignals['changes']>(join(directory, 'changes.json')),
+    jsonFile<unknown>(join(root, 'quality-report.json')),
   ]);
+  const signals = snapshot.value as CityCollection;
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
-  return { state: 'covered', data: { catalogue: city, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt, signals, changes } };
+  return { state: 'covered', data: { catalogue: city, coveredCities: catalogue.cities, generatedAt: catalogue.generatedAt,
+    signals: await publishedCoreSignals(root, city.id, signals, snapshot.sha256), changes, councilQualityHolds: councilQualityHolds(quality, city.id) } };
 }
 export interface CityCoverage {
   generatedAt: string;
@@ -140,9 +195,12 @@ export async function readCitySignal(cityId: string, signalId: string): Promise<
   const catalogue = await readSignalsCatalogue();
   const city = catalogue.cities.find((entry) => entry.id === cityId && /^[a-z0-9-]+$/.test(entry.id));
   if (!city) return null;
-  const signals = await jsonFile<SignalCollection>(join(dataDirectory(), 'cities', city.id, 'signals.geojson'));
+  const root = dataDirectory();
+  const snapshot = await jsonSnapshot(join(root, 'cities', city.id, 'signals.geojson'));
+  const signals = snapshot.value as SignalCollection;
   if (signals.type !== 'FeatureCollection' || !Array.isArray(signals.features)) throw new Error('Invalid city signals collection.');
-  return signals.features.find((feature) => feature.properties.id === signalId) ?? null;
+  const projected = await publishedCoreSignals(root, city.id, signals, snapshot.sha256);
+  return projected.features.find((feature) => feature.properties.id === signalId) as Signal | undefined ?? null;
 }
 
 export async function readCityFeed(cityId: string): Promise<CityFeedResult> {

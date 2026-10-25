@@ -64,12 +64,15 @@ async function fixture() {
     setGenesis: (value: string) => { genesis = value; }, setMutation: (change: (value: SimulationValue) => void) => { mutate = change; } };
 }
 
-test('base gateway preserves finalized lifetime and distinguishes confirmed block-height observations', async () => {
+test('base gateway preserves finalized lifetime and revalidates expired network evidence', async t => {
   const f = await fixture();
+  let now = 1_000_000;
+  t.mock.method(Date, 'now', () => now);
   assert.deepEqual(await f.gateway.lifetime(), { blockhash: SOLANA_IDS.system, lastValidBlockHeight: '100', blockHeight: '10' });
   assert.equal(await f.gateway.blockHeight('confirmed'), '12');
   assert.equal(await f.gateway.blockHeight('finalized'), '10');
   f.setGenesis('wrong-network');
+  now += 60_001;
   await assert.rejects(f.gateway.lifetime(), /genesis mismatch/);
   await assert.rejects(f.gateway.blockHeight('confirmed'), /genesis mismatch/);
 });
@@ -78,7 +81,7 @@ test('one exact finalized simulation supplies atomic native, token and fee evide
   const f = await fixture();
   assert.deepEqual(await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected),
     { slot: '10', sponsorDebitCeilingLamports: '20000', networkFeeLamports: '10000' });
-  assert.deepEqual(f.calls, ['simulateTransaction']);
+  assert.deepEqual(f.calls, ['getGenesisHash', 'simulateTransaction']);
   assert.equal((await f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address)).sponsorDebitCeilingLamports, '20000');
 });
 
@@ -144,7 +147,8 @@ test('missing or malformed atomic evidence never falls back to another bank or g
     f.setMutation(change);
     await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, f.expected));
   }
-  assert.ok(f.calls.every(method => method === 'simulateTransaction'));
+  assert.equal(f.calls[0], 'getGenesisHash');
+  assert.ok(f.calls.slice(1).every(method => method === 'simulateTransaction'));
 });
 
 test('frozen, uninitialized or executable post-token accounts and failed simulations are refused', async () => {
@@ -186,4 +190,58 @@ test('duplicate expectations and non-writable recipients remain refused', async 
   const f = await fixture();
   await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, [f.expected[0], f.expected[0]]), /Duplicate simulated token expectation/);
   await assert.rejects(f.gateway.simulate(f.bytes, f.sponsor.address, f.actor.address, [{ ...f.expected[0], account: f.actor.address }]), /not writable/);
+});
+
+test('read-only RPC signal aborts in-flight I/O, refuses subsequent calls and does not retry rate limits', async () => {
+  const config = { rpcUrl: 'https://rpc.example', genesisHash: SOLANA_DEVNET_MANIFEST.genesisHash, maximumSponsorLamports: '10000000' };
+  const controller = new AbortController(), pending = Promise.withResolvers<void>();
+  let calls = 0, aborted = false;
+  const fetcher: typeof fetch = async (_, options) => {
+    calls++;
+    assert.equal(options?.signal?.aborted, false);
+    pending.resolve();
+    return new Promise<Response>((_resolve, reject) => {
+      options!.signal!.addEventListener('abort', () => { aborted = true; reject(options!.signal!.reason); }, { once: true });
+    });
+  };
+  const gateway = createBaseSolanaGateway(config, fetcher, controller.signal);
+  const read = gateway.checkedGenesis();
+  await pending.promise;
+  controller.abort(new DOMException('Read deadline', 'TimeoutError'));
+  await assert.rejects(read, { name: 'TimeoutError' });
+  await assert.rejects(gateway.multiple([]), { name: 'TimeoutError' });
+  assert.equal(calls, 1);
+  assert.equal(aborted, true);
+  let rateLimitedCalls = 0;
+  const limited = createBaseSolanaGateway(config, async () => {
+    rateLimitedCalls++;
+    return new Response('secret provider details', { status: 429, headers: { 'retry-after': '5' } });
+  }, new AbortController().signal);
+  await assert.rejects(limited.checkedGenesis(), { message: 'RPC unavailable' });
+  assert.equal(rateLimitedCalls, 1);
+});
+
+test('financial broadcast retains total deadlines, genesis checks, preflight and identical-byte failover', async t => {
+  const deadlines: number[] = [], requests: { method: string; params: unknown[] }[] = [];
+  t.mock.method(AbortSignal, 'timeout', (milliseconds: number) => {
+    deadlines.push(milliseconds);
+    return new AbortController().signal;
+  });
+  let limited = false;
+  const gateway = createBaseSolanaGateway({
+    rpcUrl: 'https://rpc.example', genesisHash: SOLANA_DEVNET_MANIFEST.genesisHash, maximumSponsorLamports: '10000000',
+    rpcFallbackUrls: ['https://secondary.example/'],
+  }, async (_, options) => {
+    const body = JSON.parse(String(options?.body));
+    requests.push({ method: body.method, params: body.params });
+    if (body.method === 'getGenesisHash') return Response.json({ result: SOLANA_DEVNET_MANIFEST.genesisHash });
+    if (!limited) { limited = true; return new Response(null, { status: 429, headers: { 'retry-after': '0.001' } }); }
+    return Response.json({ result: 'fixture-signature' });
+  });
+  assert.equal(gateway.readSignal, undefined);
+  assert.equal(await gateway.broadcast(new Uint8Array([1, 2, 3])), 'fixture-signature');
+  assert.ok(deadlines.every(milliseconds => milliseconds > 0 && milliseconds <= 10_000));
+  assert.deepEqual(requests.map(request => request.method), ['getGenesisHash', 'sendTransaction', 'getGenesisHash', 'sendTransaction']);
+  assert.deepEqual(requests[1], requests[3]);
+  assert.deepEqual(requests[1].params, ['AQID', { encoding: 'base64', skipPreflight: false, preflightCommitment: 'finalized' }]);
 });

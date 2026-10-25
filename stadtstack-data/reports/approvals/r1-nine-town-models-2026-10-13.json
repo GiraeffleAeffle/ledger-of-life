@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-nine-town-models-2026-10-13",
+  "recordedAt": "2026-10-13T13:00:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, answering Vikunja task 81 after the lead clarified the three steps and the answer options 1/2/3",
+  "questionShownToOwner": "#81 AI processing of the nine-town documents (only after #80). Steps: 1 extraction (Codex through the OpenAI subscription, at most 48 model calls per document, no paid API), 2 checking (Haiku through the Claude Max subscription in the reviewed container, #74 rules: normal subscription only, a usage limit means stop, no waiting, no fallback), 3 reconciliation (rule-based comparison plus a third pass; unclear cases go to the owner, aiming for at most about 2 hours of owner time per phase). Limits: at most 500 documents, valid until Sun 25 Oct, ntfy at start, stops and result. Technical consequence: the first Haiku run writes a new kind of entry into the shared opt-out/policy store that the old 0.3.2 software cannot read; from then on opt-out handling and clean-up for that store must use the R1 software only (0.3.2 itself stays live and unchanged). Option 1 (recommended): approve all three steps including that switch. Option 2: only extraction now. Option 3: not yet. Subscriptions: only the OpenAI and Claude Max subscriptions, no paid API keys, no extra usage; a usage limit stops the run.",
+  "ownerStatementsVerbatim": [
+    "80. A is fine, 81. is this a b or c or are these the steps? We can use all the subscriptions we have or not?",
+    "Yes for 81. go with the recommended"
+  ],
+  "approved": {
+    "option": 1,
+    "scope": "Documents from the nine-town fetch approved in r1-nine-town-crawl-2026-10-13 that became owner-authorized R1 corpora after passing all policy/origin/access checks",
+    "extraction": {"route": "Codex via the owner's OpenAI subscription on the VM (provider openai-subscription)", "maxChunksPerDocument": 24, "maxModelCallsPerDocument": 48, "paidMicroUsd": 0},
+    "assessmentB": {"route": "anthropic/claude-haiku-5-5 via stock omp 18.9.2 in the reviewed omp-b container, owner's Claude Max subscription", "rules": "Vikunja #74: normal subscription usage only, no extra usage; usage-limit errors hold; no wait-for-reset, no retry on another transport, no model fallback"},
+    "reconciliation": "deterministic reconciliation and third pass per the approved plan; unresolved disagreements and rights questions go to the owner (target <= 2 h per phase)",
+    "maxDocuments": 500,
+    "expiresAt": "2026-10-25T21:59:59Z",
+    "notifications": "ntfy pipeline topic at start, holds/stops and results",
+    "authorityToolingCutover": "After the first native omp-b assessment writes its resource into the shared civic policy authority inventory, opt-out handling, scratch recovery and purge for that authority are performed only with R1 code; tag-0.3.2 tools must not operate on it. The 0.3.2 release itself stays live and unchanged."
+  },
+  "notApproved": [
+    "Paid API execution, API keys or extra/overage usage",
+    "Models or transports other than the two named routes",
+    "Publication or release of extracted facts (step 8/9 gates still apply)",
+    "Documents outside owner-authorized R1 corpora from the approved nine-town fetch"
+  ]
+}

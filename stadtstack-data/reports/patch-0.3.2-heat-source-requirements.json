@@ -1,0 +1,44 @@
+{
+  "purpose": "Source acquisition and re-extraction requirements, not published facts or completed-extraction evidence",
+  "localEvidence": {
+    "inspected": ["regional/city-evidence.json", "out/regions/brandenburg-mol/topics.json", "cache/staging/regions/brandenburg-mol/topics.json", "reports/corpus-manifest.jsonl", "cache/districts", "cache/reassessment-input/prepared"],
+    "finding": "Local curated and released records retain source URLs, dates and navigation locators; no complete source text for these two heat pages was found. regional/.cache is absent. Historical outputs and receipts were not changed."
+  },
+  "sources": [
+    {
+      "municipalityId": "ruedersdorf-bei-berlin",
+      "sourceId": "ruedersdorf-bei-berlin-website",
+      "url": "https://www.ruedersdorf.de/meine-gemeinde/konzepte/kommunale-waermeplanung/",
+      "acceptanceRequirements": [
+        "Substantive source-bound statement, with locator retained separately",
+        "Source-stated start January 2024, preserving month precision",
+        "Approximate duration 18 months, preserving approximation",
+        "Named contractor EWE NETZ as actually spelled in source",
+        "Two suitability areas",
+        "At least five measures within five years, preserving minimum and horizon"
+      ]
+    },
+    {
+      "municipalityId": "hoppegarten",
+      "sourceId": "hoppegarten-website",
+      "url": "https://www.gemeinde-hoppegarten.de/news/1/1240589/nachrichten/kommunale-w%C3%A4rmeplanung-in-hoppegarten.html",
+      "sourceDateToVerify": "2026-05-27",
+      "acceptanceRequirements": [
+        "Source-bound planning association entity and all five explicit member_of relations",
+        "Members Hoppegarten, Neuenhagen, Altlandsberg, Fredersdorf-Vogelsdorf and Petershagen/Eggersdorf, using exact source names",
+        "Each relation quote contains both member and association and explicit membership predicate",
+        "Named contractor energielenker, not automatically a member",
+        "Target mid-2027, not an invented full date or completed implementation"
+      ]
+    }
+  ],
+  "producer": {
+    "acquisition": "After acquisition/security changes land: governed VM crawler, existing registered website source IDs and exact registered pageRoots only. Preserve current owner/host decisions; do not use the legacy regional cachedFetch lane or fetch sources manually.",
+    "prepareCommand": "node --experimental-strip-types src/district-extract.ts prepare --index INDEX_PATH --corpus-sha256 INDEX_SHA256 --raw-root RAW_ROOT --registry REGISTRY_PATH",
+    "extractCommand": "node --experimental-strip-types src/district-extract.ts run --prepared-plan PREPARED_PLAN_PATH --prepared-sha256 PREPARED_PLAN_SHA256 --assignment-mode codex-only --registry REGISTRY_PATH --out NEW_IGNORED_RUN_PATH",
+    "inputPlaceholders": "Capitalized command inputs are actual producer receipt paths/hashes to be supplied after governed acquisition, not invented values.",
+    "regionalContract": "src/regional-statement.ts exports regionalStatementFields, StatementEvidence and regionalStatement. regional/statements.mjs exports extractRegionalStatement(html, anchors). Source-selected excerpts must match actual acquired bytes; do not derive quotes from these acceptance requirements.",
+    "districtContract": "Existing DistrictExtractionClaimsSchema summary/summaryQuote and entities/relations; member_of supported by district-graph-claims.ts normalizeGraphClaims. Preserve exact quote gates and model/source evidence provenance.",
+    "releaseGate": "Do not declare the named findings fixed in published data until actual source acquisition, Codex-only extraction and source-grounded acceptance succeed. Never mutate frozen out/ or historical receipts."
+  }
+}

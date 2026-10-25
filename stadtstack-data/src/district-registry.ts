@@ -1,17 +1,21 @@
-import {readFile,writeFile,mkdir,rename} from 'node:fs/promises';
-import {dirname,resolve} from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {z} from 'zod';
-import {PoliteFetcher,PoliteFetchError,publicUrl} from './polite-fetch.ts';
+import {publicUrl} from './polite-fetch.ts';
+import {OwnerRobotsOverrideSchema} from './district-schema.ts';
+import {ownerRobotsOverrideApplies} from './source-policy.ts';
 
 const url=z.string().url().refine(value=>{try{publicUrl(value);return true;}catch{return false;}},'Expected a public, credential-free HTTP URL');
 const timestamp=z.string().datetime({offset:true});
 const evidenceSchema=z.object({url,locator:z.string().min(1),sha256:z.string().regex(/^[a-f0-9]{64}$/).optional(),retrievedAt:timestamp.optional()});
 const checkState=z.enum(['checked','not_found','not_checked']);
-const kind=z.enum(['council','participation','gazette','website']);
+const kind=z.enum(['council','participation','gazette','website','structured']);
 export const districtSourceSchema=z.object({
  id:z.string().min(1),kind,url:url.nullable(),vendor:z.enum(['oparl','allris','sessionnet','somacos','other','unknown']),
  checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional(),
+ ownerRobotsOverride:OwnerRobotsOverrideSchema.optional(),robotsStatus:z.enum(['allowed','disallowed','unavailable']).optional(),override:z.literal('owner-approved 2026-10-11').optional(),
+ hostProfile:z.enum(['municipal','default']).optional(),
  api:z.object({url,method:z.enum(['GET','POST']).optional(),form:z.record(z.string(),z.string()).optional(),format:z.enum(['diplan-list','bobsh-list','mv-bauleitplan'])}).optional(),
  rights:z.object({licence:z.string(),reuse:z.literal('facts_with_attribution'),checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional()}).optional(),
  robots:z.object({url,checkState,checkedAt:timestamp.nullable(),evidence:z.array(evidenceSchema),reason:z.string().optional()}).optional(),
@@ -24,6 +28,10 @@ export const districtSourceSchema=z.object({
  if(source.checkState==='checked'&&(!source.url||!source.checkedAt||!source.evidence.length))ctx.addIssue({code:'custom',message:'Checked sources require URL, timestamp and evidence'});
  if(source.checkState==='not_found'&&(!source.checkedAt||!source.reason||!source.evidence.length))ctx.addIssue({code:'custom',message:'Not-found requires a scoped search reason and evidence; fetch failures are not absence'});
  if(source.checkState==='not_checked'&&!source.reason)ctx.addIssue({code:'custom',message:'Unchecked sources require a reason'});
+ if(source.ownerRobotsOverride||source.override||source.robotsStatus){
+  if(!source.url||!ownerRobotsOverrideApplies(source.url,source.ownerRobotsOverride)||source.override!=='owner-approved 2026-10-11')ctx.addIssue({code:'custom',message:'Owner robots exception requires an exact approved decision bound to the registered public source host'});
+  if(source.robotsStatus==='disallowed'&&(!source.robots||source.robots.checkState!=='checked'||!source.robots.checkedAt||!source.url||source.robots.url!==new URL('/robots.txt',source.url).href||!source.robots.evidence.some(item=>item.url===source.robots!.url&&item.sha256&&item.retrievedAt)))ctx.addIssue({code:'custom',message:'Disallowed registry status requires retained robots evidence, not an inferred or unavailable policy'});
+ }
 });
 const municipalitySchema=z.object({
  id:z.string().min(1),name:z.string().min(1),ags:z.string().regex(/^\d{8}$/),districtId:z.string().min(1),districtAgs:z.string().regex(/^\d{5}$/),
@@ -37,7 +45,7 @@ const municipalitySchema=z.object({
  if((m.amt===null)!==(m.administrativeStatus==='amtsfrei'))ctx.addIssue({code:'custom',message:'Amt membership contradicts administrative status'});
  const ids=new Set(m.sources.map(s=>s.id));
  if(ids.size!==m.sources.length)ctx.addIssue({code:'custom',message:'Duplicate source ID'});
- for(const k of kind.options)if(!m.sources.some(s=>s.kind===k))ctx.addIssue({code:'custom',message:`Missing explicit ${k} source category`});
+ for(const k of ['council','participation','gazette','website'] as const)if(!m.sources.some(s=>s.kind===k))ctx.addIssue({code:'custom',message:`Missing explicit ${k} source category`});
  for(const seed of m.seedDocuments){
   if(!ids.has(seed.sourceId))ctx.addIssue({code:'custom',message:`Unbound seed ${seed.sourceId}`});
   if(seed.documentDate===null&&!seed.dateReason)ctx.addIssue({code:'custom',message:'Unknown document dates need a reason; retrieval time is not document time'});
@@ -65,38 +73,13 @@ export const districtRegistrySchema=z.object({
 export type DistrictRegistry=z.infer<typeof districtRegistrySchema>;
 export async function loadDistrictRegistry(path='sources/district-registry.json'):Promise<DistrictRegistry>{return districtRegistrySchema.parse(JSON.parse(await readFile(path,'utf8')));}
 
-/** Refreshes configured endpoints only. It does not infer municipal absence from a failed request,
- * discover OParl by guessing paths, or turn registry reachability into extracted-fact approval. */
-export async function refreshDistrictRegistry(registry:DistrictRegistry,cacheDir='cache/registry-refresh'):Promise<DistrictRegistry>{
- const next=structuredClone(registry),fetcher=new PoliteFetcher({cacheDir});
- for(const municipality of next.municipalities)for(const source of municipality.sources){
-  if(!source.url)continue;
-  try{
-   const observed=await fetcher.fetch(source.url);
-   source.evidence=[...source.evidence.filter(e=>!e.locator.startsWith('Endpoint refresh:')),{
-    url:observed.url,locator:`Endpoint refresh: HTTP ${observed.status}; configured ${source.kind} endpoint retrieved; no content licence or extraction approval inferred`,sha256:observed.sha256,retrievedAt:observed.retrievedAt,
-   }];
-   source.checkedAt=observed.checkedAt;
-   // Reachability alone cannot establish a municipality's use of a generic portal
-   // or turn an ALLRIS login page into a public proceedings archive.
-   if(source.checkState==='checked')source.reason='Configured endpoint retrieved through robots-aware, bounded public fetch. Documentary evidence and source category remain separately attributed.';
-  }catch(error){
-   source.checkState='not_checked';source.checkedAt=new Date().toISOString();
-   source.reason=error instanceof PoliteFetchError?`Refresh inaccessible: ${error.failure}${error.status?` (HTTP ${error.status})`:''}; not evidence that the source does not exist`:'Refresh failed; prior discovery evidence retained, source existence not disproved';
-  }
- }
- next.generatedAt=new Date().toISOString();return districtRegistrySchema.parse(next);
+/** Local metadata validation only. Acquisition requires the governed crawl descriptor. */
+export async function districtRegistryMain(args:string[]=process.argv.slice(2)){
+ const values=[...args],command=values.shift()??'validate';
+ if(command!=='validate')throw Error('Usage: district-registry.ts validate [--registry PATH]; acquisition uses the governed crawl configuration');
+ let path:string|undefined;
+ while(values.length){const key=values.shift(),value=values.shift();if(key!=='--registry'||!value)throw Error('Invalid registry validation option');path=value;}
+ const registry=await loadDistrictRegistry(path);
+ console.log(JSON.stringify({schemaVersion:registry.schemaVersion,districts:registry.districts.length,municipalities:registry.municipalities.length,inventory:registry.inventory.length,sources:registry.municipalities.reduce((count,municipality)=>count+municipality.sources.length,0)}));
 }
-async function main(){
- const args=process.argv.slice(2),command=args.shift()??'validate';
- if(!['validate','refresh'].includes(command))throw Error('Usage: district-registry.ts validate|refresh [--registry PATH] [--out PATH] [--cache PATH]');
- const options:Record<string,string>={};
- while(args.length){const key=args.shift()!,value=args.shift();if(!['--registry','--out','--cache'].includes(key)||!value)throw Error('Invalid registry option');options[key]=value;}
- const registry=await loadDistrictRegistry(options['--registry']);
- if(command==='refresh'){
-  const refreshed=await refreshDistrictRegistry(registry,options['--cache']),target=resolve(options['--out']??'cache/registry-refresh/registry.json');
-  await mkdir(dirname(target),{recursive:true});const temporary=target+`.${process.pid}.tmp`;await writeFile(temporary,JSON.stringify(refreshed,null,2)+'\n');await rename(temporary,target);
-  console.log(JSON.stringify({schemaVersion:refreshed.schemaVersion,municipalities:refreshed.municipalities.length,out:target}));
- }else console.log(JSON.stringify({schemaVersion:registry.schemaVersion,districts:registry.districts.length,municipalities:registry.municipalities.length,inventory:registry.inventory.length,sources:registry.municipalities.reduce((n,m)=>n+m.sources.length,0)}));
-}
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)main().catch(error=>{console.error(error instanceof z.ZodError?error.message:error instanceof Error?error.message:'Registry command failed');process.exitCode=1;});
+if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href)districtRegistryMain().catch(()=>{console.error('Registry metadata validation failed; no acquisition or refresh was performed.');process.exitCode=1;});

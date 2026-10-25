@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry3-stage-acquisition-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-14T09:18:19.823Z",
+  "parentApproval": {
+    "id": "r1-k1-retry3-2026-10-14",
+    "path": "stadtstack-data/reports/approvals/r1-k1-retry3-2026-10-14.json",
+    "sha256": "55a7713242aabe6c36cc6035ecd88fec4f27b21fd353ce8011c7416d209bea1b",
+    "clause": "approved.k1Retry3"
+  },
+  "relatedApprovals": [
+    {
+      "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+      "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+    },
+    {
+      "id": "r1-genesis-api-robots-2026-10-13",
+      "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7"
+    },
+    {
+      "id": "r1-first-live-batch-2026-10-12",
+      "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"
+    },
+    {
+      "id": "r1-first-live-batch-2026-10-12-amendment-1",
+      "sha256": "d49596ccea79f07ac420966d842c914589809a08c4406c19374a4d88af8b28dc"
+    }
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 576f93c (= cca869e + docs; registry membership fix a7f4ab0, inventory compaction, all reviewed to no P0-P3)",
+    "sourceGate": "tsc=0, 1627 tests, 1579 pass, 0 fail, 48 opt-in skips (cca869e)",
+    "parserAuthorization": "image sha256:4f33816f456ca498a01cf3d7d4840491f87a06d369037e70ef5544011c0deb8b, contract f1dd639e169034ff05a344829db01758fb4c3d1195c2699f963a93f285afdb2b; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "acquire_representation",
+    "selector": "unchanged K1 acquisition.json (GENESIS POST data/table, 12411-02-03, 2024, Strausberg 12064472) via the owner-account lane",
+    "registryDescriptor": {
+      "path": "cache/districts/r1-operator/registry-96e34c4-code-cca869e/operator-registry-config.json",
+      "sha256": "532fa36c4c8f7c14671b5ba4f6c9df542b03c13c7a2110ba092cbb94689eeddb"
+    },
+    "jobKeys": [
+      "178e058796303a144145dadeab137247f34260fce60ec20c346d720de74802f2"
+    ],
+    "ags": [
+      "12064472"
+    ],
+    "maxJobs": 1,
+    "maxElapsedMs": 300000,
+    "osDeadlineSeconds": 420,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 1
+  },
+  "cumulativeWithinK1": {
+    "priorRuns": [
+      {
+        "runId": "85a9e281-e4cf-43c1-927d-871c7b6f9232",
+        "processWallSeconds": 165,
+        "result": "held, HTTP 401 guest access"
+      },
+      {
+        "runId": "0c1de10f-4ab5-49d3-8924-1369052b2c43",
+        "processWallSeconds": 164,
+        "result": "held policy_excluded (robots + non-official origin)"
+      },
+      {
+        "runId": "a0591964-4fa8-456a-9f1d-8bb1f040cc0e",
+        "processWallSeconds": 272,
+        "result": "succeeded acquisition; parse blocked by registry-binding defect, receipt expired"
+      }
+    ],
+    "jobsIncludingThis": 4,
+    "k1MaxJobs": 5,
+    "wallSecondsUsedBefore": 601,
+    "wallSecondsBoundIncludingThis": 1021,
+    "k1TotalSeconds": 1500,
+    "remainingForParseStage": "1500 - 601 - actual process wall of this run"
+  }
+}

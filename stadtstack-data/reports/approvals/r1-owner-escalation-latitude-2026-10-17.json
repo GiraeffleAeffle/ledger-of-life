@@ -1,0 +1,27 @@
+{
+ "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+ "id": "r1-owner-escalation-latitude-2026-10-17",
+ "recordedAt": "2026-10-17T12:17:13Z",
+ "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "approver": "Max (owner)",
+ "channel": "omp chat with the R1 session",
+ "ownerStatementsVerbatim": [
+  "What's the status? Do you need anything from me? If something doesn't work you can always escalate to smarter models and higher effort please."
+ ],
+ "interpretation": "The owner allows the lead to use stronger models or higher reasoning effort when a step does not work, for agents and for pipeline lanes, within his existing subscriptions. Each concrete pipeline-model change is still recorded by the lead with its exact model id and scope before use, and keeps the #74 rules: normal subscription usage only, no paid API, usage limits stop, no silent runtime fallback, strict checks unchanged.",
+ "parentApprovals": [
+  {
+   "id": "r1-nine-town-models-2026-10-13",
+   "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  {
+   "id": "r1-b-model-sonnet-2026-10-17",
+   "sha256": "a527b02f4fd04487cf9eeb7314f539d83fd841cf0422cc8c2f69e411dd1d369f"
+  }
+ ],
+ "notApproved": [
+  "Paid API execution, API keys or extra/overage usage",
+  "Relaxing schema, checker or decoder security checks",
+  "Publication outside the step 8/9 gates"
+ ]
+}

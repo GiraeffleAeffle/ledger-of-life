@@ -4,7 +4,7 @@
 # Human-readable companion: docs/ONTOLOGY.md. Keep both in sync when concepts change.
 
 version: 1
-updated: 2026-10-09
+updated: 2026-10-24
 product:
   working_name: Ledger of Life   # chosen 2026-09-26; technical identifiers unchanged
   thesis: >-
@@ -50,7 +50,7 @@ layers:  # product architecture, bottom-up
   - id: local_services
     concepts: [LocalInferenceRequest, InferencePayment, InferenceHost, HostPairingInvitation, HostEconomicsScenario]
   - id: civic_system
-    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicTopic, CivicContribution, OpinionPoll]
+    concepts: [Organization, CityEvent, Project, Funding, Activity, Output, Outcome, Indicator, Scenario, RelationEvidence, CivicAssessment, DocumentDisposition, CivicTopic, CivicContribution, OpinionPoll]
   - id: vision
     concepts: [ServiceChargeAccount, HomeEquityPath, DeviceTokenization, LocalInvestment, LifeTimeline]
 
@@ -105,6 +105,7 @@ concepts:
       - Topic scopes and cross-city links do not create map/atlas coverage or duplicate a poll.
       - Game progress and separate test loyalty balances are not participation evidence or personal Position; Privy remains and native self-hosted wallets are roadmap.
       - Loyalty map pins require validated public feed evidence and retain the Sepolia test label; empty feeds offer an owner handoff, not invented shops.
+      - Operator-test loyalty entries require the literal true test flag; their pins/list/details say Test entry, not a real business and never contribute to real-shop participation.
       - Optional loyalty feed reads occur in the browser without credentials, city or wallet data; failures are distinct from successful empty results and balances remain outside Ledger.
   CivicTopic:
     definition: A user-authored public topic with an originating city, optional source context and linked city scopes.
@@ -124,6 +125,9 @@ concepts:
       - Relevant council records and explicit source matches outrank generic places. Preserve each source's exact kind/title/date/locator; no inferred common physical category.
       - The tagged question controls answer language, not the poll question. No relevant source means no model call; explicit fresh attempts may rerank but completed/in-flight evidence remains bound.
       - Grounding reads full records and preserves included locators, recorded unknowns and the actual question; invalid/absent dates are not dated evidence. Oversized complete context is declined explicitly, not silently truncated.
+      - Relevant auto-verified core evidence outranks candidates without bypassing relevance; measurement dates and budget years remain distinct from source document dates.
+      - Failed core publication bindings exclude that claim from City AI; auto_checked alone never grants auto-verified status.
+      - Every requested admitted budget year must fit the grounding packet or the request declines explicitly; a dropped source must not become a false claim of missing data.
   OpinionPoll:
     definition: A non-binding Ledger test-account poll moving through discussion, ready, open and closed.
     reality: prototype
@@ -133,7 +137,7 @@ concepts:
       - Closed counts, denominator, time and hash are immutable; no onchain anchoring, payment or municipal execution is implied.
 
   CitySignal:
-    definition: A public, versioned city-wide statement or place published by Stadtstack; its source, as-of, review state, geometry precision and (for LLM extraction) faithfulness score qualify every claim.
+    definition: A public, versioned city-wide statement, dated measurement, budget plan or place published by Stadtstack; its source dates, review/verification state, geometry precision and automated evidence qualify every claim.
     source: stadtstack-data/out/catalogue.json plus cities/<cityId>/signals.min.geojson for browsing and signals.geojson for detail
     reality: read_only_live
     levels:
@@ -142,6 +146,39 @@ concepts:
       compact_browse: {reality: read_only_live, note: "Map and lists read compact public records; selecting an item loads full sources by public ID only."}
     relations: {located_in: Context (city), relevant_to: Person (matched in the browser with MyPlaces)}
     code: [src/server/city-signals.ts, app/api/city-signals/route.ts, src/components/personal-map.tsx]
+    invariants:
+      - Auto-verified means named automated gates passed against a single primary source, not human review, independent corroboration or municipal endorsement; reviewState remains auto_checked.
+      - Core bundle and full/compact corpus hashes must match the immutable release manifest, with content-bound assertions, primary sources and actual DeepEval receipts.
+      - Missing or mismatched core publication metadata shows unverified and grants no core AI admission; raw pipeline receipts are projected to a public allowlist.
+      - Measurement date is not PDF date or today's level; budget year and planned outlay are not actual spending.
+
+  CivicAssessment:
+    definition: A governed, provenance-bound blind A/B review and mandatory C reconciliation of actual source propositions, distinct from generated record identity and explicit unknown qualifications; AI agreement is not independent validation.
+    reality: prototype
+    relations: {assesses: CitySignal or private source record, grounded_in: original source evidence}
+    invariants:
+      - Source-record projection v2 requires assertions for every real proposition, including positive classifications; unresolved classifications remain held.
+      - Generated identifiers and hashes are deterministically authenticated against the retained record and source bindings, not quoted as municipal statements.
+      - Relation subject and object direction and modality are source-assessed roles, including noncritical relations; local mention labels are context and mechanical global IDs remain bindings.
+      - Null, empty and unknown roles, including precision none for unlocated geometry, remain explicit unset qualifications, never affirmative source propositions or zero observations.
+      - The full private record and hash remain lossless; prior model judgments are never supplied to blind assessors.
+      - Non-quantitative assertion value and unit are both null; genuine typed quantities and critical financial roles retain exact source grounding.
+      - A changed assessment target needs fresh A/B/C receipts; historical v1 artifacts retain their original version and meaning, with no call-cap reset or inferred support.
+      - Read-only seal/export reconstructs and authenticates the exact persisted v1 or v2 target and committed preparation ancestry; new preparation emits v2 only.
+    code: [stadtstack-data/src/district-assessment-projection.ts, stadtstack-data/src/district-assessment.ts, stadtstack-data/src/district-assessment-jobs.ts]
+  DocumentDisposition:
+    definition: Source-scoped accounting of a frozen campaign document without a new admission claim; duplicate native outputs and authenticated pre-processing import rejections are distinct variants.
+    reality: prototype
+    relations: {disposes: source document, canonical_carrier: smallest documentId in the same municipality/sourceId/sourceSha256 group, pinned_to: canonical document and the duplicate's extraction receipt/output}
+    invariants:
+      - Duplicate identity is exact source-byte identity within the same municipality, sourceId and sourceSha256; matching titles or URLs alone do not qualify.
+      - The smallest documentId is the canonical native record carrier; every other member receives derived reasonCode duplicate_source_content.
+      - The disposition binds the canonical document and the duplicate's own residual-extraction receipt and sole output artifact; authenticated seal membership includes both extraction pins.
+      - A duplicate disposition is terminal accounting only: its records are excluded from admission and merging, not asserted to be the same legal instrument or case.
+      - Import rejections bind the issued owner decision, selected seal, frozen corpus/document/original bytes, exact registry and historical import manifest/result; consumers recompute the deciding importer rule.
+      - Permanent unsupported_mime and scope_mismatch reasons require a pinned issued decision; source_policy_stale additionally requires the explicit owner choice to dispose without processing, unauthenticable registered discovery and expired ordinary policy.
+      - An import rejection has no residual job or StepReceipt, no admitted records and no processing claim; results, terminal exceptions and import rejections exhaust the frozen campaign without overlap.
+    code: [stadtstack-data/src/district-duplicate-source-content.ts, stadtstack-data/src/district-queue-text-run.ts, stadtstack-data/src/r1-step8-governance.ts, stadtstack-data/src/r1-step8-import-dispositions.ts]
 
   Organization:
     definition: A public body, enterprise, cooperative or builder in a city Context; sourced Strausberg profiles describe products, participation channels, published opportunities and documented group membership. These independent organizations are separate from fictional test issuers.
@@ -197,6 +234,10 @@ concepts:
     definition: A separately sourced delivered, reported or planned thing such as a phase-one facility, scheduled opening or nominal solar capacity; each output retains its own basis, URL, locator and date (null if unknown), and none proves benefit.
     relations: {produced_by: Project, may_contribute_to: Outcome}
     code: [src/data/civic-outcome-evidence.ts]
+    invariants:
+      - A source-identified electricity unit is an Output observation, not a financial Asset, municipal ownership or a measured Outcome.
+      - "The R2 MaStR mapping is prototype pending source admission: only nine-town solar/wind unit identity, status, commissioning and rated capacity; no natural-person/contact enrichment."
+      - Rated solar kWp and net or wind kW are distinct from generated energy/yield; GENESIS building/dwelling stock is reference-day statistical context, not project completion.
     reality: read_only_live
 
   Outcome:
@@ -228,6 +269,7 @@ concepts:
       uses a dashed line with editable assumptions and cannot inherit adjacent source status.
     modes: [evidence_backed, proposed, modeled_assumption]
     rule: Reported work and a measured before/during indicator do not alone prove a causal benefit; planned spending and provisional actual costs do not reveal funding source.
+    structured_register_rule: A public organization-only operator field plus an explicit MaStR ABR registry ID can support an attributed organization operates SEE energy-unit relation; both endpoints retain native cell evidence and source-scoped identity. Name-only, ID-only, redacted or private-person rows cannot create the relation. Unknown validity remains unknown, not confirmed-current operation or independently verified legal-entity equivalence.
     reality: read_only_live
 
 

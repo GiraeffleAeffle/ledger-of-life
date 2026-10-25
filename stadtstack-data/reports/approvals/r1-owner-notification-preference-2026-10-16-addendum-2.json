@@ -1,0 +1,17 @@
+{
+ "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+ "id": "r1-owner-notification-preference-2026-10-16-addendum-2",
+ "amends": {
+  "id": "r1-owner-notification-preference-2026-10-16",
+  "path": "stadtstack-data/reports/approvals/r1-owner-notification-preference-2026-10-16.json"
+ },
+ "recordedAt": "2026-10-17T12:32:25Z",
+ "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+ "approver": "Max (owner)",
+ "channel": "omp chat with the R1 session",
+ "ownerStatementsVerbatim": [
+  "I always get the notifications in ntfy that R1 needs attention. What is that supposed to mean? I already told you several times that you should only send me something if it is important. And also give me always the overview of where we are in R1 and when we can estimate to finish it"
+ ],
+ "finding": "The pushes are automatic executor disposition notifications (district-notifications.ts:28, title 'R1 needs attention: <source> / <step> (<reason>)', normal priority) sent for every held stage run; they multiplied when all assessments re-ran on 2026-10-17.",
+ "interpretation": "Interim: all executor notifications (startup, completion, held/failure dispositions) at ntfy minimum priority with a neutral title, so no push reaches the owner; final: routine executor messages move to topic pipeline-audit (addendum-1, Ops #89). Every lead message to the owner includes a short R1 overview (step status) and a completion estimate."
+}

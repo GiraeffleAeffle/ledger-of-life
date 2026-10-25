@@ -56,7 +56,41 @@ function sourceTemporal(raw:string|null):string|null{
  // Keep sourced meeting precision and offset; do not turn a timed event into a day.
  return /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/.test(raw)&&Number.isFinite(Date.parse(raw))?raw:null;
 }
-export type QuarantinedSignal={id:string;cityId:string;reason:string};
+export type QuarantinedSignal={id:string;cityId:string;kind?:Signal['properties']['kind'];reason:string};
+export type QualityReportReference={releaseId:string;generatedAt:string;qualityReportSha256:string};
+export type RetainedQuarantine={id:string;cityId:string;kind?:Signal['properties']['kind'];reason:string;originalReport:QualityReportReference};
+/** Keep prior holds auditable until that exact identity passes current normalization. */
+export function carryForwardQuarantines(
+ prior:readonly QuarantinedSignal[],
+ retained:readonly RetainedQuarantine[],
+ staged:readonly Signal[],
+ published:readonly Signal[],
+ report:QualityReportReference,
+):RetainedQuarantine[]{
+ const holds=new Map<string,RetainedQuarantine>();
+ for(const item of prior)holds.set(item.id,{id:item.id,cityId:item.cityId,kind:item.kind,reason:item.reason,originalReport:report});
+ for(const item of retained)holds.set(item.id,item);
+ const stagedIds=new Set(staged.map(feature=>feature.properties.id));
+ const publishedIds=new Set(published.map(feature=>feature.properties.id));
+ return [...holds.values()].filter(item=>!(stagedIds.has(item.id)&&publishedIds.has(item.id))).sort((a,b)=>a.id.localeCompare(b.id));
+}
+/** Public catalogue wording supplements binding status with distinct data-quality holds. */
+export function councilQualityNotice(current:readonly QuarantinedSignal[],retained:readonly RetainedQuarantine[]):string|null{
+ const reasons=new Map<string,Set<string>>();
+ for(const item of [...current,...retained])if(item.kind==='council_meeting'||item.kind==='council_paper'||item.id.startsWith('council:')){
+  let held=reasons.get(item.id);if(!held){held=new Set();reasons.set(item.id,held);}held.add(item.reason);
+ }
+ if(!reasons.size)return null;
+ const allReasons=[...new Set([...reasons.values()].flatMap(reasons=>[...reasons]))].sort();
+ return `Publication quality also withholds ${reasons.size} council record${reasons.size===1?'':'s'}: ${allReasons.join(', ')}.`;
+}
+/** Replace this publication's generated notice while keeping the source-owned explanation. */
+export function replaceCouncilQualityNotice(reason:string|undefined,notice:string|null):string|undefined{
+ const generated=/\s*Publication quality also withholds \d+ council record(?:s)?: [^.\n]*\.$/;
+ let base=reason??'';
+ while(generated.test(base))base=base.replace(generated,'').trimEnd();
+ return [base,notice].filter((part):part is string=>Boolean(part)).join(' ')||undefined;
+}
 /** Event/legal dates are mandatory for comparison signals; places retain observation/asOf semantics. */
 export function normalizePublicationSignals(input:Signal[]):{features:Signal[];quarantined:QuarantinedSignal[];counts:{input:number;deduplicated:number;published:number;quarantined:number}}{
  assertPublicUrls(input);
@@ -65,7 +99,7 @@ export function normalizePublicationSignals(input:Signal[]):{features:Signal[];q
   const p=feature.properties,start=sourceTemporal(p.startDate),end=sourceTemporal(p.endDate);
   const observationReason=p.kind!=='place'?null:!p.asOf?'missing_observation_asof':!sourceTemporal(p.asOf)?'invalid_observation_asof':!p.sources.some(s=>sourceTemporal(s.retrievedAt))?'missing_sourced_observation_date':null;
   const reason=observationReason??(p.startDate!==null&&!start?'invalid_sourced_start_date':p.kind!=='place'&&!start?'missing_sourced_start_date':p.endDate!==null&&!end?'invalid_sourced_end_date':start&&end&&Date.parse(end)<Date.parse(start)?'end_before_start':null);
-  if(reason){quarantined.push({id:p.id,cityId:p.cityId,reason});continue;}
+  if(reason){quarantined.push({id:p.id,cityId:p.cityId,kind:p.kind,reason});continue;}
   // Core versions are independently hash-bound by their release manifest.
   if(p.assertion&&p.verification){valid.push(feature);continue;}
   const {version:_,...properties}=p;

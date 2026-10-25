@@ -1,0 +1,73 @@
+{
+  "schemaVersion": "stadtstack-correction-acceptance-v1",
+  "fixtureId": "solarpark-am-flugplatz-area-correction",
+  "ownerApprovedDecisionDate": "2026-10-11",
+  "frozen": true,
+  "meaning": "Fixed correction/supersession acceptance scenario; not evidence that a new source claim has already been admitted or released.",
+  "baseline": {
+    "dataManifestId": "25d99c9382ccbfeb3fbdef8541409950c8e4adc96852922f151e661d25c90eaf",
+    "recordId": "knowledge:strausberg:312ccd92c53c6241c52e3349",
+    "evidenceHash": "a10003da8af7d63973ba0fc32a6ee6d9218a393afd2a17889dabc42bf6b838e6",
+    "documentDate": "2024-01-30",
+    "metric": "plan_area",
+    "unit": "ha",
+    "value": 68.6,
+    "sourceUrl": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/a894a685-adc4-4bf1-a34e-d182a86ec003",
+    "sourceSha256": "5cb37bc02188cd24ad27884fb59163672b9860d05237e70cb2ad3e209437edc4",
+    "quote": "Ziel des aktuell vorliegenden Änderungsentwurfes des FNP ist es, Baurecht\nfür die Errichtung einer großflächigen Freiflächen-Photovoltaikanlage\naktuell mit einer Gesamtfläche von ca. 68,6 ha zu schaffen."
+  },
+  "replacementEvidence": {
+    "sourceUrl": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347",
+    "expectedRetainedSourceSha256": "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55",
+    "documentDate": "2025-08-07",
+    "dateRole": "document_version_not_new_stage_date",
+    "value": 41.5,
+    "unit": "ha",
+    "metric": "plan_area",
+    "instrument": "fnp:base:amendment:10",
+    "scope": "fnp:base:amendment:10",
+    "quote": "In der Konkretisierung des Projektes wurde nach dem Vorentwurf der\nGeltungsbereich von ca. 68,6 ha auf nunmehr ca. 41,5 ha im südlichen Bereich\n\n2025-08-07_FNP-Strausberg-10-Änd_Entwurf\n\n5\n\nStadt Strausberg, 10. Änderung des Flächennutzungsplans\n\nAugust 2025\n\nreduziert",
+    "admission": "Requires current-policy-managed source acquisition and actual passing extraction/judgment gates; existing private source excerpt is not a new admission receipt."
+  },
+  "acceptance": {
+    "case": {
+      "currentValue": 41.5,
+      "unit": "ha",
+      "historyIncludes": [
+        68.6,
+        41.5
+      ],
+      "previousRecordStatus": "superseded",
+      "previousRecordId": "knowledge:strausberg:312ccd92c53c6241c52e3349",
+      "distinctLegalInstrumentsPreserved": true
+    },
+    "get_changes": {
+      "kind": "superseded",
+      "reason": "Must explain the explicit source-stated area reduction, not mere publication removal or legal withdrawal.",
+      "previousEvidenceHash": "a10003da8af7d63973ba0fc32a6ee6d9218a393afd2a17889dabc42bf6b838e6",
+      "replacementSelector": {
+        "sourceUrl": "https://bb.beteiligung.diplanung.de/file/fnp-solarpark-flugplatz/e85e3cda-c72c-405f-9b66-bd1ac7d6c347",
+        "sourceSha256": "6b3d0a467c73bac1617dbcc88a692d9cc3319ec2d17ca22dbd3e5d91c764ea55",
+        "metric": "plan_area",
+        "instrument": "fnp:base:amendment:10",
+        "scope": "fnp:base:amendment:10",
+        "value": 41.5,
+        "unit": "ha"
+      },
+      "sourceEvidenceRequired": true
+    },
+    "export_records": {
+      "includesPreviousRecordAndReplacement": true,
+      "includesCurrentValueAndHistory": true,
+      "includesBothSourceAttributions": true,
+      "filterAndPaginationDoNotChangeCurrentValue": true
+    }
+  },
+  "negativeAcceptance": [
+    "Do not mark legal withdrawal for this correction.",
+    "Do not infer replacement from a newer date alone.",
+    "Do not supersede a different legal instrument or metric scope.",
+    "Do not treat planned, conditional or negated reductions as accomplished replacement.",
+    "Do not rewrite the original model or judge receipts."
+  ]
+}

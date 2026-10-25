@@ -11,7 +11,7 @@ const SIGNALS = ['SIGINT', 'SIGTERM', 'SIGHUP'] as const;
 const HEARTBEAT_FRAME = Buffer.from(WORKER_HEARTBEAT.slice(0, -1));
 export type WorkerLease<T> = { control: Promise<T>; signal: AbortSignal; dispose: () => void };
 
-// SSH authenticates the channel. Only one bounded JSON control frame is accepted;
+// A native parent pipe accepts one bounded, authority-pinned JSON control frame;
 // subsequent frames are fixed heartbeats, never further commands or source text.
 export function startWorkerLease<T>(input: Readable, parse: (raw: unknown) => T, options: { leaseMs?: number; signals?: EventEmitter } = {}): WorkerLease<T> {
   const controller = new AbortController();
@@ -102,7 +102,7 @@ export function startWorkerHeartbeat(output: Writable, control: unknown, failed:
 // The pipe lease also cancels inference if the coordinator dies without cleanup.
 export async function captureLocalDocumentWorker(control: unknown, signal: AbortSignal): Promise<string> {
   signal.throwIfAborted();
-  const child = spawn(process.execPath, [fileURLToPath(new URL('./district-extract.ts', import.meta.url)), 'local-worker'], { stdio: ['pipe', 'pipe', 'pipe'] });
+  const child = spawn(process.execPath, [fileURLToPath(new URL('./district-extract.ts', import.meta.url)), 'worker'], { stdio: ['pipe', 'pipe', 'pipe'] });
   const result = Promise.withResolvers<string>(), chunks: Buffer[] = [];
   let bytes = 0, failure: unknown, killTimer: NodeJS.Timeout | undefined;
   const stop = (error: unknown) => {

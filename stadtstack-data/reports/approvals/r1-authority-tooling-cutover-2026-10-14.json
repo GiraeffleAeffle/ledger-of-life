@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+  "id": "r1-authority-tooling-cutover-2026-10-14",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approval r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+  "issuedAt": "2026-10-14T06:42:07.016Z",
+  "parentApproval": {
+    "id": "r1-nine-town-models-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-nine-town-models-2026-10-13.json",
+    "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b",
+    "clause": "approved.authorityToolingCutover"
+  },
+  "action": "Compacted the shared civic policy authority inventory (owner-2026-10-11-codex-workstation, sha256 e35c90d1…) into the R1 sealed-segment layout with the reviewed R1 code at rebuild-r1 cca869e. From this point the inventory is readable only by R1 code; opt-out handling, scratch recovery and purge for this authority are performed only with R1 code, and tag-0.3.2 authority tools must not operate on it. The live 0.3.2 release itself is unchanged.",
+  "reason": "Throughput: the 297 MB monolithic inventory was rewritten on every locked transaction (lock held ~97% of the time by one crawler; processing commands failed with CIVIC_POLICY_BUSY). The cutover was approved as a consequence of the first native omp-b assessment, which follows within the same processing phase; it is executed now, before that assessment, because the compaction requires it.",
+  "migration": {
+    "command": "node --experimental-strip-types src/civic-opt-out.ts compact-inventory --authority-sha256 e35c90d1b705a52d739f438ae80b0ab1217db86386826fd9feac2f32329e926f",
+    "executedAt": "2026-10-14T06:39Z",
+    "receiptPath": "/home/max/.local/state/stadtstack-data/r1-operator-inputs/compaction-2026-10-14.json",
+    "receiptSha256": "27eca415c0e9fdfce4fc260e35f87cd49c06e56b8f2fbf2a7b932df2ee991796",
+    "status": "compacted",
+    "before": {
+      "bytes": 297468096,
+      "sha256": "3edc3e2930d46988d53e7f9e92269534a7d63f713eaaf96679d05b6786e5d5e6"
+    },
+    "after": {
+      "bytes": 1942256,
+      "sha256": "2f38a0790a5dda0d2ceeacbecc6c1c143b36f803c915c3ecb740a1bce170cabf"
+    },
+    "segments": 19,
+    "logicalEquality": true,
+    "logicalSha256": "4d726e7b64e686302cd9f3a1cb5cc74b48fdc9ad7773d0f7d6881e025d05d064",
+    "backupPath": "/home/max/.local/state/stadtstack-data/civic-policy/inventory.json.backup-3edc3e2930d46988d53e7f9e92269534a7d63f713eaaf96679d05b6786e5d5e6",
+    "precondition": "crawler stopped cleanly between sources; no active leases (preservedWorkingLeases empty); dry run first, logicalEquality true"
+  },
+  "reviews": "Compaction 6af5923/7b68f9b + fixes 60994d2/b7a83b3 reviewed by reviewer agent openai-codex/gpt-6.1-sol to no P0-P3 (AI static review, not a human review); integrated gate at cca869e: tsc=0, 1627 tests, 1579 pass, 0 fail.",
+  "notified": "Main/ops via Vikunja #64 comment (2026-10-13, announced) and a new comment at execution"
+}

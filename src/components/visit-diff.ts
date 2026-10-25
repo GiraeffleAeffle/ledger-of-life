@@ -1,12 +1,14 @@
 import type { CityFeature, CityFeed, SignalKind } from '@/server/city-signals';
+import type { SourceVerification } from '../data/city-source-evidence.ts';
 
 type VisitRecord = {
   id: string; version: string | number; kind: SignalKind; title: string; statement: string;
   status: string; startDate: string | null; endDate: string | null; nextStep: string | null;
   geometryPrecision: string; reviewState: string; asOf: string;
+  verification?: SourceVerification;
 };
 export type VisitBaseline = { schemaVersion: 1; records: Record<string, VisitRecord> };
-export type VisitChange = { id: string; title: string; description: string; reviewState: string; asOf: string };
+export type VisitChange = { id: string; title: string; description: string; reviewState: string; asOf: string; verification?: SourceVerification };
 type FeedVisitRecord = {
   id: string; kind: 'news' | 'event'; title: string; publisher: string;
   url: string; publishedAt: string; eventStart: string | null; reviewState: string;
@@ -54,6 +56,7 @@ export function snapshotCitySignals(features: CityFeature[]): VisitBaseline {
       id: p.id, version: p.version, kind: p.kind, title: p.title, statement: p.statement,
       status: p.status, startDate: p.startDate, endDate: p.endDate, nextStep: p.nextStep,
       geometryPrecision: p.geometryPrecision, reviewState: p.reviewState, asOf: p.asOf,
+      ...(p.verification ? { verification: p.verification } : {}),
     };
   }
   return { schemaVersion: 1, records };
@@ -68,13 +71,13 @@ export function meaningfulVisitChanges(previous: VisitBaseline | null, current: 
     const old = previous.records[record.id];
     let description = '';
     if (!old) description = 'Newly available in city sources';
-    else if (old.reviewState !== record.reviewState) description = 'Review updated';
+    else if (old.reviewState !== record.reviewState || old.verification?.status !== record.verification?.status) description = 'Review updated';
     else if (old.status !== record.status || old.startDate !== record.startDate || old.endDate !== record.endDate)
       description = 'Status or date updated';
     else if (old.title !== record.title || old.statement !== record.statement || old.nextStep !== record.nextStep)
       description = 'Details corrected';
     else if (old.geometryPrecision !== record.geometryPrecision) description = 'Location precision updated';
-    if (description) changes.push({ id: record.id, title: record.title, description, reviewState: record.reviewState, asOf: record.asOf });
+    if (description) changes.push({ id: record.id, title: record.title, description, reviewState: record.reviewState, asOf: record.asOf, ...(record.verification ? { verification: record.verification } : {}) });
   }
   // A missing record may mean a partial publication or ID migration, not withdrawal.
   return changes;

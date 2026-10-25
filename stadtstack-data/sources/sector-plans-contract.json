@@ -1,0 +1,102 @@
+{
+  "adapterId": "sector-plans",
+  "mappingVersion": "sector-plans-html-v1",
+  "catalogFamily": 15,
+  "catalogSnapshotDate": "2026-10-11",
+  "implementationStatus": "native_html_metadata_and_bounded_table_mapping; native_pdf_discovery_only",
+  "collectionExecuted": false,
+  "sourceSchemasExercised": false,
+  "parserNetwork": false,
+  "policy": {
+    "input": "AdmittedSnapshot bound to original bytes and external policyReceiptSha256",
+    "engine": "shared acquisition owner; no separate rights engine",
+    "rights": "No open-data licence established for these distributions. Unknown document-specific origin/rights must remain held by acquisition before ordinary parsing.",
+    "receiptCaveat": "Parser checks receipt hash syntax and byte binding. It cannot independently authenticate an acquisition decision. Caller must supply an admitted snapshot, not an arbitrary hash."
+  },
+  "limits": {"htmlBytes": 4000000, "planLinks": 256, "tableRows": 2000, "tableColumns": 32},
+  "sources": [
+    {
+      "sourceId": "sep-mol", "publisher": "Landkreis Märkisch-Oderland", "districtPrefix": "12064", "type": "school",
+      "endpoint": "https://www.maerkisch-oderland.de/_Resources/Persistent/0/4/8/0/0480ee80e4b5db98707b2c584829afa69db16590/Plan%20-%2003.07.2026%20-%20%20-%20%20-%20genehmigt%20f%C3%BCr%20Druck%20-%20%20-%20%20-%20%20-%20.pdf",
+      "index": "https://www.maerkisch-oderland.de/leben-wohnen/leben/bildung-sport-kultur",
+      "catalogHorizon": "2025/26–2029/30", "nativeFormat": "pdf", "parseDisposition": "held_quality", "remainingGap": "Isolated PDF table preparation and original-PDF locator are unavailable in pinned API. Publication filename is not an adoption date."
+    },
+    {
+      "sourceId": "sep-lup", "publisher": "Landkreis Ludwigslust-Parchim", "districtPrefix": "13076", "type": "school",
+      "endpoint": "https://www.kreis-lup.de/output/download.php?fid=3378.10751.1.PDF",
+      "catalogHorizon": "2022/23–2026/27", "nativeFormat": "pdf", "parseDisposition": "held_quality", "remainingGap": "Original PDF tables require isolated preparation and PDF locators; no current or implemented seats from horizon."
+    },
+    {
+      "sourceId": "sep-rz-gap", "publisher": "Kreis Herzogtum Lauenburg", "districtPrefix": "01053", "type": "school",
+      "endpoint": "https://www.kreis-rz.de/schulamt", "catalogHorizon": null, "nativeFormat": "html", "parseDisposition": "not_checked",
+      "remainingGap": "Current school-development plan unlocated. Contact/responsibility page and 2007 agenda item do not establish a current capacity plan."
+    },
+    {
+      "sourceId": "nvp-mol", "publisher": "Landkreis Märkisch-Oderland", "districtPrefix": "12064", "type": "transport",
+      "endpoint": "https://www.maerkisch-oderland.de/wirtschaft-entwicklung/wirtschaft/oepnv",
+      "catalogHorizon": "2025–2029", "nativeFormat": "html_index_with_pdf_annexes", "parseDisposition": "partial_html_metadata_only",
+      "remainingGap": "Linked native PDF text/maps/annexes remain held; target service is not actual operated service."
+    },
+    {
+      "sourceId": "rnvp-rz", "publisher": "Kreis Herzogtum Lauenburg", "districtPrefix": "01053", "type": "transport",
+      "endpoint": "https://www.kreis-rz.de/media/custom/3150_1536_1.PDF?1678701703=",
+      "index": "https://www.kreis-rz.de/index.php?La=1&ffsn=false&kat=&kuo=1&object=tx%2C1814.119.1&sub=0",
+      "catalogHorizon": "2022–2026", "catalogAdoptionDate": "2022-09-22", "nativeFormat": "pdf", "parseDisposition": "held_quality",
+      "remainingGap": "Catalog reports index adoption but parser must observe an admitted explicit adoption statement, not seed the date from catalog. Successor not established."
+    },
+    {
+      "sourceId": "rnvp-lup", "publisher": "Landkreis Ludwigslust-Parchim", "districtPrefix": "13076", "type": "transport",
+      "endpoint": "https://www.kreis-lup.de/output/download.php?fid=3378.14119.1.PDF",
+      "index": "https://www.kreis-lup.de/Verwaltung/%C3%9Cber-uns/Fachdienste-und-Stabstellen/Regionalmanagement-und-Kreisentwicklung/",
+      "catalogHorizon": null, "catalogEdition": "Teil B", "nativeFormat": "pdf", "parseDisposition": "held_quality",
+      "remainingGap": "Edition interval not established. Native PDF table schema not exercised."
+    }
+  ],
+  "nativeIdentity": {
+    "plan": "Publisher/source scoped exact linked URL including fid and version query parameters; only source-document identity, never inferred project identity.",
+    "tableRow": "Source document URL + native Schulnummer/Linie + sourced planning period; caption/header/cell locators bound to source bytes.",
+    "version": "nativeVersion carries supplied snapshot.sourceVersion as representation-version binding, not inferred legal amendment or edition. URL parameters retained. No version invented from retrieval clock."
+  },
+  "geography": {
+    "ags": "Only explicit eight-digit native AGS table cells; leading zeroes retained. Missing AGS means unknown, not requested municipality. District prefixes validate applicability but never become municipal AGS.",
+    "role": "administrative_area, not project location or operator seat",
+    "townJoins": "No name-only joins; separate verified identity/geography evidence required. District totals never allocated across pilots."
+  },
+  "dates": {
+    "planning": "Sourced title horizon or row school year/planning period is dateRole planning_horizon/planning_period, not adoption or operation.",
+    "adoption": "Valid calendar date in explicit nonconditional locally linked Kreistag statement. Draft, intended, negated, withdrawn and ambiguous multiple-plan contexts do not produce adoption.",
+    "sourceReferenceDate": "Unknown unless a future versioned mapping explicitly observes it; currently null.",
+    "publishedAt": "Unknown; filename and retrieval time are not publication dates.",
+    "retrievedAt": "Original admitted snapshot clock, not present validity."
+  },
+  "htmlTableSchema": {
+    "status": "Supported bounded native-HTML fixtures, not claimed observed PDF headers",
+    "schoolRequired": ["Schulnummer", "Schuljahr"],
+    "schoolFields": {"Plätze (Prognose)": "forecast_capacity/seats", "Schülerprognose": "forecast_pupils/pupils", "Schuleinzugsbereich": "planned_catchment"},
+    "transportRequired": ["Linie", "Planungszeitraum"],
+    "transportFields": {"Zielangebot": "target_service", "Mindestbedienung": "target_service_standard", "Zieltakt (Minuten)": "target_service_interval/minutes"},
+    "captionRequired": "Explicit school-development/transport plan title; unrelated tables not imported.",
+    "schemaChange": "Unknown schema, duplicate headers, merged cells, invalid numeric/AGS values yield held_quality. Numeric counts and minute intervals require safe integers: German dotted thousands (1.050 = 1050) accepted; decimal/ambiguous/malformed forms (1.234,5; 240.5; 1,050) rejected. Suppressed/absent cells do not become zero."
+  },
+  "evidence": "HTML DOM text/attribute locators preserve raw field values plus plan href or native row identifier/period/geography/caption and schema hash. No fabricated prose quote, judge score, or model receipt.",
+  "dispositions": {
+    "positive": "partial: only the supplied HTML page is inspected; linked PDFs/archive completeness are unchecked",
+    "empty": "empty on supplied page, not proof of absent plans or no implementation",
+    "paginated": "rel=next yields absolute cursor/resource for separately admitted next-page snapshot; parser never fetches",
+    "withdrawn": "Explicit withdrawn/repealed document label yields document_withdrawn metadata; disappearance from partial discovery never deletes",
+    "blocked": "Password/CAPTCHA/access-denied page yields blocked_access, not empty",
+    "pdf": "held_quality; original PDF bytes not relabeled as HTML originals",
+    "rights": "external blocked_policy/held_origin admission boundary; no operational coverage credit while unresolved"
+  },
+  "requiredPdfPreparation": {
+    "originalSourceSha256": "Admitted original PDF hash",
+    "preparedSha256": "Immutable table artifact hash",
+    "parserVersion": "Pinned PDF table extractor version and options",
+    "isolationReceiptSha256": "Verified credential-free, bounded, network-disabled execution receipt",
+    "pages": "Page-numbered tables with table IDs, bounds, original raw headers and raw cell values, row/column IDs and page bounding boxes",
+    "locatorMigration": "Shared locator needs pdf discriminator, original source hash, prepared hash/parser version, page/table/row/column/bbox/schema mapping version. Current pinned locator lacks pdf."
+  },
+  "semanticNonClaims": ["No forecast as implemented seats", "No target service as actual service", "No adoption as construction completion", "No catchment as facility opening", "No district total as each town's capacity", "No plan appropriation as payout", "No service target or traffic model as measured impact"],
+  "fixtures": ["school positive forecast/catchment", "transport positive target standards", "explicit adoption", "draft/negated/conditional/invalid-date adoption denial", "empty", "paginated", "changed schema", "withdrawn", "blocked access", "RZ school unlocated", "native PDF held", "bounds", "byte/receipt binding", "missing values", "six-source district applicability"],
+  "checksForIntegrator": ["Run sector-plans-adapter.test.ts", "Run repository TypeScript/build checks", "Run shared adapter schema integration", "Run original-PDF preparation/isolation and locator migration acceptance before treating PDF distributions as operational"]
+}

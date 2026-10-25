@@ -16,20 +16,10 @@ function base64(value: unknown): Uint8Array {
   if (typeof value !== "string" || value.length > 40_000_000 || !/^[A-Za-z0-9+/]*={0,2}$/.test(value)) throw new Error("Invalid RPC base64");
   return Uint8Array.from(atob(value), char => char.charCodeAt(0));
 }
-async function rpc(url: string, method: string, params: unknown[], fetcher: typeof fetch) {
-  const endpoint = new URL(url);
-  if (endpoint.protocol !== "https:" && !(endpoint.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(endpoint.hostname))) throw new Error("RPC must use HTTPS or loopback");
-  const response = await fetcher(endpoint, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }), signal: AbortSignal.timeout(10_000) });
-  if (!response.ok) throw new Error(`RPC returned HTTP ${response.status}`);
-  const envelope = object(await response.json());
-  if (envelope.error || !("result" in envelope)) throw new Error("RPC request failed");
-  return envelope.result;
-}
-
-export async function readTenancy(input: { rpcUrl: string; manifest: DeploymentManifest; tenancy: string }, fetcher: typeof fetch = fetch) {
+export async function readTenancy(input: { manifest: DeploymentManifest; tenancy: string }, request: (method: string, params: unknown[]) => Promise<unknown>) {
   const [genesisHash, raw] = await Promise.all([
-    rpc(input.rpcUrl, "getGenesisHash", [], fetcher),
-    rpc(input.rpcUrl, "getAccountInfo", [input.tenancy, { encoding: "base64", commitment: "finalized" }], fetcher),
+    request("getGenesisHash", []),
+    request("getAccountInfo", [input.tenancy, { encoding: "base64", commitment: "finalized" }]),
   ]);
   if (genesisHash !== input.manifest.genesisHash) throw new Error("RPC genesis mismatch");
   const result = object(raw);
@@ -44,13 +34,13 @@ export async function readTenancy(input: { rpcUrl: string; manifest: DeploymentM
 
 /** Read-only RPC reconciliation. Transport failure is unknown, never an invitation to duplicate intent. */
 export async function observeSolanaSignature(input: {
-  rpcUrl: string; signature: string; genesisHash: string; expectedMessageSha256: string; expectedDeltas: readonly ExpectedTokenDelta[];
-}, fetcher: typeof fetch = fetch) {
+  signature: string; genesisHash: string; expectedMessageSha256: string; expectedDeltas: readonly ExpectedTokenDelta[];
+}, request: (method: string, params: unknown[]) => Promise<unknown>) {
   try {
     const [genesis, rawStatus, rawTransaction] = await Promise.all([
-      rpc(input.rpcUrl, "getGenesisHash", [], fetcher),
-      rpc(input.rpcUrl, "getSignatureStatuses", [[input.signature], { searchTransactionHistory: true }], fetcher),
-      rpc(input.rpcUrl, "getTransaction", [input.signature, { encoding: "base64", commitment: "finalized", maxSupportedTransactionVersion: 0 }], fetcher),
+      request("getGenesisHash", []),
+      request("getSignatureStatuses", [[input.signature], { searchTransactionHistory: true }]),
+      request("getTransaction", [input.signature, { encoding: "base64", commitment: "finalized", maxSupportedTransactionVersion: 0 }]),
     ]);
     if (typeof genesis !== "string") throw new Error("RPC genesis unavailable");
     const statusEnvelope = object(rawStatus);

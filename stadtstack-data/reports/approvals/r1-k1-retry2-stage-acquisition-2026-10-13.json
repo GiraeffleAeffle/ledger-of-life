@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k1-retry2-stage-acquisition-2026-10-13",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approvals below; not a new owner approval",
+  "issuedAt": "2026-10-13T21:30:00Z",
+  "parentApproval": {
+    "id": "r1-genesis-api-robots-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-genesis-api-robots-2026-10-13.json",
+    "sha256": "ca6f7f1458488014eeea307ee3a327e84d28ff4ac34aa12a1fd11dc0444428a7",
+    "clause": "approved.k1Retry"
+  },
+  "relatedApprovals": [
+    {"id": "r1-k2-and-genesis-owner-account-2026-10-13", "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"},
+    {"id": "r1-first-live-batch-2026-10-12", "sha256": "4fdff1a60c64f1c4ebfe49f4757bc8dca297db9060b89cf9f52d80c9b8bffba4"},
+    {"id": "r1-first-live-batch-2026-10-12-amendment-1", "sha256": "d49596ccea79f07ac420966d842c914589809a08c4406c19374a4d88af8b28dc"}
+  ],
+  "preconditionsMet": {
+    "code": "rebuild-r1 1b951fe (GENESIS robots exemption 9f6b32d reviewed YES; integration reviewed YES)",
+    "sourceGate": "tsc=0, 1572 tests, 1524 pass, 0 fail, 48 opt-in skips",
+    "parserAuthorization": "image sha256:52f232e1613b89a3b1231770b7595148001eee96f7f892b4d0986a479fdef4c4, contract 45981975901c3c52131350299a0c8e0e853d0e84ecb81e3372842c077b6470aa; sentinels 29/30 (+1 Mac skip), 30/30, 17/17"
+  },
+  "stage": {
+    "step": "acquire_representation",
+    "selector": "unchanged K1 acquisition.json (GENESIS POST data/table, 12411-02-03, 2024, Strausberg 12064472) via the owner-account lane",
+    "registryDescriptor": {"path": "cache/districts/r1-operator/registry-96e34c4-code-1b951fe/operator-registry-config.json", "sha256": "81eaba82e0b6cbc6804bc1786184f02ff1d56f38eb2887438910cb95477e4610"},
+    "jobKeys": ["d5eebe3f33a0fbe2455006af057282f9fe1312cdf2a80ea5d8ca6a4f40c8fcaa"],
+    "ags": ["12064472"],
+    "maxJobs": 1,
+    "maxElapsedMs": 600000,
+    "osDeadlineSeconds": 600,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-14T21:59:59Z",
+    "newDataRequests": 1
+  },
+  "cumulativeWithinK1": {
+    "priorRuns": [
+      {"runId": "85a9e281-e4cf-43c1-927d-871c7b6f9232", "processWallSeconds": 165, "result": "held, HTTP 401 guest access"},
+      {"runId": "0c1de10f-4ab5-49d3-8924-1369052b2c43", "processWallSeconds": 164, "result": "held policy_excluded (robots + non-official origin)"}
+    ],
+    "jobsIncludingThis": 3,
+    "k1MaxJobs": 5,
+    "wallSecondsUsedBefore": 329,
+    "wallSecondsBoundIncludingThis": 929,
+    "k1TotalSeconds": 1500
+  }
+}

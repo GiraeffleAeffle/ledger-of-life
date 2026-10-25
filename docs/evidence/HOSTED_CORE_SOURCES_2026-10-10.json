@@ -1,0 +1,113 @@
+{
+  "release": {
+    "revision": 37,
+    "deployedAt": "2026-10-10T12:18:06+02:00",
+    "sourceCommit": "8e60739707030828908026da92cf67f1c2457579",
+    "pinCommit": "364b8ac43b9de7ebb5e64b6a7cebf0c7216914c6",
+    "digest": "sha256:414f1df67e6231e530bee1bb068a7626fdda21c0d1dab83a504ac35a9fce5fce",
+    "sourceCi": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38043764967",
+    "imageBuild": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38043992859",
+    "pod": "ledger-of-life-74c74c557d-4g9l9",
+    "podReady": true,
+    "podSpecAndImageIdMatchDigest": true,
+    "method": "Governed Ledger release only under atomic shared privileged-session.lock. Foreign transport check, viewer stop, no remaining wireproxy, successful apply, viewer restored and lock released before SiteUpdate's urgent session. No NetworkPolicy, Secret, financial program, authority or migration change."
+  },
+  "initialCoreRelease": {
+    "revision": 36,
+    "deployedAt": "2026-10-10T11:55:36+02:00",
+    "sourceCommit": "d015cb719c7cae33ba5f3d1743b25e7cf51a9288",
+    "pinCommit": "d003e0b6c25a293a86e47c4c4413a21c20a7671e",
+    "digest": "sha256:a6d5948f142a860c6db9c1aa476ef68d2d2c6dc3997bf8fde6887942914fba0d",
+    "sourceCi": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38042327463",
+    "imageBuild": "https://github.com/GiraeffleAeffle/ledger-of-life/actions/runs/38042555541",
+    "pod": "ledger-of-life-865c574448-98bcx",
+    "podReadyAndDigestVerified": true,
+    "acceptanceBoundary": "Lake answer and public source DTOs passed. Two-year budget inference acceptance failed as detailed below; revision36 is not claimed to have passed the full source-answer acceptance."
+  },
+  "gates": {
+    "routeTypeGeneration": "passed",
+    "typescript": "passed",
+    "lint": "passed",
+    "testsPassed": 1081,
+    "testsSkipped": 2,
+    "testsFailed": 0,
+    "whitespace": "passed",
+    "productionBuild": "passed",
+    "sourceCi": "application, EVM and Solana-host passed",
+    "independentReviews": "Security and GPT-6.1-sol correctness/UX reviews cleared new-delta findings, including focused rechecks of fresh-byte trust caching and required-year packing. Not an external audit.",
+    "imageSmoke": "Both immutable amd64 images passed non-root uid1000/read-only/drop-ALL Colima smoke, public200/private401/retired404 boundaries, available SQLite/private-file absence, and actual bundled core/full/compact manifest hash checks. Smoke containers/images removed.",
+    "dockerInputs": "All hosted imports remain in existing src/app COPY roots; publication bytes already enter through stadtstack-data/out. No pipeline, PDF parser or Zod import enters the hosted app."
+  },
+  "corePublication": {
+    "upstreamDataCommit": "2cd459f",
+    "integratedDataCommit": "7e5c80d",
+    "bundlePath": "stadtstack-data/out/core/strausberg-facts.json",
+    "manifestPath": "stadtstack-data/out/core/release-manifest.json",
+    "bundleSha256": "ff2cc11e26322a30663f1f62ad39873056cfb4f9ff34c44684b36453f70e3c75",
+    "bundleVersion": "4de6e538c19be61e9014b782e2b5f75f9228c5794d340967e0ccc67c0e4d4d08",
+    "runtimeGate": "Freshly hash bundle, manifest and full/compact corpora before admission reuse. Match required IDs, assertion/fact/bundle versions, primary-source and evaluation-receipt bindings, actual evaluator flag, deterministic pass and expected DeepEval policy. Missing/mismatched/metadata-preserving replacements become unverified and cannot ground City AI.",
+    "reviewState": "auto_checked",
+    "verificationStatus": "auto-verified",
+    "meaning": "Named automated gates against one primary source, not human review, independent corroboration or municipal endorsement. Manifest trust comes from the immutable image, not an upstream signature.",
+    "publicationChecksReportedByCivicPipelineMap": "Fresh PDF bytes/exact rows and actual DeepEval3.9.9 codex:gpt-6-luna, ambiguity penalty enabled, score1.0 for each fact; data22tests/typecheck and game183tests/typecheck/build passed. Game was not deployed by CityApp.",
+    "liveDtoObservedAt": "2026-10-10T10:06:21.552Z",
+    "liveDtoRecords": [
+      {"id":"lake:straussee-level-2026-09-14","kind":"measurement","reviewState":"auto_checked","verificationStatus":"auto-verified","documentDate":"2026-10-05","assertion":{"date":"2026-09-14","value":-1.61,"unit":"m","reference":"Normalstau"}},
+      {"id":"budget:investment-outlays-2025","kind":"budget","reviewState":"auto_checked","verificationStatus":"auto-verified","documentDate":"2024-11-07","assertion":{"year":2025,"value":17941270,"unit":"EUR"}},
+      {"id":"budget:investment-outlays-2026","kind":"budget","reviewState":"auto_checked","verificationStatus":"auto-verified","documentDate":"2024-11-07","assertion":{"year":2026,"value":12609320,"unit":"EUR"}}
+    ],
+    "primarySourcesRead": [
+      "https://www.stadt-strausberg.de/wp-content/uploads/2025/05/26-10-05_Stauhoehe-Straussee.pdf",
+      "https://www.stadt-strausberg.de/wp-content/uploads/2025/04/2024-11-07_Haushaltssatzung_2025_2026.pdf"
+    ],
+    "primarySourceObservation": "Direct public PDF readings match the selected historical14Sep row and planned2025/2026 investment-outlay columns. Measurement date differs from PDF date; planned amounts are not actual expenditure."
+  },
+  "nativeTopic": {
+    "id": "4c5d2db9-ccd4-4aaa-8a57-070d17b76716",
+    "url": "https://ledger.stadtstack.eu/?area=places&tab=places-say&civicCity=strausberg&civicTopic=4c5d2db9-ccd4-4aaa-8a57-070d17b76716",
+    "title": "Demo: datierte Straussee- und Haushaltsquellen",
+    "classification": "Labelled test-account source-understanding example, not a resident opinion sample, official participation or municipal decision."
+  },
+  "lakeAnswer": {
+    "revision": 36,
+    "status": "completed",
+    "generatedAt": "2026-10-10T11:57:51+02:00",
+    "model": "qwen3.8:27b-ud-q3-k-xl",
+    "answer": "Am 14.09.2026 lag der Straussee 1,61 m unter dem Normalstau [1].\n\n*   **Messdatum:** 14.09.2026 [1]\n*   **Dokumentdatum:** 05.10.2026 [1]\n\nDieser Wert ist eine historische Messung und belegt **nicht** den heutigen Wasserstand. Die Quelle enthält explizit keine Aussage zum aktuellen Zustand [1]. Die Prüfung erfolgte automatisiert (auto-verified), nicht durch menschliche Überprüfung [1].",
+    "acceptance": "Real German generated answer, correct measurement/document dates and reference, explicitly not current, with measurement kind and auto-verified/not-human-reviewed source metadata."
+  },
+  "budgetAcceptanceBeforeCorrection": {
+    "revision": 36,
+    "firstAttempt": "Failed: model did not complete a publishable answer; no answer or wallet charge. Exact underlying provider cause is not established by the public job.",
+    "secondQuestion": "In höchstens zwei kurzen Sätzen ohne Aufzählung: Welche Investitionsauszahlungen sind für 2025 und 2026 geplant? Nenne beide EUR-Beträge, das Dokumentdatum und dass keine Ist-Ausgaben belegt sind.",
+    "secondGeneratedAt": "2026-10-10T11:59:33+02:00",
+    "secondAnswer": "Für 2025 sind laut dem am 2024-11-07 datierten Investitionsplan geplante Investitionsauszahlungen in Höhe von 17.941.270 EUR veranschlagt [1]. Für das Jahr 2026 liegen in den vorliegenden Quellen keine konkreten geplanten EUR-Beträge vor, und es sind keine Ist-Ausgaben belegt [1].",
+    "failure": "The longer question packed2025 but omitted2026 and admitted a smaller candidate. This is incomplete-context acceptance failure, not proof that2026 source data is absent.",
+    "preservation": "Both observed states are preserved. A plainly labelled human correction was posted without an AI tag, stating both actual planned amounts and the missing-context error; no generated answer was rewritten."
+  },
+  "correction": {
+    "revision": 37,
+    "behavior": "Reserve every explicitly requested admitted budget year before optional context; remove duplicate date and verification wording, never whole required facts/caveats. Refuse inference with context-too-large if any required year cannot fit. Ask for at most two short sentences under unchanged192-token completion/privacy/citation checks.",
+    "regressions": "Both exact hosted question strings now include2025 and2026 under2000 characters. Oversized required-year evidence refuses before any provider call.",
+    "hostedBudgetReplayAtRecording": "Not yet exercised after correction: all3 account/topic attempts for10Oct were used. No quota increase, reset or alternate-account bypass was used; another live attempt requires the next UTC day."
+  },
+  "moneyRegression": {
+    "revision": 37,
+    "network": "Solana devnet",
+    "action": "buy",
+    "reviewedCash": "0.001 tUSDC",
+    "receivedUnits": "0.001 tHOME",
+    "signature": "4H8kUxq97UaEmbyd5tK2sdGTbFqoPi6yd9gPbsso3XgLfNja6ecwhYQkkmkhhTvhi9PtyK4jnGEnVoXjLY1eunED",
+    "explorer": "https://explorer.solana.com/tx/4H8kUxq97UaEmbyd5tK2sdGTbFqoPi6yd9gPbsso3XgLfNja6ecwhYQkkmkhhTvhi9PtyK4jnGEnVoXjLY1eunED?cluster=devnet",
+    "blockTime": "2026-10-10T10:20:06Z",
+    "slot": 509508492,
+    "commitment": "finalized",
+    "transactionError": null,
+    "userTokenDeltasAtomic": {"BCgqGAUvbGobqXrJtEDS437i8r1FffVSGcnwCsHcN2oE":"-1000","2XtDmPPg9Rzu7kNufRsUVG3CGhkrp4KnuRm14rsGqwXy":"1000"},
+    "independentCheck": "Public devnet getTransaction at finalized commitment; exact reviewed effects, no error."
+  },
+  "evidenceDirectory": "/Users/max/Code/ledger-of-life-review/videos/captures-v4/",
+  "screenshots": ["live-core-lake-answer-1280.png","live-core-verification-390.png","live-core-measurement-detail-1280.png","live-core-measurement-detail-390.png","live-core-budget-incomplete-context-1280.png","live-core-money-regression-1280.png"],
+  "mobile": {"viewportWidth":390,"documentWidth":390,"expandedVerificationHashesWrap":true},
+  "limits": "No human-review, current lake-level, actual municipal spend, onchain source anchor or delivered municipal outcome claim. Existing map-proxy aggregate resource risk remains outside this delta."
+}

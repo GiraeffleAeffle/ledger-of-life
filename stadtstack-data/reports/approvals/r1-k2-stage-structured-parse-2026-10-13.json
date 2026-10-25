@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "stadtstack-r1-stage-authorization-record-v1",
+  "id": "r1-k2-stage-structured-parse-2026-10-13",
+  "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under the owner approval below; not a new owner approval",
+  "issuedAt": "2026-10-13T10:40:00Z",
+  "parentApproval": {
+    "id": "r1-k2-and-genesis-owner-account-2026-10-13",
+    "path": "stadtstack-data/reports/approvals/r1-k2-and-genesis-owner-account-2026-10-13.json",
+    "sha256": "d7c8074d80d5636520cdb0422d1f161da6529c0dbe1cb1f97256b21770823b66"
+  },
+  "reason": "district_pipeline.preauthorizations.approval_sha256 is unique, so each queue authorization must cite its own record. The owner approved K2 as a batch of at most 5 jobs and 1,500,000 ms in total; the acquisition stage used the parent record directly. This record covers only the dependent structured-parse stage and never exceeds the parent's cumulative bounds.",
+  "stage": {
+    "step": "structured_parse",
+    "adapter": "gauges",
+    "operation": "parse",
+    "representationSha256": "7e144f0bbd06ec3655467d520b68eba71d1c574aa6bdf0adc0b92b4a752b5ca3",
+    "jobKeys": ["2c920733a49121c6cb304c6b0cb092eac60bd287b1f4f5d0fbb49ba69a257b22"],
+    "ags": ["13076060"],
+    "maxJobs": 1,
+    "maxElapsedMs": 600000,
+    "mode": "bounded_unattended",
+    "category": "production",
+    "expiresAt": "2026-10-16T21:59:59Z"
+  },
+  "cumulativeWithinParent": {
+    "priorAuthorizations": [
+      {"authorizationId": "d8cfc29d-76ea-4cea-834a-f8e6dc25f609", "step": "acquire_representation", "maxJobs": 1, "maxElapsedMs": 900000, "result": "completed, 1 job"}
+    ],
+    "totalJobsAuthorized": 2,
+    "parentMaxJobs": 5,
+    "totalMaxElapsedMsAuthorized": 1500000,
+    "parentTotalMaxElapsedMs": 1500000
+  }
+}

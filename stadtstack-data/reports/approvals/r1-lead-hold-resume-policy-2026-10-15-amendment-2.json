@@ -1,0 +1,58 @@
+{
+ "schemaVersion": "stadtstack-r1-operator-action-record-v1",
+ "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-2",
+ "amends": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15",
+  "path": "stadtstack-data/reports/approvals/r1-lead-hold-resume-policy-2026-10-15.json",
+  "sha256": "c5b15eb22f544b63a8fbf71eb9b5cfbf334ee37340c542a223ad6a5464e4f493"
+ },
+ "priorAmendment": {
+  "id": "r1-lead-hold-resume-policy-2026-10-15-amendment-1",
+  "path": "stadtstack-data/reports/approvals/r1-lead-hold-resume-policy-2026-10-15-amendment-1.json",
+  "sha256": "4ef8a73624eeb33672dc41b367f4c56c7ef9dcbd9df77bff30fffc9d5648befe"
+ },
+ "parentApprovals": [
+  {
+   "id": "r1-nine-town-models-2026-10-13",
+   "sha256": "2ac6267d17ed08452665a0b2de92ec4da89915fe8619b668b85585301327502b"
+  },
+  {
+   "id": "r1-autonomy-and-release-2026-10-14",
+   "sha256": "865e80d2aad2ec23250b83b50c012639d0b04f068fc64d42eabe1b36a82b35f5"
+  }
+ ],
+ "issuedBy": "R1 VM lead (omp session in tmux on codex-workstation), under owner approvals r1-autonomy-and-release-2026-10-14 and r1-nine-town-models-2026-10-13 (#81); not a new owner approval",
+ "issuedAt": "2026-10-17T00:03:33Z",
+ "expiresAt": "2026-10-25T21:59:59Z",
+ "change": {
+  "nativeBTerminalEffectDisposition": {
+   "version": "r1-b-provider-effect-disposition-v1",
+   "step": "assessment_b",
+   "transport": "vm-omp",
+   "state": "held_execution",
+   "automatic": true,
+   "terminalOnly": true,
+   "admitted": false,
+   "refunded": false,
+   "additionalResumes": 0,
+   "additionalModelCalls": 0,
+   "paidMicroUsd": 0,
+   "eligibleReasons": [
+    "lease_expired",
+    "execution_exception"
+   ],
+   "conditions": [
+    "Only a native B job in the source's exact saved stage selection under the current canonical semantic contract is eligible; historical-contract orphan intents are not migrated or replayed.",
+    "Core must authenticate the immutable job, lease, intent, run, fencing token, input and request digests, frozen committed held receipt, original artifact-role hashes and current managed custody; the original run must be closed and no live or ambiguous provider effect may remain.",
+    "Core must authenticate genuine completed-unadmitted or rejected-unadmitted provider evidence and the required actual cleanup/disposition evidence for that kind; missing, ambiguous, tampered, opted-out, revoked or otherwise unprovable evidence refuses without an append.",
+    "The driver may invoke settle-b-provider-effect automatically only for this bounded terminal mechanism. Core appends r1-b-provider-effect-disposition-v1 evidence; its read-only verifier must freshly authenticate that evidence before the operator treats the effect as settled.",
+    "Every other provider intent and reservation must remain settled under existing Core rules. Any unresolved Codex or Anthropic subscription hold, uncertain usage, paid hold, lease_lost or run-level recovery ambiguity still stops the source.",
+    "The matching original held receipt becomes a terminal B exception for sealing and the explicit exception inventory, never an assessment result, accepted submission, fabricated purge acknowledgement or late admission of an expired-lease answer.",
+    "No job resume or new source/model request is authorized by this amendment. Existing calls, usage, paid accounting, clocks, receipts, lease states and resume ordinals are preserved; no refund, cap reset, additional retry or extra resume is permitted.",
+    "A refusal or unverifiable disposition remains a source STOP. Owner revocation of the base policy, amendment-1, this amendment or either parent approval revokes this mechanism; no fallback is allowed."
+   ]
+  },
+  "unchanged": "The base eligible-reason and never-resumed lists, maxResumesPerJobKey 2, cumulative 48-call/document cap, zero paid usage, existing guarded resume mechanism and all source-policy, custody, subscription, executor-recovery and sealing gates remain unchanged outside this native-B terminal-only mechanism."
+ },
+ "reason": "A native B provider call may finish while post-call managed staging outlasts the fixed broker lease deadline. Its genuine managed output remains an unadmitted provider effect although the original committed job receipt correctly holds. A separately authenticated append-only terminal effect disposition permits the source's other documents to continue and the held item to be sealed as an explicit exception, without late admission, provider replay, new authority or accounting changes."
+}

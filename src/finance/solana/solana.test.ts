@@ -201,7 +201,7 @@ test("wallet review checks exact bytes, encoded limits and every writable simula
 });
 
 test("RPC transport failures remain unknown and cannot create a duplicate intent", async () => {
-  const input = {rpcUrl:"https://rpc.example",signature:getBase58Decoder().decode(new Uint8Array(64).fill(1)),genesisHash:manifest.genesisHash,expectedMessageSha256:"a".repeat(64),expectedDeltas:[]};
-  const result = await observeSolanaSignature(input, (async () => { throw new Error("offline"); }) as typeof fetch);
+  const input = {signature:getBase58Decoder().decode(new Uint8Array(64).fill(1)),genesisHash:manifest.genesisHash,expectedMessageSha256:"a".repeat(64),expectedDeltas:[]};
+  const result = await observeSolanaSignature(input, async () => { throw new Error("offline"); });
   assert.equal(result.status,"unknown");
 });

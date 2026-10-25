@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "stadtstack-r1-owner-approval-record-v1",
+  "id": "r1-nine-town-crawl-2026-10-13",
+  "recordedAt": "2026-10-13T11:45:00Z",
+  "recordedBy": "R1 VM lead (omp session in tmux on codex-workstation)",
+  "approver": "Max (owner)",
+  "channel": "omp chat with the R1 session, answering Vikunja task 80 (options A/B/C) after the lead's plain-language summary",
+  "questionSummaryShownToOwner": "#80: first fetch of documents from the nine pilot towns (fetch only). 40 registered sources (council information systems, participation portals, official gazettes, town websites); Hagenow council excluded (login); three BOB-SH entries inventory check only. Per source one round, 4-24 documents, 6-28 requests; at most 630 fetch attempts in total, about 200-490 documents expected. Honest user agent with contact; at most one request per host at a time, at least 5 s apart; robots override of 11 Oct applies; login/403/captcha/paywall stops that source; third-party works excluded; opt-out/deletion honoured; facts with source attribution only, originals private. Lead starts runs one after another and monitors; ntfy after each town; about 4-10 hours; valid until Sun 25 Oct. No AI models and no publication. Fetched sets become usable for processing only if every document passed the checks; hashes reported to the owner. A = approve as described, B = half the limits, C = not yet.",
+  "ownerStatementsVerbatim": [
+    "80. A is fine, 81. is this a b or c or are these the steps? We can use all the subscriptions we have or not?"
+  ],
+  "approved": {
+    "plan": "stadtstack-data/reports/r1-nine-town-crawl-plan-2026-10-13.md (commit 09ec39b), section 4 per-source commands and bounds, with hagenow-council excluded",
+    "sources": 40,
+    "maxFetchAttemptsTotal": 630,
+    "maxRoundsPerSource": 1,
+    "pacing": "at most 1 request in flight per host; municipal profile at least 5 s between requests to a host; shared floor 2.5 s from sources/district-host-groups.json",
+    "permissionKind": "facts_with_attribution",
+    "operation": "lead-operated sequential crawler runs (src/district-crawl.ts) with ntfy reports after each town",
+    "expiresAt": "2026-10-25T21:59:59Z",
+    "corpusFollowUp": "Resulting crawl indexes may become R1 corpora (code allowlist, reviewed) only if every admitted document passed the policy/origin/access checks; the lead reports the hashes to the owner."
+  },
+  "notApproved": [
+    "Model calls of any kind (decision #81 pending)",
+    "Publication or release of any crawled content",
+    "Hagenow council (login) or any login/captcha/paywall bypass",
+    "Sources outside the 40 listed registrations, more than one round per source, or bounds above the plan"
+  ]
+}
