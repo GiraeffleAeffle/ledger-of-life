@@ -10,9 +10,9 @@
 # market on Robinhood Chain testnet: addresses, code hashes, parameters). Keys, the database and operator material are
 # supplied at run time (see docs/DEPLOYMENT.md); nothing private is copied in, and `.dockerignore` is deny-by-default.
 
-# Pinned by digest so a moved tag cannot change what builds and runs this image: node:24-bookworm-slim, Node 24.21.0,
-# resolved on 30 Sep 2026. Update deliberately: `docker buildx imagetools inspect node:24-bookworm-slim`, then rebuild.
-FROM node:24-bookworm-slim@sha256:0e0ff40c39bc087845bfb27465a0df4ea419520094bc35842ff83dd8cbe6f9b6 AS base
+# Pinned Node 24 bookworm-slim security refresh, resolved on 15 Nov 2026.
+# Update deliberately: `docker buildx imagetools inspect node:24-bookworm-slim`, then rebuild.
+FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS base
 WORKDIR /app
 
 FROM base AS deps
