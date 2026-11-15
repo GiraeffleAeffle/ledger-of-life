@@ -269,3 +269,36 @@ The privacy follow-up ran the updated rendered command against four real `LocalS
 - **The project atlas.** No project atlas is deployed. Hosted values explicitly set `STADTSTACK_ATLAS_URL` empty; city choice and bundled snapshots remain separate from the local research prototype.
 - **Resource sizes** (request 192 Mi, limit 768 Mi) come from about 120 MB idle in Docker. They were not load tested.
 - **No GPU path.** `LOCAL_AI_OLLAMA_URL` is unset, so the paid AI desk reports itself unconfigured. See `docs/DEPLOYMENT.md`, "The GPU".
+
+## Security rebuild preparation — 15 November 2026
+
+The security branch starts from the deployed application revision
+`dcbc889201575dea09452fc230c0d2dd3583d5f0`. Only Next/eslint-config-next
+16.4.1, their lockfile and the Node 24 bookworm-slim base were updated; no
+application or frontend source changed. Node 24.22.3 is supplied by base index
+`sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54`.
+
+The app suite passed 1,195 tests with three existing skips; lint/type checking
+passed. Foundry passed 112 tests with two fork skips, compiled-runtime checks
+passed, and the Solana library passed all nine tests. The local amd64 image
+built successfully and answered `/api/status` with an available SQLite store
+under the retained read-only/nonroot profile. Anonymous root/welcome pages at
+1280/390 retained their layout and 44px legal links, without horizontal
+overflow; this does not repeat authenticated wallet/iframe acceptance.
+
+The local candidate manifest is
+`sha256:7e97102bfa75aa4560ee582f04c2f42cff6308f5fa2b9cd841dc81b455d83f63`.
+Its Trivy scan has one residual CRITICAL (`zlib1g` CVE-2023-45853, no supplied
+fix), 44 HIGH, 107 MEDIUM, 86 LOW and five UNKNOWN occurrences. The saved
+critical Next and Perl findings are absent. Bookworm's unfixed MiniZip-related
+zlib advisory is explicitly accepted for this preparation, not silently
+dismissed. This is not an all-CVE clearance.
+
+Publication/deployment remains owner-gated. The proposed `image-security-20261115`
+tag goes on this branch's final reviewed commit; a main merge is not required.
+Do not reuse the local digest as a claim about a future CI rebuild: scan the
+published digest, pin all callers, verify a fresh WAL-aware backup and inspect
+the complete Helm diff before deployment. Run the reviewed release script only
+inside the current shared `stadtstack-session` governance; its release mode
+has no argument and requires the exact typed confirmation `apply ledger-of-life`.
+Do not bypass governance by replaying the historical rootless wrapper.
