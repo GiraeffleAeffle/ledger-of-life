@@ -58,6 +58,6 @@ export function CityStoryView({ story }: { story: CityStory }) {
       <p className="small-copy">Reinvestment returns to the beginning of the cycle.</p>
     </figure>
 
-    <footer className="card story-footer"><h2>Evidence, not a promise</h2><p>{story.evidenceScope}</p><nav aria-label="Explore Ledger of Life"><Link href="/replay" prefetch={false}>Recorded tenancy</Link><Link href="/welcome/strausberg" prefetch={false}>Welcome to Strausberg</Link><Link href="/" prefetch={false}>Ledger of Life</Link></nav></footer>
+    <footer className="card story-footer"><h2>Evidence, not a promise</h2><p>{story.evidenceScope}</p><nav aria-label="Explore Ledger of Life"><Link href="/topic-demo" prefetch={false}>Bürger-Themenweg · lokale Demo</Link><Link href="/replay" prefetch={false}>Recorded tenancy</Link><Link href="/welcome/strausberg" prefetch={false}>Welcome to Strausberg</Link><Link href="/" prefetch={false}>Ledger of Life</Link></nav></footer>
   </main>;
 }

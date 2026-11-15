@@ -89,7 +89,7 @@ npm run setup
 npm run dev
 ```
 
-Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. Account setup and the five signed-in areas use the real account; test-network balance and finance workflows require the relevant wallet, connection, and test-network configuration.
+Open [the workspace](http://localhost:4175). Use this hostname for passkeys; WebAuthn cannot use an IP address as its relying-party ID. Setup creates a private `.env.local` without printing secrets. Account setup and the five signed-in areas use the real account; test-network balance and finance workflows require the relevant wallet, connection, and test-network configuration. The read-only civic walkthrough needs no account or backend writes: open [localhost:4175/topic-demo](http://localhost:4175/topic-demo) for a sourced Tramm record and clearly labelled invented discussion, department replies and advisory question.
 
 For the real, passkey-signed flow on the Solana test network (post a home → apply → choose → deposit → move-out → payout, one next step at a time), open **Home**. See [the home journey](docs/HOME_JOURNEY.md).
 
