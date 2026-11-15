@@ -22,13 +22,110 @@ export function searchText(features:Signal[],query?:string,topic?:string){
 export function along(features:Signal[],line:Coord[],buffer:number,kinds?:string[]){return features.filter(f=>(!kinds||kinds.includes(f.properties.kind))&&line.some((b,i)=>i>0&&geometryNearSegment(f,line[i-1],b,buffer)));}
 function geometryNearSegment(feature:Signal,a:Coord,b:Coord,buffer:number){if(feature.geometry?.type==='Point')return segmentDistance(feature.geometry.coordinates,a,b)<=buffer;if(geometryDistance(feature,a)<=buffer||geometryDistance(feature,b)<=buffer)return true;const g=feature.geometry;if(!g)return false;const lines:Coord[][]=g.type==='LineString'?[g.coordinates]:g.type==='Polygon'?g.coordinates:g.coordinates.flat();for(const line of lines)for(let i=1;i<line.length;i++){const c=line[i-1],d=line[i];if(segmentDistance(c,a,b)<=buffer||segmentDistance(d,a,b)<=buffer)return true;const cross=(u:Coord,v:Coord,w:Coord)=>(v[0]-u[0])*(w[1]-u[1])-(v[1]-u[1])*(w[0]-u[0]);if(cross(a,b,c)*cross(a,b,d)<=0&&cross(c,d,a)*cross(c,d,b)<=0)return true;}return false;}
 async function collection(cityId:string){return jsonFile<FeatureCollection>(join(outDir,'cities',cityId,'signals.geojson'));}
-export function server(){const mcp=new McpServer({name:'stadtstack-data',version:'0.1.0'});const tool=(data:unknown)=>({content:[{type:'text' as const,text:JSON.stringify(data)}],structuredContent:typeof data==='object'&&data!==null&&!Array.isArray(data)?data as Record<string,unknown>:undefined});
- mcp.registerTool('list_cities',{description:'List public whole-city datasets and coverage',inputSchema:{}},async()=>tool(await jsonFile<Catalogue>(join(outDir,'catalogue.json'))));
- mcp.registerTool('get_core_bundle',{description:'Read the shared Strausberg core fact bundle and release manifest, including automated gate evidence. Auto-verified is not human review or independent truth certification.',inputSchema:{}},async()=>tool({bundle:await jsonFile(join(outDir,'core','strausberg-facts.json')),manifest:await jsonFile(join(outDir,'core','release-manifest.json'))}));
- mcp.registerTool('search_signals',{description:'Search whole-city facts by text/topic, including null geometry; no coordinates required.',inputSchema:{cityId:z.string().regex(/^[a-z0-9-]+$/),query:z.string().optional(),topic:z.string().optional()}},async({cityId,query,topic})=>tool({features:searchText((await collection(cityId))?.features??[],query,topic)}));
- mcp.registerTool('search_signals_near',{description:'Search geometry near a point. Null-geometry citywide records do not match.',inputSchema:{cityId:z.string().regex(/^[a-z0-9-]+$/),lon:z.number().min(-180).max(180),lat:z.number().min(-90).max(90),radius_m:z.number().positive().max(100000),kinds:z.array(z.string()).optional()}},async({cityId,lon,lat,radius_m,kinds})=>tool(near((await collection(cityId))?.features??[],[lon,lat],radius_m,kinds)));
- mcp.registerTool('search_signals_along',{description:'Search signals intersecting a buffered line',inputSchema:{cityId:z.string().regex(/^[a-z0-9-]+$/),line:z.array(z.tuple([z.number(),z.number()])).min(2),buffer_m:z.number().positive().max(50000),kinds:z.array(z.string()).optional()}},async({cityId,line,buffer_m,kinds})=>tool(along((await collection(cityId))?.features??[],line,buffer_m,kinds)));
- mcp.registerTool('get_signal',{description:'Fetch a public signal by stable id',inputSchema:{id:z.string()}},async({id})=>{const cat=await jsonFile<Catalogue>(join(outDir,'catalogue.json'));for(const c of cat?.cities??[]){const f=(await collection(c.id))?.features.find(f=>f.properties.id===id);if(f)return tool(f);}return tool({error:'not found'});});
- mcp.registerTool('get_sources',{description:'Fetch original attribution and exact source locators',inputSchema:{id:z.string()}},async({id})=>{const cat=await jsonFile<Catalogue>(join(outDir,'catalogue.json'));for(const c of cat?.cities??[]){const f=(await collection(c.id))?.features.find(f=>f.properties.id===id);if(f)return tool({id,sources:f.properties.sources,reviewState:f.properties.reviewState,verification:f.properties.verification,assertion:f.properties.assertion,geometryPrecision:f.properties.geometryPrecision,asOf:f.properties.asOf});}return tool({error:'not found'});});
- mcp.registerTool('get_changes',{description:'Added, changed and removed stable ids since the prior publication; use get_signal for current details',inputSchema:{cityId:z.string().regex(/^[a-z0-9-]+$/)}},async({cityId})=>tool(await jsonFile<Changes>(join(outDir,'cities',cityId,'changes.json'))??{error:'unknown city'}));return mcp;}
+export function server() {
+ const mcp = new McpServer({name: 'stadtstack-data', version: '0.1.0'});
+ const tool = (data: unknown, isError = false) => ({
+  content: [{type: 'text' as const, text: JSON.stringify(data)}],
+  ...(isError ? {isError: true} : {}),
+  structuredContent: typeof data === 'object' && data !== null && !Array.isArray(data)
+   ? data as Record<string, unknown> : undefined,
+ });
+ const unavailableCity = (cityId: string) => ({
+  error: 'unknown_city',
+  message: `No published dataset is available for cityId "${cityId}". Call list_cities and use one of its exact city ids.`,
+  cityId,
+ });
+ const missingSignal = (id: string) => ({
+  error: 'signal_not_found',
+  message: `No current published signal has id "${id}". Search the published city data with search_signals, then use the returned stable id.`,
+  id,
+ });
+ mcp.registerTool('list_cities', {
+  description: 'Start here to discover exact cityId values and published coverage. Results describe whole-city datasets, not every municipality in Germany.',
+  inputSchema: {},
+ }, async () => tool(await jsonFile<Catalogue>(join(outDir, 'catalogue.json'))));
+ mcp.registerTool('get_core_bundle', {
+  description: 'Read the released Strausberg core facts and their release manifest. Use for the historical lake measurement or planned budget outlays; follow each fact source and date. Auto-verified is automated checking, not human review or independent certification.',
+  inputSchema: {},
+ }, async () => tool({
+  bundle: await jsonFile(join(outDir, 'core', 'strausberg-facts.json')),
+  manifest: await jsonFile(join(outDir, 'core', 'release-manifest.json')),
+ }));
+ mcp.registerTool('search_signals', {
+  description: 'Search all published facts for one exact cityId from list_cities; no coordinates required, and null-geometry facts are included. Every query word must match. Use topic for a category/kind filter; call get_sources with a returned signal id for attribution.',
+  inputSchema: {
+   cityId: z.string().regex(/^[a-z0-9-]+$/).describe('Exact cityId returned by list_cities.'),
+   query: z.string().optional().describe('Optional text; all whitespace-separated terms must match.'),
+   topic: z.string().optional().describe('Optional case-insensitive category, kind or id-prefix filter.'),
+  },
+ }, async ({cityId, query, topic}) => {
+  const data = await collection(cityId);
+  return tool(data
+   ? {features: searchText(data.features, query, topic)}
+   : unavailableCity(cityId), !data);
+ });
+ mcp.registerTool('search_signals_near', {
+  description: 'Find published signals whose geometry lies within radius_m of a WGS84 point. First get an exact cityId from list_cities. Requires longitude and latitude in decimal degrees; null-geometry citywide facts cannot match. Use get_sources for a returned id.',
+  inputSchema: {
+   cityId: z.string().regex(/^[a-z0-9-]+$/).describe('Exact cityId returned by list_cities.'),
+   lon: z.number().min(-180).max(180).describe('WGS84 longitude in decimal degrees.'),
+   lat: z.number().min(-90).max(90).describe('WGS84 latitude in decimal degrees.'),
+   radius_m: z.number().positive().max(100000).describe('Search radius in metres (maximum 100,000).'),
+   kinds: z.array(z.string()).optional().describe('Optional exact signal kinds to include.'),
+  },
+ }, async ({cityId, lon, lat, radius_m, kinds}) => {
+  const data = await collection(cityId);
+  return tool(data
+   ? near(data.features, [lon, lat], radius_m, kinds)
+   : unavailableCity(cityId), !data);
+ });
+ mcp.registerTool('search_signals_along', {
+  description: 'Find published signal geometries within buffer_m of a WGS84 line. First get an exact cityId from list_cities. Supply at least two [longitude, latitude] points in decimal degrees; null-geometry facts cannot match. Use get_sources for a returned id.',
+  inputSchema: {
+   cityId: z.string().regex(/^[a-z0-9-]+$/).describe('Exact cityId returned by list_cities.'),
+   line: z.array(z.tuple([z.number(), z.number()])).min(2).describe('At least two [longitude, latitude] WGS84 points.'),
+   buffer_m: z.number().positive().max(50000).describe('Search buffer in metres (maximum 50,000).'),
+   kinds: z.array(z.string()).optional().describe('Optional exact signal kinds to include.'),
+  },
+ }, async ({cityId, line, buffer_m, kinds}) => {
+  const data = await collection(cityId);
+  return tool(data
+   ? along(data.features, line, buffer_m, kinds)
+   : unavailableCity(cityId), !data);
+ });
+ mcp.registerTool('get_signal', {
+  description: 'Fetch the full current published signal by its exact stable id. Discover ids with search_signals or a spatial search. A removed or unknown id is not available in the current publication.',
+  inputSchema: {id: z.string().describe('Exact stable signal id returned by a search result.')},
+ }, async ({id}) => {
+  const cat = await jsonFile<Catalogue>(join(outDir, 'catalogue.json'));
+  for (const city of cat?.cities ?? []) {
+   const feature = (await collection(city.id))?.features.find(item => item.properties.id === id);
+   if (feature) return tool(feature);
+  }
+  return tool(missingSignal(id), true);
+ });
+ mcp.registerTool('get_sources', {
+  description: 'Fetch source attribution, exact locators and review metadata for a current signal id. Use after a search or get_signal; source metadata does not independently verify truth or completeness.',
+  inputSchema: {id: z.string().describe('Exact stable signal id returned by a search result.')},
+ }, async ({id}) => {
+  const cat = await jsonFile<Catalogue>(join(outDir, 'catalogue.json'));
+  for (const city of cat?.cities ?? []) {
+   const feature = (await collection(city.id))?.features.find(item => item.properties.id === id);
+   if (feature) return tool({
+    id, sources: feature.properties.sources, reviewState: feature.properties.reviewState,
+    verification: feature.properties.verification, assertion: feature.properties.assertion,
+    geometryPrecision: feature.properties.geometryPrecision, asOf: feature.properties.asOf,
+   });
+  }
+  return tool(missingSignal(id), true);
+ });
+ mcp.registerTool('get_changes', {
+  description: 'Read stable ids added, changed or removed in the latest city publication. First choose an exact cityId from list_cities; call get_signal for current details of an available id. Removed ids are not current records.',
+  inputSchema: {cityId: z.string().regex(/^[a-z0-9-]+$/).describe('Exact cityId returned by list_cities.')},
+ }, async ({cityId}) => {
+  const changes = await jsonFile<Changes>(join(outDir, 'cities', cityId, 'changes.json'));
+  return tool(changes ?? unavailableCity(cityId), !changes);
+ });
+ return mcp;
+}
 if(process.argv[1]&&new URL(import.meta.url).pathname===process.argv[1]){if(process.argv.includes('--http')){const port=Number(process.env.STADTSTACK_MCP_PORT??'4318');const http=createServer(async(req,res)=>{if(!req.url?.startsWith('/mcp')){res.writeHead(req.url==='/health'?200:404,{'content-type':'application/json'});res.end(JSON.stringify({ok:req.url==='/health'}));return;}const instance=server(),transport=new StreamableHTTPServerTransport({sessionIdGenerator:undefined});try{await instance.connect(transport);await transport.handleRequest(req,res);}catch(error){console.error(error);if(!res.headersSent){res.writeHead(500);res.end();}}});http.listen(port,'127.0.0.1',()=>console.error(`Stadtstack MCP http://127.0.0.1:${port}/mcp`));}else{await server().connect(new StdioServerTransport());}}

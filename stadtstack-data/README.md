@@ -74,6 +74,8 @@ The faithfulness threshold is `0.8`; production uses DeepEval `FaithfulnessMetri
 
 `get_core_bundle()` returns `{bundle,manifest}` from the exact shared release. `search_signals(cityId,query?,topic?)` searches citywide/full features by all case-insensitive text terms and optional topic/kind/category, including null geometry. `topic:"water"` finds the historical lake assertion; `topic:"budget"` finds the planned outlays. `get_sources` additionally returns assertions and verification. City IDs are restricted to safe catalogue-style slugs. These local tools are read-only and do not require or send geometry.
 
+Assistant call flow: use `list_cities` first and copy an exact `cityId`; call `search_signals` with concrete terms (all query terms must match), then `get_signal` and `get_sources` for the stable id and attribution. Spatial tools require WGS84 longitude/latitude and can only match records with geometry. Unknown city ids and missing signal ids return an explicit `error` plus the next tool to call; empty search results mean no match in this publication, not proof that the subject does not exist. Cite the source locators, as-of dates and review state from the returned record; automated checks are not human review.
+
 ## Consumers
 
 The owner's Stadtstack Projektatlas reads this `out/` snapshot for its optional city views via `GET /api/signals`, `GET /api/signals/<city>?kind=<kind>` (compact map data), and `GET /api/signals/<city>/<encoded-id>` (full record). Its existing `/api/atlas/<city>` and `/map` remain the pipeline's curated-project input, not pipeline output.
