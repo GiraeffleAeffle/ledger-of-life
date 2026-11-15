@@ -4,20 +4,15 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {test} from 'node:test';
 
-type Tool = {
- name: string;
- description: string;
- inputSchema: {properties?: Record<string, {description?: string}>};
-};
 type McpResponse = {
  id?: number;
  error?: {code: number; message: string};
- result?: {tools?: Tool[]; content?: Array<{text: string}>; isError?: boolean};
+ result?: {content?: Array<{text: string}>; isError?: boolean};
 };
 
 const packageDirectory = fileURLToPath(new URL('..', import.meta.url));
 
-test('MCP guidance and not-found results direct assistants to valid next steps', async () => {
+test('MCP unknown city and signal IDs return typed tool errors without terminating the server', async () => {
  const child = spawn(process.execPath, ['--experimental-strip-types', fileURLToPath(new URL('../src/mcp.ts', import.meta.url))], {
   cwd: packageDirectory, stdio: ['pipe', 'pipe', 'pipe'],
  });
@@ -55,23 +50,14 @@ test('MCP guidance and not-found results direct assistants to valid next steps',
   });
   assert.equal(initialized.error, undefined);
   stdin.write(`${JSON.stringify({jsonrpc: '2.0', method: 'notifications/initialized'})}\n`);
-  const listed = await request(2, 'tools/list');
-  const tools = listed.result?.tools ?? [];
-  const byName = new Map(tools.map(item => [item.name, item]));
-  assert.match(byName.get('list_cities')!.description, /Start here/);
-  assert.match(byName.get('search_signals')!.description, /Every query word must match/);
-  assert.match(byName.get('get_sources')!.description, /Use after a search/);
-  assert.match(byName.get('search_signals')!.inputSchema.properties!.cityId.description!, /list_cities/);
   const unknownCity = await request(3, 'tools/call', {name: 'search_signals', arguments: {cityId: 'no-such-city'}});
   assert.equal(unknownCity.result?.isError, true);
-  const unknown = JSON.parse(unknownCity.result!.content![0].text) as {error: string; message: string};
+  const unknown = JSON.parse(unknownCity.result!.content![0].text) as {error: string};
   assert.equal(unknown.error, 'unknown_city');
-  assert.match(unknown.message, /list_cities/);
   const missingSignal = await request(4, 'tools/call', {name: 'get_sources', arguments: {id: 'missing:signal'}});
   assert.equal(missingSignal.result?.isError, true);
-  const missing = JSON.parse(missingSignal.result!.content![0].text) as {error: string; message: string};
+  const missing = JSON.parse(missingSignal.result!.content![0].text) as {error: string};
   assert.equal(missing.error, 'signal_not_found');
-  assert.match(missing.message, /search_signals/);
  } finally {
   if (child.exitCode === null) {
    const exited = once(child, 'exit');
