@@ -1,7 +1,6 @@
 export type TopicStageId = 'feed' | 'problem' | 'discussion' | 'proposal' | 'feedback' | 'decision' | 'trace';
 
 export const TOPIC_FLOW_TITLE = 'Windenergienutzung · B-Plan Nr. 8 · Gemeinde Tramm';
-export const TOPIC_FLOW_UPDATED = '2026-11-15';
 export const TOPIC_FLOW_CASE_ID = 'case:831553f3615c84ee48a6f979492d8b88';
 export const TOPIC_FLOW_SNAPSHOT = 'Live API · snapshot 20261115T194130Z';
 
@@ -63,51 +62,54 @@ export const TOPIC_DEMO_STAGES: readonly { id: TopicStageId; label: string; owne
   { id: 'feed', label: 'Stadthinweis', owner: 'Quelle' },
   { id: 'problem', label: 'Problem', owner: 'Bürger:in · Beispiel, erfunden' },
   { id: 'discussion', label: 'Diskussion', owner: 'Bürger:innen · Beispiel, erfunden' },
-  { id: 'proposal', label: 'Vorschlag', owner: 'Redaktioneller Text · kein Modell ausgeführt' },
-  { id: 'feedback', label: 'Fachfeedback', owner: 'Fachbereiche · menschliche Prüfung' },
+  { id: 'proposal', label: 'KI-Vorschlag', owner: 'KI-Beispiel · offline erstellt, menschlich ungeprüft' },
+  { id: 'feedback', label: 'Fachfeedback', owner: 'Fiktive Fachrollen · Beispiel, erfunden' },
   { id: 'decision', label: 'Entscheidung', owner: 'Rat oder beratendes Mitmachen' },
   { id: 'trace', label: 'Verlauf', owner: 'Öffentliche Nachverfolgung' },
 ];
 
+export const TOPIC_CITIZEN_PROBLEM = {
+  id: 'problem-tramm-status',
+  date: 'Beispiel-Datum, erfunden · 20. November 2026',
+  actor: 'Mara Beispiel · Bürgerin, erfunden',
+  text: 'Wie lassen sich die belegten nächsten Schritte zum Beschluss nachvollziehen?',
+} as const;
+
 export const TOPIC_ARGUMENTS = [
-  { id: 'pro-1', parent: null, side: 'Dafür', text: 'Eine nachvollziehbare öffentliche Statusanzeige könnte zeigen, welche Verfahrensschritte belegt sind.', sourceIds: ['minutes'] },
-  { id: 'pro-2', parent: 'pro-1', side: 'Dafür', text: 'Die Kostenregelung ließe sich als Vertragstext verlinken, ohne einen Eurobetrag zu erfinden.', sourceIds: ['minutes'] },
-  { id: 'con-1', parent: null, side: 'Dagegen', text: 'Eine zusätzliche Statuspflege kann Aufwand verursachen und beantwortet nicht, ob ein Schritt umgesetzt wurde.', sourceIds: ['paper'] },
-  { id: 'con-2', parent: 'con-1', side: 'Dagegen', text: 'Ohne Unterzeichnungs- oder Umsetzungsbeleg bleibt eine Fortschrittsanzeige lückenhaft.', sourceIds: ['minutes'] },
+  { id: 'pro-1', parent: null, side: 'Dafür', text: 'Eine nachvollziehbare öffentliche Statusanzeige könnte zeigen, welche Verfahrensschritte belegt sind.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
+  { id: 'pro-2', parent: 'pro-1', side: 'Dafür', text: 'Die Kostenregelung ließe sich als Vertragstext verlinken, ohne einen Eurobetrag zu erfinden.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
+  { id: 'con-1', parent: null, side: 'Dagegen', text: 'Eine zusätzliche Statuspflege kann Aufwand verursachen und beantwortet nicht, ob ein Schritt umgesetzt wurde.', sourceIds: ['paper'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
+  { id: 'con-2', parent: 'con-1', side: 'Dagegen', text: 'Ohne Unterzeichnungs- oder Umsetzungsbeleg bleibt eine Fortschrittsanzeige lückenhaft.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 21. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
 ] as const;
 
 export const TOPIC_FEEDBACK_ROUNDS = [
   {
-    round: 1,
-    date: 'Beispiel-Datum, erfunden · 20. November 2026',
-    department: 'Fachbereich Planung · Rollenbeispiel, erfunden',
+    id: 'reply-plan-r1', round: 1, date: 'Beispiel-Datum, erfunden · 20. November 2026',
+    department: 'Fachbereich Planung · Rollenbeispiel, erfunden', actor: 'Lina Beispiel · Rollenfigur, erfunden',
     response: 'Die Anzeige sollte Beschluss, Vertragsschluss und Umsetzung getrennt benennen. Die vorliegende Quelle belegt nur den Beschlussauftrag.',
-    sourceIds: ['minutes'],
-    revision: 'Entwurf 1 · Beispiel, erfunden',
+    sourceIds: ['minutes'], revision: 'proposal-v1 → proposal-v2 · Statusfelder für Ratsauftrag, Vertrag und Umsetzung getrennt',
+    proposalId: 'proposal-v1', nextProposalId: 'proposal-v2',
   },
   {
-    round: 1,
-    date: 'Beispiel-Datum, erfunden · 20. November 2026',
-    department: 'Fachbereich Haushalt · Rollenbeispiel, erfunden',
+    id: 'reply-budget-r1', round: 1, date: 'Beispiel-Datum, erfunden · 20. November 2026',
+    department: 'Fachbereich Haushalt · Rollenbeispiel, erfunden', actor: 'Timo Beispiel · Rollenfigur, erfunden',
     response: 'Bitte keinen Betrag eintragen: die gelesenen Quellen nennen keine Euro-Summe. Die Vertragsregelung ersetzt keinen Kostennachweis.',
-    sourceIds: ['minutes', 'paper'],
-    revision: 'Entwurf 1 · Beispiel, erfunden',
+    sourceIds: ['minutes', 'paper'], revision: 'proposal-v1 → proposal-v2 · Betrag bleibt wie zuvor unbekannt',
+    proposalId: 'proposal-v1', nextProposalId: 'proposal-v2',
   },
   {
-    round: 2,
-    date: 'Beispiel-Datum, erfunden · 25. November 2026',
-    department: 'Fachbereich Planung · Rollenbeispiel, erfunden',
-    response: 'Der überarbeitete Vorschlag zeigt den Beschluss als belegten Schritt und kennzeichnet den Vertragsschluss als ungeklärt.',
-    sourceIds: ['minutes'],
-    revision: 'Entwurf 2 · Beispiel, erfunden',
+    id: 'reply-plan-r2', round: 2, date: 'Beispiel-Datum, erfunden · 25. November 2026',
+    department: 'Fachbereich Planung · Rollenbeispiel, erfunden', actor: 'Lina Beispiel · Rollenfigur, erfunden',
+    response: 'Der Ratsauftrag bleibt als belegt sichtbar; Vertragsabschluss und Umsetzung sind weiterhin ungeklärt. Dafür ist keine weitere Statusänderung nötig.',
+    sourceIds: ['minutes'], revision: 'proposal-v2 → proposal-v3 · Statusfelder unverändert beibehalten',
+    proposalId: 'proposal-v2', nextProposalId: 'proposal-v3',
   },
   {
-    round: 2,
-    date: 'Beispiel-Datum, erfunden · 25. November 2026',
-    department: 'Fachbereich Haushalt · Rollenbeispiel, erfunden',
+    id: 'reply-budget-r2', round: 2, date: 'Beispiel-Datum, erfunden · 25. November 2026',
+    department: 'Fachbereich Haushalt · Rollenbeispiel, erfunden', actor: 'Timo Beispiel · Rollenfigur, erfunden',
     response: 'Vertragliche Kostenzuständigkeit und tatsächliche Kosten bleiben getrennte Felder; ein Beleg für tatsächliche Kosten fehlt.',
-    sourceIds: ['minutes', 'paper'],
-    revision: 'Entwurf 2 · Beispiel, erfunden',
+    sourceIds: ['minutes', 'paper'], revision: 'proposal-v2 → proposal-v3 · Kostenzuständigkeit und Betrag getrennt',
+    proposalId: 'proposal-v2', nextProposalId: 'proposal-v3',
   },
 ] as const;
 

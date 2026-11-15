@@ -1,0 +1,337 @@
+{
+  "schemaVersion": "civic-topic-proposal-example-v1",
+  "generationId": "night-tramm-c6227f69dede86f5",
+  "topicCaseId": "case:831553f3615c84ee48a6f979492d8b88",
+  "sourceSnapshot": "20261115T194130Z",
+  "generatedAt": "2026-11-15T21:44:38.166362+00:00",
+  "modelId": "openai-codex/gpt-6.1-sol",
+  "operatorLabel": "Stadtstack-Nachtschicht · automatisierter Entwicklungsagent, keine Kommune",
+  "generationMode": "offline-authoring-agent",
+  "inputSha256": "c6227f69dede86f53fca43f4804908256343a4fc87d7aaccc8cc38f062fa54b6",
+  "inputArgumentIds": [
+    "pro-1",
+    "pro-2",
+    "con-1",
+    "con-2"
+  ],
+  "inputSourceIds": [
+    "paper",
+    "minutes",
+    "roseburg",
+    "witzeeze"
+  ],
+  "humanReview": "not_performed",
+  "fictionLabel": "Beispiel, erfunden · hypothetischer Vorschlag und simulierte Fachfeedback-Runden; keine kommunale Freigabe",
+  "versions": [
+    {
+      "problem": "Die gespeicherte Niederschrift belegt den Auftrag zum Abschluss des Planungskostenvertrags, aber keinen späteren Vertragsabschluss, keine B-Plan-Rechtskraft und keine Umsetzung. Eine öffentliche Übersicht muss diese Lücken sichtbar lassen.",
+      "facts": [
+        {
+          "text": "Die Gemeindevertretung Tramm beauftragte am 1. Juni 2026 den Bürgermeister, den §-11-Vertrag zur Übernahme der Bauleitplanungskosten mit Green Wind Energy GmbH abzuschließen; das dokumentierte Ergebnis lautet 7 Ja, 1 Nein, 0 Enthaltungen.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Der Beschlusstext weist dem Vorhabenträger die Rechtsanwaltskosten für die Ausarbeitung beziehungsweise Verhandlung des §-12-Durchführungsvertrags zu. Ein bezifferter tatsächlicher Kostenbetrag ist nicht enthalten.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Roseburg-Wotersen und Witzeeze sind quellenbasierte Vergleichsfälle zu Planungs-Kostenübernahmen bei Windenergie-Verfahren. Ihre Ähnlichkeit beweist weder Erfolg noch Vollzug in Tramm.",
+          "sourceIds": [
+            "roseburg",
+            "witzeeze"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "minimal",
+          "title": "Nur belegte Schritte zeigen",
+          "text": "Ratsauftrag, Datum und Originalbeleg in einer kleinen Übersicht verbinden. Nicht belegte Folgeschritte ausdrücklich als ungeklärt markieren.",
+          "argumentIds": [
+            "pro-1",
+            "con-2"
+          ]
+        },
+        {
+          "id": "extended",
+          "title": "Belege später ergänzen",
+          "text": "Vertragsabschluss und tatsächliche Kosten nur nach einem datierten veröffentlichten Nachweis ergänzen. Zuständigkeit und Pflegeaufwand vor einer echten Einführung klären.",
+          "argumentIds": [
+            "pro-2",
+            "con-1"
+          ]
+        }
+      ],
+      "costs": {
+        "amountEur": null,
+        "text": "Unbekannt: tatsächliche Planungskosten und Aufwand einer Statusübersicht. Die vertragliche Kostenzuständigkeit ist kein Zahlungs- oder Ausführungsnachweis.",
+        "sourceIds": [
+          "minutes"
+        ]
+      },
+      "legalStatus": {
+        "text": "Belegt ist der Ratsauftrag zum Vertragsabschluss. Vertragsunterzeichnung, B-Plan-Rechtskraft, Baugenehmigung und Umsetzung sind im gespeicherten Datensatz nicht belegt. Dieser Vorschlag ist keine Rechtsberatung und kein Beschluss.",
+        "sourceIds": [
+          "minutes",
+          "paper"
+        ]
+      },
+      "recommendation": "Beispiel, erfunden: Die beiden Optionen zunächst öffentlich diskutieren; ohne bestätigte Zuständigkeit, Datenschutzprüfung und tatsächliche Freigabe nichts veröffentlichen oder beauftragen.",
+      "id": "proposal-v1",
+      "exampleDateLabel": "Beispiel-Datum, erfunden · 20. November 2026",
+      "changes": [],
+      "sourceIds": [
+        "paper",
+        "minutes",
+        "roseburg",
+        "witzeeze"
+      ],
+      "argumentIds": [
+        "pro-1",
+        "pro-2",
+        "con-1",
+        "con-2"
+      ]
+    },
+    {
+      "problem": "Die gespeicherte Niederschrift belegt den Auftrag zum Abschluss des Planungskostenvertrags, aber keinen späteren Vertragsabschluss, keine B-Plan-Rechtskraft und keine Umsetzung. Eine öffentliche Übersicht muss diese Lücken sichtbar lassen.",
+      "facts": [
+        {
+          "text": "Die Gemeindevertretung Tramm beauftragte am 1. Juni 2026 den Bürgermeister, den §-11-Vertrag zur Übernahme der Bauleitplanungskosten mit Green Wind Energy GmbH abzuschließen; das dokumentierte Ergebnis lautet 7 Ja, 1 Nein, 0 Enthaltungen.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Der Beschlusstext weist dem Vorhabenträger die Rechtsanwaltskosten für die Ausarbeitung beziehungsweise Verhandlung des §-12-Durchführungsvertrags zu. Ein bezifferter tatsächlicher Kostenbetrag ist nicht enthalten.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Roseburg-Wotersen und Witzeeze sind quellenbasierte Vergleichsfälle zu Planungs-Kostenübernahmen bei Windenergie-Verfahren. Ihre Ähnlichkeit beweist weder Erfolg noch Vollzug in Tramm.",
+          "sourceIds": [
+            "roseburg",
+            "witzeeze"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "minimal",
+          "title": "Nur belegte Schritte zeigen",
+          "text": "Ratsauftrag, Datum und Originalbeleg in einer kleinen Übersicht verbinden. Nicht belegte Folgeschritte ausdrücklich als ungeklärt markieren.",
+          "argumentIds": [
+            "pro-1",
+            "con-2"
+          ]
+        },
+        {
+          "id": "extended",
+          "title": "Belege später ergänzen",
+          "text": "Vertragsabschluss und tatsächliche Kosten nur nach einem datierten veröffentlichten Nachweis ergänzen. Zuständigkeit und Pflegeaufwand vor einer echten Einführung klären.",
+          "argumentIds": [
+            "pro-2",
+            "con-1"
+          ]
+        }
+      ],
+      "costs": {
+        "amountEur": null,
+        "text": "Unbekannt: tatsächliche Planungskosten und Aufwand einer Statusübersicht. Die vertragliche Kostenzuständigkeit ist kein Zahlungs- oder Ausführungsnachweis.",
+        "sourceIds": [
+          "minutes"
+        ]
+      },
+      "legalStatus": {
+        "text": "Belegt ist der Ratsauftrag zum Vertragsabschluss. Vertragsunterzeichnung, B-Plan-Rechtskraft, Baugenehmigung und Umsetzung sind im gespeicherten Datensatz nicht belegt. Dieser Vorschlag ist keine Rechtsberatung und kein Beschluss.",
+        "sourceIds": [
+          "minutes",
+          "paper"
+        ]
+      },
+      "recommendation": "Beispiel, erfunden: Die beiden Optionen zunächst öffentlich diskutieren; ohne bestätigte Zuständigkeit, Datenschutzprüfung und tatsächliche Freigabe nichts veröffentlichen oder beauftragen.",
+      "id": "proposal-v2",
+      "exampleDateLabel": "Beispiel-Datum, erfunden · 22. November 2026",
+      "changes": [
+        "Nach fiktiver Runde 1: Ratsauftrag, Vertragsabschluss und Umsetzung erhalten getrennte Statusfelder.",
+        "Nicht belegte Folgeschritte bleiben ausdrücklich ungeklärt; der Quellenabruf wird nicht als Verfahrensdatum benutzt."
+      ],
+      "sourceIds": [
+        "paper",
+        "minutes",
+        "roseburg",
+        "witzeeze"
+      ],
+      "argumentIds": [
+        "pro-1",
+        "pro-2",
+        "con-1",
+        "con-2"
+      ],
+      "statusFields": [
+        {
+          "id": "council-instruction",
+          "label": "Ratsauftrag",
+          "state": "recorded",
+          "date": "2026-06-01",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "id": "contract-signature",
+          "label": "Vertragsabschluss",
+          "state": "unknown",
+          "date": null,
+          "sourceIds": [
+            "paper",
+            "minutes"
+          ]
+        },
+        {
+          "id": "implementation",
+          "label": "Umsetzung",
+          "state": "unknown",
+          "date": null,
+          "sourceIds": [
+            "paper",
+            "minutes"
+          ]
+        }
+      ]
+    },
+    {
+      "problem": "Die gespeicherte Niederschrift belegt den Auftrag zum Abschluss des Planungskostenvertrags, aber keinen späteren Vertragsabschluss, keine B-Plan-Rechtskraft und keine Umsetzung. Eine öffentliche Übersicht muss diese Lücken sichtbar lassen.",
+      "facts": [
+        {
+          "text": "Die Gemeindevertretung Tramm beauftragte am 1. Juni 2026 den Bürgermeister, den §-11-Vertrag zur Übernahme der Bauleitplanungskosten mit Green Wind Energy GmbH abzuschließen; das dokumentierte Ergebnis lautet 7 Ja, 1 Nein, 0 Enthaltungen.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Der Beschlusstext weist dem Vorhabenträger die Rechtsanwaltskosten für die Ausarbeitung beziehungsweise Verhandlung des §-12-Durchführungsvertrags zu. Ein bezifferter tatsächlicher Kostenbetrag ist nicht enthalten.",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "text": "Roseburg-Wotersen und Witzeeze sind quellenbasierte Vergleichsfälle zu Planungs-Kostenübernahmen bei Windenergie-Verfahren. Ihre Ähnlichkeit beweist weder Erfolg noch Vollzug in Tramm.",
+          "sourceIds": [
+            "roseburg",
+            "witzeeze"
+          ]
+        }
+      ],
+      "options": [
+        {
+          "id": "minimal",
+          "title": "Nur belegte Schritte zeigen",
+          "text": "Ratsauftrag, Datum und Originalbeleg in einer kleinen Übersicht verbinden. Nicht belegte Folgeschritte ausdrücklich als ungeklärt markieren.",
+          "argumentIds": [
+            "pro-1",
+            "con-2"
+          ]
+        },
+        {
+          "id": "extended",
+          "title": "Belege später ergänzen",
+          "text": "Vertragsabschluss und tatsächliche Kosten nur nach einem datierten veröffentlichten Nachweis ergänzen. Zuständigkeit und Pflegeaufwand vor einer echten Einführung klären.",
+          "argumentIds": [
+            "pro-2",
+            "con-1"
+          ]
+        }
+      ],
+      "costs": {
+        "amountEur": null,
+        "text": "Unbekannt: tatsächliche Planungskosten und Aufwand einer Statusübersicht. Die vertragliche Kostenzuständigkeit ist kein Zahlungs- oder Ausführungsnachweis.",
+        "sourceIds": [
+          "minutes"
+        ]
+      },
+      "legalStatus": {
+        "text": "Belegt ist der Ratsauftrag zum Vertragsabschluss. Vertragsunterzeichnung, B-Plan-Rechtskraft, Baugenehmigung und Umsetzung sind im gespeicherten Datensatz nicht belegt. Dieser Vorschlag ist keine Rechtsberatung und kein Beschluss.",
+        "sourceIds": [
+          "minutes",
+          "paper"
+        ]
+      },
+      "recommendation": "Beispiel, erfunden: Die beiden Optionen zunächst öffentlich diskutieren; ohne bestätigte Zuständigkeit, Datenschutzprüfung und tatsächliche Freigabe nichts veröffentlichen oder beauftragen.",
+      "id": "proposal-v3",
+      "exampleDateLabel": "Beispiel-Datum, erfunden · 26. November 2026",
+      "changes": [
+        "Nach fiktiver Runde 2: Kostenzuständigkeit und tatsächlicher Kostenbetrag werden getrennt geführt.",
+        "Ein tatsächlicher Eurobetrag bleibt null/unbekannt, niemals 0 Euro. Jede spätere Ergänzung braucht einen datierten Beleg und menschliche Prüfung."
+      ],
+      "sourceIds": [
+        "paper",
+        "minutes",
+        "roseburg",
+        "witzeeze"
+      ],
+      "argumentIds": [
+        "pro-1",
+        "pro-2",
+        "con-1",
+        "con-2"
+      ],
+      "statusFields": [
+        {
+          "id": "council-instruction",
+          "label": "Ratsauftrag",
+          "state": "recorded",
+          "date": "2026-06-01",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "id": "contract-signature",
+          "label": "Vertragsabschluss",
+          "state": "unknown",
+          "date": null,
+          "sourceIds": [
+            "paper",
+            "minutes"
+          ]
+        },
+        {
+          "id": "implementation",
+          "label": "Umsetzung",
+          "state": "unknown",
+          "date": null,
+          "sourceIds": [
+            "paper",
+            "minutes"
+          ]
+        }
+      ],
+      "costFields": [
+        {
+          "id": "responsibility",
+          "label": "Vertragliche Kostenzuständigkeit",
+          "state": "source_backed",
+          "sourceIds": [
+            "minutes"
+          ]
+        },
+        {
+          "id": "actual-amount",
+          "label": "Tatsächlich angefallene Kosten",
+          "amountEur": null,
+          "state": "unknown",
+          "sourceIds": [
+            "paper",
+            "minutes"
+          ]
+        }
+      ]
+    }
+  ]
+}

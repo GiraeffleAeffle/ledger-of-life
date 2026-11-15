@@ -76,6 +76,17 @@
 .topic-stage-controls { display: flex; justify-content: space-between; gap: 12px; }
 .topic-stage-controls button:first-child { color: #275c4a; background: #fff; }
 .topic-walkthrough-footer nav { display: flex; flex-wrap: wrap; gap: 8px 22px; margin-top: 12px; }
+
+.topic-link-button { min-height: 40px; border: 1px solid #275c4a; border-radius: 8px; padding: 7px 11px; background: #fff; color: #174e48; font-weight: 700; cursor: pointer; }
+.topic-link-button:hover { background: #e8f0e9; }
+.topic-proposal-version { scroll-margin-top: 20px; margin: 22px 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fbfaf6; }
+.topic-proposal-version > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 10px; }
+.topic-proposal-version > header h3 { margin-bottom: 10px; }
+.topic-proposal-version h4 { margin: 12px 0 6px; }
+.topic-proposal-grid article { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fff; }
+.topic-proposal-grid article > h4:first-child { margin-top: 0; }
+.topic-proposal-grid ol, .topic-proposal-grid ul { padding-left: 20px; line-height: 1.6; }
+.topic-tree article[id^="contribution-"], .topic-round li[id^="contribution-"] { scroll-margin-top: 20px; }
 .topic-walkthrough-footer nav a { display: inline-flex; align-items: center; min-height: 44px; }
 @media (max-width: 760px) {
   .topic-stage-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
