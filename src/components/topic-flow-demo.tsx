@@ -68,7 +68,7 @@ function Discussion() {
 
 function Proposal({ version, onContribution }: { version: ProposalVersion; onContribution: (id: string) => void }) {
   return <article className="topic-proposal-version" id={`contribution-${version.id}`}>
-    <header><div><span className="topic-demo-fiction">{version.exampleDateLabel}</span><h3>{version.id}</h3></div><p className="topic-note">Beispiel, erfunden · KI-Beitrag aus gespeichertem Datensatz</p></header>
+    <header><div><span className="topic-demo-fiction">{version.exampleDateLabel}</span><h3>{version.id}</h3></div><p className="topic-note">KI-Beitrag · Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</p></header>
     <div className="topic-proposal-grid">
       <article><h4>Problem</h4><p>{version.problem}</p></article>
       <article><h4>Quellenbasierte Fakten</h4><ul>{version.facts.map((fact, index) => <li key={index}>{fact.text}<Sources ids={fact.sourceIds} /></li>)}</ul></article>
