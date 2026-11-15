@@ -80,8 +80,15 @@
 .topic-link-button { min-height: 40px; border: 1px solid #275c4a; border-radius: 8px; padding: 7px 11px; background: #fff; color: #174e48; font-weight: 700; cursor: pointer; }
 .topic-link-button:hover { background: #e8f0e9; }
 .topic-proposal-version { scroll-margin-top: 20px; margin: 22px 0; padding: 20px; border: 1px solid var(--line); border-radius: 14px; background: #fbfaf6; }
-.topic-proposal-version > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: start; gap: 10px; }
-.topic-proposal-version > header h3 { margin-bottom: 10px; }
+.topic-proposal-version > summary { cursor: pointer; line-height: 1.6; min-height: 44px; }
+.topic-proposal-version > summary .topic-note { display: block; margin: 6px 0; }
+.topic-ai-assist { margin: 14px 0; border-left: 3px solid #8b6b22; padding: 10px 14px; background: #fffaf2; }
+.topic-ai-assist > summary { min-height: 44px; cursor: pointer; font-weight: 700; line-height: 1.5; }
+.topic-ai-assist > summary:focus-visible, .topic-ai-assist:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.topic-proposal-version > summary:focus-visible, .topic-proposal-version:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+.topic-proposal-version dl > div { border-top: 1px solid var(--line); padding: 12px 0; }
+.topic-proposal-version dt { font-weight: 700; }
+.topic-proposal-version dd { margin: 6px 0 0; }
 .topic-proposal-version h4 { margin: 12px 0 6px; }
 .topic-proposal-grid article { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fff; }
 .topic-proposal-grid article > h4:first-child { margin-top: 0; }

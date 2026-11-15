@@ -70,28 +70,28 @@ export const TOPIC_DEMO_STAGES: readonly { id: TopicStageId; label: string; owne
 
 export const TOPIC_CITIZEN_PROBLEM = {
   id: 'problem-tramm-status',
-  date: 'Beispiel-Datum, erfunden · 20. November 2026',
+  date: 'Beispiel-Datum, erfunden · 19. November 2026',
   actor: 'Mara Beispiel · Bürgerin, erfunden',
   text: 'Wie lassen sich die belegten nächsten Schritte zum Beschluss nachvollziehen?',
 } as const;
 
 export const TOPIC_ARGUMENTS = [
-  { id: 'pro-1', parent: null, side: 'Dafür', text: 'Eine nachvollziehbare öffentliche Statusanzeige könnte zeigen, welche Verfahrensschritte belegt sind.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
-  { id: 'pro-2', parent: 'pro-1', side: 'Dafür', text: 'Die Kostenregelung ließe sich als Vertragstext verlinken, ohne einen Eurobetrag zu erfinden.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
-  { id: 'con-1', parent: null, side: 'Dagegen', text: 'Eine zusätzliche Statuspflege kann Aufwand verursachen und beantwortet nicht, ob ein Schritt umgesetzt wurde.', sourceIds: ['paper'], date: 'Beispiel-Datum, erfunden · 20. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
-  { id: 'con-2', parent: 'con-1', side: 'Dagegen', text: 'Ohne Unterzeichnungs- oder Umsetzungsbeleg bleibt eine Fortschrittsanzeige lückenhaft.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 21. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
+  { id: 'pro-1', parent: null, side: 'Dafür', text: 'Eine nachvollziehbare öffentliche Statusanzeige könnte zeigen, welche Verfahrensschritte belegt sind.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 19. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
+  { id: 'pro-2', parent: 'pro-1', side: 'Dafür', text: 'Die Kostenregelung ließe sich als Vertragstext verlinken, ohne einen Eurobetrag zu erfinden.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 19. November 2026', actor: 'Mara Beispiel · Bürgerin, erfunden' },
+  { id: 'con-1', parent: null, side: 'Dagegen', text: 'Eine zusätzliche Statuspflege kann Aufwand verursachen und beantwortet nicht, ob ein Schritt umgesetzt wurde.', sourceIds: ['paper'], date: 'Beispiel-Datum, erfunden · 19. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
+  { id: 'con-2', parent: 'con-1', side: 'Dagegen', text: 'Ohne Unterzeichnungs- oder Umsetzungsbeleg bleibt eine Fortschrittsanzeige lückenhaft.', sourceIds: ['minutes'], date: 'Beispiel-Datum, erfunden · 19. November 2026', actor: 'Jan Beispiel · Bürger, erfunden' },
 ] as const;
 
 export const TOPIC_FEEDBACK_ROUNDS = [
   {
-    id: 'reply-plan-r1', round: 1, date: 'Beispiel-Datum, erfunden · 20. November 2026',
+    id: 'reply-plan-r1', round: 1, date: 'Beispiel-Datum, erfunden · 21. November 2026',
     department: 'Fachbereich Planung · Rollenbeispiel, erfunden', actor: 'Lina Beispiel · Rollenfigur, erfunden',
     response: 'Die Anzeige sollte Beschluss, Vertragsschluss und Umsetzung getrennt benennen. Die vorliegende Quelle belegt nur den Beschlussauftrag.',
     sourceIds: ['minutes'], revision: 'proposal-v1 → proposal-v2 · Statusfelder für Ratsauftrag, Vertrag und Umsetzung getrennt',
     proposalId: 'proposal-v1', nextProposalId: 'proposal-v2',
   },
   {
-    id: 'reply-budget-r1', round: 1, date: 'Beispiel-Datum, erfunden · 20. November 2026',
+    id: 'reply-budget-r1', round: 1, date: 'Beispiel-Datum, erfunden · 21. November 2026',
     department: 'Fachbereich Haushalt · Rollenbeispiel, erfunden', actor: 'Timo Beispiel · Rollenfigur, erfunden',
     response: 'Bitte keinen Betrag eintragen: die gelesenen Quellen nennen keine Euro-Summe. Die Vertragsregelung ersetzt keinen Kostennachweis.',
     sourceIds: ['minutes', 'paper'], revision: 'proposal-v1 → proposal-v2 · Betrag bleibt wie zuvor unbekannt',

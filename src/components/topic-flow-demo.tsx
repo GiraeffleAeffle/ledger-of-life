@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
 import proposalRecord from '@/data/ai-proposal-generation.json';
+import departmentAiRecord from '@/data/topic-ai-feedback.json';
 import {
   TOPIC_ADVISORY_OPTIONS,
   TOPIC_ARGUMENTS,
@@ -66,9 +67,9 @@ function Discussion() {
   </section>;
 }
 
-function Proposal({ version, onContribution }: { version: ProposalVersion; onContribution: (id: string) => void }) {
-  return <article className="topic-proposal-version" id={`contribution-${version.id}`}>
-    <header><div><span className="topic-demo-fiction">{version.exampleDateLabel}</span><h3>{version.id}</h3></div><p className="topic-note">KI-Beitrag · Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</p></header>
+function Proposal({ version, expanded, onContribution }: { version: ProposalVersion; expanded: boolean; onContribution: (id: string) => void }) {
+  return <details className="topic-proposal-version" id={`contribution-${version.id}`} open={expanded}>
+    <summary><strong>{version.id}</strong> · {version.exampleDateLabel}<span className="topic-note">KI-Beitrag · Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</span></summary>
     <div className="topic-proposal-grid">
       <article><h4>Problem</h4><p>{version.problem}</p></article>
       <article><h4>Quellenbasierte Fakten</h4><ul>{version.facts.map((fact, index) => <li key={index}>{fact.text}<Sources ids={fact.sourceIds} /></li>)}</ul></article>
@@ -78,7 +79,25 @@ function Proposal({ version, onContribution }: { version: ProposalVersion; onCon
       <article><h4>Empfehlung des Beispielentwurfs</h4><p>{version.recommendation}</p><h4>Vergleichsfälle</h4><p>Roseburg-Wotersen und Witzeeze sind nur belegte Vergleichsreferenzen, keine Wirkungs- oder Erfolgsnachweise.</p><Sources ids={version.sourceIds.filter((id) => id === 'roseburg' || id === 'witzeeze')} /></article>
     </div>
     {version.changes.length > 0 && <section><h4>Änderungen gegenüber vorher</h4><ul>{version.changes.map((change) => <li key={change}>{change}</li>)}</ul></section>}
-  </article>;
+    {version.statusFields && <section><h4>Getrennte Verfahrensstände</h4><dl>{version.statusFields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.state === 'recorded' ? `Belegt · ${field.date}` : 'Nicht belegt · unbekannt'}<Sources ids={field.sourceIds} /></dd></div>)}</dl></section>}
+    {version.costFields && <section><h4>Getrennte Kostenangaben</h4><dl>{version.costFields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.state === 'unknown' ? 'Unbekannt · kein Eurobetrag belegt' : 'Quellenbelegt · keine Aussage über erfolgte Zahlung'}<Sources ids={field.sourceIds} /></dd></div>)}</dl></section>}
+  </details>;
+}
+
+function DepartmentAiDraft({ replyId }: { replyId: string }) {
+  const draft = departmentAiRecord.drafts.find((item) => item.replyId === replyId);
+  if (!draft) return null;
+  return <details className="topic-ai-assist" id={`contribution-${draft.id}`}>
+    <summary>KI-Hilfe für die erfundene Fachrolle · {draft.id}</summary>
+    <p className="topic-note">Modell {departmentAiRecord.modelId} · betrieben von {departmentAiRecord.operatorLabel} · erstellt {departmentAiRecord.generatedAt}</p>
+    <p>{draft.draft}</p><p><strong>Quellenabgleich:</strong> {draft.sourceCheck}</p><Sources ids={draft.sourceIds} />
+    <p className="topic-note">{departmentAiRecord.checkBoundary} Menschliche Prüfung: nicht erfolgt. Die daneben gezeigte menschliche Rückmeldung ist ausschließlich ein erfundenes Rollenbeispiel.</p>
+  </details>;
+}
+
+function DepartmentAiTraceLink({ replyId, onContribution }: { replyId: string; onContribution: (id: string) => void }) {
+  const draft = departmentAiRecord.drafts.find((item) => item.replyId === replyId);
+  return draft ? <p><button className="topic-link-button" type="button" onClick={() => onContribution(draft.id)}>KI-Hilfe öffnen · {draft.id}</button><span className="topic-note"> Modell {departmentAiRecord.modelId} · betrieben von {departmentAiRecord.operatorLabel}</span></p> : null;
 }
 
 function DemoStage({ id, onVote, onContribution }: { id: TopicStageId; onVote: (value: string) => void; onContribution: (id: string) => void }) {
@@ -101,14 +120,14 @@ function DemoStage({ id, onVote, onContribution }: { id: TopicStageId; onVote: (
     <p className="topic-demo-fiction">Gespeicherter, einmalig verfasster KI-Beispieldatensatz · keine Live-Generierung</p><h2>Strukturierter Vorschlag · drei überprüfbare Versionen</h2>
     <div className="topic-status-note"><strong>Attribution:</strong> Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel} · erstellt {proposalRecord.generatedAt} · Eingabe-SHA-256 <code>{proposalRecord.inputSha256}</code>. Menschliche Prüfung: nicht erfolgt. Offline von einer KI verfasst; keine Provider-API oder integrierte Inferenzfunktion.</div>
     <p className="topic-note">Die Versionen sind hypothetisch und nicht freigegeben. KI-Beiträge zeigen Modell und Betreiber aus ihrem Datensatz; die Oberfläche ist nicht an einen Anbieter gebunden.</p>
-    {proposalRecord.versions.map((version) => <Proposal key={version.id} version={version} onContribution={onContribution} />)}
+    {proposalRecord.versions.map((version, index) => <Proposal key={version.id} version={version} expanded={index === proposalRecord.versions.length - 1} onContribution={onContribution} />)}
   </>;
   if (id === 'feedback') return <>
     <p className="topic-demo-fiction">Zwei fiktive Fachrollen · zwei Runden · alle Beiträge erfunden</p><h2>Öffentlich nachvollziehbares Beispiel-Feedback</h2>
-    <p>Kein realer Fachbereich in Tramm hat geantwortet. Jede Antwort nennt geprüfte Version und die darauffolgende Version.</p>
+    <p>Kein realer Fachbereich in Tramm hat geantwortet. Die KI-Hilfen wurden offline für diese Demo erstellt, nicht von einer Verwaltung. Eine echte menschliche Prüfung ist nicht erfolgt; die Antworten der menschlichen Rollenfiguren sind erfunden.</p>
     {[1, 2].map((round) => <section key={round} className="topic-round"><h3>Runde {round} · Beispiel, erfunden</h3><ol>{TOPIC_FEEDBACK_ROUNDS.filter((item) => item.round === round).map((item) => <li key={item.id} id={`contribution-${item.id}`}>
       <p><strong>{item.department}</strong> · {item.actor} · {item.date}</p><p className="topic-note">Beitrags-ID <code>{item.id}</code> · geprüft: <button className="topic-link-button" type="button" onClick={() => onContribution(item.proposalId)}>{item.proposalId}</button> · führt zu <button className="topic-link-button" type="button" onClick={() => onContribution(item.nextProposalId)}>{item.nextProposalId}</button></p>
-      <p>{item.response}</p><p>Änderungsbezug: {item.revision}</p><Sources ids={item.sourceIds} />
+      <p><strong>Fiktive menschliche Rückmeldung:</strong> {item.response}</p><p>Änderungsbezug: {item.revision}</p><DepartmentAiDraft replyId={item.id} /><Sources ids={item.sourceIds} />
     </li>)}</ol></section>)}
     <p className="topic-note">Keine echte Abgabe, Verwaltungssitzung, Personalposition oder Verwaltungsantwort.</p>
   </>;
@@ -125,9 +144,11 @@ function DemoStage({ id, onVote, onContribution }: { id: TopicStageId; onVote: (
     <ol className="topic-trace">{TOPIC_SOURCE_TIMELINE.map((event) => <li key={event.date}><time>{event.date}</time><span className="topic-event-kind">{event.reality === 'source' ? 'Quellenereignis' : 'Bestandsaufnahme · kein Quellenereignis'}</span><p>{event.event}</p><Sources ids={[event.sourceId]} /></li>)}
       <li className="demo-event"><time>{TOPIC_CITIZEN_PROBLEM.date}</time><span className="topic-event-kind">Problem · Beispiel, erfunden</span><p>{TOPIC_CITIZEN_PROBLEM.actor} · {TOPIC_CITIZEN_PROBLEM.text}</p><button className="topic-link-button" type="button" onClick={() => onContribution(TOPIC_CITIZEN_PROBLEM.id)}>Öffnen · {TOPIC_CITIZEN_PROBLEM.id}</button></li>
       {TOPIC_ARGUMENTS.map((argument) => <li className="demo-event" key={argument.id}><time>{argument.date}</time><span className="topic-event-kind">Diskussion · Beitrag {argument.id} · Beispiel, erfunden</span><p>{argument.actor} · {argument.text}</p><button className="topic-link-button" type="button" onClick={() => onContribution(argument.id)}>Öffnen · {argument.id}</button><Sources ids={argument.sourceIds} /></li>)}
-      {proposalRecord.versions.map((version) => <li className="demo-event" key={version.id}><time>{version.exampleDateLabel}</time><span className="topic-event-kind">KI-Vorschlag · {version.id} · KI-Beispiel, menschlich ungeprüft</span><p>{version.changes.join(' ') || version.problem}</p><button className="topic-link-button" type="button" onClick={() => onContribution(version.id)}>Öffnen · {version.id}</button></li>)}
-      {TOPIC_FEEDBACK_ROUNDS.map((reply) => <li className="demo-event" key={reply.id}><time>{reply.date}</time><span className="topic-event-kind">Fachfeedback · {reply.id} · Beispiel, erfunden</span><p>{reply.department} · {reply.actor}: {reply.response}</p><p>Version {reply.proposalId} → {reply.nextProposalId}</p><button className="topic-link-button" type="button" onClick={() => onContribution(reply.id)}>Öffnen · {reply.id}</button></li>)}
-      <li className="demo-event"><time>Beispiel-Datum, erfunden · 27. November 2026</time><span className="topic-event-kind">Mitmachen · beratende lokale Demo</span><p>Keine echte Runde, Abgabe oder Teilnahme.</p><button className="topic-link-button" type="button" onClick={() => onContribution('advisory-question')}>Zur beratenden Ansicht</button></li>
+      {proposalRecord.versions.map((version) => <Fragment key={version.id}>
+        <li className="demo-event"><time>{version.exampleDateLabel}</time><span className="topic-event-kind">KI-Vorschlag · {version.id} · menschlich ungeprüft</span><p>Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</p><p>{version.changes.join(' ') || version.problem}</p><button className="topic-link-button" type="button" onClick={() => onContribution(version.id)}>Öffnen · {version.id}</button></li>
+        {TOPIC_FEEDBACK_ROUNDS.filter((reply) => reply.proposalId === version.id).map((reply) => <li className="demo-event" key={reply.id}><time>{reply.date}</time><span className="topic-event-kind">Fachfeedback · {reply.id} · Beispiel, erfunden</span><p>{reply.department} · {reply.actor}: {reply.response}</p><p>Version {reply.proposalId} → {reply.nextProposalId}</p><button className="topic-link-button" type="button" onClick={() => onContribution(reply.id)}>Öffnen · {reply.id}</button><DepartmentAiTraceLink replyId={reply.id} onContribution={onContribution} /></li>)}
+      </Fragment>)}
+      <li className="demo-event"><time>Beispiel-Datum, erfunden · 27. November 2026</time><span className="topic-event-kind">Mitmachen · beratende lokale Demo</span><p>Beispielrolle: Bürger:in der Stadt. Keine echte Runde, Abgabe oder Teilnahme.</p><button className="topic-link-button" type="button" onClick={() => onContribution('advisory-question')}>Zur beratenden Ansicht</button></li>
     </ol><section><h3>Alle verwendeten Quellen</h3><SourceCards /></section>
   </>;
 }
@@ -140,9 +161,16 @@ export function TopicFlowDemo() {
     const nextStage: TopicStageId = contributionId === TOPIC_CITIZEN_PROBLEM.id ? 'problem'
       : TOPIC_ARGUMENTS.some((item) => item.id === contributionId) ? 'discussion'
         : proposalRecord.versions.some((item) => item.id === contributionId) ? 'proposal'
-          : TOPIC_FEEDBACK_ROUNDS.some((item) => item.id === contributionId) ? 'feedback' : 'decision';
+          : TOPIC_FEEDBACK_ROUNDS.some((item) => item.id === contributionId) || departmentAiRecord.drafts.some((item) => item.id === contributionId) ? 'feedback' : 'decision';
     setStage(nextStage);
-    requestAnimationFrame(() => document.getElementById(`contribution-${contributionId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    requestAnimationFrame(() => {
+      const target = document.getElementById(`contribution-${contributionId}`);
+      if (!target) return;
+      if (target instanceof HTMLDetailsElement) target.open = true;
+      target.tabIndex = -1;
+      target.focus({ preventScroll: true });
+      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+    });
   };
   return <main className="topic-walkthrough">
     <header className="topic-walkthrough-hero"><span className="topic-eyebrow">LEDGER OF LIFE · BÜRGER-THEMENWEG · LOKALE DEMO</span><h1>Vom Stadthinweis bis zur nachvollziehbaren Entscheidung</h1>

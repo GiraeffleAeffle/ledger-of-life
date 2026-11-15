@@ -1,0 +1,66 @@
+{
+  "schemaVersion": "civic-department-ai-example-v1",
+  "generationId": "night-tramm-department-ebc901b7c046bfa9",
+  "generatedAt": "2026-11-15T22:32:48.015709+00:00",
+  "modelId": "openai-codex/gpt-6.1-sol",
+  "operatorLabel": "Stadtstack-Nachtschicht · automatisierter Entwicklungsagent, keine Kommune",
+  "generationMode": "offline-authoring-agent",
+  "sourceSnapshot": "20261115T194130Z",
+  "inputSha256": "ebc901b7c046bfa920d356d8f8f36561625f7fb79c153375b6e98ce0b55bc317",
+  "humanReview": "not_performed",
+  "checkBoundary": "Modellseitiger Abgleich mit den gespeicherten Quellen, keine unabhängige Prüfung, Rechtsberatung oder Verwaltungsfreigabe.",
+  "fictionLabel": "Beispiel, erfunden · keine KI oder Antwort einer tatsächlichen Trammer Verwaltung",
+  "drafts": [
+    {
+      "replyId": "reply-plan-r1",
+      "id": "ai-plan-r1",
+      "proposalId": "proposal-v1",
+      "department": "Planung",
+      "round": 1,
+      "draft": "Der gespeicherte Beschlusstext beauftragt den Bürgermeister zum Vertragsabschluss. Er ist kein Nachweis einer Unterzeichnung. Für den Beispielentwurf schlage ich getrennte Felder für Ratsauftrag, Vertragsabschluss und Umsetzung vor.",
+      "sourceCheck": "Der Wortlaut des Ratsauftrags wurde im gespeicherten Quellenbeleg gelesen; spätere Ausführung bleibt unbekannt.",
+      "sourceIds": [
+        "minutes"
+      ]
+    },
+    {
+      "replyId": "reply-budget-r1",
+      "id": "ai-budget-r1",
+      "proposalId": "proposal-v1",
+      "department": "Haushalt",
+      "round": 1,
+      "draft": "Der Beleg benennt die Kostenzuständigkeit für die Ausarbeitung des Durchführungsvertrags, aber keinen tatsächlichen Eurobetrag. Im Entwurf muss der Betrag unbekannt bleiben; 0 Euro wäre eine unbelegte Behauptung.",
+      "sourceCheck": "Kostenregelung und tatsächlich angefallene oder bezahlte Kosten sind verschiedene Aussagen.",
+      "sourceIds": [
+        "minutes",
+        "paper"
+      ]
+    },
+    {
+      "replyId": "reply-plan-r2",
+      "id": "ai-plan-r2",
+      "proposalId": "proposal-v2",
+      "department": "Planung",
+      "round": 2,
+      "draft": "Version 2 trennt die Verfahrensstände. Der Ratsauftrag bleibt belegt, Vertragsabschluss und Umsetzung bleiben ungeklärt. Eine echte Fachperson müsste weitere veröffentlichte Nachweise prüfen, bevor ein Status geändert wird.",
+      "sourceCheck": "Der Snapshot belegt keinen späteren Vollzug; sein Abrufdatum ist kein kommunales Ereignisdatum.",
+      "sourceIds": [
+        "minutes",
+        "paper"
+      ]
+    },
+    {
+      "replyId": "reply-budget-r2",
+      "id": "ai-budget-r2",
+      "proposalId": "proposal-v2",
+      "department": "Haushalt",
+      "round": 2,
+      "draft": "Version 2 lässt Beträge zu Recht offen. Für Version 3 schlage ich zwei ausdrückliche Kostenfelder vor: vertragliche Zuständigkeit und tatsächlich angefallener Betrag. Der Betrag bleibt null/unbekannt, bis ein datierter Beleg vorliegt.",
+      "sourceCheck": "Die gefundene Kostenklausel belegt weder eine Zahlung noch eine bezifferte Summe.",
+      "sourceIds": [
+        "minutes",
+        "paper"
+      ]
+    }
+  ]
+}
