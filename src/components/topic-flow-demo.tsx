@@ -1,187 +1,111 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import proposalRecord from '@/data/ai-proposal-generation.json';
-import departmentAiRecord from '@/data/topic-ai-feedback.json';
-import {
-  TOPIC_ADVISORY_OPTIONS,
-  TOPIC_ARGUMENTS,
-  TOPIC_CITIZEN_PROBLEM,
-  TOPIC_DEMO_STAGES,
-  TOPIC_FEEDBACK_ROUNDS,
-  TOPIC_FLOW_CASE_ID,
-  TOPIC_FLOW_SNAPSHOT,
-  TOPIC_FLOW_TITLE,
-  TOPIC_SOURCES,
-  TOPIC_SOURCE_TIMELINE,
-  type TopicStageId,
-} from '@/data/topic-flow-demo';
-import './topic-flow-demo.css';
+import { ArrowRight, ArrowUpRight, Check, ChevronLeft, FileText, Leaf, MapPin, MessageCircle, Scale, ShieldCheck, Sparkles, Sprout, Sun, Users, Wallet } from 'lucide-react';
+import { TOPIC_CITIZEN_PROBLEM, TOPIC_COMPARABLES, TOPIC_COUNCIL, TOPIC_DEMO_STAGES, TOPIC_ENERGY, TOPIC_FEED_ITEMS, TOPIC_FLOW_CASE_ID, TOPIC_FLOW_SNAPSHOT, TOPIC_SOURCE_TIMELINE, TOPIC_SOURCES, type TopicStageId } from '@/data/topic-flow-demo';
+import { TOPIC_ADVISORY, TOPIC_AI, TOPIC_DEPARTMENTS, TOPIC_OPEN_QUESTIONS, TOPIC_OPTIONS, TOPIC_REVISIONS } from '@/data/topic-proposal';
+import { TopicDiscussion } from './topic-discussion';
+import { TOPIC_ARGUMENTS } from '@/data/topic-discussion';
 import { moveTopicStage, topicSource } from './topic-flow-model';
+import './topic-flow-demo.css';
 
-type ProposalVersion = (typeof proposalRecord.versions)[number];
+const stageIcons = [MapPin, MessageCircle, Users, Sparkles, FileText, Scale, ShieldCheck];
+type Jump = (stage: TopicStageId, id?: string) => void;
+
+function Fiction({ children = 'Beispiel, erfunden' }: { children?: React.ReactNode }) {
+  return <span className="topic-fiction">{children}</span>;
+}
 
 function Sources({ ids }: { ids: readonly string[] }) {
-  return <ul className="topic-sources">{ids.flatMap((id) => {
-    const item = topicSource(id);
-    return item ? [<li key={id}><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} ↗</a><span>{item.authority} · {item.dateLabel}</span></li>] : [];
-  })}</ul>;
+  return <div className="topic-sources">{ids.map((id) => {
+    const source = topicSource(id);
+    return source ? <a key={id} href={source.url} target="_blank" rel="noopener noreferrer"><FileText size={13} aria-hidden="true" />{source.title}<ArrowUpRight size={13} aria-hidden="true" /></a> : null;
+  })}</div>;
 }
 
-function SourceCards({ ids }: { ids?: readonly string[] }) {
-  const selected = ids ? TOPIC_SOURCES.filter((item) => ids.includes(item.id)) : TOPIC_SOURCES;
-  return <ul className="topic-source-cards">{selected.map((item) => <li key={item.id}>
-    <span className="topic-evidence-label">{item.authority}</span><h3><a href={item.url} target="_blank" rel="noopener noreferrer">{item.title} ↗</a></h3>
-    <p>{item.fact}</p>{item.quote && <blockquote>{item.quote}</blockquote>}<time>{item.dateLabel}</time>
-    <p className="topic-source-identity">Fall-ID: <code>{item.caseId}</code> · Quell-ID: <code>{item.evidenceSourceId}</code></p>
-  </li>)}</ul>;
+function Landscape() {
+  return <figure className="topic-landscape"><svg viewBox="0 0 560 350" role="img" aria-label="Illustration: Äcker, Solarmodule und ein Dorf. Beispiel, erfunden; keine Lagekarte.">
+    <defs><linearGradient id="b70-sky" x2="0" y2="1"><stop stopColor="#e4eadf" /><stop offset="1" stopColor="#f7ecd0" /></linearGradient><pattern id="b70-panels" width="37" height="25" patternUnits="userSpaceOnUse"><rect width="34" height="22" rx="2" fill="#285553" /><path d="M17 0V22M0 11H34" stroke="#6c9b91" strokeWidth=".8" /></pattern></defs>
+    <rect width="560" height="350" rx="28" fill="url(#b70-sky)" /><circle cx="433" cy="72" r="35" fill="#eaba61" />
+    <path d="M0 177Q105 107 239 168T560 145V350H0" fill="#b3bf96" /><path d="M0 229Q153 139 348 206T560 178V350H0" fill="#789479" />
+    <path d="M-10 309L181 205L280 225L104 350H-10" fill="#d9b975" /><path d="M0 325L199 213M35 350L223 219M79 350L247 225" stroke="#b18d52" strokeWidth="3" />
+    <path d="M248 350L378 224L485 236L402 350" fill="#ead9ac" /><path d="M269 350L390 227M309 350L416 230M353 350L448 234" stroke="#c8b07b" strokeWidth="2" />
+    <path d="M128 289L275 213L382 241L251 322Z" fill="#dfd9bd" /><path d="M143 282L277 221L365 244L248 310Z" fill="url(#b70-panels)" />
+    <path d="M0 182Q157 168 306 190T560 174" fill="none" stroke="#eee5ca" strokeWidth="8" /><path d="M0 182Q157 168 306 190T560 174" fill="none" stroke="#73817a" strokeWidth="2" strokeDasharray="5 6" />
+    <g fill="#f8f1dd" stroke="#77816a" strokeWidth="1.5"><path d="M65 165V137H98V165Z" /><path d="M111 167V143H138V168Z" /><path d="M147 171V132H171V172Z" /></g>
+    <g fill="#a87558"><path d="M60 137L81 119L102 137Z" /><path d="M107 143L124 129L142 143Z" /><path d="M142 132L159 116L176 132Z" /></g>
+    <g fill="#375e49"><ellipse cx="462" cy="173" rx="12" ry="23" /><ellipse cx="486" cy="163" rx="16" ry="29" /><ellipse cx="515" cy="176" rx="13" ry="24" /></g>
+    <path d="M462 179V207M486 170V198M515 181V211" stroke="#5d6145" strokeWidth="4" /><g fill="#f8e7b9"><circle cx="403" cy="283" r="3" /><circle cx="415" cy="291" r="3" /><circle cx="426" cy="279" r="3" /></g>
+  </svg><figcaption>Eine Zukunftsfrage vor der Haustür. Illustration · Beispiel, erfunden.</figcaption></figure>;
 }
 
-function Discussion() {
-  return <section aria-labelledby="topic-arguments-title">
-    <p className="topic-demo-fiction">Beispiel, erfunden · nach dem historischen Ratsbeschluss</p>
-    <h2 id="topic-arguments-title">Wie sollte der öffentliche Status zum Beschluss belegt werden?</h2>
-    <div className="topic-argument-layout"><div><h3>Argumentbaum · vier Beiträge</h3>
-      <ol className="topic-tree">{TOPIC_ARGUMENTS.filter((item) => item.parent === null).map((root) => <li key={root.id}>
-        <article id={`contribution-${root.id}`} className={root.side === 'Dafür' ? 'topic-side-pro' : 'topic-side-con'}>
-          <strong>{root.side} · {root.id}</strong><p>{root.text}</p><p className="topic-note">{root.date} · {root.actor}</p><Sources ids={root.sourceIds} />
-        </article>
-        <ul>{TOPIC_ARGUMENTS.filter((child) => child.parent === root.id).map((child) => <li key={child.id}>
-          <article id={`contribution-${child.id}`} className={child.side === 'Dafür' ? 'topic-side-pro' : 'topic-side-con'}>
-            <strong>{child.side} · Antwort · {child.id}</strong><p>{child.text}</p><p className="topic-note">{child.date} · {child.actor}</p><Sources ids={child.sourceIds} />
-          </article>
-        </li>)}</ul>
-      </li>)}</ol>
-    </div><figure className="topic-sunburst"><figcaption><h3>Sunburst</h3><p>Vier Argumentbeiträge · gleiche Struktur wie der Baum</p></figcaption>
-      <svg viewBox="0 0 200 200" role="img" aria-label="Strukturdiagramm mit zwei Dafür- und zwei Dagegen-Beiträgen; es zeigt keine Stimmen oder Mehrheiten.">
-        <path d="M100 48 A52 52 0 0 1 100 152 L100 124 A24 24 0 0 0 100 76Z" fill="#407f59"><title>Dafür · 2 Argumente</title></path>
-        <path d="M100 152 A52 52 0 0 1 100 48 L100 76 A24 24 0 0 0 100 124Z" fill="#a74e47"><title>Dagegen · 2 Argumente</title></path>
-        <path d="M100 18 A82 82 0 0 1 100 182 L100 156 A56 56 0 0 0 100 44Z" fill="#83a987" />
-        <path d="M100 182 A82 82 0 0 1 100 18 L100 44 A56 56 0 0 0 100 156Z" fill="#d5948e" />
-        <circle cx="100" cy="100" r="23" fill="#f8f6f0" /><text x="100" y="104" textAnchor="middle">4 Beiträge</text>
-      </svg>
-      <ul className="topic-chart-legend"><li><span className="topic-dot pro" /> Dafür · 2 Beiträge</li><li><span className="topic-dot con" /> Dagegen · 2 Beiträge</li></ul>
-      <p className="topic-note">Flächen zeigen ausschließlich Beitragsstruktur, nicht Gewichtung, Zustimmung, Stimmen oder Wahrheit.</p>
-    </figure></div>
-  </section>;
+function AiAttribution() {
+  return <details className="topic-ai-attribution"><summary><Sparkles size={15} aria-hidden="true" /> Wer hat diesen Entwurf geschrieben?</summary><dl><div><dt>Modell</dt><dd>{TOPIC_AI.model}</dd></div><div><dt>Betreiber</dt><dd>{TOPIC_AI.operator}</dd></div><div><dt>Ausführung</dt><dd>{TOPIC_AI.whereRan}</dd></div><div><dt>Erstellt</dt><dd>{TOPIC_AI.generatedAt}</dd></div></dl><p>{TOPIC_AI.mode}</p><p>{TOPIC_AI.localBoundary}</p></details>;
 }
 
-function Proposal({ version, expanded, onContribution }: { version: ProposalVersion; expanded: boolean; onContribution: (id: string) => void }) {
-  return <details className="topic-proposal-version" id={`contribution-${version.id}`} open={expanded}>
-    <summary><strong>{version.id}</strong> · {version.exampleDateLabel}<span className="topic-note">KI-Beitrag · Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</span></summary>
-    <div className="topic-proposal-grid">
-      <article><h4>Problem</h4><p>{version.problem}</p></article>
-      <article><h4>Quellenbasierte Fakten</h4><ul>{version.facts.map((fact, index) => <li key={index}>{fact.text}<Sources ids={fact.sourceIds} /></li>)}</ul></article>
-      <article><h4>Diskussionsgründe und Optionen</h4><ol>{version.options.map((option) => <li key={option.id}><strong>{option.title}</strong><p>{option.text}</p><p>Greift auf: {option.argumentIds.map((id) => <button className="topic-link-button" type="button" key={id} onClick={() => onContribution(id)}>{id}</button>)}</p></li>)}</ol></article>
-      <article><h4>Kosten (unbekannt, wo nicht belegt)</h4><p>{version.costs.text}</p><Sources ids={version.costs.sourceIds} /></article>
-      <article><h4>Rechtsstatus</h4><p>{version.legalStatus.text}</p><Sources ids={version.legalStatus.sourceIds} /></article>
-      <article><h4>Empfehlung des Beispielentwurfs</h4><p>{version.recommendation}</p><h4>Vergleichsfälle</h4><p>Roseburg-Wotersen und Witzeeze sind nur belegte Vergleichsreferenzen, keine Wirkungs- oder Erfolgsnachweise.</p><Sources ids={version.sourceIds.filter((id) => id === 'roseburg' || id === 'witzeeze')} /></article>
-    </div>
-    {version.changes.length > 0 && <section><h4>Änderungen gegenüber vorher</h4><ul>{version.changes.map((change) => <li key={change}>{change}</li>)}</ul></section>}
-    {version.statusFields && <section><h4>Getrennte Verfahrensstände</h4><dl>{version.statusFields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.state === 'recorded' ? `Belegt · ${field.date}` : 'Nicht belegt · unbekannt'}<Sources ids={field.sourceIds} /></dd></div>)}</dl></section>}
-    {version.costFields && <section><h4>Getrennte Kostenangaben</h4><dl>{version.costFields.map((field) => <div key={field.id}><dt>{field.label}</dt><dd>{field.state === 'unknown' ? 'Unbekannt · kein Eurobetrag belegt' : 'Quellenbelegt · keine Aussage über erfolgte Zahlung'}<Sources ids={field.sourceIds} /></dd></div>)}</dl></section>}
-  </details>;
-}
-
-function DepartmentAiDraft({ replyId }: { replyId: string }) {
-  const draft = departmentAiRecord.drafts.find((item) => item.replyId === replyId);
-  if (!draft) return null;
-  return <details className="topic-ai-assist" id={`contribution-${draft.id}`}>
-    <summary>KI-Hilfe für die erfundene Fachrolle · {draft.id}</summary>
-    <p className="topic-note">Modell {departmentAiRecord.modelId} · betrieben von {departmentAiRecord.operatorLabel} · erstellt {departmentAiRecord.generatedAt}</p>
-    <p>{draft.draft}</p><p><strong>Quellenabgleich:</strong> {draft.sourceCheck}</p><Sources ids={draft.sourceIds} />
-    <p className="topic-note">{departmentAiRecord.checkBoundary} Menschliche Prüfung: nicht erfolgt. Die daneben gezeigte menschliche Rückmeldung ist ausschließlich ein erfundenes Rollenbeispiel.</p>
-  </details>;
-}
-
-function DepartmentAiTraceLink({ replyId, onContribution }: { replyId: string; onContribution: (id: string) => void }) {
-  const draft = departmentAiRecord.drafts.find((item) => item.replyId === replyId);
-  return draft ? <p><button className="topic-link-button" type="button" onClick={() => onContribution(draft.id)}>KI-Hilfe öffnen · {draft.id}</button><span className="topic-note"> Modell {departmentAiRecord.modelId} · betrieben von {departmentAiRecord.operatorLabel}</span></p> : null;
-}
-
-function DemoStage({ id, onVote, onContribution }: { id: TopicStageId; onVote: (value: string) => void; onContribution: (id: string) => void }) {
-  const [choice, setChoice] = useState('');
-  const [response, setResponse] = useState('');
-  if (id === 'feed') return <>
-    <p className="topic-demo-fiction">Öffentlicher Fall · gespeicherte Live-API-Auswertung · kein zusätzlicher Abruf</p><h2>{TOPIC_FLOW_TITLE}</h2>
-    <p>Gemeinde Tramm · Kreis Herzogtum Lauenburg · Schleswig-Holstein · AGS 01053126</p>
-    <div className="topic-status-note"><strong>Belegt:</strong> Am 1. Juni 2026 beauftragte die Gemeindevertretung den Bürgermeister, den städtebaulichen Vertrag zur Übernahme der Bauleitplanungskosten abzuschließen. Die Niederschrift nennt Rechtsanwaltskosten zum Durchführungsvertrag beim Vorhabenträger.</div>
-    <p className="topic-fact-boundary"><strong>Keine Ausführung belegt.</strong> Kein Nachweis der Vertragsunterzeichnung, B-Plan-Rechtskraft, Errichtung oder des Betriebs; kein tatsächlicher Eurobetrag in den gespeicherten Quellen.</p>
-    <p className="topic-metadata">Fall-ID <code>{TOPIC_FLOW_CASE_ID}</code> · {TOPIC_FLOW_SNAPSHOT} · Entscheidung 1. Juni 2026 · 7 Ja / 1 Nein / 0 Enthaltungen</p><SourceCards ids={['paper', 'minutes']} />
-  </>;
-  if (id === 'problem') return <>
-    <p className="topic-demo-fiction">Beispiel, erfunden · kein historischer Trammer Problembericht</p><h2 id={`contribution-${TOPIC_CITIZEN_PROBLEM.id}`}>{TOPIC_CITIZEN_PROBLEM.text}</h2>
-    <p className="topic-metadata">Beitrags-ID <code>{TOPIC_CITIZEN_PROBLEM.id}</code> · {TOPIC_CITIZEN_PROBLEM.date} · {TOPIC_CITIZEN_PROBLEM.actor}</p>
-    <div className="topic-status-note">Fester Beispieltext zur Frage, welche belegten Schritte auf den Ratsauftrag folgten. Er wurde nicht eingereicht; Vertragsabschluss, Betrag und Umsetzung sind in diesem Datensatz nicht belegt.</div><Sources ids={['minutes', 'paper']} />
-  </>;
-  if (id === 'discussion') return <Discussion />;
-  if (id === 'proposal') return <>
-    <p className="topic-demo-fiction">Gespeicherter, einmalig verfasster KI-Beispieldatensatz · keine Live-Generierung</p><h2>Strukturierter Vorschlag · drei überprüfbare Versionen</h2>
-    <div className="topic-status-note"><strong>Attribution:</strong> Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel} · erstellt {proposalRecord.generatedAt} · Eingabe-SHA-256 <code>{proposalRecord.inputSha256}</code>. Menschliche Prüfung: nicht erfolgt. Offline von einer KI verfasst; keine Provider-API oder integrierte Inferenzfunktion.</div>
-    <p className="topic-note">Die Versionen sind hypothetisch und nicht freigegeben. KI-Beiträge zeigen Modell und Betreiber aus ihrem Datensatz; die Oberfläche ist nicht an einen Anbieter gebunden.</p>
-    {proposalRecord.versions.map((version, index) => <Proposal key={version.id} version={version} expanded={index === proposalRecord.versions.length - 1} onContribution={onContribution} />)}
-  </>;
-  if (id === 'feedback') return <>
-    <p className="topic-demo-fiction">Zwei fiktive Fachrollen · zwei Runden · alle Beiträge erfunden</p><h2>Öffentlich nachvollziehbares Beispiel-Feedback</h2>
-    <p>Kein realer Fachbereich in Tramm hat geantwortet. Die KI-Hilfen wurden offline für diese Demo erstellt, nicht von einer Verwaltung. Eine echte menschliche Prüfung ist nicht erfolgt; die Antworten der menschlichen Rollenfiguren sind erfunden.</p>
-    {[1, 2].map((round) => <section key={round} className="topic-round"><h3>Runde {round} · Beispiel, erfunden</h3><ol>{TOPIC_FEEDBACK_ROUNDS.filter((item) => item.round === round).map((item) => <li key={item.id} id={`contribution-${item.id}`}>
-      <p><strong>{item.department}</strong> · {item.actor} · {item.date}</p><p className="topic-note">Beitrags-ID <code>{item.id}</code> · geprüft: <button className="topic-link-button" type="button" onClick={() => onContribution(item.proposalId)}>{item.proposalId}</button> · führt zu <button className="topic-link-button" type="button" onClick={() => onContribution(item.nextProposalId)}>{item.nextProposalId}</button></p>
-      <p><strong>Fiktive menschliche Rückmeldung:</strong> {item.response}</p><p>Änderungsbezug: {item.revision}</p><DepartmentAiDraft replyId={item.id} /><Sources ids={item.sourceIds} />
-    </li>)}</ol></section>)}
-    <p className="topic-note">Keine echte Abgabe, Verwaltungssitzung, Personalposition oder Verwaltungsantwort.</p>
-  </>;
-  if (id === 'decision') return <>
-    <h2>Historischer Ratsbeschluss und unverbindliches Meinungsbild bleiben getrennt</h2><article className="topic-decision-record"><span className="topic-evidence-label">Quellenbeleg · historisch</span><h3>Gemeindevertretung Tramm · 1. Juni 2026</h3><p>7 Ja · 1 Nein · 0 Enthaltungen. Auftrag zum Abschluss des Kostenübernahme-Vertrags; kein Nachweis späterer Unterzeichnung oder Umsetzung.</p><Sources ids={['minutes']} /></article>
-    <section className="topic-advisory"><span className="topic-demo-fiction">Beispiel, erfunden · beratende Ansicht · keine echte Mitmachen-Runde</span><h3>Welche Statusangabe sollte eine öffentliche Übersicht zuerst belegen?</h3><p>Fiktive Frage zur Transparenz, keine Abstimmung zur Windenergienutzung und keine Wiederholung oder Änderung des Ratsbeschlusses. Eine App-Abstimmung wäre beratend, nicht bindend.</p>
-      <fieldset><legend>Lokale Auswahl · nicht gespeichert oder übertragen</legend>{TOPIC_ADVISORY_OPTIONS.map((option) => <label key={option}><input type="radio" name="topic-demo-choice" checked={choice === option} onChange={() => { setChoice(option); setResponse(''); }} />{option}</label>)}</fieldset>
-      <button type="button" disabled={!choice} onClick={() => { onVote(choice); setResponse('Deine Auswahl bleibt nur in dieser Seite sichtbar. Sie wurde nicht gespeichert, gezählt oder versendet.'); }}>Demo-Auswahl vormerken</button>
-      {response && <p role="status" className="topic-status-note">{response}</p>}
-    </section>
-  </>;
+function Proposal({ jump, version, setVersion }: { jump: Jump; version: 1 | 2; setVersion: (version: 1 | 2) => void }) {
+  const [diff, setDiff] = useState(false);
   return <>
-    <h2>Der ganze Weg: Quelle bis zur getrennten Entscheidung</h2><p>Der Ratsbeschluss vom 1. Juni ist historisch. Problem, Diskussion, KI-Beispiel, Fachfeedback und beratende Frage sind erfundene spätere Fortsetzungen; nichts davon hat den Ratsbeschluss verursacht oder geändert.</p>
-    <ol className="topic-trace">{TOPIC_SOURCE_TIMELINE.map((event) => <li key={event.date}><time>{event.date}</time><span className="topic-event-kind">{event.reality === 'source' ? 'Quellenereignis' : 'Bestandsaufnahme · kein Quellenereignis'}</span><p>{event.event}</p><Sources ids={[event.sourceId]} /></li>)}
-      <li className="demo-event"><time>{TOPIC_CITIZEN_PROBLEM.date}</time><span className="topic-event-kind">Problem · Beispiel, erfunden</span><p>{TOPIC_CITIZEN_PROBLEM.actor} · {TOPIC_CITIZEN_PROBLEM.text}</p><button className="topic-link-button" type="button" onClick={() => onContribution(TOPIC_CITIZEN_PROBLEM.id)}>Öffnen · {TOPIC_CITIZEN_PROBLEM.id}</button></li>
-      {TOPIC_ARGUMENTS.map((argument) => <li className="demo-event" key={argument.id}><time>{argument.date}</time><span className="topic-event-kind">Diskussion · Beitrag {argument.id} · Beispiel, erfunden</span><p>{argument.actor} · {argument.text}</p><button className="topic-link-button" type="button" onClick={() => onContribution(argument.id)}>Öffnen · {argument.id}</button><Sources ids={argument.sourceIds} /></li>)}
-      {proposalRecord.versions.map((version) => <Fragment key={version.id}>
-        <li className="demo-event"><time>{version.exampleDateLabel}</time><span className="topic-event-kind">KI-Vorschlag · {version.id} · menschlich ungeprüft</span><p>Modell {proposalRecord.modelId} · betrieben von {proposalRecord.operatorLabel}</p><p>{version.changes.join(' ') || version.problem}</p><button className="topic-link-button" type="button" onClick={() => onContribution(version.id)}>Öffnen · {version.id}</button></li>
-        {TOPIC_FEEDBACK_ROUNDS.filter((reply) => reply.proposalId === version.id).map((reply) => <li className="demo-event" key={reply.id}><time>{reply.date}</time><span className="topic-event-kind">Fachfeedback · {reply.id} · Beispiel, erfunden</span><p>{reply.department} · {reply.actor}: {reply.response}</p><p>Version {reply.proposalId} → {reply.nextProposalId}</p><button className="topic-link-button" type="button" onClick={() => onContribution(reply.id)}>Öffnen · {reply.id}</button><DepartmentAiTraceLink replyId={reply.id} onContribution={onContribution} /></li>)}
-      </Fragment>)}
-      <li className="demo-event"><time>Beispiel-Datum, erfunden · 27. November 2026</time><span className="topic-event-kind">Mitmachen · beratende lokale Demo</span><p>Beispielrolle: Bürger:in der Stadt. Keine echte Runde, Abgabe oder Teilnahme.</p><button className="topic-link-button" type="button" onClick={() => onContribution('advisory-question')}>Zur beratenden Ansicht</button></li>
-    </ol><section><h3>Alle verwendeten Quellen</h3><SourceCards /></section>
+    <div className="topic-section-heading"><span className="topic-kicker"><Sparkles size={15} aria-hidden="true" /> AUS GRÜNDEN WIRD EIN VORSCHLAG</span><h2>Solar ja. Aber was bleibt im Dorf?</h2><p>Die KI ordnet die Diskussion. Sie entscheidet nicht, was richtig ist.</p><Fiction>Beispiel, erfunden · menschlich ungeprüfter KI-Vorschlag</Fiction></div>
+    <div className="topic-version-bar" id="contribution-proposal"><div role="group" aria-label="Vorschlagsversion"><button aria-pressed={version === 1} onClick={() => setVersion(1)}>v1 · erster Entwurf</button><button aria-pressed={version === 2} onClick={() => setVersion(2)}>v2 · nach Fachfeedback</button></div><button className="topic-text-button" aria-expanded={diff} onClick={() => setDiff(!diff)}>{diff ? 'Änderungen schließen' : 'Änderungen vergleichen'}</button></div>
+    <article className="topic-proposal-lead"><span className="topic-kicker">VORSCHLAG {version} · BEISPIEL, ERFUNDEN</span><h3>Ein Dorf-Paket für den Solarpark prüfen</h3><p>Den nächsten Schritt an überprüfbare Antworten zu Boden, Natur, Wegen und lokalem Nutzen knüpfen – ohne den historischen Ratsbeschluss umzudeuten.</p><div className="topic-pill-row"><span><Sprout size={14} /> Boden schützen</span><span><Users size={14} /> Teilhabe prüfen</span><span><ShieldCheck size={14} /> Zusagen nachweisen</span></div></article>
+    {diff && <section className="topic-diff" aria-label="Änderungen von Version 1 zu Version 2"><h3>Was sich durch die drei Fachrollen geändert hat</h3>{TOPIC_REVISIONS.map((change) => <article key={change.id} id={change.id}><span className="topic-kicker">{change.department} · {change.field}</span><del><span>v1 · entfernt</span>{change.before}</del><ins><span>v2 · ersetzt durch</span>{change.after}</ins><p>{change.reason}</p><Sources ids={change.sourceIds} /></article>)}</section>}
+    <div className="topic-two-col"><section className="topic-card"><span className="topic-real"><Check size={13} /> Quellenfakten</span><h3>Worauf wir aufbauen</h3><ul className="topic-fact-list"><li>Landwirtschaftliche Vornutzung ist in den Planunterlagen beschrieben.<Sources ids={['farmland']} /></li><li>Am 14. Oktober 2025: Entwurf gebilligt, Ausgleichsfläche A2 ergänzt und Veröffentlichung beschlossen. 11 Ja, 5 Nein, keine Enthaltung.<Sources ids={['minutes']} /></li><li>{TOPIC_ENERGY.summary}<p className="topic-small">{TOPIC_ENERGY.detail}</p><Sources ids={TOPIC_ENERGY.sourceIds} /></li></ul></section><section className="topic-card"><span className="topic-kicker">DIE FRAGEN DER NACHBARSCHAFT</span><h3>Was noch beantwortet werden muss</h3><ol className="topic-question-list">{TOPIC_OPEN_QUESTIONS.map((question) => <li key={question}>{question}</li>)}</ol><button className="topic-text-button" onClick={() => jump('discussion')}>Zurück zu den Stimmen <ArrowRight size={14} /></button></section></div>
+    <section><h3>Drei mögliche Wege – keine Beschlüsse</h3><div className="topic-option-grid">{TOPIC_OPTIONS.map((option, index) => <article className="topic-card" key={option.id}><span className="topic-option-number">0{index + 1}</span><h4>{option.title}</h4><p>{option.text}</p><Sources ids={option.sourceIds} /><div className="topic-option-arguments"><span className="topic-small">Greift diese Gründe auf:</span>{option.argumentIds.map((id) => <button key={id} className="topic-text-button" onClick={() => jump('discussion', id)}>{TOPIC_ARGUMENTS.find((argument) => argument.id === id)?.title}<ArrowRight size={12} /></button>)}</div></article>)}</div></section>
+    <section className="topic-revision-summary"><h3>{version === 1 ? 'Erster Entwurf · vor dem Fachfeedback' : 'Überarbeiteter Entwurf · drei konkrete Korrekturen'}</h3>{TOPIC_REVISIONS.map((change) => <article key={change.id}><h4>{change.field}</h4><p>{version === 1 ? change.before : change.after}</p><Sources ids={change.sourceIds} /></article>)}<p className="topic-small">v1 enthält noch ungeklärte Zielvorstellungen, keine Zusagen. v2 macht Grenzen und Prüfaufträge ausdrücklich.</p></section>
+    <section><span className="topic-kicker">ÜBER DEN ORTSRAND SCHAUEN</span><h3>Andere Orte, ähnliche Fragen</h3><p className="topic-small">Durch ähnliche Sachmerkmale gefunden, nicht als Vorbilder mit erwiesenem Erfolg. Die überlieferten Ergebnisworte bleiben sichtbar.</p><div className="topic-option-grid">{TOPIC_COMPARABLES.map((item) => <article className="topic-card topic-comparable" key={item.id}><span className="topic-kicker"><MapPin size={13} /> {item.municipality}</span><h4>{item.title}</h4><p className="topic-comparable-result">{item.decision}</p><time>{item.date}</time><p className="topic-small">{item.caveat}</p><Sources ids={item.sourceIds} /></article>)}</div></section><AiAttribution />
   </>;
+}
+
+function Feedback({ jump, revise }: { jump: Jump; revise: () => void }) {
+  const [round, setRound] = useState<1 | 2>(1);
+  return <><div className="topic-section-heading"><span className="topic-kicker">ÖFFENTLICH STATT IM HINTERZIMMER</span><h2>Drei Fachblicke. Ein besserer Vorschlag.</h2><p>Jede Rückmeldung zeigt, welche Formulierung sich warum ändert.</p><Fiction>Beispiel, erfunden · keine Verwaltung hat geantwortet</Fiction></div><div className="topic-version-bar" role="group" aria-label="Feedbackrunde"><button aria-pressed={round === 1} onClick={() => setRound(1)}>Runde 1 · prüfen</button><button aria-pressed={round === 2} onClick={() => setRound(2)}>Runde 2 · v2 nachlesen</button></div><div className="topic-departments">{TOPIC_DEPARTMENTS.map((department, index) => <article className="topic-card" key={department.id} id={`contribution-${department.id}`}><header><span className={`topic-avatar avatar-${index}`}>{department.initials}</span><div><h3>{department.department}</h3><span className="topic-small">{department.person}</span></div></header><Fiction /><h4>{department.focus}</h4><p>{round === 1 ? department.response : department.round2}</p><Sources ids={department.sourceIds} /><details className="topic-ai-draft" id={`contribution-ai-${department.id}`}><summary><Sparkles size={15} /> Lokale-KI-Ansicht · Entwurf öffnen</summary><p className="topic-small">Interface-Konzept · kein ausgeführter lokaler Modellaufruf.</p><blockquote>{department.draft}</blockquote><p className="topic-small">Modell: {TOPIC_AI.model}<br />Betreiber: {TOPIC_AI.operator}<br />Ausführung: {TOPIC_AI.whereRan}<br />Gespeichert: {TOPIC_AI.generatedAt} · menschlich ungeprüft.</p></details><div className="topic-feedback-change"><span className="topic-kicker">DARAUS WIRD IN V2</span><p>{TOPIC_REVISIONS[index]?.after}</p></div></article>)}</div><div className="topic-callout"><div><h3>Keine Blackbox zwischen v1 und v2.</h3><p>Alle drei Rückmeldungen führen zu sichtbaren Textänderungen. Runde 2 dokumentiert, was weiterhin offen ist.</p></div><button className="topic-primary" onClick={revise}>Überarbeitung ansehen <ArrowRight size={16} /></button></div><AiAttribution /><button className="topic-text-button" onClick={() => jump('proposal')}>Zum Vorschlag</button></>;
+}
+
+function Decision() {
+  const [choice, setChoice] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
+  return <><div className="topic-section-heading"><span className="topic-kicker">ZWEI WEGE, NICHT DIESELBE MACHT</span><h2>Der Rat entscheidet.<br />Das Dorf gibt Orientierung.</h2><p>Ein amtlicher Beschluss und ein App-Meinungsbild dürfen nie miteinander verschwimmen.</p></div><div className="topic-decision-lanes"><section className="topic-council-lane"><span className="topic-real"><Scale size={14} /> RAT · QUELLENBELEGT</span><h3>{TOPIC_COUNCIL.body}</h3><time>{TOPIC_COUNCIL.date}</time><div className="topic-council-votes"><strong>11</strong><span>Ja</span><strong>5</strong><span>Nein</span><strong>0</strong><span>Enthaltungen</span></div><p>{TOPIC_COUNCIL.summary}</p><Sources ids={TOPIC_COUNCIL.sourceIds} /><div className="topic-boundary"><strong>Das ist keine endgültige Baugenehmigung.</strong><p>{TOPIC_COUNCIL.limits}</p></div></section><section className="topic-mitmachen"><span className="topic-kicker"><Users size={15} /> MITMACHEN · BERATEND</span><Fiction>Beispiel, erfunden · Frage und alle Ergebnisse</Fiction><h3>Wie sollte Büchen mit dem Solarpark weitergehen?</h3><p className="topic-small">Keine echte Abstimmungsrunde. Kein Bürgerentscheid. Kein Ersatz für die förmliche Beteiligung.</p><fieldset><legend>Was wäre deine Empfehlung?</legend>{TOPIC_ADVISORY.map((option) => <label key={option.id} className={choice === option.id ? 'selected' : ''}><input type="radio" name="b70-advisory" value={option.id} checked={choice === option.id} onChange={() => { setChoice(option.id); setConfirmed(false); }} /><span>{option.label}</span></label>)}</fieldset><button className="topic-primary" disabled={!choice} onClick={() => setConfirmed(true)}>Demo-Auswahl ansehen <ArrowRight size={15} /></button>{confirmed && <p role="status" className="topic-local-choice"><Check size={16} /> Nur auf dieser Seite vorgemerkt. Nicht gespeichert, gezählt oder gesendet. Die Beispielzahlen bleiben unverändert.</p>}<details className="topic-demo-results"><summary>Erfundenes Ergebnis ansehen · 140 Beispielstimmen</summary><p className="topic-small">Beispiel, erfunden · 84 / 35 / 21 Stimmen · 60 / 25 / 15 % von 140. Keine reale Teilnahme, kein Zeitfenster, keine Repräsentativität.</p>{TOPIC_ADVISORY.map((option) => <div className="topic-result" key={option.id}><div><span>{option.label}</span><strong>{option.percent} %</strong></div><div className="topic-result-track"><span style={{ width: `${option.percent}%` }} /></div><small>{option.count} erfundene Stimmen</small></div>)}</details></section></div></>;
+}
+
+function Trace({ jump }: { jump: Jump }) {
+  const demoEvents: { id: string; label: string; text: string; stage: TopicStageId }[] = [
+    { id: TOPIC_CITIZEN_PROBLEM.id, label: '01 · Eine Nachbarin stellt die Frage', text: TOPIC_CITIZEN_PROBLEM.text, stage: 'problem' },
+    { id: 'discussion', label: '02 · 18 Perspektiven werden sichtbar', text: 'Landwirtschaft, Familien, Natur, Energie und Teilhabe – im Baum und im selben Argumentkreis.', stage: 'discussion' },
+    { id: 'proposal', label: '03 · KI ordnet den ersten Vorschlag', text: 'Quellenfakten, drei Optionen und fünf offene Fragen, mit benanntem Modell und Betreiber.', stage: 'proposal' },
+    { id: 'department-plan', label: '04 · Drei Fachrollen prüfen öffentlich', text: 'Bauamt, Umwelt und Finanzen formulieren Einwände. Die lokale-KI-Ansicht ist nur ein Interface-Konzept.', stage: 'feedback' },
+    { id: 'proposal', label: '05 · v2 zeigt jede Änderung', text: 'Wege nicht versprechen. Naturgewinn nicht behaupten. Dorf-Einnahmen nicht erfinden.', stage: 'proposal' },
+    { id: 'advisory', label: '06 · Ein beratendes Meinungsbild', text: 'Frage und Ergebnis sind erfunden. Die echte Ratsentscheidung steht unabhängig daneben.', stage: 'decision' },
+  ];
+  return <><div className="topic-section-heading"><span className="topic-kicker">JEDER SCHRITT HAT EINE SPUR</span><h2>Von „Betrifft mich“<br />zu „Ich kann es nachvollziehen“.</h2><p>Erst die belegte Geschichte. Dann eine ausdrücklich erfundene Fortsetzung – nicht die Ursache der historischen Beschlüsse.</p></div><h3 className="topic-trace-heading"><ShieldCheck size={18} /> Die echte Vorgeschichte</h3><ol className="topic-trace">{TOPIC_SOURCE_TIMELINE.map((event) => <li key={event.date}><span className="topic-trace-dot" /><time>{event.date}</time><span className="topic-real">{event.reality === 'source' ? 'Quellenereignis' : 'Datenerfassung · kein Beschluss'}</span><p>{event.event}</p><Sources ids={[event.sourceId]} /></li>)}</ol><h3 className="topic-trace-heading"><MessageCircle size={18} /> So könnte Bürgerbeteiligung anschließen</h3><Fiction>Beispiel, erfunden · Demo-Fortsetzung ohne reale Einreichung</Fiction><ol className="topic-trace topic-trace-demo">{demoEvents.map((event, index) => <li key={`${event.id}-${index}`}><span className="topic-trace-dot" /><span className="topic-kicker">DEMO-SEQUENZ · KEIN REALES EREIGNISDATUM</span><h4>{event.label}</h4><p>{event.text}</p><button className="topic-text-button" onClick={() => jump(event.stage, event.id)}>Diesen Schritt öffnen <ArrowRight size={14} /></button></li>)}</ol><details className="topic-all-sources"><summary>Quellen & Herkunft vollständig ansehen</summary><p className="topic-small">{TOPIC_FLOW_SNAPSHOT} · AGS 01053020 · Fall-ID {TOPIC_FLOW_CASE_ID}. Vorlagen-/Veröffentlichungsdaten bleiben unbekannt, soweit nicht erfasst. Kein zusätzlicher Abruf kommunaler Seiten durch diesen Prototyp.</p>{TOPIC_SOURCES.map((source) => <article key={source.id}><h4>{source.title}</h4><p>{source.fact}</p>{source.quote && <blockquote>{source.quote}</blockquote>}<p className="topic-small">{source.authority} · {source.dateLabel}<br />Quell-ID: <code>{source.evidenceSourceId}</code>{source.caseId && <><br />Fall-ID: <code>{source.caseId}</code></>}</p><Sources ids={[source.id]} /></article>)}</details></>;
 }
 
 export function TopicFlowDemo() {
   const [stage, setStage] = useState<TopicStageId>('feed');
-  const [localChoice, setLocalChoice] = useState('');
+  const [version, setVersion] = useState<1 | 2>(2);
+  const [argumentId, setArgumentId] = useState<string | undefined>();
   const current = TOPIC_DEMO_STAGES.findIndex((item) => item.id === stage);
-  const openContribution = (contributionId: string) => {
-    const nextStage: TopicStageId = contributionId === TOPIC_CITIZEN_PROBLEM.id ? 'problem'
-      : TOPIC_ARGUMENTS.some((item) => item.id === contributionId) ? 'discussion'
-        : proposalRecord.versions.some((item) => item.id === contributionId) ? 'proposal'
-          : TOPIC_FEEDBACK_ROUNDS.some((item) => item.id === contributionId) || departmentAiRecord.drafts.some((item) => item.id === contributionId) ? 'feedback' : 'decision';
+  const jump: Jump = (nextStage, id) => {
+    if (nextStage === 'discussion') setArgumentId(TOPIC_ARGUMENTS.find((item) => item.id === id)?.id);
+    if (nextStage === 'proposal' && id === 'proposal') setVersion(2);
     setStage(nextStage);
     requestAnimationFrame(() => {
-      const target = document.getElementById(`contribution-${contributionId}`);
+      const target = (id && document.getElementById(`contribution-${id}`)) || document.getElementById('topic-current-stage');
       if (!target) return;
       if (target instanceof HTMLDetailsElement) target.open = true;
       target.tabIndex = -1;
       target.focus({ preventScroll: true });
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+      target.scrollIntoView({ block: 'start', behavior: 'auto' });
     });
   };
-  return <main className="topic-walkthrough">
-    <header className="topic-walkthrough-hero"><span className="topic-eyebrow">LEDGER OF LIFE · BÜRGER-THEMENWEG · LOKALE DEMO</span><h1>Vom Stadthinweis bis zur nachvollziehbaren Entscheidung</h1>
-      <p>Ein echter, quellengebundener Trammer Ratsbeschluss ist der Ausgangspunkt. Problem, Diskussion, gespeicherter KI-Entwurf, Fachfeedback und Beratungsfrage sind erfundene, spätere Beispiele.</p>
-      <div className="topic-truth-banner"><strong>Lokaler Prototyp · Nur lesen und durchklicken</strong><span>Keine Anmeldung · keine Übertragung · keine echte Abgabe, Fachantwort oder Abstimmung.</span></div>
-      <p className="topic-data-provenance">{TOPIC_FLOW_SNAPSHOT} · Tramm, Schleswig-Holstein · Fall-ID {TOPIC_FLOW_CASE_ID}</p>
-      <nav className="topic-stage-nav" aria-label="Sieben Schritte im Themenweg">{TOPIC_DEMO_STAGES.map((item, index) => <button type="button" key={item.id} aria-current={stage === item.id ? 'step' : undefined} onClick={() => setStage(item.id)}><span>{index + 1}</span><strong>{item.label}</strong></button>)}</nav>
-      <p className="topic-stage-owner">Schritt {current + 1} von 7 · Zuständig: {TOPIC_DEMO_STAGES[current]?.owner}</p>
-    </header>
-    <section className="topic-stage-content" aria-live="polite" aria-atomic="false" id={stage === 'decision' ? 'contribution-advisory-question' : undefined}><DemoStage id={stage} onVote={setLocalChoice} onContribution={openContribution} />{localChoice && stage !== 'decision' && <p className="topic-note">Lokale Demo-Auswahl: {localChoice} · nicht gespeichert und nicht versendet.</p>}</section>
-    <nav className="topic-stage-controls" aria-label="Weiter im Themenweg"><button type="button" disabled={current === 0} onClick={() => setStage(moveTopicStage(stage, -1))}>← Zurück</button><button type="button" onClick={() => setStage(moveTopicStage(stage, 1))} disabled={current === TOPIC_DEMO_STAGES.length - 1}>Weiter →</button></nav>
-    <footer className="topic-walkthrough-footer"><p><strong>Fakten und Grenzen:</strong> Quellen belegen den Ratsauftrag zur Vertragsunterzeichnung und vertragliche Kostenzuständigkeit, nicht tatsächliche Kosten, Vertragsschluss oder Umsetzung. Vergleichsfälle sind keine Wirkungsnachweise.</p><nav aria-label="Weitere Ledger-Seiten"><Link href="/story">Fiktive Ledger-Stadtgeschichte</Link><Link href="/replay">Aufgezeichnete Testnetz-Mietgeschichte</Link><Link href="/">Ledger of Life</Link></nav></footer>
-  </main>;
+  return <main className="topic-walkthrough" lang="de"><header className="topic-topbar"><Link href="/story" className="topic-brand"><span className="topic-brand-mark"><Sprout size={22} /></span><strong>Ledger<span>Dein Ort. Deine Zukunft.</span></strong></Link><span className="topic-location"><MapPin size={15} /> Büchen <span>· Schleswig-Holstein</span></span><span className="topic-prototype">Interaktiver Prototyp</span></header><section className="topic-hero"><div><span className="topic-kicker"><Sun size={16} /> BÜCHEN SPRICHT ÜBER MORGEN</span><h1>Solarpark statt Acker.<br /><em>Was bringt das<br className="topic-desktop-break" /> unserem Dorf?</em></h1><p>Eine echte Planung. Viele gute Fragen. Entdecke, wie aus einer Sorge vor der Haustür ein nachvollziehbarer Vorschlag werden kann.</p><div className="topic-pill-row"><span><ShieldCheck size={14} /> Reale Quellen</span><span><Users size={14} /> 18 erfundene Stimmen</span><span><Sparkles size={14} /> KI als Assistenz</span></div></div><Landscape /></section><div className="topic-honesty"><span><ShieldCheck size={17} /> <strong>Echte Fakten. Erfundenes Mitmachen.</strong></span><p>B-Plan 70 und Ratsbelege sind real. Bürgerbeiträge, Fachrollen, Vorschlag und App-Ergebnis: <strong>Beispiel, erfunden.</strong> Keine Anmeldung, Übertragung oder echte Abgabe.</p></div><nav className="topic-stage-nav" aria-label="Sieben Schritte im Themenweg">{TOPIC_DEMO_STAGES.map((item, index) => { const Icon = stageIcons[index]!; return <button key={item.id} aria-current={stage === item.id ? 'step' : undefined} onClick={() => jump(item.id)}><span className="topic-step-number">{index + 1}</span><Icon size={17} aria-hidden="true" /><strong>{item.label}</strong>{index < current && <Check size={12} className="topic-step-check" />}</button>; })}</nav><section className="topic-stage-content" id="topic-current-stage"><p className="topic-stage-owner">DEIN THEMENWEG <span>0{current + 1} / 07</span></p>
+      {stage === 'feed' && <><div className="topic-section-heading"><span className="topic-kicker">DEIN ORT IN BEWEGUNG</span><h2>Nicht weit weg. Direkt nebenan.</h2><p>Ein kleiner Ortsfeed aus gespeicherten Quellen – keine laufenden Nachrichten.</p></div><div className="topic-feed">{TOPIC_FEED_ITEMS.filter((item) => item.kind !== 'example').map((item, index) => { const Icon = [Scale, MapPin, Leaf, Sun, Wallet][index % 5]!; return <article className="topic-card" key={item.id}><div className="topic-feed-icon"><Icon size={22} /></div><span className="topic-real">Quellenbelegt</span><time>{item.dateLabel}</time><h3>{item.title}</h3><p>{item.text}</p><Sources ids={item.sourceIds} /></article>; })}<article className="topic-citizen-post"><div className="topic-post-author"><span className="topic-avatar">MJ</span><div><strong>Mara · junge Familie</strong><span>Nachbarin · Beispiel, erfunden</span></div></div><Fiction /><h3>„Ich will sauberen Strom. Aber auch wissen, was hier verloren geht.“</h3><p>Wir gehen dort mit den Kindern spazieren. Wenn aus Acker ein Solarpark wird: Was haben die Menschen hier davon – auch ohne eigenes Dach?</p><button className="topic-primary" onClick={() => jump('problem')}>Maras Thema öffnen <ArrowRight size={17} /></button><span className="topic-small">18 Beispielstimmen · 3 Fachperspektiven · 1 gemeinsamer Weg</span></article></div></>}
+      {stage === 'problem' && <><div className="topic-section-heading"><span className="topic-kicker">EINE FRAGE DARF DER ANFANG SEIN</span><h2>{TOPIC_CITIZEN_PROBLEM.text}</h2><Fiction /></div><article className="topic-problem" id={`contribution-${TOPIC_CITIZEN_PROBLEM.id}`}><div className="topic-post-author"><span className="topic-avatar">MJ</span><div><strong>{TOPIC_CITIZEN_PROBLEM.actor}</strong><span>{TOPIC_CITIZEN_PROBLEM.date}</span></div></div><p className="topic-problem-quote">{TOPIC_CITIZEN_PROBLEM.body}</p><Sources ids={['farmland', 'paper']} /><div className="topic-problem-needs"><span><Sprout /> Was passiert mit dem Boden?</span><span><Users /> Wer kann mitmachen?</span><span><MapPin /> Bleiben Wege nutzbar?</span></div><button className="topic-primary" onClick={() => jump('discussion')}>Die Perspektiven im Dorf entdecken <ArrowRight size={17} /></button></article><div className="topic-boundary"><strong>Die Frage ist neu. Der Beschluss ist historisch.</strong><p>Diese erfundene Nachbarschaftsrunde folgt auf die gespeicherten Quellen. Sie war kein Bestandteil der damaligen Ratsberatung und ändert keinen Beschluss.</p></div></>}
+      {stage === 'discussion' && <TopicDiscussion initialArgumentId={argumentId} />}
+      {stage === 'proposal' && <Proposal jump={jump} version={version} setVersion={setVersion} />}
+      {stage === 'feedback' && <Feedback jump={jump} revise={() => { setVersion(2); jump('proposal'); }} />}
+      {stage === 'decision' && <Decision />}
+      {stage === 'trace' && <Trace jump={jump} />}
+    </section><nav className="topic-stage-controls" aria-label="Weiter im Themenweg"><button className="topic-back" disabled={current === 0} onClick={() => jump(moveTopicStage(stage, -1))}><ChevronLeft size={16} /> Zurück</button><span>Schritt {current + 1} von 7</span><button className="topic-primary" disabled={current === 6} onClick={() => jump(moveTopicStage(stage, 1))}>{current === 6 ? 'Alles nachvollzogen' : TOPIC_DEMO_STAGES[current + 1]?.label}<ArrowRight size={16} /></button></nav><footer className="topic-footer"><span><Sprout size={18} /> Ledger of Life · Ein Ort für gemeinsame Zukunft</span><p>Gemeinde Büchen · AGS 01053020 · Datengrundlage: gespeicherte Live-API-Antworten vom 16. November 2026. Kein Nachweis von Satzungsrechtskraft, Bau oder Betrieb.</p><Link href="/story">Mehr über Ledger <ArrowUpRight size={13} /></Link></footer></main>;
 }

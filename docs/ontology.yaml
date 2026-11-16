@@ -114,6 +114,13 @@ concepts:
     invariants:
       - Source records retain their own provenance and authority; user discussion is not a municipal submission.
       - Cross-city references keep one canonical topic, poll and frozen result.
+      - The separate seven-stage Büchen B-Plan 70 topic-flow prototype labels invented citizen, AI, role-feedback and advisory content "Beispiel, erfunden"; it is neither a municipal submission nor a real poll.
+      - Captured provenance in src/data/topic-evidence.json retains exact case/paper/step IDs, source URLs, full adopted texts and observation metadata; src/data/topic-flow-demo.ts projects summaries without municipal crawling.
+      - Büchen AGS 01053020 identifies the municipality, not the Amt. Unknown dates stay unknown; collection snapshots are not civic event dates.
+      - B-Plan 70 distinguishes refusal of a public walking-right provision on 2025-06-16 (7-0-1), committee recommendation at the 2025-09-29 meeting (6-2-0), and council draft/publication resolution on 2025-10-14 (11-5-0).
+      - The council resolution includes weighing comments, compensation-area expansion, draft/environmental-report approval, publication/participation instructions and recorded planning-cost takeover; it proves no final ordinance, building permission, construction or operation.
+      - Farmland evidence retains automatically extracted statement-22 provenance. Legacy comparables retain exact ambiguous results, unknown step role and absent adopted text; proposal titles do not establish adopted provisions.
+      - MaStR solar capacity and Destatis population/area are municipality context, not B-Plan 70 generation, project footprint or implementation evidence.
   CivicContribution:
     definition: An account-authored discussion note or structured pro/con argument, or a distinctly labelled sourced model reply.
     reality: prototype
