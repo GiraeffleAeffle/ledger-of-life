@@ -29,6 +29,13 @@ export interface TopicComparable {
   date: string;
   sourceIds: readonly string[];
   caveat: string;
+  stage: string;
+  action: string;
+  reasonLabel: string;
+  reasonQuote: string;
+  reasonUrl: string;
+  reasonDate: string;
+  reasonLimit: string;
 }
 
 export const TOPIC_FLOW_TITLE = 'Solar-Freiflächenanlage · B-Plan Nr. 70 · Gemeinde Büchen';
@@ -173,9 +180,9 @@ export const TOPIC_FEED_ITEMS: readonly TopicFeedItem[] = [
 ];
 
 export const TOPIC_COMPARABLES: readonly TopicComparable[] = [
-  { id: 'broethen', municipality: 'Bröthen', title: 'B-Plan Nr. 5 „PV-Freiflächenanlage“ · Vorlage zum Aufstellungsbeschluss', decision: 'einstimmig beschlossen', date: '22. Juli 2025', sourceIds: ['broethen'], caveat: LEGACY_CAVEAT },
-  { id: 'lichtenow', municipality: 'Rüdersdorf bei Berlin', title: 'B-Plan Nr. 56 „Agri-Photovoltaik-Anlage Lichtenow“ · Vorlage zum Aufstellungsbeschluss', decision: 'ungeändert beschlossen / empfohlen', date: '18. Dezember 2025', sourceIds: ['lichtenow'], caveat: LEGACY_CAVEAT },
-  { id: 'gruenelinde', municipality: 'Rüdersdorf bei Berlin', title: 'B-Plan Nr. 56 „Photovoltaikanlage Grünelinde“ · Vorlage zum Aufstellungsbeschluss', decision: 'abgelehnt / keine Empfehlung', date: '13. Februar 2025', sourceIds: ['gruenelinde'], caveat: LEGACY_CAVEAT },
+  { id: 'broethen', municipality: 'Bröthen', title: 'PV-Freiflächenanlage · B-Plan 5', decision: 'einstimmig beschlossen', date: '22. Juli 2025', sourceIds: ['broethen'], stage: 'Aufstellungsbeschluss laut Vorlagentitel', action: 'Ein Planverfahren für eine PV-Freiflächenanlage beginnen.', reasonLabel: 'Planungsziel laut Vorlage', reasonQuote: 'Planungsziel ist die Ausweisung eines Sondergebietes mit der Zweckbestimmung “Photovoltaik“.', reasonUrl: 'https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do', reasonDate: 'Vorlagendatum nicht erfasst', reasonLimit: 'Die Vorlage nennt ein Ziel; eine gesonderte Begründung des Abstimmungsverhaltens ist nicht erfasst.', caveat: LEGACY_CAVEAT },
+  { id: 'lichtenow', municipality: 'Rüdersdorf · Lichtenow', title: 'Agri-Photovoltaik · B-Plan 56', decision: 'ungeändert beschlossen / empfohlen', date: '18. Dezember 2025', sourceIds: ['lichtenow'], stage: 'Aufstellungsbeschluss laut Vorlage BV-1612/2025', action: 'Ein vorhabenbezogenes Planverfahren für Agri-PV beginnen.', reasonLabel: 'Planungsanlass laut Vorlage', reasonQuote: 'als Partnerin eines lokalen ökologischen Landwirtschaftsbetriebs', reasonUrl: 'https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923', reasonDate: 'Vorlage vom 20. Oktober 2025', reasonLimit: 'Die Vorhabenträgerin beantragt das Verfahren in dieser Partnerschaft. Das ist der Planungsanlass, nicht eine erfasste Begründung einzelner Ratsstimmen. Ergebniswortlaut bleibt mehrdeutig.', caveat: LEGACY_CAVEAT },
+  { id: 'gruenelinde', municipality: 'Rüdersdorf · Grünelinde', title: 'Photovoltaik · eigenständiger B-Plan-56-Fall', decision: 'abgelehnt / keine Empfehlung', date: '13. Februar 2025', sourceIds: ['gruenelinde'], stage: 'Beantragter Aufstellungsbeschluss · Vorlage BV-1480/2024', action: 'Der beantragte Verfahrensstart erhielt dieses negative Ergebnis.', reasonLabel: 'Ziel der abgelehnten Vorlage', reasonQuote: 'Mit Hilfe der Planung soll die Möglichkeit geschaffen werden, an dem Standort eine Photovoltaik-Freiflächenanlage (PV-FFA) zu errichten.', reasonUrl: 'https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760', reasonDate: 'Vorlage vom 22. November 2024', reasonLimit: 'Warum abgelehnt wurde, ist in den erfassten Quellen nicht begründet. Das zitierte Vorhabenziel ist kein Ablehnungsgrund. Trotz gleicher B-Plan-Nummer nicht mit Lichtenow zusammengeführt.', caveat: LEGACY_CAVEAT },
 ];
 
 export const TOPIC_ENERGY = {

@@ -1,0 +1,255 @@
+{
+  "capturedAt": "2026-11-16",
+  "boundary": "Paper goals/context are not reasons for council votes. Legacy result roles remain unknown; proposal wording is not adopted text.",
+  "cases": [
+    {
+      "id": "broethen",
+      "dataVersion": "20261116T043011Z",
+      "queryCapture": "broethen-question-evidence.json",
+      "statements": [
+        {
+          "number": 2,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Beschlussvorschlag laut Unterlage): „Planungsziel ist die Ausweisung eines Sondergebietes mit der Zweckbestimmung “Photovoltaik“.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 5,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Vorhaben): „Antrag bei der Gemeinde Bröthen auf Aufstellung eines Bebauungsplanes sowie Änderung des Flächennutzungsplanes im Parallelverfahren mit dem Ziel der Schaffung der planungsrechtlichen Voraussetzungen für die Errichtung einer ca. 13,8 MWp Freiflächenphotovoltaikanlage“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 6,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Ort): „auf den Flurstücken 84 und 85, Flur 3, Gemarkung Bröthen“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 7,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Vorhabenträger): „die PIN Grünstrom 106 GmbH & Co. KG aus München“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 8,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Leistung): „einer ca. 13,8 MWp Freiflächenphotovoltaikanlage“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 9,
+          "text": "Aus den Unterlagen zur Vorlage „Bebauungsplan Nr. 5 \"PV-Freiflächenanlage\" für das Gebiet: \"Nördlich des landwirtschaftlichen Weges Flst. 62/1, westlich des landwirtschaftlichen Weges Flst. 65/3, östlich der landwirtschaftlich genutzten Flächen Flst. 7/2, 86 und 14/1, alles Flur 3,sowie südlich der Waldfläche Flst. 72, Flur 9, alles Gemarkung Bröthen\"hier: Aufstellungsbeschluss“ (Fläche): „auf einer Fläche von ca. 13,8 ha“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://sessionnet.amt-buechen.de/bi/getfile.php?id=128940&type=do",
+          "date": null,
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "lichtenow",
+      "dataVersion": "20261116T043011Z",
+      "queryCapture": "lichtenow-question-evidence.json",
+      "statements": [
+        {
+          "number": 1,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Vorhaben): „Die Smartenergy DE2107 GmbH (Vorhabenträgerin) hat, als Partnerin eines lokalen ökologischen Landwirtschaftsbetriebs, bei der Gemeinde Rüdersdorf bei Berlin gemäß § 12 Abs. 2 BauGB die Einleitung eines (vorhabenbezogenen) Bebauungsplanverfahrens beantragt.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 2,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Ort): „Gemarkung Lichtenow, Flur 1, Flurstücke 99 (teilweise), 101, 144 und 145 (teilweise).“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 3,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Vorhabenträger): „Die Smartenergy DE2107 GmbH (Vorhabenträgerin)“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 4,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Beschlussvorschlag laut Unterlage): „Die Gemeindevertretung beschließt die Aufstellung des vorhabenbezogenen Bebau-ungsplanes Nr. 56 „Agri-Photovoltaik-Anlage Lichtenow“ in der Gemeinde Rüdersdorf bei Berlin, Ortsteil Lichtenow.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 6,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Fläche): „Das Plangebiet hat eine Größe von rund 33 ha.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 7,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss“ (Betrag): „Auf Grund von §§ 1 und 2 BbgPVAbgG (sog. „Solareuro“) sind für die Gemeinde, im Falle der Umsetzung des geplanten Vorhabens, Einnahmen in Höhe von 2.000 Euro pro Megawatt (MW) und Jahr zu erwarten.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 8,
+          "text": "Beschlussvorlage BV-1612/2025, eingebracht am 20.10.2025: Beschluss zum Bebauungsplan Nr. 56 \"Agri-Photovoltaik-Anlage Lichtenow\" - Aufstellungsbeschluss. Ergebnis laut Ratssystem: ungeändert beschlossen / empfohlen am 18.12.2025 (Gemeindevertretung Rüdersdorf bei Berlin).",
+          "kind": "Ratsvorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1923",
+          "date": "20.10.2025",
+          "trust_label": "structured_source",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        }
+      ]
+    },
+    {
+      "id": "gruenelinde",
+      "dataVersion": "20261116T043011Z",
+      "queryCapture": "gruenelinde-question-evidence.json",
+      "statements": [
+        {
+          "number": 1,
+          "text": "Beschlussvorlage BV-1480/2024, eingebracht am 22.11.2024: Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss. Ergebnis laut Ratssystem: abgelehnt / keine Empfehlung am 13.02.2025 (Gemeindevertretung Rüdersdorf bei Berlin).",
+          "kind": "Ratsvorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "structured_source",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 2,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss“ (Vorhaben): „Mit Hilfe der Planung soll die Möglichkeit geschaffen werden, an dem Standort eine Photovoltaik-Freiflächenanlage (PV-FFA) zu errichten.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 3,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss“ (Ort): „Gemarkung Rüdersdorf, Flur 38, Flurstück 12.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 4,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss“ (Vorhabenträger): „Die IBC Solar GmbH (Vorhabenträgerin) hat bei der Gemeinde Rüdersdorf bei Berlin gemäß § 12 Abs. 2 BauGB die Einleitung eines (vorhabenbezogenen) Bebauungsplanverfahrens beantragt.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 5,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss“ (Beschlussvorschlag laut Unterlage): „Die Gemeindevertretung beschließt die Aufstellung des vorhabenbezogenen Bebauungsplanes Nr. 56 „Photovoltaikanlage Grünelinde“ in der Gemeinde Rüdersdorf bei Berlin, Ortsteil Rüdersdorf.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        },
+        {
+          "number": 6,
+          "text": "Aus den Unterlagen zur Vorlage „Beschluss über den Bebauungsplan Nr. 56 \"Photovoltaikanlage Grünelinde\" - Aufstellungsbeschluss“ (Fläche): „Das Plangebiet hat eine Größe von rund 7,0 ha.“",
+          "kind": "Textstelle aus der Vorlage",
+          "url": "https://ratsinfo-online.net/ruedersdorf-bi/vo020.asp?VOLFDNR=1760",
+          "date": "22.11.2024",
+          "trust_label": "auto_extracted",
+          "robots_label": "unknown",
+          "robots_owner_exception": false,
+          "robots_evidence": null,
+          "source_fetch_status": "unknown"
+        }
+      ]
+    }
+  ]
+}
