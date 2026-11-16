@@ -1,0 +1,104 @@
+.b70-benefits {
+  min-width: 0;
+  padding: clamp(16px, 3vw, 28px);
+  border: 1px solid #dedfce;
+  border-radius: 24px;
+  background: #faf8ef;
+  color: #293e32;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.b70-benefits * { box-sizing: border-box; }
+.b70-benefits p { margin: 0; }
+.b70-benefits-header { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px 24px; }
+.b70-benefits .b70-benefits-eyebrow { margin: 0 0 6px; color: #795b25; font-size: 11px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.b70-benefits h2 { margin: 0; font-family: Georgia, serif; font-size: clamp(25px, 4vw, 33px); font-weight: 500; line-height: 1.12; text-wrap: balance; }
+.b70-benefits .b70-benefits-scope { max-width: 235px; padding: 7px 10px; border: 1px solid #d7dbc9; border-radius: 9px; color: #4c604b; background: #f0f2e8; font-size: 11px; font-weight: 650; }
+.b70-benefits .b70-benefits-intro { margin: 12px 0 20px; max-width: 78ch; color: #536350; font-size: 13px; }
+.b70-benefits-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+.b70-benefits-card { min-width: 0; display: flex; flex-direction: column; padding: 16px; border: 1px solid #dce2d1; border-radius: 16px; background: #fffef8; }
+.b70-benefits-card-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 11px; }
+.b70-benefits-card-heading > div { min-width: 0; }
+.b70-benefits-card-heading p { margin: 0 0 3px; color: #63705e; font-size: 10px; font-weight: 650; }
+.b70-benefits h3 { margin: 0; font-size: 16px; line-height: 1.25; font-weight: 750; text-wrap: balance; }
+.b70-benefits-icon { display: block; flex: 0 0 45px; width: 45px; height: 45px; padding: 4px; border-radius: 12px; background: #eaf0df; fill: none; stroke: #38604a; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.b70-benefits-icon-fill { fill: #c6d9b5; }
+.b70-benefits-icon-paper { fill: #fffdf3; }
+.b70-benefits-icon-sun { fill: #efca73; stroke: #916e2f; }
+.b70-benefits-card-imports .b70-benefits-icon, .b70-benefits-card-backup .b70-benefits-icon { background: #e7efed; }
+.b70-benefits-card-lease .b70-benefits-icon, .b70-benefits-card-eeg .b70-benefits-icon { background: #f5edda; }
+.b70-benefits .b70-benefits-claim { margin: 0 0 10px; color: #304734; font-size: 13px; line-height: 1.55; }
+.b70-benefits .b70-benefits-limit { margin: 0 0 14px; padding-left: 10px; border-left: 2px solid #c7a970; color: #62553d; font-size: 12px; line-height: 1.5; }
+.b70-benefits-limit strong { font-weight: 750; }
+.b70-benefits-card footer { display: grid; gap: 5px; margin-top: auto; padding-top: 9px; border-top: 1px solid #e7e8dc; }
+.b70-benefits-card-scope { color: #62705a; font-size: 10px; line-height: 1.4; }
+.b70-benefits-citations { display: flex; flex-wrap: wrap; gap: 0 9px; }
+.b70-benefits-citations a { display: inline-flex; align-items: center; min-height: 28px; color: #365d45; font-size: 10px; font-weight: 600; line-height: 1.4; text-decoration: underline; text-decoration-color: #a8b89b; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.b70-benefits-citations a:hover, .b70-benefits-sources a:hover { text-decoration-color: currentColor; }
+.b70-benefits :focus-visible { outline: 3px solid #906419; outline-offset: 4px; border-radius: 3px; }
+.b70-benefits .b70-benefits-boundary { margin-top: 16px; padding: 12px 14px; border: 1px dashed #c8cbb7; border-radius: 12px; color: #59634d; font-size: 12px; }
+.b70-benefits-boundary strong { color: #344e37; }
+.b70-benefits-sources { margin-top: 14px; border-top: 1px solid #dcdfcf; font-size: 12px; }
+.b70-benefits-sources summary { min-height: 44px; padding: 13px 0; cursor: pointer; font-weight: 700; color: #405b40; }
+.b70-benefits-sources > p { margin: 0 0 16px; color: #607057; }
+.b70-benefits-sources ul { display: grid; gap: 16px; margin: 0; padding-left: 20px; }
+.b70-benefits-sources li { padding-left: 3px; overflow-wrap: anywhere; }
+.b70-benefits-sources a { color: #365d45; font-weight: 650; text-underline-offset: 3px; }
+.b70-benefits-sources small { display: block; margin: 4px 0; color: #67715f; font-size: 11px; }
+.b70-benefits-sources blockquote { margin: 8px 0; padding: 0 0 0 10px; border-left: 2px solid #c2cbb3; color: #4d5e45; }
+.b70-agri { background: #f3f5e9; }
+.b70-agri-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.b70-agri-card { min-width: 0; overflow: hidden; border: 1px solid #d4ddc4; border-radius: 17px; background: #fffdf6; }
+.b70-agri-card-classic { border-color: #dddbca; }
+.b70-agri-art { display: block; width: 100%; height: auto; }
+.b70-agri-sky { fill: #e7efdd; }
+.b70-agri-sun { fill: #f0d180; }
+.b70-agri-hill { fill: #d4e0bd; }
+.b70-agri-field { fill: #bfce9f; }
+.b70-agri-art-classic .b70-agri-sky { fill: #edeedc; }
+.b70-agri-art-classic .b70-agri-field { fill: #d0d4ae; }
+.b70-agri-structure { fill: none; stroke: #727d66; stroke-width: 3; stroke-linecap: round; }
+.b70-agri-panel { fill: #4a7068; stroke: #d1e0cd; stroke-width: 1.3; stroke-linejoin: round; }
+.b70-agri-crop { fill: #7c9d4d; stroke: #5c7b39; stroke-width: 1.5; stroke-linejoin: round; }
+.b70-agri-furrow { fill: none; stroke: #a0b17d; stroke-width: 2; }
+.b70-agri-grass { fill: none; stroke: #839762; stroke-width: 2; stroke-linecap: round; }
+.b70-agri-sheep { fill: #fffbeb; stroke: #6e7961; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.b70-agri-tractor { fill: #bd9450; stroke: #5e6549; stroke-width: 1.8; stroke-linejoin: round; }
+.b70-agri-tractor circle { fill: #53634b; }
+.b70-agri-tractor path:nth-child(2) { fill: #e0ead2; }
+.b70-agri-card-body { padding: 15px; }
+.b70-agri .b70-agri-label { margin: 0 0 5px; color: #6b704c; font-size: 10px; font-weight: 750; letter-spacing: .02em; }
+.b70-agri-card h3 { margin-bottom: 10px; font-size: 18px; }
+.b70-agri-card .b70-benefits-limit { margin-bottom: 7px; }
+.b70-agri-proof { display: flex; align-items: flex-start; gap: 13px; margin-top: 16px; padding: 16px; border: 1px solid #d5d9bd; border-radius: 13px; background: #e9edda; }
+.b70-agri-proof-mark { flex-shrink: 0; color: #718044; font-family: Georgia, serif; font-size: 43px; line-height: 1; }
+.b70-agri-proof h3 { font-size: 15px; }
+.b70-agri-proof p { margin: 7px 0 4px; max-width: 88ch; color: #536246; font-size: 12px; }
+.b70-agri-case-boundaries { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+.b70-agri-case-boundaries > p { min-width: 0; padding: 12px 14px; border: 1px dashed #c8cdb8; border-radius: 12px; font-size: 12px; }
+.b70-agri-case-boundaries strong { display: block; margin-bottom: 4px; color: #354d36; font-size: 13px; }
+.b70-agri-case-boundaries span:not(.b70-benefits-citations) { color: #5d684f; }
+.b70-agri .b70-agri-art-note { margin-top: 12px; color: #68715d; font-size: 10px; }
+@media (max-width: 760px) {
+  .b70-agri-grid { grid-template-columns: 1fr; }
+  .b70-agri-card { display: grid; grid-template-columns: minmax(140px, .9fr) 1.5fr; align-items: stretch; }
+  .b70-agri-art { height: 100%; min-height: 150px; object-fit: cover; }
+  .b70-agri-card-body { padding: 14px; }
+  .b70-agri-card h3 { font-size: 17px; }
+}
+@media (max-width: 480px) {
+  .b70-benefits { padding: 15px; border-radius: 17px; }
+  .b70-benefits-header { gap: 10px; }
+  .b70-benefits h2 { font-size: 27px; }
+  .b70-benefits .b70-benefits-scope { max-width: none; font-size: 10px; }
+  .b70-benefits .b70-benefits-intro { margin-bottom: 14px; font-size: 12px; }
+  .b70-benefits-grid { gap: 10px; }
+  .b70-benefits-card { padding: 14px; }
+  .b70-benefits-card-heading { margin-bottom: 9px; }
+  .b70-benefits .b70-benefits-limit { margin-bottom: 10px; }
+  .b70-agri-card { display: block; }
+  .b70-agri-art { width: 100%; height: 150px; min-height: 0; object-fit: cover; }
+  .b70-agri-card-body { padding: 14px; }
+  .b70-agri-proof { gap: 10px; padding: 13px; }
+  .b70-agri-case-boundaries { grid-template-columns: 1fr; gap: 8px; }
+}

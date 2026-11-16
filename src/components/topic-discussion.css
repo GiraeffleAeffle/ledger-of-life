@@ -18,19 +18,14 @@
 .b70-discussion summary{cursor:pointer;min-height:44px;align-content:center;line-height:1.4;padding:8px 0;box-sizing:border-box}
 .b70-chart-guide>summary{text-align:center}
 .b70-thread-preview{background:#fffdf7;border:1px solid #dedbce;border-radius:14px;padding:12px 14px}
-.b70-thread-preview-meta,.b70-thread-preview-actions{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px}
+.b70-thread-preview-meta{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px}
 .b70-thread-preview-meta>span{color:#716039}
-.b70-thread-preview h3{font-size:17px;line-height:1.3;margin:5px 0}
-.b70-thread-preview>p{margin:6px 0 8px}
 .b70-thread-preview button{min-height:44px;border:0;background:none;font:inherit;color:#365943;cursor:pointer;padding:5px 0;text-align:right}
 .b70-thread-preview button:disabled{opacity:.45;cursor:default}
-.b70-thread-preview-actions>button{font-weight:750}
-.b70-tree-browser{margin-top:8px}
-.b70-tree-browser>summary{font-weight:700}
 .b70-tree{min-width:0;scroll-margin-top:20px}
 .b70-tree>h3{font-size:14px;margin:8px 0;scroll-margin-top:20px}
 .b70-tree-arguments,.b70-tree-replies{list-style:none;padding:0;margin:0}
-.b70-tree-item{margin:8px 0}
+.b70-tree-item{margin:8px 0;scroll-margin-top:90px}
 .b70-tree-item article{padding:10px 12px;border:1px solid #e3dfd1;border-inline-start-width:4px;background:#fffdf7;border-radius:12px;overflow-wrap:anywhere}
 .b70-tree-selected>article{outline:2px solid #293c32;outline-offset:1px}
 .b70-tree-stance{display:block;font-size:10px;font-weight:750;color:#686657;text-transform:uppercase}
@@ -41,17 +36,19 @@
 .b70-argument-details>summary{font-size:11px;color:#5c6255}
 .b70-tree-voice{font-size:12px;color:#686657}
 .b70-tree-voice span{display:block;color:#936042}
-.b70-thread-replies>summary{font-size:12px;color:#365943;font-weight:700;margin-left:5px}
-.b70-tree-replies{margin-left:8px;padding-left:10px;border-left:2px solid #d8d8c3}
+.b70-thread-reply-count{font-size:11px;color:#365943;font-weight:700;padding-left:8px}
+.b70-tree-parent{display:block;font-size:11px;line-height:1.4;color:#526b55;text-decoration:none;padding:3px 0 6px}
+.b70-tree-parent:hover{text-decoration:underline}
+.b70-tree-replies{margin-left:8px;padding-left:10px;border-left:2px solid #a9b89e}
 .b70-tree-unanswered,.b70-tree-context-note{font-size:11px;color:#6e6a5b}
 .b70-tree-sources{border-top:1px dashed #dedacb;margin-top:10px;padding-top:8px}
 .b70-tree-sources small{font-size:11px;color:#776b53}
 .b70-tree-sources ul{list-style:none;padding:0;margin:5px 0}
 .b70-tree-sources a{display:inline-block;font-size:12px;color:#38634b;text-underline-offset:3px;padding:8px 0;overflow-wrap:anywhere}
-.b70-discussion button:focus-visible,.b70-discussion a:focus-visible,.b70-discussion summary:focus-visible,.b70-tree>h3:focus-visible{outline:3px solid #ad7926;outline-offset:3px;border-radius:5px}
+.b70-discussion button:focus-visible,.b70-discussion a:focus-visible,.b70-discussion summary:focus-visible{outline:3px solid #ad7926;outline-offset:3px;border-radius:5px}
 @media(min-width:850px){.b70-discussion-grid{grid-template-columns:minmax(260px,.85fr) minmax(0,1.15fr);gap:26px}.b70-chart-panel{position:sticky;top:20px}.b70-chart{max-width:370px}.b70-tree-replies{margin-left:14px;padding-left:12px}}
-@media(max-width:480px){.b70-discussion{font-size:13px;border-radius:18px;padding:12px}.b70-discussion-header h2{font-size:23px}.b70-discussion-header>p:not(.b70-discussion-eyebrow){font-size:11px}.b70-chart{max-width:230px}.b70-discussion-grid{gap:8px;margin-top:4px}.b70-chart-caption{font-size:10px}.b70-chart-guide{font-size:11px}.b70-chart-guide>summary{min-height:36px}.b70-thread-preview{padding:8px 12px}.b70-thread-preview h3{font-size:16px}.b70-thread-preview-meta,.b70-thread-preview-actions{font-size:11px}.b70-tree-replies{margin-left:4px;padding-left:7px}}
+@media(max-width:480px){.b70-discussion{font-size:13px;border-radius:18px;padding:12px}.b70-discussion-header h2{font-size:23px}.b70-discussion-header>p:not(.b70-discussion-eyebrow){font-size:11px}.b70-chart{max-width:230px}.b70-discussion-grid{gap:8px;margin-top:4px}.b70-chart-caption{font-size:10px}.b70-chart-guide{font-size:11px}.b70-chart-guide>summary{min-height:36px}.b70-thread-preview{padding:8px 12px}.b70-thread-preview-meta{font-size:11px}.b70-tree-replies{margin-left:4px;padding-left:7px}}
 @media(prefers-reduced-motion:reduce){.b70-chart-segment{transition:none}}
-@media(max-width:650px){.topic-round3 .b70-discussion-header h2{font-size:23px}.b70-chart{max-width:190px}.b70-thread-preview button{min-height:32px}.b70-chart-guide>summary{min-height:28px;font-size:10px}.b70-tree-browser>summary{min-height:32px;font-size:11px}.b70-thread-preview>p{font-size:12px}.b70-thread-preview-meta,.b70-thread-preview-actions{font-size:10px}}
-.topic-round3 .b70-tree>h3{scroll-margin-top:80px}
-@media(min-width:850px){.topic-round3 .b70-chart-panel{top:80px}}
+@media(max-width:650px){.topic-round4 .b70-discussion-header h2{font-size:25px}.b70-chart{max-width:210px}.b70-chart-guide>summary{min-height:28px;font-size:10px}.b70-thread-preview-meta{font-size:11px}}
+.topic-round4 .b70-tree>h3{scroll-margin-top:80px}
+@media(min-width:850px){.topic-round4 .b70-chart-panel{top:80px}}

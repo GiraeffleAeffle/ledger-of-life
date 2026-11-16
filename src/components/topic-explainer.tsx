@@ -10,7 +10,6 @@ const decimal = new Intl.NumberFormat('de-DE', { maximumFractionDigits: 1 });
 
 export function TopicExplainer() {
   const id = useId();
-  const [mode, setMode] = useState<'film' | 'calculator'>('film');
   const [captionIndex, setCaptionIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [systemReducedMotion, setSystemReducedMotion] = useState(false);
@@ -40,9 +39,9 @@ export function TopicExplainer() {
   }, [playing, reducedMotion, captionIndex, lastCaption]);
 
   return <section className="b70-explainer" aria-labelledby={`${id}-heading`}>
-    <header><p className="b70-explainer-eyebrow">Solar in 18 Sekunden</p><h2 id={`${id}-heading`}>Was könnte das bringen?</h2></header>
-    <div className="b70-explainer-modes" role="group" aria-label="Erklärstück oder Beispielrechnung"><button type="button" aria-pressed={mode === 'film'} onClick={() => { setMode('film'); setPlaying(false); }}>Kurzfilm</button><button type="button" aria-pressed={mode === 'calculator'} onClick={() => { setMode('calculator'); setPlaying(false); }}>Selbst rechnen</button></div>
-    <div hidden={mode !== 'film'} className={`b70-explainer-film${playing && !reducedMotion ? ' is-playing' : ''}${reducedMotion ? ' is-reduced' : ''}`}>
+    <header><p className="b70-explainer-eyebrow">Verstehen & ausprobieren</p><h2 id={`${id}-heading`}>Wie viel Strom – und welcher Dorfnutzen?</h2></header>
+    <div className="b70-explainer-grid">
+    <div className={`b70-explainer-film${playing && !reducedMotion ? ' is-playing' : ''}${reducedMotion ? ' is-reduced' : ''}`}>
       <div className={`b70-explainer-scene scene-${caption.scene}`} aria-hidden="true">
         <svg viewBox="0 0 320 115" focusable="false">
           <g className="b70-explainer-sun"><circle cx="53" cy="28" r="16" /><path d="M53 3v-3m0 56v-5M28 28h-6m62 0h-6M35 10l-4-4m44 44-4-4M35 46l-4 4m44-44-4 4" /></g>
@@ -60,7 +59,7 @@ export function TopicExplainer() {
       </div>
       <label className="b70-explainer-check"><input type="checkbox" checked={reducedMotion} disabled={systemReducedMotion} onChange={(event) => { setQuietMotion(event.target.checked); setPlaying(false); }} />Ohne Animation{systemReducedMotion ? ' · Systemeinstellung' : ''}</label>
     </div>
-    <div hidden={mode !== 'calculator'} className="b70-explainer-calculator">
+    <div className="b70-explainer-calculator">
       <p className="b70-explainer-scenario">Beispielrechnung, keine B70-Prognose</p>
       <label className="b70-explainer-range-label" htmlFor={`${id}-capacity`}>Angenommene Leistung <strong>{capacity} MWp</strong></label>
       <input id={`${id}-capacity`} type="range" min={SOLAR_REFERENCE.minimumMwp} max={SOLAR_REFERENCE.maximumMwp} step="1" value={capacity} aria-describedby={`${id}-unknown`} aria-valuetext={`${capacity} Megawattpeak, angenommene Leistung`} onChange={(event) => setCapacity(Number(event.target.value))} />
@@ -78,6 +77,8 @@ export function TopicExplainer() {
         <p>Offizielle Quellen abgerufen am 16. November 2026; Modellreferenz fest gespeichert, keine Live-Ertragsdaten.</p>
       </details>
     </div>
-    <details hidden={mode !== 'film'} className="b70-explainer-details"><summary>Alle vier Sätze lesen</summary><ol>{EXPLAINER_CAPTIONS.map((entry) => <li key={entry.scene}><strong>{entry.title}</strong> {entry.text}</li>)}</ol></details>
+    </div>
+    <p className="b70-explainer-price-note">Ein günstiger Ortstarif braucht ein eigenes Lieferangebot; eine Genossenschaft ermöglicht wirtschaftliche Beteiligung, garantiert aber keinen billigeren Tarif. Beides ist für B70 nicht belegt.</p>
+    <ol className="b70-explainer-steps" aria-label="Vier Zusammenhänge auf einen Blick">{EXPLAINER_CAPTIONS.map((entry, index) => <li key={entry.scene} className={captionIndex === index ? 'current' : ''}><span>0{index + 1}</span><strong>{entry.title}</strong><p>{entry.text}</p></li>)}</ol>
   </section>;
 }

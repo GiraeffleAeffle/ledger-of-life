@@ -29,6 +29,12 @@ test('18 invented voices form one mixed-stance reply tree without categorical wr
   assert.equal(challenge.argument.parentId, 'future-power');
   assert.equal(challenge.argument.side, 'concern');
   assert.equal(challenge.children.find((node) => node.argument.id === 'future-family')!.argument.side, 'support');
+  const farmer = nodes.find((node) => node.argument.id === 'soil-farmer')!;
+  const agriPv = farmer.children.find((node) => node.argument.id === 'alternatives-farm')!;
+  assert.equal(agriPv.argument.side, 'support');
+  assert.equal(agriPv.children[0]!.argument.id, 'soil-return');
+  assert.equal(agriPv.children[0]!.argument.side, 'concern');
+  assert.equal(nodes.find((node) => node.argument.id === 'alternatives-roofs')!.replyCount, 0);
 });
 
 test('each actual reply occupies its next ring inside its parent with additive subtree widths', () => {
@@ -91,6 +97,10 @@ test('selecting a challenge retains mixed-stance ancestors and replies but exclu
   assert.deepEqual(focusedArguments('future-family').map((argument) => argument.id), ['future-power', 'conditions-budget', 'future-family']);
   assert.deepEqual(focusedArguments('village-renter').map((argument) => argument.id), ['village-coop', 'village-renter', 'village-club']);
   assert.deepEqual(focusedArguments('soil-nature').map((argument) => argument.id), ['soil-farmer', 'soil-nature']);
+  assert.deepEqual(focusedArguments('alternatives-farm').map((argument) => argument.id), ['alternatives-farm', 'soil-return', 'soil-farmer']);
+  assert.deepEqual(focusedArguments('soil-return').map((argument) => argument.id), ['alternatives-farm', 'soil-return', 'soil-farmer']);
+  assert.deepEqual(focusedArguments('soil-farmer').map((argument) => argument.id), ['alternatives-farm', 'soil-return', 'soil-farmer', 'soil-nature']);
+  assert.equal(focusedArguments(null).length, 18);
   assert.deepEqual(focusedArguments(null), TOPIC_ARGUMENTS);
   assert.deepEqual(focusedArguments('missing'), TOPIC_ARGUMENTS);
   for (const id of ['conditions-mayor', 'village-coop', 'alternatives-roofs', 'alternatives-farm', 'soil-farmer', 'everyday-trust']) assert.ok(TOPIC_ARGUMENTS.some((argument) => argument.id === id));
@@ -106,6 +116,9 @@ test('keyboard moves around a ring, follows ancestry, selects with Enter and res
   assert.deepEqual(discussionKeyAction(first, 'ArrowDown', segments), { type: 'move', index: challenge });
   assert.deepEqual(discussionKeyAction(challenge, 'ArrowUp', segments), { type: 'move', index: first });
   assert.deepEqual(discussionKeyAction(challenge, 'ArrowDown', segments), { type: 'move', index: answer });
+  assert.deepEqual(discussionKeyAction(indexOf('alternatives-farm'), 'ArrowUp', segments), { type: 'move', index: indexOf('soil-farmer') });
+  assert.deepEqual(discussionKeyAction(indexOf('alternatives-farm'), 'ArrowDown', segments), { type: 'move', index: indexOf('soil-return') });
+  assert.deepEqual(discussionKeyAction(indexOf('soil-return'), 'ArrowUp', segments), { type: 'move', index: indexOf('alternatives-farm') });
   assert.deepEqual(discussionKeyAction(first, 'ArrowUp', segments), { type: 'move', index: first });
   assert.deepEqual(discussionKeyAction(answer, 'ArrowDown', segments), { type: 'move', index: answer });
   assert.deepEqual(discussionKeyAction(first, 'ArrowLeft', segments), { type: 'move', index: lastRoot });
@@ -118,4 +131,20 @@ test('keyboard moves around a ring, follows ancestry, selects with Enter and res
   assert.deepEqual(discussionKeyAction(challenge, 'End', segments), { type: 'move', index: segments.length - 1 });
   assert.equal(discussionKeyAction(challenge, 'Tab', segments), null);
   assert.equal(discussionKeyAction(0, 'ArrowRight', []), null);
+});
+
+test('focusing the Agri-PV counterargument retains the farmer and its counter-reply', () => {
+  const selected = focusedArguments('alternatives-farm');
+  assert.deepEqual(new Set(selected.map((argument) => argument.id)), new Set(['soil-farmer', 'alternatives-farm', 'soil-return']));
+  const segments = discussionLayout();
+  const farmer = segments.find((segment) => segment.id === 'soil-farmer')!;
+  const reply = segments.find((segment) => segment.id === 'alternatives-farm')!;
+  const counterReply = segments.find((segment) => segment.id === 'soil-return')!;
+  assert.equal(reply.depth, farmer.depth + 1);
+  assert.equal(counterReply.depth, reply.depth + 1);
+  assert.equal(reply.parentId, farmer.id);
+  assert.equal(counterReply.parentId, reply.id);
+  assert.notEqual(reply.side, farmer.side);
+  assert.notEqual(counterReply.side, reply.side);
+  assert.equal(focusedArguments(null).length, TOPIC_ARGUMENTS.length);
 });
