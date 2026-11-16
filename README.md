@@ -290,6 +290,8 @@ npm run build
 
 These checks do not authorize financial actions. `npm run reconcile` is a separate operator action that may advance configured test-network state; do not run it as a smoke check.
 
+The Home Node cancellation regression waits for the loopback model's chat request before triggering its controlled deadline signal. Discovery and local startup can take longer than 150 ms under load; they must not decide which cancellation stage is tested. The checks still require the inference connection to close, a bounded failure on expiry, and no result submission on shutdown. Production deadline budgets are unchanged.
+
 For a local preview use `DATABASE_URL= WATCHPACK_POLLING=true npm run dev` on port 4175 from a shell with working outbound DNS. Without a configured Privy verification key, the server must retrieve Privy's public JWKS over HTTPS to authenticate actual passkey sessions. A process supervisor that replaces working DNS with an isolated resolver can leave the page reachable while its authenticated APIs report provider unavailability; fix the launch environment rather than resetting accounts or weakening token checks.
 
 ## Whole-city data for the map

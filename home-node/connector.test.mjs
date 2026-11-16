@@ -380,7 +380,11 @@ test('a stalled wake is aborted at the job deadline before any prompt reaches Ol
   assert.deepEqual(results[0], { jobId: 'job-fixture', error: 'Connector could not produce a complete bounded answer' });
 });
 
-test('job expiry aborts local inference and shutdown cancels it without submitting a result', async (t) => {
+test('job expiry aborts local inference and shutdown cancels it without submitting a result', { timeout: 5000 }, async (t) => {
+  const deadline = new AbortController();
+  const nativeTimeout = AbortSignal.timeout;
+  let controlledDeadline = true;
+  t.mock.method(AbortSignal, 'timeout', (ms) => controlledDeadline ? deadline.signal : nativeTimeout(ms));
   let disconnected;
   let started;
   const start = new Promise((resolve) => { started = resolve; });
@@ -391,10 +395,14 @@ test('job expiry aborts local inference and shutdown cancels it without submitti
     response.on('close', disconnected);
     started();
   } });
-  await connector.execute(job({ expiresAt: new Date(Date.now() + 150).toISOString() }));
+  const expiryExecution = connector.execute(job());
+  await start;
+  // Expire only after chat has really started; discovery may exceed 150 ms under load.
+  controlledDeadline = false;
+  deadline.abort(new DOMException('Fixture job deadline elapsed', 'TimeoutError'));
+  await expiryExecution;
   await closed;
   assert.deepEqual(results[0], { jobId: 'job-fixture', error: 'Connector could not produce a complete bounded answer' });
-  await start;
   const controller = new AbortController();
   let chatStarted;
   const chat = new Promise((resolve) => { chatStarted = resolve; });
